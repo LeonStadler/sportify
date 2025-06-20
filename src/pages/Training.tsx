@@ -6,29 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useCallback, useEffect, useState } from "react";
-
-interface WorkoutActivity {
-  id: string;
-  activityType: string;
-  amount: number;
-  unit: string;
-  notes?: string;
-  sets?: Array<{
-    reps: number;
-    weight?: number;
-  }>;
-}
-
-interface Workout {
-  id: string;
-  title: string;
-  description?: string;
-  workoutDate: string;
-  duration?: number;
-  createdAt: string;
-  updatedAt: string;
-  activities: WorkoutActivity[];
-}
+import { API_URL } from '@/lib/api';
+import type { Workout, WorkoutActivity } from '@/types/workout';
 
 interface WorkoutResponse {
   workouts: Workout[];
@@ -53,6 +32,7 @@ export function Training() {
     hasNext: false,
     hasPrev: false,
   });
+  const [editingWorkout, setEditingWorkout] = useState<Workout | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -80,7 +60,7 @@ export function Training() {
 
       console.log('Loading workouts with params:', params.toString());
 
-      const response = await fetch(`http://localhost:3001/api/workouts?${params}`, {
+      const response = await fetch(`${API_URL}/workouts?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -132,7 +112,7 @@ export function Training() {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/workouts/${workoutId}`, {
+      const response = await fetch(`${API_URL}/workouts/${workoutId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -158,6 +138,17 @@ export function Training() {
       });
     }
   };
+
+  const handleEditClick = (workout: Workout) => {
+    setEditingWorkout(workout);
+  };
+
+  const handleWorkoutUpdated = () => {
+    setEditingWorkout(null);
+    loadWorkouts(currentPage, filterType);
+  };
+
+  const handleCancelEdit = () => setEditingWorkout(null);
 
   // Prüfe ob Workout bearbeitbar ist (jünger als 7 Tage)
   const isWorkoutEditable = (workoutDate: string, createdAt: string) => {
@@ -278,7 +269,12 @@ export function Training() {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6 px-4 md:px-0">
-        <WorkoutForm onWorkoutCreated={handleWorkoutCreated} />
+        <WorkoutForm
+          workout={editingWorkout ?? undefined}
+          onWorkoutCreated={handleWorkoutCreated}
+          onWorkoutUpdated={handleWorkoutUpdated}
+          onCancelEdit={handleCancelEdit}
+        />
 
         <Card>
           <CardHeader className="pb-4">
@@ -366,7 +362,7 @@ export function Training() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => {/* TODO: Edit-Funktionalität implementieren */}}
+                              onClick={() => handleEditClick(workout)}
                               className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 flex-shrink-0"
                             >
                               <span className="hidden sm:inline">Bearbeiten</span>

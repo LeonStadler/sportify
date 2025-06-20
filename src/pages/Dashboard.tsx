@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { BarChart, Dumbbell, TrendingUp, Trophy } from "lucide-react";
 import { useEffect, useState } from 'react';
+import { API_URL } from '@/lib/api';
 
 interface DashboardStats {
   totalPoints: number;
@@ -39,7 +40,6 @@ interface RecentWorkout {
   }>;
 }
 
-const API_URL = 'http://localhost:3001/api';
 
 export function Dashboard() {
   const { user } = useAuth();

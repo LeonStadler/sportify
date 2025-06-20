@@ -2,6 +2,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCallback, useEffect, useState } from "react";
+import { API_URL } from '@/lib/api';
 
 interface LeaderboardUser {
   id: string;
@@ -48,7 +49,7 @@ export function ScoreboardTable({ activity, period }: ScoreboardTableProps) {
     setIsLoading(true);
     try {
       const token = localStorage.getItem("token");
-      let url = `http://localhost:3001/api/scoreboard/`;
+      let url = `${API_URL}/scoreboard/`;
       if (activity === 'all') {
           url += `overall?period=${period}`;
       } else {

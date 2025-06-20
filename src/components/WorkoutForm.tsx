@@ -8,12 +8,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
+import { API_URL } from '@/lib/api';
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { CalendarIcon, Clock, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import type { Workout } from '@/types/workout';
 
 interface WorkoutSet {
   reps: number;
@@ -30,7 +32,10 @@ interface WorkoutActivity {
 }
 
 interface WorkoutFormProps {
+  workout?: Workout;
   onWorkoutCreated?: () => void;
+  onWorkoutUpdated?: () => void;
+  onCancelEdit?: () => void;
 }
 
 // Aktivitätstypen mit fixen Einheiten und verschiedenen Größenordnungen
@@ -95,7 +100,7 @@ const exerciseTypes = [
   }
 ];
 
-export function WorkoutForm({ onWorkoutCreated }: WorkoutFormProps) {
+export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCancelEdit }: WorkoutFormProps) {
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -128,12 +133,29 @@ export function WorkoutForm({ onWorkoutCreated }: WorkoutFormProps) {
   }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Titel automatisch auf Default setzen wenn leer
+  // Initialwerte setzen oder aktualisieren wenn ein Workout editiert wird
   useEffect(() => {
-    if (!title) {
+    if (workout) {
+      setTitle(workout.title);
+      setDescription(workout.description || "");
+      const date = new Date(workout.workoutDate);
+      setWorkoutDate(date);
+      setWorkoutTime(format(date, "HH:mm"));
+      setDuration(workout.duration ? String(workout.duration) : "");
+      setActivities(
+        workout.activities.map((a) => ({
+          activityType: a.activityType,
+          totalAmount: a.amount,
+          unit: a.unit,
+          useSetMode: !!a.sets,
+          sets: a.sets && a.sets.length > 0 ? a.sets.map((s) => ({ ...s })) : [{ reps: a.amount }],
+          notes: a.notes || "",
+        }))
+      );
+    } else if (!title) {
       setTitle(getDefaultTitle());
     }
-  }, [title]);
+  }, [workout, title]);
 
   const addActivity = () => {
     setActivities([...activities, {
@@ -285,8 +307,11 @@ export function WorkoutForm({ onWorkoutCreated }: WorkoutFormProps) {
         duration: duration ? parseInt(duration) : null,
       });
 
-      const response = await fetch('http://localhost:3001/api/workouts', {
-        method: 'POST',
+      const url = workout ? `${API_URL}/workouts/${workout.id}` : `${API_URL}/workouts`;
+      const method = workout ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
@@ -306,12 +331,12 @@ export function WorkoutForm({ onWorkoutCreated }: WorkoutFormProps) {
         throw new Error(errorData.error || 'Fehler beim Erstellen des Workouts');
       }
 
-      const newWorkout = await response.json();
-      console.log('Workout created successfully:', newWorkout);
+      const savedWorkout = await response.json();
+      console.log('Workout saved successfully:', savedWorkout);
 
-    toast({
-        title: "Workout erstellt! 🎉",
-        description: `${newWorkout.title} wurde erfolgreich gespeichert.`,
+      toast({
+        title: workout ? 'Workout aktualisiert! 🎉' : 'Workout erstellt! 🎉',
+        description: `${savedWorkout.title} wurde erfolgreich gespeichert.`,
       });
 
       // Form zurücksetzen
@@ -320,25 +345,28 @@ export function WorkoutForm({ onWorkoutCreated }: WorkoutFormProps) {
       setWorkoutDate(new Date());
       setWorkoutTime(format(new Date(), "HH:mm"));
       setDuration("");
-      setActivities([{
-        activityType: "",
-        totalAmount: 0,
-        unit: "Wiederholungen",
-        useSetMode: false,
-        sets: [{ reps: 0 }],
-        notes: ""
-      }]);
-      
-      // Parent-Komponente benachrichtigen
-      if (onWorkoutCreated) {
-        onWorkoutCreated();
+      setActivities([
+        {
+          activityType: "",
+          totalAmount: 0,
+          unit: "Wiederholungen",
+          useSetMode: false,
+          sets: [{ reps: 0 }],
+          notes: "",
+        },
+      ]);
+
+      if (workout) {
+        onWorkoutUpdated?.();
+      } else {
+        onWorkoutCreated?.();
       }
 
     } catch (error) {
-      console.error('Create workout error:', error);
+      console.error('Save workout error:', error);
       toast({
         title: "Fehler",
-        description: error instanceof Error ? error.message : "Fehler beim Erstellen des Workouts.",
+        description: error instanceof Error ? error.message : "Fehler beim Speichern des Workouts.",
         variant: "destructive",
       });
     } finally {
@@ -349,7 +377,9 @@ export function WorkoutForm({ onWorkoutCreated }: WorkoutFormProps) {
   return (
     <Card>
       <CardHeader className="pb-4">
-        <CardTitle className="text-lg md:text-xl">Neues Workout eintragen</CardTitle>
+        <CardTitle className="text-lg md:text-xl">
+          {workout ? 'Workout bearbeiten' : 'Neues Workout eintragen'}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -601,13 +631,23 @@ export function WorkoutForm({ onWorkoutCreated }: WorkoutFormProps) {
             </Button>
           </div>
 
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             className="w-full bg-orange-500 hover:bg-orange-600 text-sm md:text-base"
             disabled={isSubmitting}
           >
             {isSubmitting ? "Speichere..." : "Workout speichern"}
           </Button>
+          {workout && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onCancelEdit}
+              className="w-full mt-2 text-sm"
+            >
+              Abbrechen
+            </Button>
+          )}
         </form>
       </CardContent>
     </Card>

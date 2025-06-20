@@ -5,6 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from 'react';
+import { API_URL } from '@/lib/api';
 
 interface ActivityFeedItem {
   id: string;
@@ -19,7 +20,6 @@ interface ActivityFeedItem {
   createdAt: string;
 }
 
-const API_URL = 'http://localhost:3001/api';
 
 const getInitials = (displayName: string) => {
   const names = displayName.split(' ');

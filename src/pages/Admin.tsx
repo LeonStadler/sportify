@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Globe, Monitor, Moon, Palette, Settings, Shield, Sun, UserPlus, Users } from "lucide-react";
 import { useTheme } from 'next-themes';
 import React, { useEffect, useState } from 'react';
+import { API_URL } from '@/lib/api';
 
 interface AdminUser {
   id: string;
@@ -38,7 +39,6 @@ interface Invitation {
   invitedByLastName?: string;
 }
 
-const API_URL = 'http://localhost:3001/api';
 
 export function Admin() {
   const { user, inviteUser } = useAuth();

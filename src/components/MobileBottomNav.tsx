@@ -31,27 +31,27 @@ export function MobileBottomNav() {
   // Mock admin check
   const isAdmin = user?.email === 'admin@sportify.com';
 
-  const navItems = [
-    {
+const navItems = [
+  {
       title: t('navigation.dashboard'),
-      url: "/",
-      icon: Home,
-    },
-    {
+    url: "/",
+    icon: Home,
+  },
+  {
       title: t('navigation.scoreboard'),
-      url: "/scoreboard",
-      icon: Trophy,
-    },
-    {
+    url: "/scoreboard",
+    icon: Trophy,
+  },
+  {
       title: t('navigation.training'),
-      url: "/training",
-      icon: Dumbbell,
-    },
-    {
+    url: "/training",
+    icon: Dumbbell,
+  },
+  {
       title: t('navigation.stats'),
-      url: "/stats",
-      icon: BarChart,
-    },
+    url: "/stats",
+    icon: BarChart,
+  },
   ];
 
   const adminItems = [

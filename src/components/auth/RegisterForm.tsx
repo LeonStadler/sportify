@@ -3,7 +3,7 @@ import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -15,19 +15,17 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { RegisterData, useAuth } from '@/contexts/AuthContext';
 
 const registerSchema = z.object({
-  email: z.string().email('Ungültige E-Mail-Adresse'),
-  password: z.string()
-    .min(8, 'Passwort muss mindestens 8 Zeichen lang sein')
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Passwort muss Groß- und Kleinbuchstaben sowie eine Zahl enthalten'),
-  confirmPassword: z.string(),
   firstName: z.string().min(2, 'Vorname muss mindestens 2 Zeichen lang sein'),
   lastName: z.string().min(2, 'Nachname muss mindestens 2 Zeichen lang sein'),
   nickname: z.string().optional(),
   displayPreference: z.enum(['nickname', 'firstName', 'fullName']),
-  terms: z.boolean().refine(val => val === true, 'Du musst den Nutzungsbedingungen zustimmen')
-}).refine(data => data.password === data.confirmPassword, {
-  message: "Passwörter stimmen nicht überein",
-  path: ["confirmPassword"],
+  email: z.string().email('Ungültige E-Mail-Adresse'),
+  password: z.string().min(8, 'Passwort muss mindestens 8 Zeichen lang sein'),
+  confirmPassword: z.string(),
+  terms: z.boolean().refine(val => val === true, 'Sie müssen den Nutzungsbedingungen zustimmen')
+}).refine((data) => data.password === data.confirmPassword, {
+  message: 'Passwörter stimmen nicht überein',
+  path: ['confirmPassword'],
 });
 
 type RegisterFormData = z.infer<typeof registerSchema>;
@@ -37,11 +35,12 @@ interface RegisterFormProps {
   redirectTo?: string;
 }
 
-export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, redirectTo }) => {
+export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
   const { t } = useTranslation();
   const { register: registerUser, isLoading, error, clearError } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const navigate = useNavigate();
 
   const {
     register,
@@ -52,19 +51,21 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, redirectT
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
-      email: '',
-      password: '',
-      confirmPassword: '',
       firstName: '',
       lastName: '',
       nickname: '',
       displayPreference: 'firstName',
+      email: '',
+      password: '',
+      confirmPassword: '',
       terms: false
     }
   });
 
-  const watchedFields = watch(['firstName', 'lastName', 'nickname', 'displayPreference']);
-  const [firstName, lastName, nickname, displayPreference] = watchedFields;
+  const displayPreference = watch('displayPreference');
+  const firstName = watch('firstName');
+  const lastName = watch('lastName');
+  const nickname = watch('nickname');
 
   const getDisplayPreview = () => {
     switch (displayPreference) {
@@ -92,14 +93,13 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, redirectT
         displayPreference: data.displayPreference
       };
 
-      await registerUser(registerData);
+      const result = await registerUser(registerData);
       
       if (onSuccess) {
         onSuccess();
-      }
-      
-      if (redirectTo) {
-        window.location.href = redirectTo;
+      } else if (result.needsVerification) {
+        // Umleitung zur E-Mail-Verifizierung
+        navigate(`/auth/email-verification?email=${encodeURIComponent(result.email)}`);
       }
     } catch (err) {
       // Error is handled by auth context

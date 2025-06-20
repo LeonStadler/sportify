@@ -48,15 +48,6 @@ export default function Login() {
           </div>
 
           <LoginForm />
-
-          <div className="mt-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              Neu bei Sportify?{' '}
-              <Link to="/auth/register" className="text-primary hover:underline font-medium">
-                Jetzt kostenloses Konto erstellen
-              </Link>
-            </p>
-          </div>
         </div>
       </div>
 

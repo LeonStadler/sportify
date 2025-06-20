@@ -1,124 +1,166 @@
-
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCallback, useEffect, useState } from "react";
 
-interface User {
-  id: number;
-  name: string;
-  avatar: string;
-  totalScore: number;
-  pullUps: number;
-  pushUps: number;
-  running: number; // km
-  cycling: number; // km
+interface LeaderboardUser {
+  id: string;
+  rank: number;
+  displayName: string;
+  avatarUrl: string | null;
+  totalPoints: number;
+  totalPullups?: number;
+  totalPushups?: number;
+  totalRunning?: number;
+  totalCycling?: number;
+  totalAmount?: number;
+  unit?: string;
+  isCurrentUser: boolean;
 }
 
-const mockUsers: User[] = [
-  {
-    id: 1,
-    name: "Max Mustermann",
-    avatar: "MM",
-    totalScore: 2450,
-    pullUps: 120,
-    pushUps: 500,
-    running: 25.5,
-    cycling: 150.2
-  },
-  {
-    id: 2,
-    name: "Anna Schmidt",
-    avatar: "AS",
-    totalScore: 2380,
-    pullUps: 95,
-    pushUps: 480,
-    running: 32.1,
-    cycling: 125.8
-  },
-  {
-    id: 3,
-    name: "Tom Wagner",
-    avatar: "TW",
-    totalScore: 2210,
-    pullUps: 105,
-    pushUps: 420,
-    running: 28.3,
-    cycling: 95.5
-  },
-  {
-    id: 4,
-    name: "Lisa Müller",
-    avatar: "LM",
-    totalScore: 2150,
-    pullUps: 85,
-    pushUps: 390,
-    running: 35.2,
-    cycling: 110.3
-  },
-  {
-    id: 5,
-    name: "Du",
-    avatar: "DU",
-    totalScore: 1980,
-    pullUps: 78,
-    pushUps: 350,
-    running: 22.1,
-    cycling: 88.7
-  }
-];
+interface ScoreboardTableProps {
+  activity: string;
+  period: string;
+}
 
-export function ScoreboardTable() {
+const getUnitForActivity = (activity: string) => {
+    switch (activity) {
+      case "pullups":
+      case "pushups":
+      case "situps":
+        return "Wdh.";
+      case "running":
+      case "cycling":
+        return "km";
+      case "other":
+        return "Einheiten";
+      default:
+        return "Punkte";
+    }
+}
+
+export function ScoreboardTable({ activity, period }: ScoreboardTableProps) {
+  const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuth();
+
+  const fetchLeaderboard = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      let url = `http://localhost:3001/api/scoreboard/`;
+      if (activity === 'all') {
+          url += `overall?period=${period}`;
+      } else {
+          url += `activity/${activity}?period=${period}`;
+      }
+
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Fehler beim Laden des Scoreboards");
+      }
+      
+      const data = await response.json();
+      setLeaderboard(data.leaderboard);
+
+    } catch (error) {
+      console.error("Scoreboard fetch error:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activity, period]);
+
+  useEffect(() => {
+    fetchLeaderboard();
+  }, [fetchLeaderboard]);
+  
+  const getAvatarFallback = (name: string) => {
+    if (!name) return '??';
+    const parts = name.split(' ');
+    if (parts.length > 1) {
+      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
+  
+  const getRankColor = (rank: number) => {
+      if (rank === 1) return "text-yellow-500";
+      if (rank === 2) return "text-gray-400";
+      if (rank === 3) return "text-orange-600";
+      return "text-gray-600";
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="animate-pulse flex items-center p-4 h-24 bg-gray-200 rounded-lg"></div>
+        ))}
+      </div>
+    );
+  }
+
+  if (leaderboard.length === 0) {
+      return (
+          <div className="text-center py-12">
+              <p className="text-gray-500">Keine Daten für diese Rangliste vorhanden.</p>
+              <p className="text-sm text-gray-400 mt-1">Nimm an Workouts teil, um in der Rangliste zu erscheinen.</p>
+          </div>
+      )
+  }
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          🏆 Aktuelle Rangliste
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
         <div className="space-y-4">
-          {mockUsers.map((user, index) => (
+      {leaderboard.map((player) => (
             <div 
-              key={user.id} 
+          key={player.id} 
               className={`
                 flex items-center justify-between p-4 rounded-lg border transition-all duration-200 hover:shadow-md
-                ${user.name === "Du" ? "bg-orange-50 border-orange-200" : "bg-white border-gray-200"}
+            ${player.isCurrentUser ? "bg-orange-50 border-orange-200" : "bg-white border-gray-200"}
               `}
             >
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-3">
-                  <span className={`
-                    text-lg font-bold w-8 text-center
-                    ${index === 0 ? "text-yellow-500" : index === 1 ? "text-gray-400" : index === 2 ? "text-orange-600" : "text-gray-600"}
-                  `}>
-                    {index + 1}
+              <span className={`text-lg font-bold w-8 text-center ${getRankColor(player.rank)}`}>
+                {player.rank}
                   </span>
-                  <div className={`
-                    w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold
-                    ${user.name === "Du" ? "bg-orange-500" : "bg-slate-600"}
-                  `}>
-                    {user.avatar}
-                  </div>
+              <Avatar>
+                <AvatarImage src={player.avatarUrl || undefined} alt={player.displayName} />
+                <AvatarFallback className={`${player.isCurrentUser ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white'}`}>
+                    {getAvatarFallback(player.displayName)}
+                </AvatarFallback>
+              </Avatar>
                 </div>
                 <div>
-                  <p className="font-semibold text-gray-900">{user.name}</p>
-                  <div className="flex gap-2 mt-1">
+              <p className="font-semibold text-gray-900">{player.displayName}</p>
+              {activity === 'overall' && (
+                <div className="flex flex-wrap gap-2 mt-1">
+                  <Badge variant="outline" className="text-xs">
+                    Klimmzüge: {player.totalPullups || 0}
+                  </Badge>
                     <Badge variant="outline" className="text-xs">
-                      Klimmzüge: {user.pullUps}
+                    Liegestütze: {player.totalPushups || 0}
                     </Badge>
                     <Badge variant="outline" className="text-xs">
-                      Liegestütze: {user.pushUps}
+                    Laufen: {player.totalRunning || 0} km
                     </Badge>
                   </div>
+              )}
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-xl font-bold text-gray-900">{user.totalScore}</p>
-                <p className="text-sm text-gray-500">Punkte</p>
+            <p className="text-xl font-bold text-gray-900">
+                {activity === 'overall' ? player.totalPoints : player.totalAmount}
+            </p>
+            <p className="text-sm text-gray-500">{getUnitForActivity(activity)}</p>
               </div>
             </div>
           ))}
         </div>
-      </CardContent>
-    </Card>
   );
 }

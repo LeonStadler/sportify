@@ -1,11 +1,10 @@
-import { BarChart, Dumbbell, Globe, Home, LogOut, Monitor, Moon, Palette, Settings, Shield, Sun, Trophy, User, UserPlus, Users } from "lucide-react";
+import { BarChart, Dumbbell, Globe, Home, LogOut, Monitor, Moon, Palette, Settings, Shield, Sun, Trophy, User, Users } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -28,6 +27,7 @@ import {
     SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/contexts/AuthContext";
+import { Notifications } from './Notifications';
 
 export function AppSidebar() {
   const { t, i18n } = useTranslation();
@@ -36,49 +36,54 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const { user, logout, getDisplayName, isAuthenticated } = useAuth();
 
-  // Mock admin check - replace with actual logic
-  const isAdmin = user?.email === 'admin@sportify.com';
+  // Verwende isAdmin vom User-Objekt
+  const isAdmin = user?.isAdmin || false;
 
-  const menuItems = [
-    {
+const menuItems = [
+  {
       title: t('navigation.dashboard'),
-      url: "/",
-      icon: Home,
-    },
-    {
+    url: "/",
+    icon: Home,
+  },
+  {
       title: t('navigation.scoreboard'),
-      url: "/scoreboard",
-      icon: Trophy,
-    },
-    {
+    url: "/scoreboard",
+    icon: Trophy,
+  },
+  {
       title: t('navigation.training'),
-      url: "/training",
-      icon: Dumbbell,
-    },
-    {
+    url: "/training",
+    icon: Dumbbell,
+  },
+  {
       title: t('navigation.stats'),
-      url: "/stats",
-      icon: BarChart,
+    url: "/stats",
+    icon: BarChart,
+  },
+  {
+      title: "Freunde",
+      url: "/friends",
+      icon: Users,
     },
     {
       title: t('navigation.profile'),
-      url: "/profile",
-      icon: User,
-    },
-  ];
+    url: "/profile",
+    icon: User,
+  },
+];
 
-  const adminItems = [
-    {
+const adminItems = [
+  {
       title: t('navigation.admin'),
-      url: "/admin",
-      icon: Settings,
-    },
-    {
-      title: "User Management",
-      url: "/admin/users",
-      icon: Users,
-    },
-  ];
+    url: "/admin",
+      icon: Shield,
+  },
+  {
+    title: "User Management",
+    url: "/admin/users",
+    icon: Users,
+  },
+];
 
   const handleLogout = async () => {
     try {
@@ -104,6 +109,25 @@ export function AppSidebar() {
     }
   };
 
+  const getThemeLabel = () => {
+    switch (theme) {
+      case 'light':
+        return 'Hell';
+      case 'dark':
+        return 'Dunkel';
+      default:
+        return 'System';
+    }
+  };
+
+  const getCurrentLanguageFlag = () => {
+    return i18n.language === 'de' ? '🇩🇪' : '🇺🇸';
+  };
+
+  const getCurrentLanguageLabel = () => {
+    return i18n.language === 'de' ? 'Deutsch' : 'English';
+  };
+
   const getUserInitials = () => {
     if (!user) return '?';
     if (user.displayPreference === 'nickname' && user.nickname) {
@@ -116,22 +140,21 @@ export function AppSidebar() {
     return null; // Don't render sidebar if not authenticated
   }
 
+  const ThemeIcon = getThemeIcon();
+
   return (
-    <Sidebar className="border-r border-border">
-      <SidebarHeader className="border-b border-border">
+    <Sidebar className="border-r border-border bg-background">
+      <SidebarHeader className="border-b border-border bg-background">
         <div className="p-6">
           <h2 className="text-xl font-bold text-primary">Sportify</h2>
           <p className="text-sm text-muted-foreground">Sports Analytics Platform</p>
-          <Badge variant="outline" className="mt-2">
-            von Leon Stadler
-          </Badge>
         </div>
       </SidebarHeader>
-
+        
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel className="text-muted-foreground text-xs uppercase tracking-wider px-6 py-3">
-            {t('navigation.dashboard')}
+            Navigation
           </SidebarGroupLabel>
           <SidebarGroupContent className="px-3">
             <SidebarMenu>
@@ -190,117 +213,145 @@ export function AppSidebar() {
         <SidebarSeparator className="mx-6 my-2" />
         <SidebarGroup>
           <SidebarGroupLabel className="text-muted-foreground text-xs uppercase tracking-wider px-6 py-3">
-            {t('navigation.settings')}
+            Einstellungen
           </SidebarGroupLabel>
           <SidebarGroupContent className="px-3">
             <SidebarMenu>
+              {/* Language Switch */}
               <SidebarMenuItem>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <SidebarMenuButton className="hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200">
-                      <Globe size={20} />
-                      <span>{t('settings.language')}</span>
+                    <SidebarMenuButton className="hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200 justify-between">
+                      <div className="flex items-center gap-3">
+                        <Globe size={20} />
+                        <span>Sprache</span>
+            </div>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <span>{getCurrentLanguageFlag()}</span>
+                        <span>{getCurrentLanguageLabel()}</span>
+            </div>
                     </SidebarMenuButton>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-48">
-                    <DropdownMenuLabel>{t('settings.language')}</DropdownMenuLabel>
+                  <DropdownMenuContent align="start" className="w-56" side="right">
+                    <DropdownMenuLabel>Sprache auswählen</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => handleLanguageChange('de')}>
-                      🇩🇪 Deutsch
+                    <DropdownMenuItem 
+                      onClick={() => handleLanguageChange('de')}
+                      className={`cursor-pointer ${i18n.language === 'de' ? 'bg-accent' : ''}`}
+                    >
+                      <span className="mr-3">🇩🇪</span>
+                      <span>Deutsch</span>
+                      {i18n.language === 'de' && (
+                        <Badge variant="secondary" className="ml-auto">Aktiv</Badge>
+                      )}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleLanguageChange('en')}>
-                      🇺🇸 English
+                    <DropdownMenuItem 
+                      onClick={() => handleLanguageChange('en')}
+                      className={`cursor-pointer ${i18n.language === 'en' ? 'bg-accent' : ''}`}
+                    >
+                      <span className="mr-3">🇺🇸</span>
+                      <span>English</span>
+                      {i18n.language === 'en' && (
+                        <Badge variant="secondary" className="ml-auto">Active</Badge>
+                      )}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </SidebarMenuItem>
 
+              {/* Theme Switch */}
               <SidebarMenuItem>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <SidebarMenuButton className="hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200">
-                      <Palette size={20} />
-                      <span>{t('settings.theme')}</span>
+                    <SidebarMenuButton className="hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200 justify-between">
+                      <div className="flex items-center gap-3">
+                        <Palette size={20} />
+                        <span>Design</span>
+          </div>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <ThemeIcon size={14} />
+                        <span>{getThemeLabel()}</span>
+        </div>
                     </SidebarMenuButton>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-48">
-                    <DropdownMenuLabel>{t('settings.theme')}</DropdownMenuLabel>
+                  <DropdownMenuContent align="start" className="w-56" side="right">
+                    <DropdownMenuLabel>Theme auswählen</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => setTheme('light')}>
-                      <Sun className="mr-2 h-4 w-4" />
-                      {t('settings.light')}
+                    <DropdownMenuItem 
+                      onClick={() => setTheme('light')}
+                      className={`cursor-pointer ${theme === 'light' ? 'bg-accent' : ''}`}
+                    >
+                      <Sun className="mr-3 h-4 w-4" />
+                      <span>Hell</span>
+                      {theme === 'light' && (
+                        <Badge variant="secondary" className="ml-auto">Aktiv</Badge>
+                      )}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setTheme('dark')}>
-                      <Moon className="mr-2 h-4 w-4" />
-                      {t('settings.dark')}
+                    <DropdownMenuItem 
+                      onClick={() => setTheme('dark')}
+                      className={`cursor-pointer ${theme === 'dark' ? 'bg-accent' : ''}`}
+                    >
+                      <Moon className="mr-3 h-4 w-4" />
+                      <span>Dunkel</span>
+                      {theme === 'dark' && (
+                        <Badge variant="secondary" className="ml-auto">Aktiv</Badge>
+                      )}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setTheme('system')}>
-                      <Monitor className="mr-2 h-4 w-4" />
-                      {t('settings.system')}
+                    <DropdownMenuItem 
+                      onClick={() => setTheme('system')}
+                      className={`cursor-pointer ${theme === 'system' ? 'bg-accent' : ''}`}
+                    >
+                      <Monitor className="mr-3 h-4 w-4" />
+                      <span>System</span>
+                      {theme === 'system' && (
+                        <Badge variant="secondary" className="ml-auto">Aktiv</Badge>
+                      )}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton 
-                  onClick={() => navigate('/friends/invite')}
-                  className="hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200"
-                >
-                  <UserPlus size={20} />
-                  <span>{t('navigation.friends')}</span>
-                </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-border">
-        <div className="p-4">
+      <SidebarFooter className="p-3 border-t border-border bg-background mt-auto">
+        <div className="flex items-center justify-between">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                className="w-full justify-start p-2 h-auto hover:bg-accent"
-              >
-                <div className="flex items-center gap-3 w-full">
-                  <Avatar className="w-8 h-8">
-                    <AvatarImage src={user?.avatar} alt={getDisplayName()} />
-                    <AvatarFallback className="bg-primary text-primary-foreground text-sm">
-                      {getUserInitials()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="text-sm text-left flex-1 min-w-0">
-                    <p className="font-medium text-foreground truncate">{getDisplayName()}</p>
-                    <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-                  </div>
+              <div className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-accent transition-colors">
+                <Avatar className="h-9 w-9">
+                  <AvatarImage src={user?.avatar} alt={getDisplayName()} />
+                  <AvatarFallback>{getUserInitials()}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold truncate">{getDisplayName()}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                 </div>
-              </Button>
+              </div>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56" side="top">
-              <DropdownMenuLabel className="font-normal">
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium">{getDisplayName()}</p>
-                  <p className="text-xs text-muted-foreground">{user?.email}</p>
-                </div>
-              </DropdownMenuLabel>
+            <DropdownMenuContent className="w-56 mb-2" side="top" align="start">
+              <DropdownMenuLabel>Mein Account</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigate('/profile')} className="cursor-pointer">
-                <User className="mr-2 h-4 w-4" />
-                {t('navigation.profile')}
+              <DropdownMenuItem onClick={() => navigate('/profile')}>
+                <User className="w-4 h-4 mr-2" />
+                <span>Profil</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate('/settings')} className="cursor-pointer">
-                <Settings className="mr-2 h-4 w-4" />
-                {t('navigation.settings')}
+              <DropdownMenuItem onClick={() => navigate('/settings')}>
+                <Settings className="w-4 h-4 mr-2" />
+                <span>Einstellungen</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive">
-                <LogOut className="mr-2 h-4 w-4" />
-                {t('navigation.logout')}
+              <DropdownMenuItem onClick={handleLogout}>
+                <LogOut className="w-4 h-4 mr-2" />
+                <span>Abmelden</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          
+          <div className="flex items-center">
+            <Notifications />
+          </div>
         </div>
       </SidebarFooter>
     </Sidebar>

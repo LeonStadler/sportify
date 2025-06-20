@@ -46,17 +46,7 @@ export default function Register() {
               Erstelle dein Sportify-Konto und beginne deine Fitness-Reise
             </p>
           </div>
-
           <RegisterForm />
-
-          <div className="mt-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              Bereits ein Konto?{' '}
-              <Link to="/auth/login" className="text-primary hover:underline font-medium">
-                Hier anmelden
-              </Link>
-            </p>
-          </div>
         </div>
       </div>
 

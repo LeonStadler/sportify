@@ -6,12 +6,32 @@ export interface User {
   firstName: string;
   lastName: string;
   nickname?: string;
-  displayPreference: 'nickname' | 'firstName' | 'fullName';
+  displayPreference: 'firstName' | 'fullName' | 'nickname';
   isEmailVerified: boolean;
   has2FA: boolean;
+  isAdmin: boolean;
   avatar?: string;
+  themePreference?: string;
+  languagePreference: 'de' | 'en';
   createdAt: string;
   lastLoginAt: string;
+  role: 'user' | 'admin';
+  preferences: {
+    timeFormat: '12h' | '24h';
+    units: {
+      distance: 'km' | 'm' | 'miles' | 'yards';
+      weight: 'kg' | 'lbs' | 'stone';
+      temperature: 'celsius' | 'fahrenheit';
+    };
+    notifications: {
+      push: boolean;
+      email: boolean;
+    };
+    privacy: {
+      publicProfile: boolean;
+    };
+    theme: 'light' | 'dark' | 'system';
+  };
 }
 
 export interface AuthState {
@@ -23,7 +43,7 @@ export interface AuthState {
 
 export interface AuthContextType extends AuthState {
   login: (email: string, password: string, twoFactorCode?: string) => Promise<void>;
-  register: (data: RegisterData) => Promise<void>;
+  register: (data: RegisterData) => Promise<{ needsVerification: boolean; email: string }>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   confirmResetPassword: (token: string, newPassword: string) => Promise<void>;
@@ -44,33 +64,12 @@ export interface RegisterData {
   firstName: string;
   lastName: string;
   nickname?: string;
-  displayPreference?: 'nickname' | 'firstName' | 'fullName';
+  displayPreference?: 'firstName' | 'fullName' | 'nickname';
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock storage functions (replace with actual API calls)
-const authStorage = {
-  getUser: (): User | null => {
-    const userData = localStorage.getItem('user');
-    return userData ? JSON.parse(userData) : null;
-  },
-  setUser: (user: User) => {
-    localStorage.setItem('user', JSON.stringify(user));
-  },
-  removeUser: () => {
-    localStorage.removeItem('user');
-  },
-  getToken: (): string | null => {
-    return localStorage.getItem('token');
-  },
-  setToken: (token: string) => {
-    localStorage.setItem('token', token);
-  },
-  removeToken: () => {
-    localStorage.removeItem('token');
-  }
-};
+const API_URL = 'http://localhost:3001/api';
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, setState] = useState<AuthState>({
@@ -80,203 +79,397 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     error: null
   });
 
-  // Initialize auth state
   useEffect(() => {
-    const initializeAuth = () => {
-      const user = authStorage.getUser();
-      const token = authStorage.getToken();
-      
-      if (user && token) {
-        setState({
-          user,
-          isAuthenticated: true,
-          isLoading: false,
-          error: null
-        });
+    const initializeAuth = async () => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        try {
+          // Verify token with backend and get user data
+          const response = await fetch(`${API_URL}/auth/me`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+
+          if (response.ok) {
+            const user = await response.json();
+            setState({
+              user,
+              isAuthenticated: true,
+              isLoading: false,
+              error: null
+            });
+          } else {
+            localStorage.removeItem('token');
+            setState({ user: null, isAuthenticated: false, isLoading: false, error: null });
+          }
+        } catch (error) {
+          localStorage.removeItem('token');
+          setState({ user: null, isAuthenticated: false, isLoading: false, error: null });
+        }
       } else {
-        setState({
-          user: null,
-          isAuthenticated: false,
-          isLoading: false,
-          error: null
-        });
+        setState({ user: null, isAuthenticated: false, isLoading: false, error: null });
       }
     };
 
     initializeAuth();
   }, []);
 
-  const login = async (email: string, password: string, twoFactorCode?: string): Promise<void> => {
+  const login = async (email: string, password: string): Promise<void> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
-      // Mock API call - replace with actual authentication
-      if (email === 'demo@sportify.com' && password === 'demo123') {
-        const mockUser: User = {
-          id: '1',
-          email,
-          firstName: 'Demo',
-          lastName: 'User',
-          nickname: 'DemoAthlete',
-          displayPreference: 'nickname',
-          isEmailVerified: true,
-          has2FA: false,
-          createdAt: new Date().toISOString(),
-          lastLoginAt: new Date().toISOString()
-        };
-        
-        const mockToken = 'mock-jwt-token';
-        
-        authStorage.setUser(mockUser);
-        authStorage.setToken(mockToken);
-        
-        setState({
-          user: mockUser,
-          isAuthenticated: true,
-          isLoading: false,
-          error: null
-        });
-      } else {
-        throw new Error('Ungültige Anmeldedaten');
-      }
-    } catch (error) {
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Anmeldung fehlgeschlagen'
-      }));
-      throw error;
-    }
-  };
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
 
-  const register = async (data: RegisterData): Promise<void> => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
-    
-    try {
-      // Mock API call - replace with actual registration
-      const mockUser: User = {
-        id: Date.now().toString(),
-        email: data.email,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        nickname: data.nickname,
-        displayPreference: data.displayPreference || 'firstName',
-        isEmailVerified: false,
-        has2FA: false,
-        createdAt: new Date().toISOString(),
-        lastLoginAt: new Date().toISOString()
-      };
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Login fehlgeschlagen');
+      }
+
+      const { user, token } = data;
       
-      const mockToken = 'mock-jwt-token';
-      
-      authStorage.setUser(mockUser);
-      authStorage.setToken(mockToken);
+      localStorage.setItem('token', token);
       
       setState({
-        user: mockUser,
+        user,
         isAuthenticated: true,
         isLoading: false,
         error: null
       });
+
     } catch (error) {
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Registrierung fehlgeschlagen'
-      }));
+      const errorMessage = error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.';
+      setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));
+      throw error;
+    }
+  };
+
+  const register = async (data: RegisterData): Promise<{ needsVerification: boolean; email: string }> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      const response = await fetch(`${API_URL}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        throw new Error(responseData.error || 'Registrierung fehlgeschlagen.');
+      }
+      
+      // Nach erfolgreicher Registrierung wird der Benutzer NICHT automatisch eingeloggt
+      // Er muss erst seine E-Mail verifizieren
+      setState(prev => ({ ...prev, isLoading: false, error: null }));
+      
+      return {
+        needsVerification: true,
+        email: data.email
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.';
+      setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));
       throw error;
     }
   };
 
   const logout = async (): Promise<void> => {
-    setState(prev => ({ ...prev, isLoading: true }));
-    
-    try {
-      // Mock API call for logout
-      authStorage.removeUser();
-      authStorage.removeToken();
-      
-      setState({
-        user: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: null
-      });
-    } catch (error) {
-      setState(prev => ({ ...prev, isLoading: false }));
-    }
-  };
-
-  const resetPassword = async (email: string): Promise<void> => {
-    // Mock API call for password reset
-    console.log('Password reset requested for:', email);
-  };
-
-  const confirmResetPassword = async (token: string, newPassword: string): Promise<void> => {
-    // Mock API call for password reset confirmation
-    console.log('Password reset confirmed with token:', token);
-  };
-
-  const verifyEmail = async (token: string): Promise<void> => {
-    // Mock API call for email verification
-    if (state.user) {
-      const updatedUser = { ...state.user, isEmailVerified: true };
-      authStorage.setUser(updatedUser);
-      setState(prev => ({ ...prev, user: updatedUser }));
-    }
-  };
-
-  const resendVerification = async (): Promise<void> => {
-    // Mock API call for resending verification email
-    console.log('Verification email resent');
-  };
-
-  const enable2FA = async (): Promise<{ qrCode: string; backupCodes: string[] }> => {
-    // Mock API call for enabling 2FA
-    if (state.user) {
-      const updatedUser = { ...state.user, has2FA: true };
-      authStorage.setUser(updatedUser);
-      setState(prev => ({ ...prev, user: updatedUser }));
-    }
-    
-    return {
-      qrCode: 'mock-qr-code-url',
-      backupCodes: ['123456', '789012', '345678']
-    };
-  };
-
-  const disable2FA = async (password: string): Promise<void> => {
-    // Mock API call for disabling 2FA
-    if (state.user) {
-      const updatedUser = { ...state.user, has2FA: false };
-      authStorage.setUser(updatedUser);
-      setState(prev => ({ ...prev, user: updatedUser }));
-    }
-  };
-
-  const updateProfile = async (data: Partial<User>): Promise<void> => {
-    if (state.user) {
-      const updatedUser = { ...state.user, ...data };
-      authStorage.setUser(updatedUser);
-      setState(prev => ({ ...prev, user: updatedUser }));
-    }
-  };
-
-  const deleteAccount = async (password: string): Promise<void> => {
-    // Mock API call for account deletion
-    authStorage.removeUser();
-    authStorage.removeToken();
     setState({
       user: null,
       isAuthenticated: false,
       isLoading: false,
       error: null
     });
+    localStorage.removeItem('token');
+  };
+
+  const resetPassword = async (email: string): Promise<void> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      const response = await fetch(`${API_URL}/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Fehler beim Zurücksetzen des Passworts');
+      }
+
+      setState(prev => ({ ...prev, isLoading: false }));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.';
+      setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));
+      throw error;
+    }
+  };
+
+  const confirmResetPassword = async (token: string, newPassword: string): Promise<void> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      const response = await fetch(`${API_URL}/auth/confirm-reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, newPassword })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Fehler beim Bestätigen des neuen Passworts');
+      }
+
+      setState(prev => ({ ...prev, isLoading: false }));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.';
+      setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));
+      throw error;
+    }
+  };
+
+  const verifyEmail = async (token: string): Promise<void> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      const response = await fetch(`${API_URL}/auth/verify-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Fehler bei der E-Mail-Verifizierung');
+      }
+
+      // Update user state
+      if (state.user) {
+        const updatedUser = { ...state.user, isEmailVerified: true };
+        setState(prev => ({ ...prev, user: updatedUser, isLoading: false }));
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.';
+      setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));
+      throw error;
+    }
+  };
+
+  const resendVerification = async (): Promise<void> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Nicht angemeldet');
+      }
+
+      // Generate verification token and send email (placeholder for now)
+      const response = await fetch(`${API_URL}/auth/resend-verification`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Fehler beim Senden der Verifizierungs-E-Mail');
+      }
+
+      setState(prev => ({ ...prev, isLoading: false }));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.';
+      setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));
+      throw error;
+    }
+  };
+
+  const enable2FA = async (): Promise<{ qrCode: string; backupCodes: string[] }> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Nicht angemeldet');
+      }
+
+      const response = await fetch(`${API_URL}/auth/enable-2fa`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Fehler beim Aktivieren der 2FA');
+      }
+
+      // Update user state
+      if (state.user) {
+        const updatedUser = { ...state.user, has2FA: true };
+        setState(prev => ({ ...prev, user: updatedUser, isLoading: false }));
+      }
+
+      return data;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.';
+      setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));
+      throw error;
+    }
+  };
+
+  const disable2FA = async (password: string): Promise<void> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Nicht angemeldet');
+      }
+
+      const response = await fetch(`${API_URL}/auth/disable-2fa`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ password })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Fehler beim Deaktivieren der 2FA');
+      }
+
+      // Update user state
+      if (state.user) {
+        const updatedUser = { ...state.user, has2FA: false };
+        setState(prev => ({ ...prev, user: updatedUser, isLoading: false }));
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.';
+      setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));
+      throw error;
+    }
+  };
+
+  const updateProfile = async (data: Partial<User>): Promise<void> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/profile/update`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(data)
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        throw new Error(responseData.error || 'Fehler beim Aktualisieren des Profils');
+      }
+
+      setState(prev => ({ 
+        ...prev, 
+        user: responseData, 
+        isLoading: false, 
+        error: null 
+      }));
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.';
+      setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));
+      throw error;
+    }
+  };
+
+  const deleteAccount = async (password: string): Promise<void> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/profile/account`, {
+        method: 'DELETE',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ password })
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        throw new Error(responseData.error || 'Fehler beim Löschen des Kontos');
+      }
+
+      // Clear user data and redirect to login
+      setState({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: null
+      });
+      localStorage.removeItem('token');
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.';
+      setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));
+      throw error;
+    }
   };
 
   const inviteUser = async (email: string, firstName: string, lastName: string): Promise<void> => {
-    // Mock API call for user invitation
-    console.log('User invitation sent to:', email);
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Nicht angemeldet');
+      }
+
+      const response = await fetch(`${API_URL}/admin/invite-user`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ email, firstName, lastName })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Fehler beim Einladen des Benutzers');
+      }
+
+      setState(prev => ({ ...prev, isLoading: false }));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.';
+      setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));
+      throw error;
+    }
   };
 
   const getDisplayName = (): string => {

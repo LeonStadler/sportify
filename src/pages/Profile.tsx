@@ -1,22 +1,238 @@
-
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Camera, Shield, Settings, Award, Share2 } from "lucide-react";
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { Award, Camera, Check, Copy, Share2, Shield } from "lucide-react";
+import React, { useState } from 'react';
 
 export function Profile() {
+  const { user, updateProfile, deleteAccount, enable2FA, disable2FA, isLoading } = useAuth();
+  const { toast } = useToast();
+  
+  // Profile form state
+  const [profileForm, setProfileForm] = useState({
+    firstName: user?.firstName || '',
+    lastName: user?.lastName || '',
+    nickname: user?.nickname || '',
+    displayPreference: user?.displayPreference || 'firstName'
+  });
+
+  // User preferences state
+  const [preferencesForm, setPreferencesForm] = useState({
+    languagePreference: user?.languagePreference || 'de',
+    timeFormat: user?.preferences?.timeFormat || '24h',
+    units: {
+      distance: user?.preferences?.units?.distance || 'km',
+      weight: user?.preferences?.units?.weight || 'kg',
+      temperature: user?.preferences?.units?.temperature || 'celsius'
+    },
+    notifications: {
+      push: user?.preferences?.notifications?.push ?? true,
+      email: user?.preferences?.notifications?.email ?? true
+    },
+    privacy: {
+      publicProfile: user?.preferences?.privacy?.publicProfile ?? true
+    },
+    theme: user?.preferences?.theme || 'system'
+  });
+
+  // Password change state
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+
+  // User invitation state
+  const [inviteForm, setInviteForm] = useState({
+    email: '',
+    firstName: '',
+    lastName: ''
+  });
+
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [twoFAEnabled, setTwoFAEnabled] = useState(user?.has2FA || false);
+
+  const getUserInitials = () => {
+    if (!user) return '?';
+    if (user.displayPreference === 'nickname' && user.nickname) {
+      return user.nickname.substring(0, 2).toUpperCase();
+    }
+    return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
+  };
+
+  const getDisplayName = () => {
+    if (!user) return '';
+    
+    switch (user.displayPreference) {
+      case 'nickname':
+        return user.nickname || user.firstName;
+      case 'firstName':
+        return user.firstName;
+      case 'fullName':
+        return `${user.firstName} ${user.lastName}`;
+      default:
+        return user.firstName;
+    }
+  };
+
+  const handleProfileUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      await updateProfile(profileForm);
+      toast({
+        title: "Profil aktualisiert",
+        description: "Deine Profilinformationen wurden erfolgreich gespeichert.",
+      });
+    } catch (error) {
+      toast({
+        title: "Fehler",
+        description: error instanceof Error ? error.message : "Fehler beim Speichern des Profils",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePreferencesUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      await updateProfile({
+        languagePreference: preferencesForm.languagePreference as 'de' | 'en',
+        preferences: preferencesForm
+      });
+      toast({
+        title: "Einstellungen gespeichert",
+        description: "Deine Präferenzen wurden erfolgreich aktualisiert.",
+      });
+    } catch (error) {
+      toast({
+        title: "Fehler",
+        description: error instanceof Error ? error.message : "Fehler beim Speichern der Einstellungen",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast({
+        title: "Fehler",
+        description: "Die Passwörter stimmen nicht überein.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      toast({
+        title: "Fehler",
+        description: "Das Passwort muss mindestens 6 Zeichen lang sein.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // This would need a separate API endpoint for password change
+    toast({
+      title: "Funktion in Entwicklung",
+      description: "Passwort ändern wird bald verfügbar sein.",
+    });
+  };
+
+  const handleToggle2FA = async () => {
+    try {
+      if (twoFAEnabled) {
+        // Show password prompt for disabling 2FA
+        const password = prompt("Bitte gib dein Passwort ein, um 2FA zu deaktivieren:");
+        if (!password) return;
+        
+        await disable2FA(password);
+        setTwoFAEnabled(false);
+        toast({
+          title: "2FA deaktiviert",
+          description: "Zwei-Faktor-Authentifizierung wurde erfolgreich deaktiviert.",
+        });
+      } else {
+        const result = await enable2FA();
+        setTwoFAEnabled(true);
+        toast({
+          title: "2FA aktiviert",
+          description: "Zwei-Faktor-Authentifizierung wurde erfolgreich aktiviert.",
+        });
+        // In a real app, you would show the QR code and backup codes
+        console.log('2FA Data:', result);
+      }
+    } catch (error) {
+      toast({
+        title: "Fehler",
+        description: error instanceof Error ? error.message : "Fehler bei 2FA-Einstellung",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const copyInviteLink = async () => {
+    const inviteLink = `https://sportify.app/invite/${user?.id}`;
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+      toast({
+        title: "Link kopiert",
+        description: "Einladungslink wurde in die Zwischenablage kopiert.",
+      });
+    } catch (error) {
+      toast({
+        title: "Fehler",
+        description: "Link konnte nicht kopiert werden.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    const confirmDelete = confirm("Möchtest du dein Konto wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.");
+    if (!confirmDelete) return;
+
+    const password = prompt("Bitte gib dein Passwort ein, um das Konto zu löschen:");
+    if (!password) return;
+
+    try {
+      await deleteAccount(password);
+      toast({
+        title: "Konto gelöscht",
+        description: "Dein Konto wurde erfolgreich gelöscht.",
+      });
+    } catch (error) {
+      toast({
+        title: "Fehler",
+        description: error instanceof Error ? error.message : "Fehler beim Löschen des Kontos",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (!user) {
+    return <div>Lädt...</div>;
+  }
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Profil</h1>
-        <p className="text-gray-600 mt-2">Verwalte deine persönlichen Einstellungen und Ziele</p>
+        <h1 className="text-3xl font-bold">Profil</h1>
+        <p className="text-muted-foreground mt-2">Verwalte deine persönlichen Einstellungen und Ziele</p>
       </div>
 
       <Tabs defaultValue="profile" className="w-full">
@@ -38,79 +254,81 @@ export function Profile() {
                 <div className="flex items-center gap-4 mb-4">
                   <div className="relative">
                     <Avatar className="w-20 h-20">
-                      <AvatarImage src="" />
-                      <AvatarFallback className="bg-orange-500 text-white text-2xl font-bold">
-                        DU
+                      <AvatarImage src={user.avatar} />
+                      <AvatarFallback className="bg-primary text-primary-foreground text-2xl font-bold">
+                        {getUserInitials()}
                       </AvatarFallback>
                     </Avatar>
                     <Button 
                       size="sm" 
-                      className="absolute -bottom-2 -right-2 rounded-full w-8 h-8 p-0 bg-orange-500 hover:bg-orange-600"
+                      className="absolute -bottom-2 -right-2 rounded-full w-8 h-8 p-0"
                     >
                       <Camera size={14} />
                     </Button>
                   </div>
                   <div>
-                    <h3 className="text-xl font-semibold">Dein Name</h3>
-                    <p className="text-gray-600">Rang #5 von 127 Athleten</p>
-                    <Badge className="mt-1 bg-orange-100 text-orange-800">1,980 Punkte</Badge>
+                    <h3 className="text-xl font-semibold">{getDisplayName()}</h3>
+                    <p className="text-muted-foreground">{user.email}</p>
+                    {user.isAdmin && (
+                      <Badge variant="secondary" className="mt-1">
+                        <Shield size={12} className="mr-1" />
+                        Administrator
+                      </Badge>
+                    )}
                   </div>
                 </div>
                 
                 <Separator />
                 
-                <div className="space-y-3">
+                <form onSubmit={handleProfileUpdate} className="space-y-3">
                   <div>
-                    <Label htmlFor="name">Name</Label>
-                    <Input id="name" defaultValue="Dein Name" />
+                    <Label htmlFor="firstName">Vorname</Label>
+                    <Input 
+                      id="firstName" 
+                      value={profileForm.firstName}
+                      onChange={(e) => setProfileForm(prev => ({ ...prev, firstName: e.target.value }))}
+                    />
                   </div>
                   
                   <div>
-                    <Label htmlFor="email">E-Mail</Label>
-                    <Input id="email" type="email" defaultValue="dein@email.de" />
+                    <Label htmlFor="lastName">Nachname</Label>
+                    <Input 
+                      id="lastName" 
+                      value={profileForm.lastName}
+                      onChange={(e) => setProfileForm(prev => ({ ...prev, lastName: e.target.value }))}
+                    />
                   </div>
                   
                   <div>
-                    <Label htmlFor="location">Standort</Label>
-                    <Input id="location" defaultValue="Deutschland" />
-                  </div>
+                    <Label htmlFor="nickname">Spitzname (optional)</Label>
+                    <Input 
+                      id="nickname" 
+                      value={profileForm.nickname}
+                      onChange={(e) => setProfileForm(prev => ({ ...prev, nickname: e.target.value }))}
+                    />
                 </div>
                 
-                <Button className="w-full bg-orange-500 hover:bg-orange-600">
-                  Profil aktualisieren
+                <div>
+                    <Label htmlFor="displayPreference">Anzeigename</Label>
+                    <Select 
+                      value={profileForm.displayPreference} 
+                      onValueChange={(value) => setProfileForm(prev => ({ ...prev, displayPreference: value as 'nickname' | 'firstName' | 'fullName' }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="firstName">Vorname</SelectItem>
+                        <SelectItem value="fullName">Vollständiger Name</SelectItem>
+                        <SelectItem value="nickname">Spitzname</SelectItem>
+                      </SelectContent>
+                    </Select>
+                </div>
+                
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? "Wird gespeichert..." : "Profil aktualisieren"}
                 </Button>
-              </CardContent>
-            </Card>
-
-            {/* Weekly Goals */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Wochenziele</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="pullup-goal">Klimmzüge pro Woche</Label>
-                  <Input id="pullup-goal" type="number" defaultValue="100" />
-                </div>
-                
-                <div>
-                  <Label htmlFor="pushup-goal">Liegestütze pro Woche</Label>
-                  <Input id="pushup-goal" type="number" defaultValue="400" />
-                </div>
-                
-                <div>
-                  <Label htmlFor="running-goal">Laufen (km pro Woche)</Label>
-                  <Input id="running-goal" type="number" defaultValue="25" />
-                </div>
-                
-                <div>
-                  <Label htmlFor="cycling-goal">Radfahren (km pro Woche)</Label>
-                  <Input id="cycling-goal" type="number" defaultValue="100" />
-                </div>
-                
-                <Button className="w-full bg-blue-500 hover:bg-blue-600">
-                  Ziele speichern
-                </Button>
+                </form>
               </CardContent>
             </Card>
 
@@ -123,8 +341,8 @@ export function Profile() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-sm text-gray-600">
-                  Lade deine Freunde ein und erhalte Bonuspunkte für jeden neuen Nutzer!
+                <p className="text-sm text-muted-foreground">
+                  Lade deine Freunde ein und trainiert gemeinsam!
                 </p>
                 
                 <div>
@@ -132,21 +350,23 @@ export function Profile() {
                   <div className="flex gap-2 mt-1">
                     <Input 
                       id="invite-link" 
-                      value="https://sportifyscore.app/invite/abc123" 
+                      value={`https://sportify.app/invite/${user.id}`}
                       readOnly 
                     />
-                    <Button variant="outline">Kopieren</Button>
+                    <Button variant="outline" onClick={copyInviteLink}>
+                      {copiedLink ? <Check size={16} /> : <Copy size={16} />}
+                    </Button>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <Button variant="outline" className="w-full">WhatsApp</Button>
-                  <Button variant="outline" className="w-full">E-Mail</Button>
-                </div>
-
-                <div className="bg-green-50 p-3 rounded-lg">
-                  <p className="text-sm font-medium text-green-800">Einladungsbonus</p>
-                  <p className="text-sm text-green-600">50 Punkte für jeden neuen Nutzer</p>
+                <div className="bg-accent p-3 rounded-lg">
+                  <p className="text-sm font-medium">E-Mail Verifizierung</p>
+                  <p className="text-sm text-muted-foreground">
+                    {user.isEmailVerified 
+                      ? "✓ Deine E-Mail ist verifiziert" 
+                      : "⚠ Bitte verifiziere deine E-Mail-Adresse"
+                    }
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -164,24 +384,41 @@ export function Profile() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <form onSubmit={handlePasswordChange} className="space-y-4">
                 <div>
                   <Label htmlFor="current-password">Aktuelles Passwort</Label>
-                  <Input id="current-password" type="password" />
+                    <Input 
+                      id="current-password" 
+                      type="password" 
+                      value={passwordForm.currentPassword}
+                      onChange={(e) => setPasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))}
+                    />
                 </div>
                 
                 <div>
                   <Label htmlFor="new-password">Neues Passwort</Label>
-                  <Input id="new-password" type="password" />
+                    <Input 
+                      id="new-password" 
+                      type="password" 
+                      value={passwordForm.newPassword}
+                      onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                    />
                 </div>
                 
                 <div>
                   <Label htmlFor="confirm-password">Passwort bestätigen</Label>
-                  <Input id="confirm-password" type="password" />
+                    <Input 
+                      id="confirm-password" 
+                      type="password" 
+                      value={passwordForm.confirmPassword}
+                      onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                    />
                 </div>
                 
-                <Button className="w-full bg-red-500 hover:bg-red-600">
+                  <Button type="submit" className="w-full" variant="destructive" disabled={isLoading}>
                   Passwort ändern
                 </Button>
+                </form>
               </CardContent>
             </Card>
 
@@ -194,147 +431,245 @@ export function Profile() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium">2FA aktivieren</p>
-                    <p className="text-sm text-gray-600">Zusätzliche Sicherheit für dein Konto</p>
+                    <p className="text-sm text-muted-foreground">
+                      Zusätzliche Sicherheit für dein Konto
+                    </p>
+                    <p className="text-sm">
+                      Status: {user.has2FA ? "✓ Aktiviert" : "○ Deaktiviert"}
+                    </p>
                   </div>
-                  <Switch />
+                  <Switch 
+                    checked={twoFAEnabled} 
+                    onCheckedChange={handleToggle2FA}
+                    disabled={isLoading}
+                  />
                 </div>
                 
                 <Separator />
                 
-                <div className="space-y-3">
-                  <p className="text-sm font-medium">Backup-Codes</p>
-                  <p className="text-sm text-gray-600">
-                    Speichere diese Codes sicher. Du kannst sie verwenden, wenn du keinen Zugang zu deinem Authenticator hast.
-                  </p>
-                  <Button variant="outline" className="w-full">
-                    Backup-Codes generieren
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Login History */}
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle>Anmelde-Verlauf</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {[
-                    { date: "Heute, 14:30", device: "Chrome auf Windows", location: "Deutschland", current: true },
-                    { date: "Gestern, 09:15", device: "Safari auf iPhone", location: "Deutschland", current: false },
-                    { date: "3 Tage her, 18:45", device: "Chrome auf Windows", location: "Deutschland", current: false },
-                  ].map((login, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <p className="font-medium">{login.device}</p>
-                        <p className="text-sm text-gray-600">{login.date} • {login.location}</p>
-                      </div>
-                      {login.current ? (
-                        <Badge className="bg-green-100 text-green-800">Aktuelle Sitzung</Badge>
-                      ) : (
-                        <Button variant="outline" size="sm">Abmelden</Button>
-                      )}
+                <div className="space-y-2">
+                  <p className="font-medium text-sm">Kontosicherheit</p>
+                  <div className="space-y-1 text-sm text-muted-foreground">
+                    <p>• Erstellt: {new Date(user.createdAt).toLocaleDateString('de-DE')}</p>
+                    <p>• Letzter Login: {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString('de-DE') : 'Nie'}</p>
+                    <p>• E-Mail verifiziert: {user.isEmailVerified ? 'Ja' : 'Nein'}</p>
                     </div>
-                  ))}
                 </div>
+
+                <Button 
+                  variant="destructive" 
+                  className="w-full" 
+                  onClick={handleDeleteAccount}
+                  disabled={isLoading}
+                >
+                  Konto löschen
+                </Button>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
         <TabsContent value="preferences" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Units & Measurements */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="w-5 h-5" />
-                  Einheiten & Maßstäbe
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="distance-unit">Streckeneinheit</Label>
-                  <Select defaultValue="km">
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="km">Kilometer</SelectItem>
-                      <SelectItem value="miles">Meilen</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <Label htmlFor="weight-unit">Gewichtseinheit</Label>
-                  <Select defaultValue="kg">
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="kg">Kilogramm</SelectItem>
-                      <SelectItem value="lbs">Pfund</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <Label htmlFor="time-format">Zeitformat</Label>
-                  <Select defaultValue="24h">
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="24h">24 Stunden</SelectItem>
-                      <SelectItem value="12h">12 Stunden (AM/PM)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
+          <form onSubmit={handlePreferencesUpdate}>
+            <div className="grid gap-6 md:grid-cols-2">
+              {/* Benutzereinstellungen */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Benutzereinstellungen</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Passe die App an deine Vorlieben an
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Sprache */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Sprache</Label>
+                    <Select 
+                      value={preferencesForm.languagePreference} 
+                      onValueChange={(value) => setPreferencesForm(prev => ({ ...prev, languagePreference: value as 'de' | 'en' }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="de">Deutsch</SelectItem>
+                        <SelectItem value="en">English</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-            {/* Notifications */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Benachrichtigungen</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Workout Erinnerungen</p>
-                    <p className="text-sm text-gray-600">Täglich um 18:00 Uhr</p>
+                  {/* Uhrzeitformat */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Uhrzeitformat</Label>
+                    <Select 
+                      value={preferencesForm.timeFormat} 
+                      onValueChange={(value) => setPreferencesForm(prev => ({ ...prev, timeFormat: value as '12h' | '24h' }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="24h">24-Stunden (14:30)</SelectItem>
+                        <SelectItem value="12h">12-Stunden (2:30 PM)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <Switch defaultChecked />
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Wöchentliche Zusammenfassung</p>
-                    <p className="text-sm text-gray-600">Jeden Sonntag</p>
+
+                  {/* Theme */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Design</Label>
+                    <Select 
+                      value={preferencesForm.theme} 
+                      onValueChange={(value) => setPreferencesForm(prev => ({ ...prev, theme: value as 'light' | 'dark' | 'system' }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="system">System</SelectItem>
+                        <SelectItem value="light">Hell</SelectItem>
+                        <SelectItem value="dark">Dunkel</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <Switch defaultChecked />
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Ranglistenänderungen</p>
-                    <p className="text-sm text-gray-600">Bei Auf- oder Abstieg</p>
+                </CardContent>
+              </Card>
+
+              {/* Einheiten-Präferenzen */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Einheiten-Präferenzen</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Wähle deine bevorzugten Einheiten für Messungen
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Distanz */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Distanz</Label>
+                    <Select 
+                      value={preferencesForm.units.distance} 
+                      onValueChange={(value) => setPreferencesForm(prev => ({ 
+                        ...prev, 
+                        units: { ...prev.units, distance: value as 'km' | 'm' | 'miles' | 'yards' }
+                      }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="km">Kilometer (km)</SelectItem>
+                        <SelectItem value="m">Meter (m)</SelectItem>
+                        <SelectItem value="miles">Meilen</SelectItem>
+                        <SelectItem value="yards">Yards</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <Switch />
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Neue persönliche Rekorde</p>
-                    <p className="text-sm text-gray-600">Sofortige Benachrichtigung</p>
+                  
+                  {/* Gewicht */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Gewicht</Label>
+                    <Select 
+                      value={preferencesForm.units.weight} 
+                      onValueChange={(value) => setPreferencesForm(prev => ({ 
+                        ...prev, 
+                        units: { ...prev.units, weight: value as 'kg' | 'lbs' | 'stone' }
+                      }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="kg">Kilogramm (kg)</SelectItem>
+                        <SelectItem value="lbs">Pfund (lbs)</SelectItem>
+                        <SelectItem value="stone">Stone</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <Switch defaultChecked />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                  
+                  {/* Temperatur */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Temperatur</Label>
+                    <Select 
+                      value={preferencesForm.units.temperature} 
+                      onValueChange={(value) => setPreferencesForm(prev => ({ 
+                        ...prev, 
+                        units: { ...prev.units, temperature: value as 'celsius' | 'fahrenheit' }
+                      }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="celsius">Celsius (°C)</SelectItem>
+                        <SelectItem value="fahrenheit">Fahrenheit (°F)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* App-Einstellungen */}
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="text-lg">App-Einstellungen</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm font-medium">Push-Benachrichtigungen</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Erhalte Benachrichtigungen für neue Aktivitäten und Freundschaftsanfragen
+                      </p>
+                    </div>
+                    <Switch 
+                      checked={preferencesForm.notifications.push}
+                      onCheckedChange={(checked) => setPreferencesForm(prev => ({ 
+                        ...prev, 
+                        notifications: { ...prev.notifications, push: checked }
+                      }))}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm font-medium">E-Mail-Benachrichtigungen</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Wöchentliche Zusammenfassung deiner Fortschritte
+                      </p>
+                    </div>
+                    <Switch 
+                      checked={preferencesForm.notifications.email}
+                      onCheckedChange={(checked) => setPreferencesForm(prev => ({ 
+                        ...prev, 
+                        notifications: { ...prev.notifications, email: checked }
+                      }))}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm font-medium">Öffentliches Profil</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Andere Benutzer können dein Profil und deine Aktivitäten sehen
+                      </p>
+                    </div>
+                    <Switch 
+                      checked={preferencesForm.privacy.publicProfile}
+                      onCheckedChange={(checked) => setPreferencesForm(prev => ({ 
+                        ...prev, 
+                        privacy: { ...prev.privacy, publicProfile: checked }
+                      }))}
+                    />
+                  </div>
+
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? "Wird gespeichert..." : "Alle Einstellungen speichern"}
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </form>
         </TabsContent>
 
         <TabsContent value="achievements" className="space-y-6">
@@ -342,44 +677,13 @@ export function Profile() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Award className="w-5 h-5" />
-                Erfolge & Badges
+                Erfolge & Statistiken
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[
-                  { name: "First Timer", desc: "Erstes Workout eingetragen", icon: "🏆", achieved: true, date: "15.03.2024" },
-                  { name: "Pull-up Hero", desc: "50 Klimmzüge in einer Woche", icon: "💪", achieved: true, date: "22.03.2024" },
-                  { name: "Runner", desc: "20km in einer Woche gelaufen", icon: "🏃", achieved: true, date: "29.03.2024" },
-                  { name: "Streak Master", desc: "7 Tage in Folge trainiert", icon: "🔥", achieved: false, progress: "4/7" },
-                  { name: "Century Club", desc: "100 Liegestütze an einem Tag", icon: "💯", achieved: false, progress: "67/100" },
-                  { name: "Distance King", desc: "100km Radfahren in einer Woche", icon: "🚴", achieved: false, progress: "78/100" },
-                ].map((achievement, index) => (
-                  <div 
-                    key={index} 
-                    className={`p-4 rounded-lg border transition-all ${
-                      achievement.achieved 
-                        ? 'bg-gradient-to-br from-yellow-50 to-orange-50 border-orange-200' 
-                        : 'bg-gray-50 border-gray-200'
-                    }`}
-                  >
-                    <div className="text-center">
-                      <div className="text-3xl mb-2">{achievement.icon}</div>
-                      <h3 className="font-semibold text-gray-900">{achievement.name}</h3>
-                      <p className="text-sm text-gray-600 mt-1">{achievement.desc}</p>
-                      {achievement.achieved ? (
-                        <Badge className="mt-2 bg-orange-100 text-orange-800">
-                          Erreicht am {achievement.date}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="mt-2">
-                          {achievement.progress}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <p className="text-muted-foreground">
+                Erfolge und detaillierte Statistiken werden bald verfügbar sein.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>

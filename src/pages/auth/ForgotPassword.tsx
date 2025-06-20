@@ -40,19 +40,30 @@ export default function ForgotPassword() {
     setIsLoading(true);
     
     try {
-      // Mock API call - hier würde normalerweise die Passwort-Reset-E-Mail versendet werden
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      console.log('Password reset requested for:', data.email);
-      
+      const response = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: data.email }),
+      });
+
+      const result = await response.json();
+
+      // Aus Sicherheitsgründen zeigen wir immer eine Erfolgsmeldung,
+      // auch wenn die E-Mail-Adresse nicht existiert
       setIsSubmitted(true);
-      
       toast.success('E-Mail versendet!', {
-        description: 'Überprüfen Sie Ihr Postfach für weitere Anweisungen.'
+        description: response.ok 
+          ? 'Überprüfen Sie Ihr Postfach für weitere Anweisungen.'
+          : 'Falls ein Konto mit dieser E-Mail existiert, erhalten Sie eine Reset-E-Mail.'
       });
     } catch (error) {
-      toast.error('Fehler beim Versenden', {
-        description: 'Bitte versuchen Sie es später erneut.'
+      console.error('Password reset request error:', error);
+      // Aus Sicherheitsgründen zeigen wir auch bei Fehlern eine Erfolgsmeldung
+      setIsSubmitted(true);
+      toast.success('E-Mail versendet!', {
+        description: 'Falls ein Konto mit dieser E-Mail existiert, erhalten Sie eine Reset-E-Mail.'
       });
     } finally {
       setIsLoading(false);

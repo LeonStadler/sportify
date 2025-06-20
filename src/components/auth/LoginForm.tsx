@@ -3,7 +3,7 @@ import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -27,11 +27,12 @@ interface LoginFormProps {
   redirectTo?: string;
 }
 
-export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo }) => {
+export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/dashboard' }) => {
   const { t } = useTranslation();
   const { login, isLoading, error, clearError } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showTwoFactor, setShowTwoFactor] = useState(false);
+  const navigate = useNavigate();
 
   const {
     register,
@@ -55,11 +56,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo }) =
       
       if (onSuccess) {
         onSuccess();
-      }
-      
-      // Redirect logic can be handled by parent component or router
-      if (redirectTo) {
-        window.location.href = redirectTo;
+      } else {
+        // Automatische Umleitung zum Dashboard nach erfolgreichem Login
+        navigate(redirectTo);
       }
     } catch (err) {
       // Check if 2FA is required

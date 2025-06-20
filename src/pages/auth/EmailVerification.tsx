@@ -59,23 +59,28 @@ export default function EmailVerification() {
     setIsLoading(true);
     
     try {
-      // Mock API call - hier würde normalerweise die E-Mail verifiziert werden
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      console.log('Email verification attempted with token:', verificationToken);
-      
-      // Simulate success/failure based on token
-      if (verificationToken === 'valid-token' || verificationToken.length > 10) {
+      const response = await fetch('/api/auth/verify-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token: verificationToken }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
         setIsVerified(true);
         toast.success('E-Mail erfolgreich verifiziert!', {
           description: 'Ihr Konto ist jetzt aktiviert.'
         });
       } else {
         toast.error('Ungültiger Verifizierungslink', {
-          description: 'Der Link ist abgelaufen oder ungültig.'
+          description: data.error || 'Der Link ist abgelaufen oder ungültig.'
         });
       }
     } catch (error) {
+      console.error('Email verification error:', error);
       toast.error('Fehler bei der Verifizierung', {
         description: 'Bitte versuchen Sie es später erneut.'
       });
@@ -90,17 +95,28 @@ export default function EmailVerification() {
     setIsLoading(true);
     
     try {
-      // Mock API call - hier würde normalerweise eine neue Verifizierungs-E-Mail gesendet werden
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      console.log('Resend verification email to:', data.email);
-      
-      toast.success('Verifizierungs-E-Mail erneut gesendet!', {
-        description: 'Überprüfen Sie Ihr Postfach und Spam-Ordner.'
+      const response = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: data.email }),
       });
-      
-      setCountdown(60); // 60 Sekunden Countdown
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast.success('Verifizierungs-E-Mail erneut gesendet!', {
+          description: 'Überprüfen Sie Ihr Postfach und Spam-Ordner.'
+        });
+        setCountdown(60); // 60 Sekunden Countdown
+      } else {
+        toast.error('Fehler beim Senden', {
+          description: result.error || 'Bitte versuchen Sie es später erneut.'
+        });
+      }
     } catch (error) {
+      console.error('Resend verification error:', error);
       toast.error('Fehler beim Senden', {
         description: 'Bitte versuchen Sie es später erneut.'
       });

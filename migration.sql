@@ -1,0 +1,2 @@
+ALTER TABLE workouts ADD COLUMN IF NOT EXISTS duration INTEGER;
+ALTER TABLE workout_activities ADD COLUMN IF NOT EXISTS sets_data JSONB;

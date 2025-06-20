@@ -1,6 +1,5 @@
-
-import { LucideIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { LucideIcon } from "lucide-react";
 
 interface StatCardProps {
   title: string;
@@ -20,17 +19,17 @@ export function StatCard({ title, value, icon: Icon, trend, color = "orange" }: 
 
   return (
     <Card className="hover:shadow-lg transition-shadow duration-200">
-      <CardContent className="p-6">
+      <CardContent className="p-3 md:p-6">
         <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-gray-600">{title}</p>
-            <p className="text-2xl font-bold text-gray-900">{value}</p>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs md:text-sm font-medium text-muted-foreground truncate">{title}</p>
+            <p className="text-lg md:text-2xl font-bold text-foreground mt-1">{value}</p>
             {trend && (
-              <p className="text-sm text-green-600 mt-1">{trend}</p>
+              <p className="text-xs md:text-sm text-green-600 mt-1 line-clamp-2">{trend}</p>
             )}
           </div>
-          <div className={`p-3 rounded-full ${colorClasses[color]} text-white`}>
-            <Icon size={24} />
+          <div className={`p-2 md:p-3 rounded-full ${colorClasses[color]} text-white flex-shrink-0 ml-2`}>
+            <Icon size={16} className="md:w-6 md:h-6" />
           </div>
         </div>
       </CardContent>

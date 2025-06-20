@@ -12,6 +12,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { Bell, CheckCircle, UserPlus } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { API_URL } from '@/lib/api';
 import { toast } from 'sonner';
 
 interface Notification {
@@ -48,7 +49,7 @@ export function Notifications() {
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:3001/api/notifications', {
+      const response = await fetch(`${API_URL}/notifications`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
       });
       if (!response.ok) {
@@ -82,7 +83,7 @@ export function Notifications() {
     if (unreadCount === 0) return;
 
     try {
-      const response = await fetch('http://localhost:3001/api/notifications/mark-read', {
+      const response = await fetch(`${API_URL}/notifications/mark-read`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
       });

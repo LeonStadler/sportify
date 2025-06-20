@@ -1,5 +1,6 @@
-import { BarChart, Dumbbell, Globe, Home, LogOut, Menu, Monitor, Moon, Palette, Settings, Shield, Sun, Trophy, User, UserPlus } from "lucide-react";
-import { useTheme } from "next-themes";
+import { BarChart, Dumbbell, Globe, Home, LogOut, Menu, Palette, Settings, Shield, Trophy, User, UserPlus } from "lucide-react";
+import ThemeSwitcher from './ThemeSwitcher';
+import LanguageSwitcher from './LanguageSwitcher';
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -21,8 +22,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { useAuth } from "@/contexts/AuthContext";
 
 export function MobileBottomNav() {
-  const { t, i18n } = useTranslation();
-  const { theme, setTheme } = useTheme();
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, getDisplayName, isAuthenticated } = useAuth();
@@ -77,9 +77,6 @@ const navItems = [
     }
   };
 
-  const handleLanguageChange = (lang: string) => {
-    i18n.changeLanguage(lang);
-  };
 
   const getUserInitials = () => {
     if (!user) return '?';
@@ -191,27 +188,11 @@ const navItems = [
                   
                   {/* Language Setting */}
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2">
                       <Globe className="h-4 w-4" />
                       <span className="text-sm">{t('settings.language')}</span>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm">
-                          {i18n.language === 'de' ? '🇩🇪' : '🇺🇸'}
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>{t('settings.language')}</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleLanguageChange('de')}>
-                          🇩🇪 Deutsch
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleLanguageChange('en')}>
-                          🇺🇸 English
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <LanguageSwitcher />
                   </div>
 
                   {/* Theme Setting */}
@@ -220,31 +201,7 @@ const navItems = [
                       <Palette className="h-4 w-4" />
                       <span className="text-sm">{t('settings.theme')}</span>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm">
-                          {theme === 'light' ? <Sun className="h-4 w-4" /> : 
-                           theme === 'dark' ? <Moon className="h-4 w-4" /> : 
-                           <Monitor className="h-4 w-4" />}
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>{t('settings.theme')}</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => setTheme('light')}>
-                          <Sun className="mr-2 h-4 w-4" />
-                          {t('settings.light')}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setTheme('dark')}>
-                          <Moon className="mr-2 h-4 w-4" />
-                          {t('settings.dark')}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setTheme('system')}>
-                          <Monitor className="mr-2 h-4 w-4" />
-                          {t('settings.system')}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <ThemeSwitcher />
                   </div>
                 </div>
 

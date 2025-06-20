@@ -1,5 +1,6 @@
-import { BarChart, Dumbbell, Globe, Home, LogOut, Monitor, Moon, Palette, Settings, Shield, Sun, Trophy, User, Users } from "lucide-react";
-import { useTheme } from "next-themes";
+import { BarChart, Dumbbell, Globe, Home, LogOut, Palette, Settings, Shield, Trophy, User, Users } from "lucide-react";
+import ThemeSwitcher from './ThemeSwitcher';
+import LanguageSwitcher from './LanguageSwitcher';
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
@@ -30,8 +31,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Notifications } from './Notifications';
 
 export function AppSidebar() {
-  const { t, i18n } = useTranslation();
-  const { theme, setTheme } = useTheme();
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, getDisplayName, isAuthenticated } = useAuth();
@@ -94,39 +94,6 @@ const adminItems = [
     }
   };
 
-  const handleLanguageChange = (lang: string) => {
-    i18n.changeLanguage(lang);
-  };
-
-  const getThemeIcon = () => {
-    switch (theme) {
-      case 'light':
-        return Sun;
-      case 'dark':
-        return Moon;
-      default:
-        return Monitor;
-    }
-  };
-
-  const getThemeLabel = () => {
-    switch (theme) {
-      case 'light':
-        return 'Hell';
-      case 'dark':
-        return 'Dunkel';
-      default:
-        return 'System';
-    }
-  };
-
-  const getCurrentLanguageFlag = () => {
-    return i18n.language === 'de' ? '🇩🇪' : '🇺🇸';
-  };
-
-  const getCurrentLanguageLabel = () => {
-    return i18n.language === 'de' ? 'Deutsch' : 'English';
-  };
 
   const getUserInitials = () => {
     if (!user) return '?';
@@ -140,7 +107,6 @@ const adminItems = [
     return null; // Don't render sidebar if not authenticated
   }
 
-  const ThemeIcon = getThemeIcon();
 
   return (
     <Sidebar className="border-r border-border bg-background">
@@ -219,96 +185,24 @@ const adminItems = [
             <SidebarMenu>
               {/* Language Switch */}
               <SidebarMenuItem>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <SidebarMenuButton className="hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200 justify-between">
-                      <div className="flex items-center gap-3">
-                        <Globe size={20} />
-                        <span>Sprache</span>
-            </div>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <span>{getCurrentLanguageFlag()}</span>
-                        <span>{getCurrentLanguageLabel()}</span>
-            </div>
-                    </SidebarMenuButton>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-56" side="right">
-                    <DropdownMenuLabel>Sprache auswählen</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem 
-                      onClick={() => handleLanguageChange('de')}
-                      className={`cursor-pointer ${i18n.language === 'de' ? 'bg-accent' : ''}`}
-                    >
-                      <span className="mr-3">🇩🇪</span>
-                      <span>Deutsch</span>
-                      {i18n.language === 'de' && (
-                        <Badge variant="secondary" className="ml-auto">Aktiv</Badge>
-                      )}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => handleLanguageChange('en')}
-                      className={`cursor-pointer ${i18n.language === 'en' ? 'bg-accent' : ''}`}
-                    >
-                      <span className="mr-3">🇺🇸</span>
-                      <span>English</span>
-                      {i18n.language === 'en' && (
-                        <Badge variant="secondary" className="ml-auto">Active</Badge>
-                      )}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <SidebarMenuButton className="hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200 justify-between">
+                  <div className="flex items-center gap-3">
+                    <Globe size={20} />
+                    <span>{t('settings.language')}</span>
+                  </div>
+                  <LanguageSwitcher />
+                </SidebarMenuButton>
               </SidebarMenuItem>
 
               {/* Theme Switch */}
               <SidebarMenuItem>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <SidebarMenuButton className="hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200 justify-between">
-                      <div className="flex items-center gap-3">
-                        <Palette size={20} />
-                        <span>Design</span>
-          </div>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <ThemeIcon size={14} />
-                        <span>{getThemeLabel()}</span>
-        </div>
-                    </SidebarMenuButton>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-56" side="right">
-                    <DropdownMenuLabel>Theme auswählen</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem 
-                      onClick={() => setTheme('light')}
-                      className={`cursor-pointer ${theme === 'light' ? 'bg-accent' : ''}`}
-                    >
-                      <Sun className="mr-3 h-4 w-4" />
-                      <span>Hell</span>
-                      {theme === 'light' && (
-                        <Badge variant="secondary" className="ml-auto">Aktiv</Badge>
-                      )}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => setTheme('dark')}
-                      className={`cursor-pointer ${theme === 'dark' ? 'bg-accent' : ''}`}
-                    >
-                      <Moon className="mr-3 h-4 w-4" />
-                      <span>Dunkel</span>
-                      {theme === 'dark' && (
-                        <Badge variant="secondary" className="ml-auto">Aktiv</Badge>
-                      )}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => setTheme('system')}
-                      className={`cursor-pointer ${theme === 'system' ? 'bg-accent' : ''}`}
-                    >
-                      <Monitor className="mr-3 h-4 w-4" />
-                      <span>System</span>
-                      {theme === 'system' && (
-                        <Badge variant="secondary" className="ml-auto">Aktiv</Badge>
-                      )}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <SidebarMenuButton className="hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200 justify-between">
+                  <div className="flex items-center gap-3">
+                    <Palette size={20} />
+                    <span>{t('settings.theme')}</span>
+                  </div>
+                  <ThemeSwitcher />
+                </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>

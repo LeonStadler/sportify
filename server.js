@@ -640,6 +640,175 @@ workoutRouter.post('/', authMiddleware, async (req, res) => {
     }
 });
 
+// GET /api/workouts/:id - Get single workout
+workoutRouter.get('/:id', authMiddleware, async (req, res) => {
+    try {
+        const workoutId = req.params.id;
+        const query = `
+            SELECT
+                w.id, w.title, w.description, w.workout_date, w.duration,
+                w.created_at, w.updated_at,
+                COALESCE(
+                    JSON_AGG(
+                        JSON_BUILD_OBJECT(
+                            'id', wa.id,
+                            'activityType', wa.activity_type,
+                            'quantity', wa.quantity,
+                            'points', wa.points_earned,
+                            'notes', wa.notes,
+                            'unit', wa.unit,
+                            'setsData', wa.sets_data
+                        ) ORDER BY wa.order_index, wa.id
+                    ) FILTER (WHERE wa.id IS NOT NULL),
+                    '[]'::json
+                ) as activities
+            FROM workouts w
+            LEFT JOIN workout_activities wa ON w.id = wa.workout_id
+            WHERE w.id = $1 AND w.user_id = $2
+            GROUP BY w.id, w.title, w.description, w.workout_date, w.duration, w.created_at, w.updated_at;
+        `;
+        const { rows } = await pool.query(query, [workoutId, req.user.id]);
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Workout nicht gefunden.' });
+        }
+        const row = rows[0];
+        const activities = Array.isArray(row.activities)
+            ? row.activities.map(a => ({
+                id: a.id,
+                activityType: a.activityType,
+                amount: a.quantity,
+                points: a.points,
+                notes: a.notes,
+                unit: a.unit,
+                sets: a.setsData ? JSON.parse(a.setsData) : null,
+            })).filter(a => a.id !== null)
+            : [];
+        res.json({ ...toCamelCase(row), activities });
+    } catch (error) {
+        console.error('Get workout error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Laden des Workouts.' });
+    }
+});
+
+// PUT /api/workouts/:id - Update workout
+workoutRouter.put('/:id', authMiddleware, async (req, res) => {
+    try {
+        const workoutId = req.params.id;
+        const { title, description, activities, workoutDate, duration } = req.body;
+
+        if (!title || !title.trim()) {
+            return res.status(400).json({ error: 'Workout-Titel ist erforderlich.' });
+        }
+        if (!activities || !Array.isArray(activities) || activities.length === 0) {
+            return res.status(400).json({ error: 'Mindestens eine Aktivität ist erforderlich.' });
+        }
+
+        const validActivityTypes = ['pullups', 'pushups', 'running', 'cycling', 'situps', 'other'];
+        for (const activity of activities) {
+            if (!activity.activityType || !validActivityTypes.includes(activity.activityType)) {
+                return res.status(400).json({ error: `Ungültiger Aktivitätstyp: ${activity.activityType}` });
+            }
+            const activityAmount = activity.quantity || activity.amount;
+            if (!activityAmount || activityAmount <= 0) {
+                return res.status(400).json({ error: 'Aktivitätsmenge muss größer als 0 sein.' });
+            }
+        }
+
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            const checkQuery = 'SELECT id FROM workouts WHERE id = $1 AND user_id = $2';
+            const { rows: checkRows } = await client.query(checkQuery, [workoutId, req.user.id]);
+            if (checkRows.length === 0) {
+                await client.query('ROLLBACK');
+                return res.status(404).json({ error: 'Workout nicht gefunden.' });
+            }
+
+            const updateQuery = `
+                UPDATE workouts
+                SET title = $1,
+                    description = $2,
+                    workout_date = $3,
+                    duration = $4,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = $5 AND user_id = $6
+                RETURNING id, title, description, workout_date, duration, created_at, updated_at;
+            `;
+            const { rows: workoutRows } = await client.query(updateQuery, [
+                title.trim(),
+                description ? description.trim() : null,
+                workoutDate ? new Date(workoutDate) : new Date(),
+                duration && duration > 0 ? duration : null,
+                workoutId,
+                req.user.id,
+            ]);
+
+            await client.query('DELETE FROM workout_activities WHERE workout_id = $1', [workoutId]);
+
+            const calculateActivityPoints = (activityType, amount) => {
+                switch (activityType) {
+                    case 'pullups': return amount * 3;
+                    case 'pushups': return amount * 1;
+                    case 'situps': return amount * 1;
+                    case 'running': return amount * 10;
+                    case 'cycling': return amount * 5;
+                    case 'other': return amount * 1;
+                    default: return 0;
+                }
+            };
+
+            const activitiesData = [];
+            for (let i = 0; i < activities.length; i++) {
+                const activity = activities[i];
+                const activityAmount = activity.quantity || activity.amount;
+                const points = calculateActivityPoints(activity.activityType, activityAmount);
+                const activityQuery = `
+                    INSERT INTO workout_activities (workout_id, activity_type, quantity, points_earned, notes, order_index, sets_data, unit)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    RETURNING id, activity_type, quantity, points_earned, notes, order_index, sets_data, unit;
+                `;
+                const { rows: activityRows } = await client.query(activityQuery, [
+                    workoutId,
+                    activity.activityType,
+                    activityAmount,
+                    points,
+                    activity.notes ? activity.notes.trim() : null,
+                    i,
+                    activity.sets ? JSON.stringify(activity.sets) : null,
+                    activity.unit || 'Stück',
+                ]);
+                const row = toCamelCase(activityRows[0]);
+                row.amount = row.quantity;
+                row.points = row.pointsEarned;
+                if (row.setsData) {
+                    row.sets = JSON.parse(row.setsData);
+                }
+                delete row.quantity;
+                delete row.pointsEarned;
+                delete row.setsData;
+                activitiesData.push(row);
+            }
+
+            await client.query('COMMIT');
+
+            const updatedWorkout = {
+                ...toCamelCase(workoutRows[0]),
+                activities: activitiesData,
+            };
+            res.json(updatedWorkout);
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
+        }
+    } catch (error) {
+        console.error('Update workout error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Aktualisieren des Workouts.' });
+    }
+});
+
 // DELETE /api/workouts/:id - Delete workout
 workoutRouter.delete('/:id', authMiddleware, async (req, res) => {
     try {

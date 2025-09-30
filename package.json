@@ -11,7 +11,7 @@
     "dev:backend": "nodemon server.js",
     "build": "tsc -b && vite build",
     "build:dev": "vite build --mode development",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "lint:check": "eslint .",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",

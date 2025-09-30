@@ -1,5 +1,6 @@
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { StatCard } from "@/components/StatCard";
+import { WeeklyChallengeCard } from "@/components/WeeklyChallengeCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from '@/contexts/AuthContext';
@@ -271,7 +272,7 @@ export function Dashboard() {
       </div>
 
       {/* Progress Section - Mobile Stack Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 px-4 md:px-0">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6 px-4 md:px-0">
         <Card>
           <CardHeader className="pb-4">
             <CardTitle className="text-lg md:text-xl">Wochenziele</CardTitle>
@@ -319,7 +320,10 @@ export function Dashboard() {
             </div>
           </CardContent>
         </Card>
+        <WeeklyChallengeCard className="xl:col-span-2" />
+      </div>
 
+      <div className="px-4 md:px-0">
         <ActivityFeed />
       </div>
     </div>

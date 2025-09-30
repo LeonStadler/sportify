@@ -1,3 +1,4 @@
+import { TrainingDiarySection } from "@/components/TrainingDiarySection";
 import { WorkoutForm } from "@/components/WorkoutForm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -416,6 +417,8 @@ export function Training() {
             )}
           </CardContent>
         </Card>
+
+        <TrainingDiarySection className="xl:col-span-2" />
       </div>
     </div>
   );

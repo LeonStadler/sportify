@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import cors from 'cors';
+import crypto from 'crypto';
 import dotenv from 'dotenv';
 import express from 'express';
 import jwt from 'jsonwebtoken';
@@ -27,13 +28,162 @@ const toCamelCase = (obj) => {
     return converted;
 };
 
-// Database Connection
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: {
-        rejectUnauthorized: false
+// TOTP helpers
+const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+
+const bufferToBase32 = (buffer) => {
+    let bits = 0;
+    let value = 0;
+    let output = '';
+
+    for (const byte of buffer) {
+        value = (value << 8) | byte;
+        bits += 8;
+
+        while (bits >= 5) {
+            output += BASE32_ALPHABET[(value >>> (bits - 5)) & 31];
+            bits -= 5;
+        }
     }
-});
+
+    if (bits > 0) {
+        output += BASE32_ALPHABET[(value << (5 - bits)) & 31];
+    }
+
+    return output;
+};
+
+const base32ToBuffer = (input) => {
+    const sanitized = input.toUpperCase().replace(/=+$/, '');
+    let bits = 0;
+    let value = 0;
+    const bytes = [];
+
+    for (const char of sanitized) {
+        const index = BASE32_ALPHABET.indexOf(char);
+        if (index === -1) {
+            throw new Error('Ungültiger Base32-Wert.');
+        }
+
+        value = (value << 5) | index;
+        bits += 5;
+
+        if (bits >= 8) {
+            bytes.push((value >>> (bits - 8)) & 0xff);
+            bits -= 8;
+        }
+    }
+
+    return Buffer.from(bytes);
+};
+
+const generateTotpSecret = (length = 20) => {
+    const random = crypto.randomBytes(length);
+    return bufferToBase32(random);
+};
+
+const generateHOTP = (secret, counter, digits = 6) => {
+    const secretBuffer = base32ToBuffer(secret);
+    const counterBuffer = Buffer.alloc(8);
+    counterBuffer.writeBigUInt64BE(BigInt(counter));
+
+    const hmac = crypto.createHmac('sha1', secretBuffer).update(counterBuffer).digest();
+    const offset = hmac[hmac.length - 1] & 0x0f;
+    const code = ((hmac[offset] & 0x7f) << 24)
+        | ((hmac[offset + 1] & 0xff) << 16)
+        | ((hmac[offset + 2] & 0xff) << 8)
+        | (hmac[offset + 3] & 0xff);
+
+    const otp = (code % (10 ** digits)).toString().padStart(digits, '0');
+    return otp;
+};
+
+const constantTimeEquals = (a, b) => {
+    const bufferA = Buffer.from(a);
+    const bufferB = Buffer.from(b);
+    if (bufferA.length !== bufferB.length) return false;
+    return crypto.timingSafeEqual(bufferA, bufferB);
+};
+
+const verifyTotpToken = (token, secret, window = 1, digits = 6) => {
+    if (!secret) return false;
+    const sanitizedToken = String(token || '').replace(/\s+/g, '');
+    if (sanitizedToken.length !== digits) return false;
+
+    const currentCounter = Math.floor(Date.now() / 1000 / 30);
+
+    try {
+        for (let offset = -window; offset <= window; offset++) {
+            const generated = generateHOTP(secret, currentCounter + offset, digits);
+            if (constantTimeEquals(generated, sanitizedToken)) {
+                return true;
+            }
+        }
+    } catch (error) {
+        console.error('TOTP verification error:', error);
+        return false;
+    }
+
+    return false;
+};
+
+const buildOtpAuthUrl = (secret, label, issuer = 'Sportify') => {
+    const encodedLabel = encodeURIComponent(label);
+    const encodedIssuer = encodeURIComponent(issuer);
+    return `otpauth://totp/${encodedIssuer}:${encodedLabel}?secret=${secret}&issuer=${encodedIssuer}&algorithm=SHA1&digits=6&period=30`;
+};
+
+const generateBackupCodes = (count = 10, length = 10) => {
+    const codes = new Set();
+
+    while (codes.size < count) {
+        let code = '';
+        while (code.length < length) {
+            const value = crypto.randomInt(0, 36);
+            code += value.toString(36);
+        }
+        codes.add(code.toUpperCase());
+    }
+
+    return Array.from(codes);
+};
+
+const parseBoolean = (value, defaultValue = false) => {
+    if (value === undefined) return defaultValue;
+    const normalized = String(value).toLowerCase();
+    if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
+    if (['false', '0', 'no', 'off'].includes(normalized)) return false;
+    return defaultValue;
+};
+
+const hashResetToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
+
+const sendPasswordResetEmail = async (recipientEmail, _token) => {
+    // Integrate with transactional email provider here
+    if (!recipientEmail) return;
+
+    // Placeholder implementation ensures sensitive tokens are not logged.
+    console.info('Passwort-Zurücksetzungs-E-Mail ausgelöst', { email: recipientEmail });
+
+    if (process.env.NODE_ENV !== 'production') {
+        console.info('Ein Entwicklungs-Reset-Token wurde generiert. Überprüfen Sie Ihren konfigurierten Mail-Service für Details.');
+    }
+};
+
+// Database Connection
+const sslEnabled = parseBoolean(process.env.DATABASE_SSL_ENABLED, false);
+const rejectUnauthorized = parseBoolean(process.env.DATABASE_SSL_REJECT_UNAUTHORIZED, true);
+const poolConfig = {
+    connectionString: process.env.DATABASE_URL,
+};
+
+if (sslEnabled) {
+    poolConfig.ssl = {
+        rejectUnauthorized,
+    };
+}
+
+const pool = new Pool(poolConfig);
 
 // Middlewares
 app.use(cors());
@@ -166,7 +316,7 @@ authRouter.post('/register', async (req, res) => {
 
 // POST /api/auth/login
 authRouter.post('/login', async (req, res) => {
-    const { email, password } = req.body;
+    const { email, password, twoFactorToken, backupCode } = req.body;
 
     if (!email || !password) {
         return res.status(400).json({ error: 'E-Mail und Passwort sind erforderlich.' });
@@ -187,10 +337,51 @@ authRouter.post('/login', async (req, res) => {
             return res.status(401).json({ error: 'Ungültige Anmeldedaten.' });
         }
 
+        if (rawUser.has_2fa) {
+            if (!twoFactorToken && !backupCode) {
+                return res.status(400).json({ error: 'Zwei-Faktor-Authentifizierungscode erforderlich.' });
+            }
+
+            const secret = rawUser.totp_secret;
+
+            if (twoFactorToken) {
+                if (!secret) {
+                    return res.status(500).json({ error: '2FA-Konfiguration ist unvollständig.' });
+                }
+                const isValidToken = verifyTotpToken(twoFactorToken, secret);
+                if (!isValidToken) {
+                    return res.status(401).json({ error: 'Ungültiger Zwei-Faktor-Code.' });
+                }
+            } else if (backupCode) {
+                const normalizedCode = String(backupCode).replace(/\s+/g, '').toUpperCase();
+                const { rows: backupRows } = await pool.query(
+                    'SELECT id, code_hash FROM user_backup_codes WHERE user_id = $1 AND used_at IS NULL',
+                    [rawUser.id]
+                );
+
+                let matchedCodeId = null;
+                for (const backupRow of backupRows) {
+                    const matches = await bcrypt.compare(normalizedCode, backupRow.code_hash);
+                    if (matches) {
+                        matchedCodeId = backupRow.id;
+                        break;
+                    }
+                }
+
+                if (!matchedCodeId) {
+                    return res.status(401).json({ error: 'Ungültiger Backup-Code.' });
+                }
+
+                await pool.query('UPDATE user_backup_codes SET used_at = CURRENT_TIMESTAMP WHERE id = $1', [matchedCodeId]);
+            }
+        }
+
         const token = jwt.sign({ userId: rawUser.id }, process.env.JWT_SECRET, { expiresIn: '1d' });
 
         // Don't send password hash to client
         delete rawUser.password_hash;
+        delete rawUser.totp_secret;
+        delete rawUser.totp_confirmed;
 
         // Convert snake_case to camelCase
         const user = toCamelCase(rawUser);
@@ -214,20 +405,39 @@ authRouter.post('/reset-password', async (req, res) => {
             return res.status(400).json({ error: 'E-Mail-Adresse ist erforderlich.' });
         }
 
-        // Check if user exists
         const userQuery = 'SELECT id FROM users WHERE email = $1';
         const { rows } = await pool.query(userQuery, [email]);
 
         if (rows.length === 0) {
-            // Don't reveal if email exists or not for security
             return res.json({ message: 'Falls die E-Mail-Adresse existiert, wurde eine Zurücksetzungs-E-Mail gesendet.' });
         }
 
-        // Generate reset token
-        const resetToken = jwt.sign({ userId: rows[0].id, type: 'password_reset' }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        const userId = rows[0].id;
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const tokenHash = hashResetToken(resetToken);
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
-        // In a real app, you would send an email here
-        console.log(`Password reset token for ${email}:`, resetToken);
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+            await client.query('UPDATE password_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE user_id = $1 AND used_at IS NULL', [userId]);
+            await client.query(
+                'INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)',
+                [userId, tokenHash, expiresAt]
+            );
+            await client.query('COMMIT');
+        } catch (transactionError) {
+            await client.query('ROLLBACK');
+            throw transactionError;
+        } finally {
+            client.release();
+        }
+
+        try {
+            await sendPasswordResetEmail(email, resetToken);
+        } catch (emailError) {
+            console.error('Reset password email dispatch error:', emailError);
+        }
 
         res.json({ message: 'Falls die E-Mail-Adresse existiert, wurde eine Zurücksetzungs-E-Mail gesendet.' });
     } catch (error) {
@@ -236,24 +446,242 @@ authRouter.post('/reset-password', async (req, res) => {
     }
 });
 
-// POST /api/auth/enable-2fa - Enable Two-Factor Authentication
-authRouter.post('/enable-2fa', authMiddleware, async (req, res) => {
+// POST /api/auth/reset-password/confirm - Complete Password Reset
+authRouter.post('/reset-password/confirm', async (req, res) => {
     try {
-        // In a real app, you would generate a TOTP secret and QR code
-        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=otpauth://totp/Sportify:${req.user.id}?secret=MOCK_SECRET&issuer=Sportify`;
-        const backupCodes = ['123456', '789012', '345678', '901234', '567890'];
+        const { token, password } = req.body;
 
-        // Update user's 2FA status
-        await pool.query('UPDATE users SET has_2fa = true, updated_at = CURRENT_TIMESTAMP WHERE id = $1', [req.user.id]);
+        if (!token || !password) {
+            return res.status(400).json({ error: 'Token und neues Passwort sind erforderlich.' });
+        }
+
+        const tokenHash = hashResetToken(token);
+
+        const tokenQuery = `
+            SELECT id, user_id
+            FROM password_reset_tokens
+            WHERE token_hash = $1
+              AND used_at IS NULL
+              AND expires_at > NOW()
+            ORDER BY created_at DESC
+            LIMIT 1
+        `;
+        const { rows } = await pool.query(tokenQuery, [tokenHash]);
+
+        if (rows.length === 0) {
+            return res.status(400).json({ error: 'Ungültiger oder abgelaufener Token.' });
+        }
+
+        const resetRecord = rows[0];
+        const salt = await bcrypt.genSalt(10);
+        const newPasswordHash = await bcrypt.hash(password, salt);
+
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+            await client.query('UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [
+                newPasswordHash,
+                resetRecord.user_id,
+            ]);
+            await client.query('UPDATE password_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE id = $1', [resetRecord.id]);
+            await client.query('UPDATE password_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE user_id = $1 AND used_at IS NULL', [
+                resetRecord.user_id,
+            ]);
+            await client.query('COMMIT');
+        } catch (transactionError) {
+            await client.query('ROLLBACK');
+            throw transactionError;
+        } finally {
+            client.release();
+        }
+
+        res.json({ message: 'Passwort wurde erfolgreich zurückgesetzt.' });
+    } catch (error) {
+        console.error('Confirm reset password error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Bestätigen des Passwort-Resets.' });
+    }
+});
+
+// POST /api/auth/enable-2fa - Initiate Two-Factor Authentication setup
+authRouter.post('/enable-2fa', authMiddleware, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { rows } = await client.query(
+            'SELECT email, has_2fa, totp_secret, totp_confirmed FROM users WHERE id = $1',
+            [req.user.id]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
+        }
+
+        const user = rows[0];
+
+        if (user.has_2fa && user.totp_confirmed) {
+            return res.status(400).json({ error: 'Zwei-Faktor-Authentifizierung ist bereits aktiviert.' });
+        }
+
+        const secret = generateTotpSecret();
+        const otpLabel = user.email || `user-${req.user.id}`;
+        const otpauthUrl = buildOtpAuthUrl(secret, otpLabel);
+        const backupCodes = generateBackupCodes();
+        const hashedBackupCodes = await Promise.all(backupCodes.map(async (code) => {
+            const normalized = code.toUpperCase();
+            return bcrypt.hash(normalized, 12);
+        }));
+
+        try {
+            await client.query('BEGIN');
+            await client.query(
+                'UPDATE users SET totp_secret = $1, totp_confirmed = false, has_2fa = false, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+                [secret, req.user.id]
+            );
+            await client.query('DELETE FROM user_backup_codes WHERE user_id = $1', [req.user.id]);
+            for (const hashedCode of hashedBackupCodes) {
+                await client.query(
+                    'INSERT INTO user_backup_codes (user_id, code_hash) VALUES ($1, $2)',
+                    [req.user.id, hashedCode]
+                );
+            }
+            await client.query('COMMIT');
+        } catch (transactionError) {
+            await client.query('ROLLBACK');
+            throw transactionError;
+        }
 
         res.json({
-            qrCode: qrCodeUrl,
-            backupCodes: backupCodes,
-            message: '2FA wurde erfolgreich aktiviert.'
+            secret: {
+                base32: secret,
+                otpauthUrl,
+            },
+            backupCodes,
+            message: 'Zwei-Faktor-Authentifizierung vorbereitet. Bitte Code eingeben, um zu bestätigen.',
         });
     } catch (error) {
         console.error('Enable 2FA error:', error);
         res.status(500).json({ error: 'Serverfehler beim Aktivieren der 2FA.' });
+    } finally {
+        client.release();
+    }
+});
+
+// POST /api/auth/verify-2fa - Confirm Two-Factor Authentication setup
+authRouter.post('/verify-2fa', authMiddleware, async (req, res) => {
+    try {
+        const { token } = req.body;
+
+        if (!token) {
+            return res.status(400).json({ error: 'Ein TOTP-Code ist erforderlich.' });
+        }
+
+        const { rows } = await pool.query(
+            'SELECT totp_secret, totp_confirmed FROM users WHERE id = $1',
+            [req.user.id]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
+        }
+
+        const { totp_secret: secret } = rows[0];
+
+        if (!secret) {
+            return res.status(400).json({ error: 'Kein TOTP-Setup gefunden. Bitte erneut starten.' });
+        }
+
+        const isValid = verifyTotpToken(token, secret);
+
+        if (!isValid) {
+            return res.status(401).json({ error: 'Ungültiger TOTP-Code.' });
+        }
+
+        await pool.query(
+            'UPDATE users SET has_2fa = true, totp_confirmed = true, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+            [req.user.id]
+        );
+
+        res.json({ message: 'Zwei-Faktor-Authentifizierung wurde erfolgreich aktiviert.' });
+    } catch (error) {
+        console.error('Verify 2FA error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Bestätigen der 2FA.' });
+    }
+});
+
+// POST /api/auth/backup-codes/consume - Consume a backup code
+authRouter.post('/backup-codes/consume', authMiddleware, async (req, res) => {
+    try {
+        const { code } = req.body;
+
+        if (!code) {
+            return res.status(400).json({ error: 'Ein Backup-Code ist erforderlich.' });
+        }
+
+        const normalizedCode = String(code).replace(/\s+/g, '').toUpperCase();
+        const { rows } = await pool.query(
+            'SELECT id, code_hash FROM user_backup_codes WHERE user_id = $1 AND used_at IS NULL',
+            [req.user.id]
+        );
+
+        let matchedCodeId = null;
+        for (const row of rows) {
+            const matches = await bcrypt.compare(normalizedCode, row.code_hash);
+            if (matches) {
+                matchedCodeId = row.id;
+                break;
+            }
+        }
+
+        if (!matchedCodeId) {
+            return res.status(404).json({ error: 'Backup-Code wurde nicht gefunden oder bereits verwendet.' });
+        }
+
+        await pool.query('UPDATE user_backup_codes SET used_at = CURRENT_TIMESTAMP WHERE id = $1', [matchedCodeId]);
+
+        res.json({ message: 'Backup-Code wurde erfolgreich verwendet.' });
+    } catch (error) {
+        console.error('Consume backup code error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Verwenden des Backup-Codes.' });
+    }
+});
+
+// POST /api/auth/backup-codes/rotate - Generate new backup codes
+authRouter.post('/backup-codes/rotate', authMiddleware, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { rows } = await client.query('SELECT has_2fa FROM users WHERE id = $1', [req.user.id]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
+        }
+
+        if (!rows[0].has_2fa) {
+            return res.status(400).json({ error: 'Backup-Codes können nur für aktive 2FA erneuert werden.' });
+        }
+
+        const backupCodes = generateBackupCodes();
+        const hashedBackupCodes = await Promise.all(backupCodes.map(async (code) => bcrypt.hash(code.toUpperCase(), 12)));
+
+        try {
+            await client.query('BEGIN');
+            await client.query('DELETE FROM user_backup_codes WHERE user_id = $1', [req.user.id]);
+            for (const hashedCode of hashedBackupCodes) {
+                await client.query('INSERT INTO user_backup_codes (user_id, code_hash) VALUES ($1, $2)', [req.user.id, hashedCode]);
+            }
+            await client.query('COMMIT');
+        } catch (transactionError) {
+            await client.query('ROLLBACK');
+            throw transactionError;
+        }
+
+        res.json({
+            backupCodes,
+            message: 'Neue Backup-Codes wurden erfolgreich generiert.',
+        });
+    } catch (error) {
+        console.error('Rotate backup codes error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Erneuern der Backup-Codes.' });
+    } finally {
+        client.release();
     }
 });
 
@@ -279,8 +707,21 @@ authRouter.post('/disable-2fa', authMiddleware, async (req, res) => {
             return res.status(401).json({ error: 'Ungültiges Passwort.' });
         }
 
-        // Disable 2FA
-        await pool.query('UPDATE users SET has_2fa = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1', [req.user.id]);
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+            await client.query(
+                'UPDATE users SET has_2fa = false, totp_secret = NULL, totp_confirmed = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+                [req.user.id]
+            );
+            await client.query('DELETE FROM user_backup_codes WHERE user_id = $1', [req.user.id]);
+            await client.query('COMMIT');
+        } catch (transactionError) {
+            await client.query('ROLLBACK');
+            throw transactionError;
+        } finally {
+            client.release();
+        }
 
         res.json({ message: '2FA wurde erfolgreich deaktiviert.' });
     } catch (error) {

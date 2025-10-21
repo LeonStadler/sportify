@@ -4,6 +4,18 @@ import dotenv from 'dotenv';
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import pkg from 'pg';
+import { queueEmail } from './services/emailService.js';
+import {
+    TokenError,
+    createEmailVerificationToken,
+    createPasswordResetToken,
+    markEmailVerificationTokenUsed,
+    markPasswordResetTokenUsed,
+    validateEmailVerificationToken,
+    validatePasswordResetToken,
+} from './services/tokenService.js';
+import { InvitationError, createInvitation } from './services/invitationService.js';
+import { createAdminMiddleware } from './middleware/adminMiddleware.js';
 
 dotenv.config();
 const { Pool } = pkg;
@@ -34,6 +46,8 @@ const pool = new Pool({
         rejectUnauthorized: false
     }
 });
+
+const adminMiddleware = createAdminMiddleware(pool);
 
 // Middlewares
 app.use(cors());
@@ -149,6 +163,17 @@ authRouter.post('/register', async (req, res) => {
         const { rows } = await pool.query(newUserQuery, values);
         const rawUser = rows[0];
 
+        try {
+            const { token: verificationToken } = await createEmailVerificationToken(pool, rawUser.id);
+            await queueEmail(pool, {
+                recipient: email,
+                subject: 'Sportify – E-Mail bestätigen',
+                body: `Hallo ${firstName},\n\nbitte bestätige deine E-Mail-Adresse mit diesem Code: ${verificationToken}\n\nDein Sportify-Team`,
+            });
+        } catch (mailError) {
+            console.error('Verification email error:', mailError);
+        }
+
         // Convert snake_case to camelCase
         const user = toCamelCase(rawUser);
 
@@ -223,16 +248,104 @@ authRouter.post('/reset-password', async (req, res) => {
             return res.json({ message: 'Falls die E-Mail-Adresse existiert, wurde eine Zurücksetzungs-E-Mail gesendet.' });
         }
 
-        // Generate reset token
-        const resetToken = jwt.sign({ userId: rows[0].id, type: 'password_reset' }, process.env.JWT_SECRET, { expiresIn: '1h' });
-
-        // In a real app, you would send an email here
-        console.log(`Password reset token for ${email}:`, resetToken);
+        try {
+            const { token: resetToken } = await createPasswordResetToken(pool, rows[0].id);
+            await queueEmail(pool, {
+                recipient: email,
+                subject: 'Sportify – Passwort zurücksetzen',
+                body: `Hallo,\n\nverwende diesen Code, um dein Passwort zurückzusetzen: ${resetToken}\n\nDieser Code ist eine Stunde lang gültig.`,
+            });
+        } catch (mailError) {
+            console.error('Password reset email error:', mailError);
+            return res.status(500).json({ error: 'Fehler beim Versenden der Zurücksetzungs-E-Mail.' });
+        }
 
         res.json({ message: 'Falls die E-Mail-Adresse existiert, wurde eine Zurücksetzungs-E-Mail gesendet.' });
     } catch (error) {
         console.error('Reset password error:', error);
         res.status(500).json({ error: 'Serverfehler beim Zurücksetzen des Passworts.' });
+    }
+});
+
+authRouter.post('/confirm-reset-password', async (req, res) => {
+    try {
+        const { token, newPassword } = req.body;
+
+        if (!token || !newPassword) {
+            return res.status(400).json({ error: 'Token und neues Passwort sind erforderlich.' });
+        }
+
+        if (newPassword.length < 8) {
+            return res.status(400).json({ error: 'Passwort muss mindestens 8 Zeichen lang sein.' });
+        }
+
+        const tokenData = await validatePasswordResetToken(pool, token);
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(newPassword, salt);
+
+        await pool.query('UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [passwordHash, tokenData.userId]);
+        await markPasswordResetTokenUsed(pool, tokenData.id);
+
+        res.json({ message: 'Passwort wurde erfolgreich aktualisiert.' });
+    } catch (error) {
+        if (error instanceof TokenError) {
+            return res.status(400).json({ error: error.message });
+        }
+        console.error('Confirm reset password error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Aktualisieren des Passworts.' });
+    }
+});
+
+authRouter.post('/verify-email', async (req, res) => {
+    try {
+        const { token } = req.body;
+
+        if (!token) {
+            return res.status(400).json({ error: 'Verifizierungstoken ist erforderlich.' });
+        }
+
+        const tokenData = await validateEmailVerificationToken(pool, token);
+        await pool.query('UPDATE users SET is_email_verified = true, updated_at = CURRENT_TIMESTAMP WHERE id = $1', [tokenData.userId]);
+        await markEmailVerificationTokenUsed(pool, tokenData.id);
+
+        res.json({ message: 'E-Mail erfolgreich verifiziert.' });
+    } catch (error) {
+        if (error instanceof TokenError) {
+            return res.status(400).json({ error: error.message });
+        }
+        console.error('Verify email error:', error);
+        res.status(500).json({ error: 'Serverfehler bei der E-Mail-Verifizierung.' });
+    }
+});
+
+authRouter.post('/resend-verification', authMiddleware, async (req, res) => {
+    try {
+        const { rows } = await pool.query('SELECT email, first_name, is_email_verified FROM users WHERE id = $1', [req.user.id]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
+        }
+
+        const user = rows[0];
+
+        if (user.is_email_verified) {
+            return res.status(400).json({ error: 'E-Mail wurde bereits verifiziert.' });
+        }
+
+        const { token: verificationToken } = await createEmailVerificationToken(pool, req.user.id);
+        await queueEmail(pool, {
+            recipient: user.email,
+            subject: 'Sportify – E-Mail bestätigen',
+            body: `Hallo ${user.first_name},\n\nbitte bestätige deine E-Mail-Adresse mit diesem Code: ${verificationToken}\n\nDein Sportify-Team`,
+        });
+
+        res.json({ message: 'Verifizierungs-E-Mail wurde erneut gesendet.' });
+    } catch (error) {
+        if (error instanceof TokenError) {
+            return res.status(400).json({ error: error.message });
+        }
+        console.error('Resend verification error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Senden der Verifizierungs-E-Mail.' });
     }
 });
 
@@ -290,6 +403,103 @@ authRouter.post('/disable-2fa', authMiddleware, async (req, res) => {
 });
 
 app.use('/api/auth', authRouter);
+
+// Admin APIs
+const adminRouter = express.Router();
+
+adminRouter.get('/users', async (req, res) => {
+    try {
+        const { rows } = await pool.query(`
+            SELECT
+                id,
+                email,
+                first_name,
+                last_name,
+                nickname,
+                is_email_verified,
+                has_2fa,
+                is_admin,
+                COALESCE(is_active, true) AS is_active,
+                created_at,
+                last_login_at
+            FROM users
+            ORDER BY created_at DESC
+        `);
+
+        const users = rows.map(row => toCamelCase(row));
+        res.json(users);
+    } catch (error) {
+        console.error('Admin users error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Laden der Benutzerliste.' });
+    }
+});
+
+adminRouter.get('/invitations', async (req, res) => {
+    try {
+        const { rows } = await pool.query(`
+            SELECT
+                i.id,
+                i.email,
+                i.first_name,
+                i.last_name,
+                i.status,
+                i.created_at,
+                i.expires_at,
+                inviter.first_name AS invited_by_first_name,
+                inviter.last_name AS invited_by_last_name
+            FROM invitations i
+            LEFT JOIN users inviter ON i.invited_by = inviter.id
+            ORDER BY i.created_at DESC
+        `);
+
+        const invitations = rows.map(row => toCamelCase(row));
+        res.json(invitations);
+    } catch (error) {
+        console.error('Admin invitations error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Laden der Einladungen.' });
+    }
+});
+
+adminRouter.post('/invite-user', async (req, res) => {
+    try {
+        const { email, firstName, lastName } = req.body;
+
+        if (!email || !firstName || !lastName) {
+            return res.status(400).json({ error: 'E-Mail, Vorname und Nachname sind erforderlich.' });
+        }
+
+        const { rows: existingUsers } = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+        if (existingUsers.length > 0) {
+            return res.status(409).json({ error: 'Für diese E-Mail existiert bereits ein Konto.' });
+        }
+
+        const { invitation, token } = await createInvitation(pool, {
+            email,
+            firstName,
+            lastName,
+            invitedBy: req.user.id,
+        });
+
+        await queueEmail(pool, {
+            recipient: email,
+            subject: 'Sportify – Einladung',
+            body: `Hallo ${firstName},\n\nDu wurdest zu Sportify eingeladen.\nVerwende diesen Code, um dich zu registrieren: ${token}\n\nDie Einladung läuft am ${new Date(invitation.expires_at).toISOString()} ab.`,
+        });
+
+        res.status(201).json({
+            message: 'Einladung gesendet.',
+            invitation: toCamelCase(invitation),
+        });
+    } catch (error) {
+        if (error instanceof InvitationError) {
+            return res.status(400).json({ error: error.message });
+        }
+        console.error('Invite user error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Senden der Einladung.' });
+    }
+});
+
+app.use('/api/admin', authMiddleware, adminMiddleware, adminRouter);
 
 // Profile Management APIs
 const profileRouter = express.Router();
@@ -1129,6 +1339,11 @@ feedRouter.get('/', authMiddleware, async (req, res) => {
 app.use('/api/feed', feedRouter);
 
 // Start Server
-app.listen(port, () => {
-    console.log(`Server is running on http://localhost:${port}`);
-}); 
+if (process.env.NODE_ENV !== 'test') {
+    app.listen(port, () => {
+        console.log(`Server is running on http://localhost:${port}`);
+    });
+}
+
+export { app, pool };
+export default app;

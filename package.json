@@ -9,6 +9,7 @@
     "dev": "concurrently \"npm:dev:frontend\" \"npm:dev:backend\"",
     "dev:frontend": "vite --host",
     "dev:backend": "nodemon server.js",
+    "test": "node --test",
     "build": "tsc -b && vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",

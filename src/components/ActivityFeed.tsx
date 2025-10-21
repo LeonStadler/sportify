@@ -136,6 +136,7 @@ export function ActivityFeed() {
   const { toast } = useToast();
   const [activities, setActivities] = useState<ActivityFeedItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -145,9 +146,14 @@ export function ActivityFeed() {
 
   const loadActivityFeed = async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const token = localStorage.getItem('token');
-      if (!token) return;
+      if (!token) {
+        setActivities([]);
+        setError('Bitte melde dich an, um Aktivitäten zu sehen.');
+        return;
+      }
 
       const response = await fetch(`${API_URL}/feed?page=1&limit=10`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -155,12 +161,32 @@ export function ActivityFeed() {
 
       if (response.ok) {
         const data = await response.json();
-        setActivities(data.activities || []);
+        const payload = Array.isArray(data) ? data : data?.activities;
+
+        if (Array.isArray(payload)) {
+          setActivities(payload);
+        } else {
+          setActivities([]);
+          setError('Unerwartetes Datenformat vom Server.');
+        }
       } else {
-        console.log('Activity feed API failed');
+        setActivities([]);
+        setError('Aktivitäten konnten nicht geladen werden.');
+        toast({
+          title: 'Fehler',
+          description: 'Der Activity Feed konnte nicht geladen werden.',
+          variant: 'destructive'
+        });
       }
     } catch (error) {
       console.error('Error loading activity feed:', error);
+      setActivities([]);
+      setError('Aktivitäten konnten nicht geladen werden.');
+      toast({
+        title: 'Fehler',
+        description: 'Der Activity Feed konnte nicht geladen werden.',
+        variant: 'destructive',
+      });
     } finally {
       setIsLoading(false);
     }
@@ -195,56 +221,62 @@ export function ActivityFeed() {
         <CardTitle className="text-lg md:text-xl">Aktivitäten der Freunde</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-3">
-          {activities.length > 0 ? (
-            activities.map((activity) => (
-              <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30">
-                <Avatar className="w-10 h-10 md:w-12 md:h-12">
-                  <AvatarImage src={activity.userAvatar} alt={activity.userName} />
-                  <AvatarFallback className="text-xs md:text-sm">
-                    {getUserInitials(activity.userFirstName, activity.userLastName)}
-                  </AvatarFallback>
-                </Avatar>
-                
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium text-sm md:text-base truncate">
-                      {activity.userName}
-                    </span>
-                    <Badge 
-                      variant="secondary" 
-                      className={`text-xs ${getActivityColor(activity.activityType)}`}
-                    >
-                      {getActivityIcon(activity.activityType)} {getActivityName(activity.activityType)}
-                    </Badge>
-                  </div>
-                  
-                  <p className="text-xs md:text-sm text-muted-foreground mb-1">
-                    <span className="font-medium">{formatActivity(activity)}</span>
-                  </p>
-                  
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">
-                      {formatTimeAgo(activity.createdAt)}
-                    </span>
-                    <span className="text-xs font-medium text-primary">
-                      {activity.points} Punkte
-                    </span>
+        {error ? (
+          <div role="alert" className="text-sm text-destructive">
+            {error}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {activities.length > 0 ? (
+              activities.map((activity) => (
+                <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30">
+                  <Avatar className="w-10 h-10 md:w-12 md:h-12">
+                    <AvatarImage src={activity.userAvatar} alt={activity.userName} />
+                    <AvatarFallback className="text-xs md:text-sm">
+                      {getUserInitials(activity.userFirstName, activity.userLastName)}
+                    </AvatarFallback>
+                  </Avatar>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-medium text-sm md:text-base truncate">
+                        {activity.userName}
+                      </span>
+                      <Badge
+                        variant="secondary"
+                        className={`text-xs ${getActivityColor(activity.activityType)}`}
+                      >
+                        {getActivityIcon(activity.activityType)} {getActivityName(activity.activityType)}
+                      </Badge>
+                    </div>
+
+                    <p className="text-xs md:text-sm text-muted-foreground mb-1">
+                      <span className="font-medium">{formatActivity(activity)}</span>
+                    </p>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">
+                        {formatTimeAgo(activity.createdAt)}
+                      </span>
+                      <span className="text-xs font-medium text-primary">
+                        {activity.points} Punkte
+                      </span>
+                    </div>
                   </div>
                 </div>
+              ))
+            ) : (
+              <div className="text-center py-8">
+                <div className="text-4xl mb-4">👥</div>
+                <p className="text-muted-foreground mb-2">Keine Aktivitäten von Freunden</p>
+                <p className="text-xs md:text-sm text-muted-foreground">
+                  Füge Freunde hinzu, um ihre Workouts zu sehen!
+                </p>
               </div>
-            ))
-          ) : (
-            <div className="text-center py-8">
-              <div className="text-4xl mb-4">👥</div>
-              <p className="text-muted-foreground mb-2">Keine Aktivitäten von Freunden</p>
-              <p className="text-xs md:text-sm text-muted-foreground">
-                Füge Freunde hinzu, um ihre Workouts zu sehen!
-              </p>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
-} 
+}

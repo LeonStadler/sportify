@@ -95,6 +95,22 @@ Das Projekt folgt modernen React/TypeScript Best Practices:
 - **Responsive Design First**
 - **Accessibility (a11y) Standards**
 
+## 🔐 Datenbank-TLS-Konfiguration
+
+Die PostgreSQL-Verbindung kann per Umgebungsvariablen abgesichert werden:
+
+- `DATABASE_SSL_ENABLED` – aktiviert TLS für die Verbindung, Standard: `false`.
+- `DATABASE_SSL_REJECT_UNAUTHORIZED` – legt fest, ob Zertifikate validiert werden, Standard: `true`.
+
+Beispiel für gehostete Datenbanken mit eigenem Zertifikat:
+
+```bash
+export DATABASE_SSL_ENABLED=true
+export DATABASE_SSL_REJECT_UNAUTHORIZED=false
+```
+
+Wenn `DATABASE_SSL_ENABLED` aktiviert ist, nutzt der Server standardmäßig eine strikte Zertifikatsprüfung (`rejectUnauthorized: true`).
+
 ## 👨‍💻 Autor
 
 **Leon Stadler**

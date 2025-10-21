@@ -1687,31 +1687,53 @@ const recentWorkoutsRouter = express.Router();
 // GET /api/recent-workouts - Recent workouts
 recentWorkoutsRouter.get('/', authMiddleware, async (req, res) => {
     try {
+        const { limit: limitQuery } = req.query;
+        const limit = Math.max(1, Math.min(parseInt(limitQuery, 10) || 5, 50));
+
         const query = `
-            SELECT 
+            SELECT
                 w.id,
-                w.title,
-                w.workout_date,
-                w.duration,
+                w.created_at,
+                w.notes,
                 ARRAY_AGG(
                     JSON_BUILD_OBJECT(
                         'activityType', wa.activity_type,
-                        'quantity', wa.quantity,
-                        'unit', wa.unit
+                        'amount', wa.quantity,
+                        'unit', wa.unit,
+                        'points', wa.points_earned
                     )
-                ) as activities
+                    ORDER BY wa.order_index, wa.id
+                ) FILTER (WHERE wa.id IS NOT NULL) as activities
             FROM workouts w
             LEFT JOIN workout_activities wa ON w.id = wa.workout_id
             WHERE w.user_id = $1
-            GROUP BY w.id, w.title, w.workout_date, w.duration
-            ORDER BY w.workout_date DESC
-            LIMIT 5
+            GROUP BY w.id, w.created_at, w.notes
+            ORDER BY w.created_at DESC
+            LIMIT $2
         `;
 
-        const { rows } = await pool.query(query, [req.user.id]);
-        const workouts = rows.map(row => toCamelCase(row));
+        const { rows } = await pool.query(query, [req.user.id, limit]);
 
-        res.json({ workouts });
+        const workouts = rows.map(row => {
+            const camelRow = toCamelCase(row);
+            const activities = Array.isArray(camelRow.activities)
+                ? camelRow.activities.map(activity => ({
+                    activityType: activity.activityType,
+                    amount: activity.amount ?? activity.quantity ?? 0,
+                    unit: activity.unit ?? null,
+                    points: activity.points ?? null
+                }))
+                : [];
+
+            return {
+                id: camelRow.id,
+                createdAt: camelRow.createdAt,
+                notes: camelRow.notes,
+                activities
+            };
+        });
+
+        res.json(workouts);
     } catch (error) {
         console.error('Recent workouts error:', error);
         res.status(500).json({ error: 'Serverfehler beim Laden der letzten Workouts.' });
@@ -1726,13 +1748,19 @@ const feedRouter = express.Router();
 // GET /api/feed - Activity feed
 feedRouter.get('/', authMiddleware, async (req, res) => {
     try {
+        const { page = 1, limit: limitQuery } = req.query;
+        const limit = Math.max(1, Math.min(parseInt(limitQuery, 10) || 20, 50));
+        const currentPage = Math.max(1, parseInt(page, 10) || 1);
+        const offset = (currentPage - 1) * limit;
+
         const query = `
-            SELECT 
+            SELECT
                 wa.id,
                 wa.activity_type,
                 wa.quantity as amount,
+                COALESCE(wa.points_earned, 0) as points,
+                COALESCE(wa.created_at, w.created_at) as created_at,
                 w.title as workout_title,
-                w.workout_date,
                 u.first_name,
                 u.last_name,
                 u.nickname,
@@ -1741,23 +1769,35 @@ feedRouter.get('/', authMiddleware, async (req, res) => {
             FROM workout_activities wa
             JOIN workouts w ON wa.workout_id = w.id
             JOIN users u ON w.user_id = u.id
-            ORDER BY w.workout_date DESC
-            LIMIT 20
+            ORDER BY COALESCE(wa.created_at, w.created_at) DESC
+            LIMIT $1 OFFSET $2
         `;
 
-        const { rows } = await pool.query(query);
+        const { rows } = await pool.query(query, [limit, offset]);
 
         const activities = rows.map(row => {
             const activity = toCamelCase(row);
-            // Set display name based on preference
+
+            let displayName = activity.firstName || activity.nickname || 'Athlet';
             if (activity.displayPreference === 'nickname' && activity.nickname) {
-                activity.displayName = activity.nickname;
+                displayName = activity.nickname;
             } else if (activity.displayPreference === 'fullName') {
-                activity.displayName = `${activity.firstName} ${activity.lastName}`;
-            } else {
-                activity.displayName = activity.firstName;
+                const fullName = [activity.firstName, activity.lastName].filter(Boolean).join(' ').trim();
+                displayName = fullName || displayName;
             }
-            return activity;
+
+            return {
+                id: activity.id,
+                userName: displayName,
+                userAvatar: activity.avatarUrl || null,
+                userFirstName: activity.firstName,
+                userLastName: activity.lastName,
+                activityType: activity.activityType,
+                amount: activity.amount ?? 0,
+                points: activity.points ?? 0,
+                workoutTitle: activity.workoutTitle,
+                createdAt: activity.createdAt || activity.workoutDate
+            };
         });
 
         res.json({ activities });

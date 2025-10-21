@@ -1,5 +1,6 @@
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { StatCard } from "@/components/StatCard";
+import { WeeklyChallengeCard } from "@/components/WeeklyChallengeCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from '@/contexts/AuthContext';
@@ -67,6 +68,7 @@ export function Dashboard() {
   });
 
   const [recentWorkouts, setRecentWorkouts] = useState<RecentWorkout[]>([]);
+  const [recentWorkoutsError, setRecentWorkoutsError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -133,16 +135,53 @@ export function Dashboard() {
 
   const loadRecentWorkouts = async (token: string) => {
     try {
+      setRecentWorkoutsError(null);
+
+      if (!token) {
+        setRecentWorkouts([]);
+        setRecentWorkoutsError('Bitte melde dich an, um deine letzten Workouts zu sehen.');
+        return;
+      }
+
       const response = await fetch(`${API_URL}/recent-workouts?limit=5`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (response.ok) {
         const data = await response.json();
-        setRecentWorkouts(data);
+        const workouts = Array.isArray(data) ? data : data?.workouts;
+
+        if (Array.isArray(workouts)) {
+          setRecentWorkouts(workouts.map((workout) => ({
+            ...workout,
+            activities: Array.isArray(workout.activities) ? workout.activities.map((activity) => ({
+              activityType: activity.activityType,
+              amount: activity.amount ?? activity.quantity ?? 0,
+              points: activity.points ?? 0,
+            })) : []
+          })));
+        } else {
+          setRecentWorkouts([]);
+          setRecentWorkoutsError('Unerwartetes Datenformat für Workouts erhalten.');
+        }
+      } else {
+        setRecentWorkouts([]);
+        setRecentWorkoutsError('Letzte Workouts konnten nicht geladen werden.');
+        toast({
+          title: 'Fehler',
+          description: 'Die letzten Workouts konnten nicht geladen werden.',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error loading recent workouts:', error);
+      setRecentWorkouts([]);
+      setRecentWorkoutsError('Letzte Workouts konnten nicht geladen werden.');
+      toast({
+        title: 'Fehler',
+        description: 'Die letzten Workouts konnten nicht geladen werden.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -238,6 +277,15 @@ export function Dashboard() {
         <p className="text-muted-foreground mt-2 text-sm md:text-base">Deine sportlichen Fortschritte auf einen Blick</p>
       </div>
 
+      {recentWorkoutsError && (
+        <div
+          role="alert"
+          className="mx-4 md:mx-0 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+        >
+          {recentWorkoutsError}
+        </div>
+      )}
+
       {/* Stats Grid - Mobile optimiert */}
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 px-4 md:px-0">
         <StatCard
@@ -271,7 +319,7 @@ export function Dashboard() {
       </div>
 
       {/* Progress Section - Mobile Stack Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 px-4 md:px-0">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6 px-4 md:px-0">
         <Card>
           <CardHeader className="pb-4">
             <CardTitle className="text-lg md:text-xl">Wochenziele</CardTitle>
@@ -319,7 +367,10 @@ export function Dashboard() {
             </div>
           </CardContent>
         </Card>
+        <WeeklyChallengeCard className="xl:col-span-2" />
+      </div>
 
+      <div className="px-4 md:px-0">
         <ActivityFeed />
       </div>
     </div>

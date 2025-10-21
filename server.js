@@ -4,13 +4,28 @@ import crypto from 'crypto';
 import dotenv from 'dotenv';
 import express from 'express';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 import pkg from 'pg';
+import { queueEmail } from './services/emailService.js';
+import {
+    TokenError,
+    createEmailVerificationToken,
+    createPasswordResetToken,
+    markEmailVerificationTokenUsed,
+    markPasswordResetTokenUsed,
+    validateEmailVerificationToken,
+    validatePasswordResetToken,
+} from './services/tokenService.js';
+import { InvitationError, createInvitation } from './services/invitationService.js';
+import { createAdminMiddleware } from './middleware/adminMiddleware.js';
 
 dotenv.config();
 const { Pool } = pkg;
 
 const app = express();
 const port = process.env.PORT || 3001;
+
+const ALLOWED_JOURNAL_MOODS = ['energized', 'balanced', 'tired', 'sore', 'stressed'];
 
 // Helper function to convert snake_case to camelCase
 const toCamelCase = (obj) => {
@@ -169,6 +184,12 @@ const sendPasswordResetEmail = async (recipientEmail, _token) => {
         console.info('Ein Entwicklungs-Reset-Token wurde generiert. Überprüfen Sie Ihren konfigurierten Mail-Service für Details.');
     }
 };
+class ValidationError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = 'ValidationError';
+    }
+}
 
 // Database Connection
 const sslEnabled = parseBoolean(process.env.DATABASE_SSL_ENABLED, false);
@@ -184,6 +205,243 @@ if (sslEnabled) {
 }
 
 const pool = new Pool(poolConfig);
+
+const adminMiddleware = createAdminMiddleware(pool);
+let trainingJournalTableInitialized = false;
+
+const sanitizeColumnType = (type) => {
+    if (!type) return 'UUID';
+    const sanitized = type.replace(/[^a-zA-Z0-9_\s()]/g, '');
+    return sanitized || 'UUID';
+};
+
+const getColumnSqlType = async (tableName, columnName) => {
+    const query = `
+        SELECT format_type(atttypid, atttypmod) as data_type
+        FROM pg_attribute
+        WHERE attrelid = $1::regclass
+          AND attname = $2
+          AND NOT attisdropped
+    `;
+
+    try {
+        const { rows } = await pool.query(query, [tableName, columnName]);
+        if (rows.length === 0 || !rows[0].data_type) {
+            return 'UUID';
+        }
+        return sanitizeColumnType(rows[0].data_type);
+    } catch (error) {
+        console.warn(`Could not determine column type for ${tableName}.${columnName}:`, error.message);
+        return 'UUID';
+    }
+};
+
+const WEEK_WINDOW_CONDITION = `
+    COALESCE(w.workout_date, w.created_at::date) >= date_trunc('week', CURRENT_DATE)
+    AND COALESCE(w.workout_date, w.created_at::date) < date_trunc('week', CURRENT_DATE) + INTERVAL '7 days'
+`;
+
+const weeklyChallengeTargets = {
+    pullups: 200,
+    pushups: 400,
+    running: 30,
+    cycling: 120,
+    points: 1500
+};
+
+const USER_DISPLAY_NAME_SQL = `
+    CASE
+        WHEN u.display_preference = 'nickname' AND u.nickname IS NOT NULL THEN u.nickname
+        WHEN u.display_preference = 'fullName' THEN CONCAT(u.first_name, ' ', u.last_name)
+        ELSE u.first_name
+    END
+`;
+
+const ensureTrainingJournalTable = async () => {
+    if (trainingJournalTableInitialized) {
+        return;
+    }
+
+    try {
+        await pool.query('CREATE EXTENSION IF NOT EXISTS "pgcrypto"');
+    } catch (error) {
+        console.warn('Could not ensure pgcrypto extension:', error.message);
+    }
+
+    const userIdType = await getColumnSqlType('users', 'id');
+    const workoutIdType = await getColumnSqlType('workouts', 'id');
+
+    const createTableQuery = `
+        CREATE TABLE IF NOT EXISTS training_journal_entries (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id ${userIdType} NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            workout_id ${workoutIdType} REFERENCES workouts(id) ON DELETE SET NULL,
+            entry_date DATE NOT NULL DEFAULT CURRENT_DATE,
+            mood TEXT NOT NULL CHECK (mood IN ('energized','balanced','tired','sore','stressed')),
+            energy_level SMALLINT CHECK (energy_level BETWEEN 1 AND 10),
+            focus_level SMALLINT CHECK (focus_level BETWEEN 1 AND 10),
+            sleep_quality SMALLINT CHECK (sleep_quality BETWEEN 1 AND 10),
+            soreness_level SMALLINT CHECK (soreness_level BETWEEN 0 AND 10),
+            perceived_exertion SMALLINT CHECK (perceived_exertion BETWEEN 1 AND 10),
+            notes TEXT,
+            tags TEXT[],
+            metrics JSONB NOT NULL DEFAULT '{}'::jsonb,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+    `;
+
+    await pool.query(createTableQuery);
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_training_journal_user_date ON training_journal_entries (user_id, entry_date DESC)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_training_journal_mood ON training_journal_entries (mood)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_training_journal_tags ON training_journal_entries USING GIN (tags)');
+
+    trainingJournalTableInitialized = true;
+};
+
+const normalizeEntryDate = (value) => {
+    if (!value) {
+        return new Date().toISOString().slice(0, 10);
+    }
+
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return value;
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+        throw new ValidationError('Ungültiges Datum für den Trainingseintrag.');
+    }
+    return parsed.toISOString().slice(0, 10);
+};
+
+const normalizeOptionalDateFilter = (value) => {
+    if (!value) {
+        return null;
+    }
+
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return value;
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+        throw new ValidationError('Ungültiges Datum im Filter.');
+    }
+
+    return parsed.toISOString().slice(0, 10);
+};
+
+const coerceOptionalScaleValue = (value, { field, min, max, allowZero = false }) => {
+    if (value === undefined || value === null || value === '') {
+        return null;
+    }
+
+    const numberValue = Number(value);
+    if (Number.isNaN(numberValue)) {
+        throw new ValidationError(`Der Wert für ${field} muss eine Zahl sein.`);
+    }
+
+    const rounded = Math.round(numberValue);
+    const effectiveMin = allowZero ? Math.max(min, 0) : min;
+
+    if (rounded < effectiveMin || rounded > max) {
+        throw new ValidationError(`Der Wert für ${field} muss zwischen ${effectiveMin} und ${max} liegen.`);
+    }
+
+    return rounded;
+};
+
+const parseJournalTags = (value) => {
+    if (!value) {
+        return [];
+    }
+
+    const rawTags = Array.isArray(value) ? value : String(value).split(',');
+    const trimmed = rawTags
+        .map((tag) => String(tag).trim())
+        .filter((tag) => tag.length > 0)
+        .map((tag) => tag.slice(0, 40));
+
+    const uniqueTags = Array.from(new Set(trimmed.map((tag) => tag.toLowerCase())));
+
+    if (uniqueTags.length > 10) {
+        throw new ValidationError('Es können maximal 10 Tags pro Eintrag gespeichert werden.');
+    }
+
+    return uniqueTags;
+};
+
+const sanitizeMetricsPayload = (metrics) => {
+    if (!metrics || typeof metrics !== 'object' || Array.isArray(metrics)) {
+        return {};
+    }
+
+    const sanitizedMetrics = {};
+    for (const [key, value] of Object.entries(metrics)) {
+        const trimmedKey = String(key).trim();
+        if (!trimmedKey) {
+            continue;
+        }
+
+        const numericValue = typeof value === 'number' ? value : Number(value);
+        if (Number.isFinite(numericValue)) {
+            sanitizedMetrics[trimmedKey.slice(0, 60)] = Number(numericValue);
+        }
+    }
+
+    return sanitizedMetrics;
+};
+
+const toTrainingJournalEntry = (row) => {
+    const entry = toCamelCase(row);
+    entry.tags = Array.isArray(row.tags) ? row.tags : [];
+    entry.metrics = row.metrics && typeof row.metrics === 'object' ? row.metrics : {};
+    return entry;
+};
+
+const buildPaginationMeta = (page, limit, totalItems) => {
+    const totalPages = Math.max(Math.ceil(totalItems / limit), 1);
+    return {
+        currentPage: page,
+        totalPages,
+        totalItems,
+        hasNext: page < totalPages,
+        hasPrev: page > 1
+    };
+};
+
+const ensureWorkoutOwnership = async (workoutId, userId) => {
+    if (!workoutId) {
+        return null;
+    }
+
+    const { rows } = await pool.query('SELECT id FROM workouts WHERE id = $1 AND user_id = $2', [workoutId, userId]);
+    if (rows.length === 0) {
+        throw new ValidationError('Ungültiges Workout: Es wurde kein Workout gefunden oder es gehört nicht zum Benutzer.');
+    }
+
+    return workoutId;
+};
+
+const parsePaginationParams = (page, limit) => {
+    const parsedPage = Math.max(parseInt(page, 10) || 1, 1);
+    const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 50);
+    return { page: parsedPage, limit: parsedLimit };
+};
+
+const extractSearchTerm = (value) => {
+    if (!value || typeof value !== 'string') {
+        return null;
+    }
+
+    const trimmed = value.trim();
+    if (trimmed.length < 2) {
+        return null;
+    }
+
+    return trimmed;
+};
 
 // Middlewares
 app.use(cors());
@@ -298,6 +556,17 @@ authRouter.post('/register', async (req, res) => {
 
         const { rows } = await pool.query(newUserQuery, values);
         const rawUser = rows[0];
+
+        try {
+            const { token: verificationToken } = await createEmailVerificationToken(pool, rawUser.id);
+            await queueEmail(pool, {
+                recipient: email,
+                subject: 'Sportify – E-Mail bestätigen',
+                body: `Hallo ${firstName},\n\nbitte bestätige deine E-Mail-Adresse mit diesem Code: ${verificationToken}\n\nDein Sportify-Team`,
+            });
+        } catch (mailError) {
+            console.error('Verification email error:', mailError);
+        }
 
         // Convert snake_case to camelCase
         const user = toCamelCase(rawUser);
@@ -437,6 +706,16 @@ authRouter.post('/reset-password', async (req, res) => {
             await sendPasswordResetEmail(email, resetToken);
         } catch (emailError) {
             console.error('Reset password email dispatch error:', emailError);
+        try {
+            const { token: resetToken } = await createPasswordResetToken(pool, rows[0].id);
+            await queueEmail(pool, {
+                recipient: email,
+                subject: 'Sportify – Passwort zurücksetzen',
+                body: `Hallo,\n\nverwende diesen Code, um dein Passwort zurückzusetzen: ${resetToken}\n\nDieser Code ist eine Stunde lang gültig.`,
+            });
+        } catch (mailError) {
+            console.error('Password reset email error:', mailError);
+            return res.status(500).json({ error: 'Fehler beim Versenden der Zurücksetzungs-E-Mail.' });
         }
 
         res.json({ message: 'Falls die E-Mail-Adresse existiert, wurde eine Zurücksetzungs-E-Mail gesendet.' });
@@ -503,6 +782,89 @@ authRouter.post('/reset-password/confirm', async (req, res) => {
 });
 
 // POST /api/auth/enable-2fa - Initiate Two-Factor Authentication setup
+authRouter.post('/confirm-reset-password', async (req, res) => {
+    try {
+        const { token, newPassword } = req.body;
+
+        if (!token || !newPassword) {
+            return res.status(400).json({ error: 'Token und neues Passwort sind erforderlich.' });
+        }
+
+        if (newPassword.length < 8) {
+            return res.status(400).json({ error: 'Passwort muss mindestens 8 Zeichen lang sein.' });
+        }
+
+        const tokenData = await validatePasswordResetToken(pool, token);
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(newPassword, salt);
+
+        await pool.query('UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [passwordHash, tokenData.userId]);
+        await markPasswordResetTokenUsed(pool, tokenData.id);
+
+        res.json({ message: 'Passwort wurde erfolgreich aktualisiert.' });
+    } catch (error) {
+        if (error instanceof TokenError) {
+            return res.status(400).json({ error: error.message });
+        }
+        console.error('Confirm reset password error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Aktualisieren des Passworts.' });
+    }
+});
+
+authRouter.post('/verify-email', async (req, res) => {
+    try {
+        const { token } = req.body;
+
+        if (!token) {
+            return res.status(400).json({ error: 'Verifizierungstoken ist erforderlich.' });
+        }
+
+        const tokenData = await validateEmailVerificationToken(pool, token);
+        await pool.query('UPDATE users SET is_email_verified = true, updated_at = CURRENT_TIMESTAMP WHERE id = $1', [tokenData.userId]);
+        await markEmailVerificationTokenUsed(pool, tokenData.id);
+
+        res.json({ message: 'E-Mail erfolgreich verifiziert.' });
+    } catch (error) {
+        if (error instanceof TokenError) {
+            return res.status(400).json({ error: error.message });
+        }
+        console.error('Verify email error:', error);
+        res.status(500).json({ error: 'Serverfehler bei der E-Mail-Verifizierung.' });
+    }
+});
+
+authRouter.post('/resend-verification', authMiddleware, async (req, res) => {
+    try {
+        const { rows } = await pool.query('SELECT email, first_name, is_email_verified FROM users WHERE id = $1', [req.user.id]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
+        }
+
+        const user = rows[0];
+
+        if (user.is_email_verified) {
+            return res.status(400).json({ error: 'E-Mail wurde bereits verifiziert.' });
+        }
+
+        const { token: verificationToken } = await createEmailVerificationToken(pool, req.user.id);
+        await queueEmail(pool, {
+            recipient: user.email,
+            subject: 'Sportify – E-Mail bestätigen',
+            body: `Hallo ${user.first_name},\n\nbitte bestätige deine E-Mail-Adresse mit diesem Code: ${verificationToken}\n\nDein Sportify-Team`,
+        });
+
+        res.json({ message: 'Verifizierungs-E-Mail wurde erneut gesendet.' });
+    } catch (error) {
+        if (error instanceof TokenError) {
+            return res.status(400).json({ error: error.message });
+        }
+        console.error('Resend verification error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Senden der Verifizierungs-E-Mail.' });
+    }
+});
+
+// POST /api/auth/enable-2fa - Enable Two-Factor Authentication
 authRouter.post('/enable-2fa', authMiddleware, async (req, res) => {
     const client = await pool.connect();
     try {
@@ -731,6 +1093,103 @@ authRouter.post('/disable-2fa', authMiddleware, async (req, res) => {
 });
 
 app.use('/api/auth', authRouter);
+
+// Admin APIs
+const adminRouter = express.Router();
+
+adminRouter.get('/users', async (req, res) => {
+    try {
+        const { rows } = await pool.query(`
+            SELECT
+                id,
+                email,
+                first_name,
+                last_name,
+                nickname,
+                is_email_verified,
+                has_2fa,
+                is_admin,
+                COALESCE(is_active, true) AS is_active,
+                created_at,
+                last_login_at
+            FROM users
+            ORDER BY created_at DESC
+        `);
+
+        const users = rows.map(row => toCamelCase(row));
+        res.json(users);
+    } catch (error) {
+        console.error('Admin users error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Laden der Benutzerliste.' });
+    }
+});
+
+adminRouter.get('/invitations', async (req, res) => {
+    try {
+        const { rows } = await pool.query(`
+            SELECT
+                i.id,
+                i.email,
+                i.first_name,
+                i.last_name,
+                i.status,
+                i.created_at,
+                i.expires_at,
+                inviter.first_name AS invited_by_first_name,
+                inviter.last_name AS invited_by_last_name
+            FROM invitations i
+            LEFT JOIN users inviter ON i.invited_by = inviter.id
+            ORDER BY i.created_at DESC
+        `);
+
+        const invitations = rows.map(row => toCamelCase(row));
+        res.json(invitations);
+    } catch (error) {
+        console.error('Admin invitations error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Laden der Einladungen.' });
+    }
+});
+
+adminRouter.post('/invite-user', async (req, res) => {
+    try {
+        const { email, firstName, lastName } = req.body;
+
+        if (!email || !firstName || !lastName) {
+            return res.status(400).json({ error: 'E-Mail, Vorname und Nachname sind erforderlich.' });
+        }
+
+        const { rows: existingUsers } = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+        if (existingUsers.length > 0) {
+            return res.status(409).json({ error: 'Für diese E-Mail existiert bereits ein Konto.' });
+        }
+
+        const { invitation, token } = await createInvitation(pool, {
+            email,
+            firstName,
+            lastName,
+            invitedBy: req.user.id,
+        });
+
+        await queueEmail(pool, {
+            recipient: email,
+            subject: 'Sportify – Einladung',
+            body: `Hallo ${firstName},\n\nDu wurdest zu Sportify eingeladen.\nVerwende diesen Code, um dich zu registrieren: ${token}\n\nDie Einladung läuft am ${new Date(invitation.expires_at).toISOString()} ab.`,
+        });
+
+        res.status(201).json({
+            message: 'Einladung gesendet.',
+            invitation: toCamelCase(invitation),
+        });
+    } catch (error) {
+        if (error instanceof InvitationError) {
+            return res.status(400).json({ error: error.message });
+        }
+        console.error('Invite user error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Senden der Einladung.' });
+    }
+});
+
+app.use('/api/admin', authMiddleware, adminMiddleware, adminRouter);
 
 // Profile Management APIs
 const profileRouter = express.Router();
@@ -1293,6 +1752,410 @@ workoutRouter.delete('/:id', authMiddleware, async (req, res) => {
 // Use workout router
 app.use('/api/workouts', workoutRouter);
 
+// Training Journal Router
+const trainingJournalRouter = express.Router();
+
+const ensureJournalInitialized = async (req, res, next) => {
+    try {
+        await ensureTrainingJournalTable();
+        next();
+    } catch (error) {
+        console.error('Ensure training journal table error:', error);
+        res.status(500).json({ error: 'Serverfehler bei der Initialisierung des Trainingstagebuchs.' });
+    }
+};
+
+trainingJournalRouter.use(authMiddleware, ensureJournalInitialized);
+
+// GET /api/training-journal - List journal entries with filters and pagination
+trainingJournalRouter.get('/', async (req, res) => {
+    try {
+        const { page = '1', limit = '10', mood, startDate, endDate, search } = req.query;
+        const { page: currentPage, limit: pageSize } = parsePaginationParams(page, limit);
+
+        const filters = ['user_id = $1'];
+        const params = [req.user.id];
+        let paramIndex = 2;
+
+        if (typeof mood === 'string' && ALLOWED_JOURNAL_MOODS.includes(mood)) {
+            filters.push(`mood = $${paramIndex}`);
+            params.push(mood);
+            paramIndex += 1;
+        }
+
+        if (startDate) {
+            const normalizedStart = normalizeOptionalDateFilter(startDate);
+            filters.push(`entry_date >= $${paramIndex}`);
+            params.push(normalizedStart);
+            paramIndex += 1;
+        }
+
+        if (endDate) {
+            const normalizedEnd = normalizeOptionalDateFilter(endDate);
+            filters.push(`entry_date <= $${paramIndex}`);
+            params.push(normalizedEnd);
+            paramIndex += 1;
+        }
+
+        const searchTerm = extractSearchTerm(search);
+        if (searchTerm) {
+            filters.push(`(notes ILIKE $${paramIndex} OR EXISTS (SELECT 1 FROM unnest(tags) tag WHERE tag ILIKE $${paramIndex}))`);
+            params.push(`%${searchTerm}%`);
+            paramIndex += 1;
+        }
+
+        const whereClause = filters.join(' AND ');
+        const entriesQuery = `
+            SELECT
+                id,
+                user_id,
+                workout_id,
+                entry_date,
+                mood,
+                energy_level,
+                focus_level,
+                sleep_quality,
+                soreness_level,
+                perceived_exertion,
+                notes,
+                tags,
+                metrics,
+                created_at,
+                updated_at
+            FROM training_journal_entries
+            WHERE ${whereClause}
+            ORDER BY entry_date DESC, created_at DESC
+            LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+        `;
+
+        const queryParams = [...params, pageSize, (currentPage - 1) * pageSize];
+        const { rows } = await pool.query(entriesQuery, queryParams);
+        const entries = rows.map(toTrainingJournalEntry);
+
+        const countQuery = `SELECT COUNT(*)::int AS total FROM training_journal_entries WHERE ${whereClause}`;
+        const { rows: countRows } = await pool.query(countQuery, params);
+        const totalItems = countRows[0]?.total || 0;
+
+        res.json({
+            entries,
+            pagination: buildPaginationMeta(currentPage, pageSize, totalItems)
+        });
+    } catch (error) {
+        if (error instanceof ValidationError) {
+            return res.status(400).json({ error: error.message });
+        }
+        console.error('List training journal entries error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Laden des Trainingstagebuchs.' });
+    }
+});
+
+// GET /api/training-journal/summary - Aggregated metrics for journal entries
+trainingJournalRouter.get('/summary', async (req, res) => {
+    try {
+        const summaryQuery = `
+            SELECT
+                COUNT(*)::int AS total_entries,
+                ROUND(AVG(energy_level)::numeric, 2) AS avg_energy_level,
+                ROUND(AVG(focus_level)::numeric, 2) AS avg_focus_level,
+                ROUND(AVG(sleep_quality)::numeric, 2) AS avg_sleep_quality,
+                ROUND(AVG(soreness_level)::numeric, 2) AS avg_soreness_level,
+                ROUND(AVG(perceived_exertion)::numeric, 2) AS avg_perceived_exertion,
+                MIN(entry_date) AS first_entry,
+                MAX(entry_date) AS last_entry
+            FROM training_journal_entries
+            WHERE user_id = $1
+        `;
+
+        const moodDistributionQuery = `
+            SELECT mood, COUNT(*)::int AS count
+            FROM training_journal_entries
+            WHERE user_id = $1
+            GROUP BY mood
+        `;
+
+        const tagsQuery = `
+            SELECT tag, COUNT(*)::int AS count
+            FROM training_journal_entries,
+            LATERAL unnest(tags) AS tag
+            WHERE user_id = $1
+            GROUP BY tag
+            ORDER BY count DESC
+            LIMIT 10
+        `;
+
+        const latestQuery = `
+            SELECT
+                id,
+                user_id,
+                workout_id,
+                entry_date,
+                mood,
+                energy_level,
+                focus_level,
+                sleep_quality,
+                soreness_level,
+                perceived_exertion,
+                notes,
+                tags,
+                metrics,
+                created_at,
+                updated_at
+            FROM training_journal_entries
+            WHERE user_id = $1
+            ORDER BY entry_date DESC, created_at DESC
+            LIMIT 1
+        `;
+
+        const [{ rows: summaryRows }, { rows: moodRows }, { rows: tagRows }, { rows: latestRows }] = await Promise.all([
+            pool.query(summaryQuery, [req.user.id]),
+            pool.query(moodDistributionQuery, [req.user.id]),
+            pool.query(tagsQuery, [req.user.id]),
+            pool.query(latestQuery, [req.user.id])
+        ]);
+
+        res.json({
+            ...toCamelCase(summaryRows[0] || {}),
+            moodDistribution: moodRows.map(toCamelCase),
+            topTags: tagRows.map(toCamelCase),
+            latestEntry: latestRows.length ? toTrainingJournalEntry(latestRows[0]) : null
+        });
+    } catch (error) {
+        console.error('Training journal summary error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Laden der Trainingstagebuch-Übersicht.' });
+    }
+});
+
+// GET /api/training-journal/:id - Single entry
+trainingJournalRouter.get('/:id', async (req, res) => {
+    try {
+        const query = `
+            SELECT
+                id,
+                user_id,
+                workout_id,
+                entry_date,
+                mood,
+                energy_level,
+                focus_level,
+                sleep_quality,
+                soreness_level,
+                perceived_exertion,
+                notes,
+                tags,
+                metrics,
+                created_at,
+                updated_at
+            FROM training_journal_entries
+            WHERE id = $1 AND user_id = $2
+        `;
+
+        const { rows } = await pool.query(query, [req.params.id, req.user.id]);
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Eintrag wurde nicht gefunden.' });
+        }
+
+        res.json(toTrainingJournalEntry(rows[0]));
+    } catch (error) {
+        console.error('Get training journal entry error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Laden des Trainingstagebuch-Eintrags.' });
+    }
+});
+
+// POST /api/training-journal - Create entry
+trainingJournalRouter.post('/', async (req, res) => {
+    try {
+        const entryDate = normalizeEntryDate(req.body.entryDate);
+        const mood = typeof req.body.mood === 'string' ? req.body.mood : 'balanced';
+        if (!ALLOWED_JOURNAL_MOODS.includes(mood)) {
+            throw new ValidationError('Ungültige Stimmung für das Trainingstagebuch.');
+        }
+
+        const energyLevel = coerceOptionalScaleValue(req.body.energyLevel, { field: 'Energielevel', min: 1, max: 10 });
+        const focusLevel = coerceOptionalScaleValue(req.body.focusLevel, { field: 'Fokus', min: 1, max: 10 });
+        const sleepQuality = coerceOptionalScaleValue(req.body.sleepQuality, { field: 'Schlafqualität', min: 1, max: 10 });
+        const sorenessLevel = coerceOptionalScaleValue(req.body.sorenessLevel, { field: 'Muskelkater', min: 0, max: 10, allowZero: true });
+        const perceivedExertion = coerceOptionalScaleValue(req.body.perceivedExertion, { field: 'Belastungsempfinden', min: 1, max: 10 });
+        const notes = req.body.notes ? String(req.body.notes).trim() : null;
+
+        if (notes && notes.length > 2000) {
+            throw new ValidationError('Notizen dürfen maximal 2000 Zeichen enthalten.');
+        }
+
+        const tags = parseJournalTags(req.body.tags);
+        const metrics = sanitizeMetricsPayload(req.body.metrics);
+        const workoutId = await ensureWorkoutOwnership(req.body.workoutId, req.user.id);
+
+        const insertQuery = `
+            INSERT INTO training_journal_entries (
+                user_id,
+                workout_id,
+                entry_date,
+                mood,
+                energy_level,
+                focus_level,
+                sleep_quality,
+                soreness_level,
+                perceived_exertion,
+                notes,
+                tags,
+                metrics
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            RETURNING
+                id,
+                user_id,
+                workout_id,
+                entry_date,
+                mood,
+                energy_level,
+                focus_level,
+                sleep_quality,
+                soreness_level,
+                perceived_exertion,
+                notes,
+                tags,
+                metrics,
+                created_at,
+                updated_at
+        `;
+
+        const insertValues = [
+            req.user.id,
+            workoutId,
+            entryDate,
+            mood,
+            energyLevel,
+            focusLevel,
+            sleepQuality,
+            sorenessLevel,
+            perceivedExertion,
+            notes,
+            tags.length ? tags : null,
+            Object.keys(metrics).length ? JSON.stringify(metrics) : '{}'
+        ];
+
+        const { rows } = await pool.query(insertQuery, insertValues);
+        res.status(201).json(toTrainingJournalEntry(rows[0]));
+    } catch (error) {
+        if (error instanceof ValidationError) {
+            return res.status(400).json({ error: error.message });
+        }
+        console.error('Create training journal entry error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Speichern des Trainingstagebuch-Eintrags.' });
+    }
+});
+
+// PUT /api/training-journal/:id - Update entry
+trainingJournalRouter.put('/:id', async (req, res) => {
+    try {
+        const entryId = req.params.id;
+        const selectQuery = 'SELECT id FROM training_journal_entries WHERE id = $1 AND user_id = $2';
+        const { rows: existingRows } = await pool.query(selectQuery, [entryId, req.user.id]);
+
+        if (existingRows.length === 0) {
+            return res.status(404).json({ error: 'Eintrag wurde nicht gefunden.' });
+        }
+
+        const entryDate = normalizeEntryDate(req.body.entryDate);
+        const mood = typeof req.body.mood === 'string' ? req.body.mood : 'balanced';
+        if (!ALLOWED_JOURNAL_MOODS.includes(mood)) {
+            throw new ValidationError('Ungültige Stimmung für das Trainingstagebuch.');
+        }
+
+        const energyLevel = coerceOptionalScaleValue(req.body.energyLevel, { field: 'Energielevel', min: 1, max: 10 });
+        const focusLevel = coerceOptionalScaleValue(req.body.focusLevel, { field: 'Fokus', min: 1, max: 10 });
+        const sleepQuality = coerceOptionalScaleValue(req.body.sleepQuality, { field: 'Schlafqualität', min: 1, max: 10 });
+        const sorenessLevel = coerceOptionalScaleValue(req.body.sorenessLevel, { field: 'Muskelkater', min: 0, max: 10, allowZero: true });
+        const perceivedExertion = coerceOptionalScaleValue(req.body.perceivedExertion, { field: 'Belastungsempfinden', min: 1, max: 10 });
+        const notes = req.body.notes ? String(req.body.notes).trim() : null;
+
+        if (notes && notes.length > 2000) {
+            throw new ValidationError('Notizen dürfen maximal 2000 Zeichen enthalten.');
+        }
+
+        const tags = parseJournalTags(req.body.tags);
+        const metrics = sanitizeMetricsPayload(req.body.metrics);
+        const workoutId = await ensureWorkoutOwnership(req.body.workoutId, req.user.id);
+
+        const updateQuery = `
+            UPDATE training_journal_entries
+            SET
+                workout_id = $1,
+                entry_date = $2,
+                mood = $3,
+                energy_level = $4,
+                focus_level = $5,
+                sleep_quality = $6,
+                soreness_level = $7,
+                perceived_exertion = $8,
+                notes = $9,
+                tags = $10,
+                metrics = $11,
+                updated_at = NOW()
+            WHERE id = $12 AND user_id = $13
+            RETURNING
+                id,
+                user_id,
+                workout_id,
+                entry_date,
+                mood,
+                energy_level,
+                focus_level,
+                sleep_quality,
+                soreness_level,
+                perceived_exertion,
+                notes,
+                tags,
+                metrics,
+                created_at,
+                updated_at
+        `;
+
+        const updateValues = [
+            workoutId,
+            entryDate,
+            mood,
+            energyLevel,
+            focusLevel,
+            sleepQuality,
+            sorenessLevel,
+            perceivedExertion,
+            notes,
+            tags.length ? tags : null,
+            Object.keys(metrics).length ? JSON.stringify(metrics) : '{}',
+            entryId,
+            req.user.id
+        ];
+
+        const { rows } = await pool.query(updateQuery, updateValues);
+        res.json(toTrainingJournalEntry(rows[0]));
+    } catch (error) {
+        if (error instanceof ValidationError) {
+            return res.status(400).json({ error: error.message });
+        }
+        console.error('Update training journal entry error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Aktualisieren des Trainingstagebuch-Eintrags.' });
+    }
+});
+
+// DELETE /api/training-journal/:id - Delete entry
+trainingJournalRouter.delete('/:id', async (req, res) => {
+    try {
+        const deleteQuery = 'DELETE FROM training_journal_entries WHERE id = $1 AND user_id = $2';
+        const { rowCount } = await pool.query(deleteQuery, [req.params.id, req.user.id]);
+
+        if (rowCount === 0) {
+            return res.status(404).json({ error: 'Eintrag wurde nicht gefunden.' });
+        }
+
+        res.json({ message: 'Eintrag wurde erfolgreich gelöscht.' });
+    } catch (error) {
+        console.error('Delete training journal entry error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Löschen des Trainingstagebuch-Eintrags.' });
+    }
+});
+
+app.use('/api/training-journal', trainingJournalRouter);
+
 // Scoreboard Router
 const scoreboardRouter = express.Router();
 
@@ -1311,13 +2174,9 @@ scoreboardRouter.get('/overall', authMiddleware, async (req, res) => {
         }
 
         const query = `
-            SELECT 
+            SELECT
                 u.id,
-                CASE 
-                    WHEN u.display_preference = 'nickname' AND u.nickname IS NOT NULL THEN u.nickname
-                    WHEN u.display_preference = 'fullName' THEN CONCAT(u.first_name, ' ', u.last_name)
-                    ELSE u.first_name
-                END as display_name,
+                ${USER_DISPLAY_NAME_SQL} as display_name,
                 u.avatar_url,
                 COALESCE(SUM(wa.points_earned), 0) as total_points,
                 COALESCE(SUM(CASE WHEN wa.activity_type = 'pullups' THEN wa.quantity ELSE 0 END), 0) as total_pullups,
@@ -1369,13 +2228,9 @@ scoreboardRouter.get('/activity/:activity', authMiddleware, async (req, res) => 
         }
 
         const query = `
-            SELECT 
+            SELECT
                 u.id,
-                CASE 
-                    WHEN u.display_preference = 'nickname' AND u.nickname IS NOT NULL THEN u.nickname
-                    WHEN u.display_preference = 'fullName' THEN CONCAT(u.first_name, ' ', u.last_name)
-                    ELSE u.first_name
-                END as display_name,
+                ${USER_DISPLAY_NAME_SQL} as display_name,
                 u.avatar_url,
                 COALESCE(SUM(wa.quantity), 0) as total_amount,
                 COALESCE(SUM(wa.points_earned), 0) as total_points
@@ -1487,31 +2342,53 @@ const recentWorkoutsRouter = express.Router();
 // GET /api/recent-workouts - Recent workouts
 recentWorkoutsRouter.get('/', authMiddleware, async (req, res) => {
     try {
+        const { limit: limitQuery } = req.query;
+        const limit = Math.max(1, Math.min(parseInt(limitQuery, 10) || 5, 50));
+
         const query = `
-            SELECT 
+            SELECT
                 w.id,
-                w.title,
-                w.workout_date,
-                w.duration,
+                w.created_at,
+                w.notes,
                 ARRAY_AGG(
                     JSON_BUILD_OBJECT(
                         'activityType', wa.activity_type,
-                        'quantity', wa.quantity,
-                        'unit', wa.unit
+                        'amount', wa.quantity,
+                        'unit', wa.unit,
+                        'points', wa.points_earned
                     )
-                ) as activities
+                    ORDER BY wa.order_index, wa.id
+                ) FILTER (WHERE wa.id IS NOT NULL) as activities
             FROM workouts w
             LEFT JOIN workout_activities wa ON w.id = wa.workout_id
             WHERE w.user_id = $1
-            GROUP BY w.id, w.title, w.workout_date, w.duration
-            ORDER BY w.workout_date DESC
-            LIMIT 5
+            GROUP BY w.id, w.created_at, w.notes
+            ORDER BY w.created_at DESC
+            LIMIT $2
         `;
 
-        const { rows } = await pool.query(query, [req.user.id]);
-        const workouts = rows.map(row => toCamelCase(row));
+        const { rows } = await pool.query(query, [req.user.id, limit]);
 
-        res.json({ workouts });
+        const workouts = rows.map(row => {
+            const camelRow = toCamelCase(row);
+            const activities = Array.isArray(camelRow.activities)
+                ? camelRow.activities.map(activity => ({
+                    activityType: activity.activityType,
+                    amount: activity.amount ?? activity.quantity ?? 0,
+                    unit: activity.unit ?? null,
+                    points: activity.points ?? null
+                }))
+                : [];
+
+            return {
+                id: camelRow.id,
+                createdAt: camelRow.createdAt,
+                notes: camelRow.notes,
+                activities
+            };
+        });
+
+        res.json(workouts);
     } catch (error) {
         console.error('Recent workouts error:', error);
         res.status(500).json({ error: 'Serverfehler beim Laden der letzten Workouts.' });
@@ -1526,13 +2403,19 @@ const feedRouter = express.Router();
 // GET /api/feed - Activity feed
 feedRouter.get('/', authMiddleware, async (req, res) => {
     try {
+        const { page = 1, limit: limitQuery } = req.query;
+        const limit = Math.max(1, Math.min(parseInt(limitQuery, 10) || 20, 50));
+        const currentPage = Math.max(1, parseInt(page, 10) || 1);
+        const offset = (currentPage - 1) * limit;
+
         const query = `
-            SELECT 
+            SELECT
                 wa.id,
                 wa.activity_type,
                 wa.quantity as amount,
+                COALESCE(wa.points_earned, 0) as points,
+                COALESCE(wa.created_at, w.created_at) as created_at,
                 w.title as workout_title,
-                w.workout_date,
                 u.first_name,
                 u.last_name,
                 u.nickname,
@@ -1541,23 +2424,35 @@ feedRouter.get('/', authMiddleware, async (req, res) => {
             FROM workout_activities wa
             JOIN workouts w ON wa.workout_id = w.id
             JOIN users u ON w.user_id = u.id
-            ORDER BY w.workout_date DESC
-            LIMIT 20
+            ORDER BY COALESCE(wa.created_at, w.created_at) DESC
+            LIMIT $1 OFFSET $2
         `;
 
-        const { rows } = await pool.query(query);
+        const { rows } = await pool.query(query, [limit, offset]);
 
         const activities = rows.map(row => {
             const activity = toCamelCase(row);
-            // Set display name based on preference
+
+            let displayName = activity.firstName || activity.nickname || 'Athlet';
             if (activity.displayPreference === 'nickname' && activity.nickname) {
-                activity.displayName = activity.nickname;
+                displayName = activity.nickname;
             } else if (activity.displayPreference === 'fullName') {
-                activity.displayName = `${activity.firstName} ${activity.lastName}`;
-            } else {
-                activity.displayName = activity.firstName;
+                const fullName = [activity.firstName, activity.lastName].filter(Boolean).join(' ').trim();
+                displayName = fullName || displayName;
             }
-            return activity;
+
+            return {
+                id: activity.id,
+                userName: displayName,
+                userAvatar: activity.avatarUrl || null,
+                userFirstName: activity.firstName,
+                userLastName: activity.lastName,
+                activityType: activity.activityType,
+                amount: activity.amount ?? 0,
+                points: activity.points ?? 0,
+                workoutTitle: activity.workoutTitle,
+                createdAt: activity.createdAt || activity.workoutDate
+            };
         });
 
         res.json({ activities });
@@ -1569,7 +2464,177 @@ feedRouter.get('/', authMiddleware, async (req, res) => {
 
 app.use('/api/feed', feedRouter);
 
+// Challenges Router
+const challengesRouter = express.Router();
+
+const getWeeklyWindow = async () => {
+    const windowQuery = `
+        SELECT
+            date_trunc('week', CURRENT_DATE)::date AS start_date,
+            (date_trunc('week', CURRENT_DATE) + INTERVAL '6 days')::date AS end_date
+    `;
+
+    const { rows } = await pool.query(windowQuery);
+    return rows[0];
+};
+
+challengesRouter.get('/weekly', authMiddleware, async (req, res) => {
+    try {
+        const { start_date: weekStart, end_date: weekEnd } = await getWeeklyWindow();
+
+        const progressQuery = `
+            SELECT
+                COALESCE(SUM(CASE WHEN wa.activity_type = 'pullups' THEN wa.quantity ELSE 0 END), 0) AS pullups,
+                COALESCE(SUM(CASE WHEN wa.activity_type = 'pushups' THEN wa.quantity ELSE 0 END), 0) AS pushups,
+                COALESCE(SUM(CASE WHEN wa.activity_type = 'running' THEN wa.quantity ELSE 0 END), 0) AS running,
+                COALESCE(SUM(CASE WHEN wa.activity_type = 'cycling' THEN wa.quantity ELSE 0 END), 0) AS cycling,
+                COALESCE(SUM(wa.points_earned), 0) AS total_points,
+                COUNT(DISTINCT w.id) AS workouts_completed
+            FROM workouts w
+            LEFT JOIN workout_activities wa ON w.id = wa.workout_id
+            WHERE w.user_id = $1
+              AND ${WEEK_WINDOW_CONDITION}
+        `;
+
+        const leaderboardQuery = `
+            SELECT
+                u.id,
+                ${USER_DISPLAY_NAME_SQL} AS display_name,
+                u.avatar_url,
+                COALESCE(SUM(wa.points_earned), 0) AS total_points,
+                COALESCE(SUM(CASE WHEN wa.activity_type = 'running' THEN wa.quantity ELSE 0 END), 0) AS total_running,
+                COALESCE(SUM(CASE WHEN wa.activity_type = 'pullups' THEN wa.quantity ELSE 0 END), 0) AS total_pullups
+            FROM users u
+            LEFT JOIN workouts w ON u.id = w.user_id
+            LEFT JOIN workout_activities wa ON w.id = wa.workout_id
+            WHERE ${WEEK_WINDOW_CONDITION}
+            GROUP BY u.id, u.first_name, u.last_name, u.nickname, u.display_preference, u.avatar_url
+            HAVING COALESCE(SUM(wa.points_earned), 0) > 0
+            ORDER BY total_points DESC
+            LIMIT 10
+        `;
+
+        const userStandingQuery = `
+            WITH ranked AS (
+                SELECT
+                    u.id,
+                    ${USER_DISPLAY_NAME_SQL} AS display_name,
+                    u.avatar_url,
+                    COALESCE(SUM(wa.points_earned), 0) AS total_points,
+                    COALESCE(SUM(CASE WHEN wa.activity_type = 'running' THEN wa.quantity ELSE 0 END), 0) AS total_running,
+                    COALESCE(SUM(CASE WHEN wa.activity_type = 'pullups' THEN wa.quantity ELSE 0 END), 0) AS total_pullups,
+                    ROW_NUMBER() OVER (ORDER BY COALESCE(SUM(wa.points_earned), 0) DESC) AS position
+                FROM users u
+                LEFT JOIN workouts w ON u.id = w.user_id
+                LEFT JOIN workout_activities wa ON w.id = wa.workout_id
+                WHERE ${WEEK_WINDOW_CONDITION}
+                GROUP BY u.id, u.first_name, u.last_name, u.nickname, u.display_preference, u.avatar_url
+            )
+            SELECT * FROM ranked WHERE id = $1 AND total_points > 0
+        `;
+
+        const [progressResult, leaderboardResult, userStandingResult] = await Promise.all([
+            pool.query(progressQuery, [req.user.id]),
+            pool.query(leaderboardQuery),
+            pool.query(userStandingQuery, [req.user.id])
+        ]);
+
+        const progressRow = progressResult.rows[0] || {};
+        const totalPoints = Number(progressRow.total_points) || 0;
+        const userProgress = {
+            pullups: Number(progressRow.pullups) || 0,
+            pushups: Number(progressRow.pushups) || 0,
+            running: Number(progressRow.running) || 0,
+            cycling: Number(progressRow.cycling) || 0,
+            workoutsCompleted: Number(progressRow.workouts_completed) || 0,
+            totalPoints
+        };
+
+        const leaderboard = leaderboardResult.rows.map((row, index) => ({
+            id: row.id,
+            displayName: row.display_name || 'Athlet',
+            avatarUrl: row.avatar_url,
+            totalPoints: Number(row.total_points) || 0,
+            totalRunning: Number(row.total_running) || 0,
+            totalPullups: Number(row.total_pullups) || 0,
+            rank: index + 1,
+            isCurrentUser: row.id === req.user.id
+        }));
+
+        const userOnLeaderboard = leaderboard.some(entry => entry.isCurrentUser);
+        const userStandingRow = userStandingResult.rows[0];
+
+        if (!userOnLeaderboard && userStandingRow) {
+            leaderboard.push({
+                id: userStandingRow.id,
+                displayName: userStandingRow.display_name || 'Athlet',
+                avatarUrl: userStandingRow.avatar_url,
+                totalPoints: Number(userStandingRow.total_points) || 0,
+                totalRunning: Number(userStandingRow.total_running) || 0,
+                totalPullups: Number(userStandingRow.total_pullups) || 0,
+                rank: Number(userStandingRow.position) || leaderboard.length + 1,
+                isCurrentUser: true
+            });
+        }
+
+        const now = new Date();
+        const endDate = new Date(weekEnd);
+        endDate.setHours(23, 59, 59, 999);
+        const daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+
+        const activityProgress = {
+            pullups: {
+                target: weeklyChallengeTargets.pullups,
+                current: userProgress.pullups,
+                percentage: Math.min((userProgress.pullups / weeklyChallengeTargets.pullups) * 100, 100)
+            },
+            pushups: {
+                target: weeklyChallengeTargets.pushups,
+                current: userProgress.pushups,
+                percentage: Math.min((userProgress.pushups / weeklyChallengeTargets.pushups) * 100, 100)
+            },
+            running: {
+                target: weeklyChallengeTargets.running,
+                current: userProgress.running,
+                percentage: Math.min((userProgress.running / weeklyChallengeTargets.running) * 100, 100)
+            },
+            cycling: {
+                target: weeklyChallengeTargets.cycling,
+                current: userProgress.cycling,
+                percentage: Math.min((userProgress.cycling / weeklyChallengeTargets.cycling) * 100, 100)
+            }
+        };
+
+        const totalCompletion = Math.min((totalPoints / weeklyChallengeTargets.points) * 100, 100);
+
+        res.json({
+            week: {
+                start: weekStart,
+                end: weekEnd,
+                daysRemaining
+            },
+            targets: { ...weeklyChallengeTargets },
+            progress: {
+                ...userProgress,
+                completionPercentage: totalCompletion
+            },
+            activities: activityProgress,
+            leaderboard
+        });
+    } catch (error) {
+        console.error('Weekly challenge error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Laden der Wochen-Challenge.' });
+    }
+});
+
+app.use('/api/challenges', challengesRouter);
+
 // Start Server
-app.listen(port, () => {
-    console.log(`Server is running on http://localhost:${port}`);
-}); 
+if (process.env.NODE_ENV !== 'test') {
+    app.listen(port, () => {
+        console.log(`Server is running on http://localhost:${port}`);
+    });
+}
+
+export { app, pool };
+export default app;

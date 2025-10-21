@@ -13,6 +13,7 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "lint:check": "eslint .",
+    "test": "NODE_ENV=test node --test tests",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "format": "prettier --write ."

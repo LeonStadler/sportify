@@ -281,7 +281,7 @@ export function TrainingDiarySection({ className }: TrainingDiarySectionProps) {
       setIsSubmitting(true);
       const token = localStorage.getItem("token");
       const payload: Record<string, unknown> = {
-        entryDate: entryDate.toISOString().slice(0, 10),
+        entryDate: format(entryDate, "yyyy-MM-dd"),
         mood,
       };
 

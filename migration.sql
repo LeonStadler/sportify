@@ -1,5 +1,13 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS preferences JSONB DEFAULT '{}'::jsonb;
+
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS language_preference VARCHAR(5) DEFAULT 'de';
+
+CREATE INDEX IF NOT EXISTS idx_users_language_preference ON users (language_preference);
+
 ALTER TABLE workouts ADD COLUMN IF NOT EXISTS duration INTEGER;
 ALTER TABLE workout_activities ADD COLUMN IF NOT EXISTS sets_data JSONB;
 

@@ -5,6 +5,8 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import pkg from 'pg';
 
+import { createMigrationRunner } from './db/migrations.js';
+
 dotenv.config();
 const { Pool } = pkg;
 
@@ -43,35 +45,7 @@ const pool = new Pool({
         rejectUnauthorized: false
     }
 });
-
-let trainingJournalTableInitialized = false;
-
-const sanitizeColumnType = (type) => {
-    if (!type) return 'UUID';
-    const sanitized = type.replace(/[^a-zA-Z0-9_\s()]/g, '');
-    return sanitized || 'UUID';
-};
-
-const getColumnSqlType = async (tableName, columnName) => {
-    const query = `
-        SELECT format_type(atttypid, atttypmod) as data_type
-        FROM pg_attribute
-        WHERE attrelid = $1::regclass
-          AND attname = $2
-          AND NOT attisdropped
-    `;
-
-    try {
-        const { rows } = await pool.query(query, [tableName, columnName]);
-        if (rows.length === 0 || !rows[0].data_type) {
-            return 'UUID';
-        }
-        return sanitizeColumnType(rows[0].data_type);
-    } catch (error) {
-        console.warn(`Could not determine column type for ${tableName}.${columnName}:`, error.message);
-        return 'UUID';
-    }
-};
+const runMigrations = createMigrationRunner(pool);
 
 const WEEK_WINDOW_CONDITION = `
     COALESCE(w.workout_date, w.created_at::date) >= date_trunc('week', CURRENT_DATE)
@@ -93,48 +67,6 @@ const USER_DISPLAY_NAME_SQL = `
         ELSE u.first_name
     END
 `;
-
-const ensureTrainingJournalTable = async () => {
-    if (trainingJournalTableInitialized) {
-        return;
-    }
-
-    try {
-        await pool.query('CREATE EXTENSION IF NOT EXISTS "pgcrypto"');
-    } catch (error) {
-        console.warn('Could not ensure pgcrypto extension:', error.message);
-    }
-
-    const userIdType = await getColumnSqlType('users', 'id');
-    const workoutIdType = await getColumnSqlType('workouts', 'id');
-
-    const createTableQuery = `
-        CREATE TABLE IF NOT EXISTS training_journal_entries (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            user_id ${userIdType} NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            workout_id ${workoutIdType} REFERENCES workouts(id) ON DELETE SET NULL,
-            entry_date DATE NOT NULL DEFAULT CURRENT_DATE,
-            mood TEXT NOT NULL CHECK (mood IN ('energized','balanced','tired','sore','stressed')),
-            energy_level SMALLINT CHECK (energy_level BETWEEN 1 AND 10),
-            focus_level SMALLINT CHECK (focus_level BETWEEN 1 AND 10),
-            sleep_quality SMALLINT CHECK (sleep_quality BETWEEN 1 AND 10),
-            soreness_level SMALLINT CHECK (soreness_level BETWEEN 0 AND 10),
-            perceived_exertion SMALLINT CHECK (perceived_exertion BETWEEN 1 AND 10),
-            notes TEXT,
-            tags TEXT[],
-            metrics JSONB NOT NULL DEFAULT '{}'::jsonb,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        );
-    `;
-
-    await pool.query(createTableQuery);
-    await pool.query('CREATE INDEX IF NOT EXISTS idx_training_journal_user_date ON training_journal_entries (user_id, entry_date DESC)');
-    await pool.query('CREATE INDEX IF NOT EXISTS idx_training_journal_mood ON training_journal_entries (mood)');
-    await pool.query('CREATE INDEX IF NOT EXISTS idx_training_journal_tags ON training_journal_entries USING GIN (tags)');
-
-    trainingJournalTableInitialized = true;
-};
 
 const normalizeEntryDate = (value) => {
     if (!value) {
@@ -312,37 +244,11 @@ const authRouter = express.Router();
 // GET /api/auth/me - Protected Route
 authRouter.get('/me', authMiddleware, async (req, res) => {
     try {
-        // Check if preferences column exists, if not create it
-        const checkPreferencesColumn = `
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'users' AND column_name = 'preferences';
-        `;
-        const { rows: prefColumnRows } = await pool.query(checkPreferencesColumn);
-
-        if (prefColumnRows.length === 0) {
-            // Add preferences column if it doesn't exist
-            await pool.query('ALTER TABLE users ADD COLUMN preferences JSONB DEFAULT \'{}\';');
-        }
-
-        // Check if language_preference column exists, if not create it
-        const checkLanguageColumn = `
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'users' AND column_name = 'language_preference';
-        `;
-        const { rows: langColumnRows } = await pool.query(checkLanguageColumn);
-
-        if (langColumnRows.length === 0) {
-            // Add language_preference column if it doesn't exist
-            await pool.query('ALTER TABLE users ADD COLUMN language_preference VARCHAR(5) DEFAULT \'de\';');
-        }
-
         const userQuery = `
-            SELECT id, email, first_name, last_name, nickname, display_preference, avatar_url, 
-                   is_email_verified, has_2fa, is_admin, theme_preference, language_preference, 
+            SELECT id, email, first_name, last_name, nickname, display_preference, avatar_url,
+                   is_email_verified, has_2fa, is_admin, theme_preference, language_preference,
                    preferences, created_at, last_login_at, role
-            FROM users 
+            FROM users
             WHERE id = $1
         `;
         const { rows } = await pool.query(userQuery, [req.user.id]);
@@ -548,37 +454,11 @@ profileRouter.put('/update', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'Vorname und Nachname sind erforderlich.' });
         }
 
-        // Check if preferences column exists, if not create it
-        const checkPreferencesColumn = `
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'users' AND column_name = 'preferences';
-        `;
-        const { rows: prefColumnRows } = await pool.query(checkPreferencesColumn);
-
-        if (prefColumnRows.length === 0) {
-            // Add preferences column if it doesn't exist
-            await pool.query('ALTER TABLE users ADD COLUMN preferences JSONB DEFAULT \'{}\';');
-        }
-
-        // Check if language_preference column exists, if not create it
-        const checkLanguageColumn = `
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'users' AND column_name = 'language_preference';
-        `;
-        const { rows: langColumnRows } = await pool.query(checkLanguageColumn);
-
-        if (langColumnRows.length === 0) {
-            // Add language_preference column if it doesn't exist
-            await pool.query('ALTER TABLE users ADD COLUMN language_preference VARCHAR(5) DEFAULT \'de\';');
-        }
-
         const updateQuery = `
-            UPDATE users 
-            SET first_name = $1, 
-                last_name = $2, 
-                nickname = $3, 
+            UPDATE users
+            SET first_name = $1,
+                last_name = $2,
+                nickname = $3,
                 display_preference = $4, 
                 language_preference = $5,
                 preferences = $6,
@@ -1100,17 +980,7 @@ app.use('/api/workouts', workoutRouter);
 // Training Journal Router
 const trainingJournalRouter = express.Router();
 
-const ensureJournalInitialized = async (req, res, next) => {
-    try {
-        await ensureTrainingJournalTable();
-        next();
-    } catch (error) {
-        console.error('Ensure training journal table error:', error);
-        res.status(500).json({ error: 'Serverfehler bei der Initialisierung des Trainingstagebuchs.' });
-    }
-};
-
-trainingJournalRouter.use(authMiddleware, ensureJournalInitialized);
+trainingJournalRouter.use(authMiddleware);
 
 // GET /api/training-journal - List journal entries with filters and pagination
 trainingJournalRouter.get('/', async (req, res) => {
@@ -1934,7 +1804,24 @@ challengesRouter.get('/weekly', authMiddleware, async (req, res) => {
 
 app.use('/api/challenges', challengesRouter);
 
-// Start Server
-app.listen(port, () => {
-    console.log(`Server is running on http://localhost:${port}`);
-}); 
+const startServer = async () => {
+    try {
+        await runMigrations();
+        const server = app.listen(port, () => {
+            console.log(`Server is running on http://localhost:${port}`);
+        });
+        return server;
+    } catch (error) {
+        console.error('Failed to start server due to migration error:', error);
+        if (process.env.NODE_ENV !== 'test') {
+            process.exit(1);
+        }
+        throw error;
+    }
+};
+
+if (process.env.NODE_ENV !== 'test') {
+    startServer();
+}
+
+export { app, pool, runMigrations, startServer };

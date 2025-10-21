@@ -6,6 +6,7 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import pkg from 'pg';
+import { randomUUID } from 'crypto';
 import { queueEmail } from './services/emailService.js';
 import {
     TokenError,
@@ -23,6 +24,13 @@ import { createMigrationRunner } from './db/migrations.js';
 
 dotenv.config();
 const { Pool } = pkg;
+
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false
+    }
+});
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -45,6 +53,37 @@ const toCamelCase = (obj) => {
     return converted;
 };
 
+const applyDisplayName = (user) => {
+    if (user.displayPreference === 'nickname' && user.nickname) {
+        user.displayName = user.nickname;
+    } else if (user.displayPreference === 'fullName') {
+        user.displayName = `${user.firstName} ${user.lastName}`;
+    } else {
+        user.displayName = user.firstName;
+    }
+    return user;
+};
+
+const createRateLimiter = ({ windowMs, max }) => {
+    const hits = new Map();
+
+    return (key) => {
+        const now = Date.now();
+        const windowStart = now - windowMs;
+        const existing = hits.get(key) || [];
+        const recent = existing.filter((timestamp) => timestamp > windowStart);
+        recent.push(now);
+        hits.set(key, recent);
+
+        if (recent.length > max) {
+            const earliest = recent[0];
+            const retryAfterMs = windowMs - (now - earliest);
+            return { allowed: false, retryAfter: Math.max(1, Math.ceil(retryAfterMs / 1000)) };
+        }
+
+        return { allowed: true };
+    };
+};
 // TOTP helpers
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
@@ -408,9 +447,49 @@ const extractSearchTerm = (value) => {
     return trimmed;
 };
 
+const friendRequestRateLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10 });
+
+// Database Connection
 // Middlewares
 app.use(cors());
 app.use(express.json());
+
+const ensureFriendInfrastructure = async () => {
+    const { rows } = await pool.query(`
+        SELECT to_regclass('public.users') AS has_users
+    `);
+
+    if (!rows[0]?.has_users) {
+        return;
+    }
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS friend_requests (
+            id UUID PRIMARY KEY,
+            requester_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            target_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE (requester_id, target_id)
+        );
+    `);
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS friendships (
+            id UUID PRIMARY KEY,
+            user_one_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            user_two_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE (user_one_id, user_two_id)
+        );
+    `);
+};
+
+if (process.env.NODE_ENV !== 'test') {
+    ensureFriendInfrastructure().catch((error) => {
+        console.error('Failed to ensure friend infrastructure:', error);
+    });
+}
 
 // Routes
 app.get('/', (req, res) => {
@@ -1217,6 +1296,304 @@ profileRouter.delete('/account', authMiddleware, async (req, res) => {
 });
 
 app.use('/api/profile', profileRouter);
+
+const friendsRouter = express.Router();
+
+friendsRouter.get('/', authMiddleware, async (req, res) => {
+    try {
+        await ensureFriendInfrastructure();
+
+        const query = `
+            SELECT
+                f.id AS friendship_id,
+                CASE WHEN f.user_one_id = $1 THEN f.user_two_id ELSE f.user_one_id END AS friend_id,
+                u.first_name,
+                u.last_name,
+                u.nickname,
+                u.display_preference,
+                u.avatar_url
+            FROM friendships f
+            JOIN users u ON u.id = CASE WHEN f.user_one_id = $1 THEN f.user_two_id ELSE f.user_one_id END
+            WHERE f.user_one_id = $1 OR f.user_two_id = $1
+            ORDER BY f.created_at DESC
+        `;
+
+        const { rows } = await pool.query(query, [req.user.id]);
+        const friends = rows.map((row) => {
+            const friend = applyDisplayName(toCamelCase(row));
+            friend.id = friend.friendId;
+            delete friend.friendId;
+            return friend;
+        });
+
+        res.json(friends);
+    } catch (error) {
+        console.error('Friends list error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Laden der Freundesliste.' });
+    }
+});
+
+friendsRouter.get('/requests', authMiddleware, async (req, res) => {
+    try {
+        await ensureFriendInfrastructure();
+
+        const incomingQuery = `
+            SELECT
+                fr.id AS request_id,
+                fr.created_at,
+                u.id AS user_id,
+                u.first_name,
+                u.last_name,
+                u.nickname,
+                u.display_preference,
+                u.avatar_url
+            FROM friend_requests fr
+            JOIN users u ON u.id = fr.requester_id
+            WHERE fr.target_id = $1 AND fr.status = 'pending'
+            ORDER BY fr.created_at DESC
+        `;
+
+        const outgoingQuery = `
+            SELECT
+                fr.id AS request_id,
+                fr.created_at,
+                u.id AS user_id,
+                u.first_name,
+                u.last_name,
+                u.nickname,
+                u.display_preference,
+                u.avatar_url
+            FROM friend_requests fr
+            JOIN users u ON u.id = fr.target_id
+            WHERE fr.requester_id = $1 AND fr.status = 'pending'
+            ORDER BY fr.created_at DESC
+        `;
+
+        const [incomingResult, outgoingResult] = await Promise.all([
+            pool.query(incomingQuery, [req.user.id]),
+            pool.query(outgoingQuery, [req.user.id])
+        ]);
+
+        const mapRequests = (rows, type) => rows.map((row) => {
+            const request = toCamelCase(row);
+            const user = applyDisplayName({
+                id: request.userId,
+                firstName: request.firstName,
+                lastName: request.lastName,
+                nickname: request.nickname,
+                displayPreference: request.displayPreference,
+                avatarUrl: request.avatarUrl
+            });
+
+            return {
+                type,
+                requestId: request.requestId,
+                createdAt: request.createdAt,
+                user
+            };
+        });
+
+        res.json({
+            incoming: mapRequests(incomingResult.rows, 'incoming'),
+            outgoing: mapRequests(outgoingResult.rows, 'outgoing')
+        });
+    } catch (error) {
+        console.error('Friend requests error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Laden der Freundschaftsanfragen.' });
+    }
+});
+
+friendsRouter.post('/requests', authMiddleware, async (req, res) => {
+    try {
+        await ensureFriendInfrastructure();
+
+        const { targetUserId } = req.body;
+        if (!targetUserId) {
+            return res.status(400).json({ error: 'Zielbenutzer-ID ist erforderlich.' });
+        }
+
+        if (targetUserId === req.user.id) {
+            return res.status(400).json({ error: 'Du kannst dir selbst keine Freundschaftsanfrage senden.' });
+        }
+
+        const rateLimit = friendRequestRateLimiter(req.user.id);
+        if (!rateLimit.allowed) {
+            return res.status(429).json({ error: 'Zu viele Anfragen. Bitte versuche es später erneut.', retryAfter: rateLimit.retryAfter });
+        }
+
+        const { rows: targetRows } = await pool.query(
+            'SELECT id FROM users WHERE id = $1',
+            [targetUserId]
+        );
+
+        if (targetRows.length === 0) {
+            return res.status(404).json({ error: 'Zielbenutzer wurde nicht gefunden.' });
+        }
+
+        const [firstUser, secondUser] = [req.user.id, targetUserId].sort();
+        const { rowCount: existingFriends } = await pool.query(
+            'SELECT 1 FROM friendships WHERE user_one_id = $1 AND user_two_id = $2',
+            [firstUser, secondUser]
+        );
+
+        if (existingFriends > 0) {
+            return res.status(409).json({ error: 'Ihr seid bereits befreundet.' });
+        }
+
+        const { rowCount: pendingRequests } = await pool.query(
+            `SELECT 1 FROM friend_requests
+             WHERE ((requester_id = $1 AND target_id = $2) OR (requester_id = $2 AND target_id = $1))
+             AND status = 'pending'`,
+            [req.user.id, targetUserId]
+        );
+
+        if (pendingRequests > 0) {
+            return res.status(409).json({ error: 'Es besteht bereits eine ausstehende Anfrage zwischen euch.' });
+        }
+
+        const requestId = randomUUID();
+        await pool.query(
+            `INSERT INTO friend_requests (id, requester_id, target_id, status)
+             VALUES ($1, $2, $3, 'pending')`,
+            [requestId, req.user.id, targetUserId]
+        );
+
+        res.status(201).json({ requestId });
+    } catch (error) {
+        console.error('Create friend request error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Erstellen der Freundschaftsanfrage.' });
+    }
+});
+
+friendsRouter.put('/requests/:requestId', authMiddleware, async (req, res) => {
+    try {
+        await ensureFriendInfrastructure();
+
+        const { requestId } = req.params;
+        const { action } = req.body;
+
+        if (!['accept', 'decline'].includes(action)) {
+            return res.status(400).json({ error: 'Ungültige Aktion.' });
+        }
+
+        const { rows } = await pool.query(
+            'SELECT id, requester_id, target_id, status FROM friend_requests WHERE id = $1',
+            [requestId]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Freundschaftsanfrage nicht gefunden.' });
+        }
+
+        const request = rows[0];
+
+        if (request.target_id !== req.user.id) {
+            return res.status(403).json({ error: 'Du darfst diese Anfrage nicht bearbeiten.' });
+        }
+
+        if (request.status !== 'pending') {
+            return res.status(400).json({ error: 'Anfrage wurde bereits bearbeitet.' });
+        }
+
+        if (action === 'accept') {
+            const [firstUser, secondUser] = [request.requester_id, request.target_id].sort();
+            const friendshipId = randomUUID();
+
+            await pool.query('UPDATE friend_requests SET status = $1 WHERE id = $2', ['accepted', requestId]);
+            await pool.query(
+                `INSERT INTO friendships (id, user_one_id, user_two_id)
+                 VALUES ($1, $2, $3)
+                 ON CONFLICT (user_one_id, user_two_id) DO NOTHING`,
+                [friendshipId, firstUser, secondUser]
+            );
+
+            return res.json({ status: 'accepted' });
+        }
+
+        await pool.query('UPDATE friend_requests SET status = $1 WHERE id = $2', ['declined', requestId]);
+        res.json({ status: 'declined' });
+    } catch (error) {
+        console.error('Update friend request error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Aktualisieren der Freundschaftsanfrage.' });
+    }
+});
+
+friendsRouter.delete('/:friendshipId', authMiddleware, async (req, res) => {
+    try {
+        await ensureFriendInfrastructure();
+
+        const { friendshipId } = req.params;
+        const { rows } = await pool.query(
+            'SELECT id, user_one_id, user_two_id FROM friendships WHERE id = $1',
+            [friendshipId]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Freundschaft nicht gefunden.' });
+        }
+
+        const friendship = rows[0];
+        if (![friendship.user_one_id, friendship.user_two_id].includes(req.user.id)) {
+            return res.status(403).json({ error: 'Du darfst diese Freundschaft nicht entfernen.' });
+        }
+
+        await pool.query('DELETE FROM friendships WHERE id = $1', [friendshipId]);
+        res.json({ message: 'Freund wurde entfernt.' });
+    } catch (error) {
+        console.error('Delete friendship error:', error);
+        res.status(500).json({ error: 'Serverfehler beim Entfernen des Freundes.' });
+    }
+});
+
+app.use('/api/friends', friendsRouter);
+
+const usersRouter = express.Router();
+
+usersRouter.get('/search', authMiddleware, async (req, res) => {
+    try {
+        const { query = '', page = '1', limit = '10' } = req.query;
+        const trimmedQuery = String(query).trim();
+
+        if (trimmedQuery.length < 2) {
+            return res.json([]);
+        }
+
+        const parsedLimit = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
+        const parsedPage = Math.max(1, parseInt(page, 10) || 1);
+        const offset = (parsedPage - 1) * parsedLimit;
+        const likeQuery = `%${trimmedQuery.replace(/\s+/g, '%')}%`;
+
+        const searchQuery = `
+            SELECT
+                id,
+                first_name,
+                last_name,
+                nickname,
+                display_preference,
+                avatar_url
+            FROM users
+            WHERE id <> $1
+              AND (
+                  first_name ILIKE $2 OR
+                  last_name ILIKE $2 OR
+                  nickname ILIKE $2 OR
+                  email ILIKE $2
+              )
+            ORDER BY first_name ASC, last_name ASC
+            LIMIT $3 OFFSET $4
+        `;
+
+        const { rows } = await pool.query(searchQuery, [req.user.id, likeQuery, parsedLimit, offset]);
+        const results = rows.map((row) => applyDisplayName(toCamelCase(row)));
+
+        res.json(results);
+    } catch (error) {
+        console.error('User search error:', error);
+        res.status(500).json({ error: 'Serverfehler bei der Benutzersuche.' });
+    }
+});
+
+app.use('/api/users', usersRouter);
 
 // Workout Management APIs
 const workoutRouter = express.Router();
@@ -2306,6 +2683,14 @@ const feedRouter = express.Router();
 // GET /api/feed - Activity feed
 feedRouter.get('/', authMiddleware, async (req, res) => {
     try {
+        await ensureFriendInfrastructure();
+
+        const query = `
+            WITH friend_ids AS (
+                SELECT CASE WHEN user_one_id = $1 THEN user_two_id ELSE user_one_id END AS friend_id
+                FROM friendships
+                WHERE user_one_id = $1 OR user_two_id = $1
+            )
         const { page = 1, limit: limitQuery } = req.query;
         const limit = Math.max(1, Math.min(parseInt(limitQuery, 10) || 20, 50));
         const currentPage = Math.max(1, parseInt(page, 10) || 1);
@@ -2327,6 +2712,14 @@ feedRouter.get('/', authMiddleware, async (req, res) => {
             FROM workout_activities wa
             JOIN workouts w ON wa.workout_id = w.id
             JOIN users u ON w.user_id = u.id
+            WHERE w.user_id = $1 OR w.user_id IN (SELECT friend_id FROM friend_ids)
+            ORDER BY w.workout_date DESC, wa.id DESC
+            LIMIT 20
+        `;
+
+        const { rows } = await pool.query(query, [req.user.id]);
+
+        const activities = rows.map(row => applyDisplayName(toCamelCase(row)));
             ORDER BY COALESCE(wa.created_at, w.created_at) DESC
             LIMIT $1 OFFSET $2
         `;
@@ -2560,5 +2953,6 @@ if (process.env.NODE_ENV !== 'test') {
     });
 }
 
+export { app, pool, ensureFriendInfrastructure };
 export { app, pool };
 export default app;

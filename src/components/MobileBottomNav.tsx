@@ -2,6 +2,7 @@ import { BarChart, Dumbbell, Globe, Home, LogOut, Palette, Settings, Shield, Tro
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import NiceAvatar from 'react-nice-avatar';
 import LanguageSwitcher from './LanguageSwitcher';
 import ThemeSwitcher from './ThemeSwitcher';
 
@@ -72,10 +73,22 @@ export function MobileBottomNav() {
 
   const getUserInitials = () => {
     if (!user) return '?';
-    if (user.displayPreference === 'nickname' && user.nickname) {
-      return user.nickname.substring(0, 2).toUpperCase();
-    }
     return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
+  };
+
+  const getAvatarConfig = () => {
+    if (!user) return {};
+    const seed = user.id || user.email || 'default';
+    return {
+      sex: (['man', 'woman'] as const)[Math.abs(seed.charCodeAt(0)) % 2],
+      faceColor: ['#F9C9B6', '#AC6651'][Math.abs(seed.charCodeAt(0)) % 2] as string,
+      earSize: 'big' as const,
+      eyeStyle: (['circle', 'oval', 'smile'] as const)[Math.abs(seed.charCodeAt(1)) % 3],
+      noseStyle: (['short', 'long', 'round'] as const)[Math.abs(seed.charCodeAt(2)) % 3],
+      mouthStyle: (['laugh', 'smile', 'peace'] as const)[Math.abs(seed.charCodeAt(3)) % 3],
+      shirtStyle: (['polo', 'short', 'hoody'] as const)[Math.abs(seed.charCodeAt(4)) % 3],
+      bgColor: (['#F9C9B6', '#AC6651', '#D08B5B', '#F4D150', '#ED9C6E'] as const)[Math.abs(seed.charCodeAt(5)) % 5],
+    };
   };
 
   const handleNavigation = (url: string) => {
@@ -124,10 +137,13 @@ export function MobileBottomNav() {
               <SheetHeader className="p-6 pb-4">
                 <div className="flex items-center gap-3">
                   <Avatar className="w-12 h-12">
-                    <AvatarImage src={user?.avatar} alt={getDisplayName()} />
-                    <AvatarFallback className="bg-primary text-primary-foreground">
-                      {getUserInitials()}
-                    </AvatarFallback>
+                    {user?.preferences?.useNiceAvatar ? (
+                      <NiceAvatar style={{ width: '48px', height: '48px' }} {...getAvatarConfig()} />
+                    ) : (
+                      <AvatarFallback className="bg-primary text-primary-foreground text-lg font-bold">
+                        {getUserInitials()}
+                      </AvatarFallback>
+                    )}
                   </Avatar>
                   <div className="flex-1 text-left">
                     <SheetTitle className="text-lg">{getDisplayName()}</SheetTitle>

@@ -1,3 +1,4 @@
+import { PageTemplate } from "@/components/PageTemplate";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,8 +13,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Award, Camera, Check, Copy, Share2, Shield } from "lucide-react";
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export function Profile() {
+  const { t } = useTranslation();
   const { user, updateProfile, deleteAccount, enable2FA, disable2FA, isLoading } = useAuth();
   const { toast } = useToast();
   
@@ -229,12 +232,11 @@ export function Profile() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Profil</h1>
-        <p className="text-muted-foreground mt-2">Verwalte deine persönlichen Einstellungen und Ziele</p>
-      </div>
-
+    <PageTemplate
+      title={t('profile.title', 'Profil')}
+      subtitle={t('profile.subtitle', 'Verwalte deine persönlichen Einstellungen und Ziele')}
+      className="space-y-6"
+    >
       <Tabs defaultValue="profile" className="w-full">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="profile">Profil</TabsTrigger>
@@ -688,6 +690,6 @@ export function Profile() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+    </PageTemplate>
   );
 }

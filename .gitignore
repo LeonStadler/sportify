@@ -31,3 +31,5 @@ dist-ssr
 
 .env*
 !.env.example
+
+sportify-score-battle-main.zip

@@ -11,11 +11,11 @@ import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { TrainingJournalEntry, TrainingJournalMood, TrainingJournalSummary } from "@/types/training-journal";
+import { format } from "date-fns";
+import { de, enUS } from "date-fns/locale";
 import { CalendarIcon, NotebookPen, RefreshCcw, Save, TrendingUp, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Calendar } from "./ui/calendar";
-import { format } from "date-fns";
-import { de, enUS } from "date-fns/locale";
 
 interface TrainingDiarySectionProps {
   className?: string;
@@ -88,7 +88,7 @@ export function TrainingDiarySection({ className }: TrainingDiarySectionProps) {
   const [perceivedExertion, setPerceivedExertion] = useState<string>("");
   const [notes, setNotes] = useState("");
   const [tagsInput, setTagsInput] = useState("");
-  const [workoutId, setWorkoutId] = useState<string>("");
+  const [workoutId, setWorkoutId] = useState<string>("none");
   const [sleepDuration, setSleepDuration] = useState<string>("");
   const [restingHeartRate, setRestingHeartRate] = useState<string>("");
   const [hydrationLevel, setHydrationLevel] = useState<string>("");
@@ -111,7 +111,7 @@ export function TrainingDiarySection({ className }: TrainingDiarySectionProps) {
     setPerceivedExertion("");
     setNotes("");
     setTagsInput("");
-    setWorkoutId("");
+    setWorkoutId("none");
     setSleepDuration("");
     setRestingHeartRate("");
     setHydrationLevel("");
@@ -145,21 +145,21 @@ export function TrainingDiarySection({ className }: TrainingDiarySectionProps) {
       const data = await response.json();
       const options: RecentWorkoutOption[] = Array.isArray(data.workouts)
         ? (data.workouts
-            .map((workout: Record<string, unknown>) => {
-              const id = typeof workout.id === "string" ? workout.id : null;
-              if (!id) return null;
+          .map((workout: Record<string, unknown>) => {
+            const id = typeof workout.id === "string" ? workout.id : null;
+            if (!id) return null;
 
-              const title = typeof workout.title === "string" ? workout.title : "Workout";
-              const workoutDate =
-                typeof workout.workoutDate === "string"
-                  ? workout.workoutDate
-                  : typeof workout.createdAt === "string"
+            const title = typeof workout.title === "string" ? workout.title : "Workout";
+            const workoutDate =
+              typeof workout.workoutDate === "string"
+                ? workout.workoutDate
+                : typeof workout.createdAt === "string"
                   ? workout.createdAt
                   : undefined;
 
-              return { id, title, workoutDate } satisfies RecentWorkoutOption;
-            })
-            .filter(Boolean) as RecentWorkoutOption[])
+            return { id, title, workoutDate } satisfies RecentWorkoutOption;
+          })
+          .filter(Boolean) as RecentWorkoutOption[])
         : [];
       setRecentWorkouts(options);
     } catch (error) {
@@ -304,7 +304,7 @@ export function TrainingDiarySection({ className }: TrainingDiarySectionProps) {
         .filter((tag) => tag.length > 0);
       payload.tags = tags;
 
-      if (workoutId) {
+      if (workoutId && workoutId !== "none") {
         payload.workoutId = workoutId;
       }
 
@@ -378,7 +378,7 @@ export function TrainingDiarySection({ className }: TrainingDiarySectionProps) {
     setPerceivedExertion(entry.perceivedExertion ? String(entry.perceivedExertion) : "");
     setNotes(entry.notes ?? "");
     setTagsInput(entry.tags.join(", "));
-    setWorkoutId(entry.workoutId ?? "");
+    setWorkoutId(entry.workoutId ?? "none");
     setSleepDuration(entry.metrics?.sleepDurationHours ? String(entry.metrics.sleepDurationHours) : "");
     setRestingHeartRate(entry.metrics?.restingHeartRate ? String(entry.metrics.restingHeartRate) : "");
     setHydrationLevel(entry.metrics?.hydrationLevel ? String(entry.metrics.hydrationLevel) : "");
@@ -594,12 +594,12 @@ export function TrainingDiarySection({ className }: TrainingDiarySectionProps) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="workout-reference">Workout-Verknüpfung</Label>
-              <Select value={workoutId} onValueChange={setWorkoutId}>
+              <Select value={workoutId} onValueChange={(value) => setWorkoutId(value)}>
                 <SelectTrigger id="workout-reference">
                   <SelectValue placeholder="Optional verknüpfen" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Kein Workout verknüpft</SelectItem>
+                  <SelectItem value="none">Kein Workout verknüpft</SelectItem>
                   {recentWorkouts.map((workout) => (
                     <SelectItem key={workout.id} value={workout.id}>
                       <span className="flex flex-col text-sm">

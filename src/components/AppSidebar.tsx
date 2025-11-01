@@ -1,31 +1,32 @@
 import { BarChart, Dumbbell, Globe, Home, LogOut, Palette, Settings, Shield, Trophy, User, Users } from "lucide-react";
-import ThemeSwitcher from './ThemeSwitcher';
-import LanguageSwitcher from './LanguageSwitcher';
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import LanguageSwitcher from './LanguageSwitcher';
+import ThemeSwitcher from './ThemeSwitcher';
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import {
-    Sidebar,
-    SidebarContent,
-    SidebarFooter,
-    SidebarGroup,
-    SidebarGroupContent,
-    SidebarGroupLabel,
-    SidebarHeader,
-    SidebarMenu,
-    SidebarMenuButton,
-    SidebarMenuItem,
-    SidebarSeparator,
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarSeparator,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import { Notifications } from './Notifications';
@@ -35,55 +36,63 @@ export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, getDisplayName, isAuthenticated } = useAuth();
+  const { setOpenMobile, isMobile } = useSidebar();
 
   // Verwende isAdmin vom User-Objekt
   const isAdmin = user?.isAdmin || false;
 
-const menuItems = [
-  {
+  // Schließe das Sidebar auf Mobile, wenn sich die Route ändert
+  useEffect(() => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  }, [location.pathname, isMobile, setOpenMobile]);
+
+  const menuItems = [
+    {
       title: t('navigation.dashboard'),
-    url: "/",
-    icon: Home,
-  },
-  {
+      url: "/",
+      icon: Home,
+    },
+    {
       title: t('navigation.scoreboard'),
-    url: "/scoreboard",
-    icon: Trophy,
-  },
-  {
+      url: "/scoreboard",
+      icon: Trophy,
+    },
+    {
       title: t('navigation.training'),
-    url: "/training",
-    icon: Dumbbell,
-  },
-  {
+      url: "/training",
+      icon: Dumbbell,
+    },
+    {
       title: t('navigation.stats'),
-    url: "/stats",
-    icon: BarChart,
-  },
-  {
+      url: "/stats",
+      icon: BarChart,
+    },
+    {
       title: "Freunde",
       url: "/friends",
       icon: Users,
     },
     {
       title: t('navigation.profile'),
-    url: "/profile",
-    icon: User,
-  },
-];
+      url: "/profile",
+      icon: User,
+    },
+  ];
 
-const adminItems = [
-  {
+  const adminItems = [
+    {
       title: t('navigation.admin'),
-    url: "/admin",
+      url: "/admin",
       icon: Shield,
-  },
-  {
-    title: "User Management",
-    url: "/admin/users",
-    icon: Users,
-  },
-];
+    },
+    {
+      title: "User Management",
+      url: "/admin/users",
+      icon: Users,
+    },
+  ];
 
   const handleLogout = async () => {
     try {
@@ -116,7 +125,7 @@ const adminItems = [
           <p className="text-sm text-muted-foreground">Sports Analytics Platform</p>
         </div>
       </SidebarHeader>
-        
+
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel className="text-muted-foreground text-xs uppercase tracking-wider px-6 py-3">
@@ -126,8 +135,8 @@ const adminItems = [
             <SidebarMenu>
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton 
-                    asChild 
+                  <SidebarMenuButton
+                    asChild
                     className={`
                       hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200
                       ${location.pathname === item.url ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''}
@@ -156,8 +165,8 @@ const adminItems = [
                 <SidebarMenu>
                   {adminItems.map((item) => (
                     <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton 
-                        asChild 
+                      <SidebarMenuButton
+                        asChild
                         className={`
                           hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200
                           ${location.pathname === item.url ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''}
@@ -185,13 +194,13 @@ const adminItems = [
             <SidebarMenu>
               {/* Language Switch */}
               <SidebarMenuItem>
-                <SidebarMenuButton className="hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200 justify-between">
+                <div className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200">
                   <div className="flex items-center gap-3">
                     <Globe size={20} />
                     <span>{t('settings.language')}</span>
                   </div>
                   <LanguageSwitcher />
-                </SidebarMenuButton>
+                </div>
               </SidebarMenuItem>
 
               {/* Theme Switch */}
@@ -242,7 +251,7 @@ const adminItems = [
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          
+
           <div className="flex items-center">
             <Notifications />
           </div>

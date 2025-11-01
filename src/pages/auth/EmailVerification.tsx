@@ -1,24 +1,30 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowLeft, CheckCircle, Mail, RotateCcw, Trophy } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { ArrowLeft, CheckCircle, Globe, Mail, Palette, RotateCcw, Settings, Trophy } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
+import ThemeSwitcher from '@/components/ThemeSwitcher';
 import { toast } from 'sonner';
 
-const resendSchema = z.object({
-  email: z.string().email('Ungültige E-Mail-Adresse')
-});
-
-type ResendData = z.infer<typeof resendSchema>;
-
 export default function EmailVerification() {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const [isVerified, setIsVerified] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -27,6 +33,12 @@ export default function EmailVerification() {
 
   const email = searchParams.get('email') || '';
   const token = searchParams.get('token') || '';
+
+  const resendSchema = useMemo(() => z.object({
+    email: z.string().email(t('validation.invalidEmail'))
+  }), [t]);
+
+  type ResendData = z.infer<typeof resendSchema>;
 
   const {
     register,
@@ -57,9 +69,9 @@ export default function EmailVerification() {
   const verifyEmail = async (verificationToken: string) => {
     setVerificationAttempted(true);
     setIsLoading(true);
-    
+
     try {
-      const response = await fetch('/api/auth/verify-email', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/auth/verify-email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -71,18 +83,18 @@ export default function EmailVerification() {
 
       if (response.ok) {
         setIsVerified(true);
-        toast.success('E-Mail erfolgreich verifiziert!', {
-          description: 'Ihr Konto ist jetzt aktiviert.'
+        toast.success(t('authPages.emailVerification.emailVerified'), {
+          description: t('authPages.emailVerification.accountActivated')
         });
       } else {
-        toast.error('Ungültiger Verifizierungslink', {
-          description: data.error || 'Der Link ist abgelaufen oder ungültig.'
+        toast.error(t('common.error'), {
+          description: data.error || t('authPages.emailVerification.invalidLink')
         });
       }
     } catch (error) {
       console.error('Email verification error:', error);
-      toast.error('Fehler bei der Verifizierung', {
-        description: 'Bitte versuchen Sie es später erneut.'
+      toast.error(t('common.error'), {
+        description: t('common.error')
       });
     } finally {
       setIsLoading(false);
@@ -91,34 +103,36 @@ export default function EmailVerification() {
 
   const handleResendVerification = async (data: ResendData) => {
     if (countdown > 0) return;
-    
+
     setIsLoading(true);
-    
+
     try {
-      const response = await fetch('/api/auth/resend-verification', {
+      // Verwende E-Mail aus URL-Parameter, falls vorhanden, sonst aus Form
+      const emailToUse = email || data.email;
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/auth/resend-verification`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email: data.email }),
+        body: JSON.stringify({ email: emailToUse }),
       });
 
       const result = await response.json();
 
       if (response.ok) {
-        toast.success('Verifizierungs-E-Mail erneut gesendet!', {
-          description: 'Überprüfen Sie Ihr Postfach und Spam-Ordner.'
+        toast.success(t('authPages.emailVerification.resendButton'), {
+          description: t('authPages.emailVerification.checkSpam')
         });
         setCountdown(60); // 60 Sekunden Countdown
       } else {
-        toast.error('Fehler beim Senden', {
-          description: result.error || 'Bitte versuchen Sie es später erneut.'
+        toast.error(t('common.error'), {
+          description: result.error || t('common.error')
         });
       }
     } catch (error) {
       console.error('Resend verification error:', error);
-      toast.error('Fehler beim Senden', {
-        description: 'Bitte versuchen Sie es später erneut.'
+      toast.error(t('common.error'), {
+        description: t('common.error')
       });
     } finally {
       setIsLoading(false);
@@ -133,10 +147,10 @@ export default function EmailVerification() {
           <Button variant="ghost" size="sm" asChild>
             <Link to="/auth/login">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Zur Anmeldung
+              {t('authPages.emailVerification.backToLogin')}
             </Link>
           </Button>
-          
+
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <Trophy className="w-5 h-5 text-primary-foreground" />
@@ -147,10 +161,50 @@ export default function EmailVerification() {
             </div>
           </div>
 
-          <div className="flex gap-2">
-            <Button variant="outline" asChild>
-              <Link to="/auth/register">Registrieren</Link>
-            </Button>
+          <div className="flex items-center gap-3">
+            {/* Desktop: Language & Theme Switchers */}
+            <div className="hidden sm:flex items-center gap-2">
+              <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
+                <LanguageSwitcher />
+              </div>
+              <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
+                <ThemeSwitcher />
+              </div>
+            </div>
+            
+            {/* Mobile: Settings Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="sm:hidden">
+                  <Settings className="h-5 w-5" />
+                  <span className="sr-only">{t('landing.openSettings')}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>{t('landing.settings')}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Globe className="h-4 w-4" />
+                    <span>{t('landing.language')}</span>
+                  </div>
+                  <LanguageSwitcher />
+                </DropdownMenuItem>
+                <DropdownMenuItem className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Palette className="h-4 w-4" />
+                    <span>{t('landing.theme')}</span>
+                  </div>
+                  <ThemeSwitcher />
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <div className="flex gap-2">
+              <Button variant="outline" asChild>
+                <Link to="/auth/register">{t('auth.register')}</Link>
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -165,23 +219,22 @@ export default function EmailVerification() {
                 <CheckCircle className="w-12 h-12 text-green-600" />
               </div>
               <h1 className="text-3xl font-bold text-foreground mb-4">
-                E-Mail erfolgreich verifiziert!
+                {t('authPages.emailVerification.emailVerified')}
               </h1>
               <p className="text-muted-foreground mb-8">
-                Ihr Sportify-Konto ist jetzt vollständig aktiviert. 
-                Sie können sich jetzt anmelden und alle Features nutzen.
+                {t('authPages.emailVerification.accountActivated')}
               </p>
-              
+
               <div className="space-y-4">
                 <Button size="lg" className="w-full" asChild>
                   <Link to="/auth/login">
-                    Jetzt anmelden
+                    {t('authPages.emailVerification.loginNow')}
                   </Link>
                 </Button>
-                
+
                 <Button variant="outline" size="lg" className="w-full" asChild>
                   <Link to="/">
-                    Zur Startseite
+                    {t('authPages.emailVerification.backToHome')}
                   </Link>
                 </Button>
               </div>
@@ -194,12 +247,12 @@ export default function EmailVerification() {
                   <Mail className="w-8 h-8 text-primary" />
                 </div>
                 <h1 className="text-3xl font-bold text-foreground mb-2">
-                  E-Mail-Adresse bestätigen
+                  {t('authPages.emailVerification.verifyTitle')}
                 </h1>
                 <p className="text-muted-foreground">
-                  {token 
-                    ? 'Ihre E-Mail wird verifiziert...' 
-                    : 'Überprüfen Sie Ihr Postfach und klicken Sie auf den Bestätigungslink.'
+                  {token
+                    ? t('authPages.emailVerification.verifying')
+                    : t('authPages.emailVerification.checkInbox')
                   }
                 </p>
               </div>
@@ -210,7 +263,7 @@ export default function EmailVerification() {
                     <div className="text-center space-y-4">
                       <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
                       <p className="text-muted-foreground">
-                        Ihre E-Mail wird verifiziert...
+                        {t('authPages.emailVerification.verifying')}
                       </p>
                     </div>
                   </CardContent>
@@ -218,52 +271,69 @@ export default function EmailVerification() {
               ) : !token && (
                 <Card>
                   <CardHeader>
-                    <CardTitle>Bestätigungs-E-Mail erneut senden</CardTitle>
+                    <CardTitle>{t('authPages.emailVerification.resendTitle')}</CardTitle>
                     <CardDescription>
-                      Haben Sie keine E-Mail erhalten? Senden Sie eine neue Bestätigung.
+                      {email
+                        ? t('authPages.emailVerification.resendDescription', { email })
+                        : t('authPages.emailVerification.resendDescriptionAlt')
+                      }
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <form onSubmit={handleSubmit(handleResendVerification)} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="email">E-Mail-Adresse</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          placeholder="ihre@email.com"
-                          {...register('email')}
-                          className={errors.email ? 'border-destructive' : ''}
-                        />
-                        {errors.email && (
-                          <p className="text-sm text-destructive">{errors.email.message}</p>
-                        )}
-                      </div>
+                      {!email && (
+                        <div className="space-y-2">
+                          <Label htmlFor="email">{t('authPages.emailVerification.emailLabel')}</Label>
+                          <Input
+                            id="email"
+                            type="email"
+                            placeholder={t('authPages.emailVerification.emailPlaceholder')}
+                            {...register('email')}
+                            className={errors.email ? 'border-destructive' : ''}
+                          />
+                          {errors.email && (
+                            <p className="text-sm text-destructive">{errors.email.message}</p>
+                          )}
+                        </div>
+                      )}
+                      {email && (
+                        <div className="space-y-2">
+                          <Label htmlFor="email">{t('authPages.emailVerification.emailLabel')}</Label>
+                          <Input
+                            id="email"
+                            type="email"
+                            value={email}
+                            disabled
+                            className="bg-muted"
+                          />
+                        </div>
+                      )}
 
                       <Alert>
                         <AlertDescription>
-                          Überprüfen Sie auch Ihren Spam-Ordner. Die E-Mail kann bis zu 5 Minuten dauern.
+                          {t('authPages.emailVerification.checkSpam')}
                         </AlertDescription>
                       </Alert>
 
-                      <Button 
-                        type="submit" 
-                        className="w-full" 
+                      <Button
+                        type="submit"
+                        className="w-full"
                         disabled={isLoading || countdown > 0}
                       >
                         {isLoading ? (
                           <>
                             <div className="w-4 h-4 border-2 border-background border-t-transparent rounded-full animate-spin mr-2" />
-                            Wird gesendet...
+                            {t('authPages.emailVerification.sending')}
                           </>
                         ) : countdown > 0 ? (
                           <>
                             <RotateCcw className="w-4 h-4 mr-2" />
-                            Erneut senden ({countdown}s)
+                            {t('authPages.emailVerification.resendCountdown', { count: countdown })}
                           </>
                         ) : (
                           <>
                             <Mail className="w-4 h-4 mr-2" />
-                            Bestätigungs-E-Mail senden
+                            {t('authPages.emailVerification.resendButton')}
                           </>
                         )}
                       </Button>
@@ -277,15 +347,14 @@ export default function EmailVerification() {
                   <CardContent className="pt-6">
                     <Alert variant="destructive">
                       <AlertDescription>
-                        Der Verifizierungslink ist ungültig oder abgelaufen. 
-                        Fordern Sie einen neuen Link an.
+                        {t('authPages.emailVerification.invalidLink')}
                       </AlertDescription>
                     </Alert>
-                    
+
                     <div className="mt-4 text-center">
                       <Button variant="outline" asChild>
                         <Link to="/auth/email-verification">
-                          Neuen Link anfordern
+                          {t('authPages.emailVerification.requestNewLink')}
                         </Link>
                       </Button>
                     </div>
@@ -295,9 +364,9 @@ export default function EmailVerification() {
 
               <div className="mt-8 text-center">
                 <p className="text-sm text-muted-foreground">
-                  Bereits verifiziert?{' '}
+                  {t('authPages.emailVerification.alreadyVerified')}{' '}
                   <Link to="/auth/login" className="text-primary hover:underline font-medium">
-                    Hier anmelden
+                    {t('authPages.emailVerification.loginHere')}
                   </Link>
                 </p>
               </div>
@@ -310,7 +379,7 @@ export default function EmailVerification() {
       <footer className="border-t border-border/40 py-6">
         <div className="container mx-auto px-4 text-center">
           <p className="text-sm text-muted-foreground">
-            © 2024 Sportify. Entwickelt mit ❤️ von Leon Stadler.
+            {t('common.copyright')}
           </p>
         </div>
       </footer>

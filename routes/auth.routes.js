@@ -6,11 +6,10 @@ import { queueEmail } from '../services/emailService.js';
 import {
     TokenError,
     createEmailVerificationToken,
-    createPasswordResetToken,
     markEmailVerificationTokenUsed,
     markPasswordResetTokenUsed,
     validateEmailVerificationToken,
-    validatePasswordResetToken,
+    validatePasswordResetToken
 } from '../services/tokenService.js';
 import {
     buildOtpAuthUrl,
@@ -253,227 +252,8 @@ Dein Sportify-Team`;
         }
     });
 
-    // POST /api/auth/reset-password - Request Password Reset
-    router.post('/reset-password', async (req, res) => {
-        try {
-            const { email } = req.body;
-
-            if (!email) {
-                return res.status(400).json({ error: 'E-Mail-Adresse ist erforderlich.' });
-            }
-
-            const userQuery = 'SELECT id, first_name FROM users WHERE email = $1';
-            const { rows } = await pool.query(userQuery, [email]);
-
-            // Aus Sicherheitsgründen: Immer die gleiche Erfolgsmeldung senden
-            if (rows.length === 0) {
-                return res.json({ message: 'Falls die E-Mail-Adresse existiert, wurde eine Zurücksetzungs-E-Mail gesendet.' });
-            }
-
-            const userId = rows[0].id;
-            const userName = rows[0].first_name;
-
-            // Erstelle Reset-Token mit tokenService
-            const { token: resetToken } = await createPasswordResetToken(pool, userId);
-
-            // Versende E-Mail direkt (wie bei Registrierung)
-            try {
-                const frontendUrl = getFrontendUrl(req);
-                const resetUrl = `${frontendUrl}/auth/reset-password?token=${encodeURIComponent(resetToken)}`;
-                const greeting = userName ? `Hallo ${userName},` : 'Hallo,';
-
-                const emailBody = `${greeting}
-
-Du hast eine Passwort-Zurücksetzung für dein Sportify-Konto angefordert.
-
-Klicke auf folgenden Link, um dein Passwort zurückzusetzen:
-${resetUrl}
-
-Alternativ kannst du diesen Code manuell eingeben:
-${resetToken}
-
-Dieser Link ist eine Stunde lang gültig.
-
-Wenn du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren.
-
-Dein Sportify-Team`;
-
-                const emailHtml = `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .button { display: inline-block; padding: 12px 24px; background-color: #dc2626; color: #fff; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-        .button:hover { background-color: #b91c1c; }
-        .token { background-color: #f4f4f4; padding: 15px; border-radius: 5px; font-size: 14px; font-family: monospace; margin: 20px 0; word-break: break-all; }
-        .footer { margin-top: 30px; font-size: 12px; color: #666; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <p>${greeting}</p>
-        <p>Du hast eine Passwort-Zurücksetzung für dein Sportify-Konto angefordert.</p>
-        <p>Klicke auf folgenden Button, um dein Passwort zurückzusetzen:</p>
-        <div style="text-align: center;">
-            <a href="${resetUrl}" class="button">Passwort zurücksetzen</a>
-        </div>
-        <p style="margin-top: 30px;">Falls der Button nicht funktioniert, kopiere folgenden Link in deinen Browser:</p>
-        <div class="token">${resetUrl}</div>
-        <p>Alternativ kannst du diesen Code manuell eingeben:</p>
-        <div class="token">${resetToken}</div>
-        <p style="margin-top: 20px;">Dieser Link ist eine Stunde lang gültig.</p>
-        <p>Wenn du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren.</p>
-        <div class="footer">
-            <p>Dein Sportify-Team</p>
-        </div>
-    </div>
-</body>
-</html>`;
-
-                await queueEmail(pool, {
-                    recipient: email,
-                    subject: 'Sportify – Passwort zurücksetzen',
-                    body: emailBody,
-                    html: emailHtml,
-                });
-                console.info(`✅ Passwort-Reset-E-Mail erfolgreich versendet an: ${email}`);
-            } catch (emailError) {
-                console.error('❌ Fehler beim Versenden der Passwort-Reset-E-Mail:', emailError);
-                console.error('Fehler-Details:', emailError.stack || emailError.message);
-                return res.status(500).json({ error: 'Fehler beim Versenden der Zurücksetzungs-E-Mail.' });
-            }
-
-            res.json({ message: 'Falls die E-Mail-Adresse existiert, wurde eine Zurücksetzungs-E-Mail gesendet.' });
-        } catch (error) {
-            console.error('Reset password error:', error);
-            res.status(500).json({ error: 'Serverfehler beim Zurücksetzen des Passworts.' });
-        }
-    });
-
-    // POST /api/auth/forgot-password - Request Password Reset (Frontend-Kompatibilität)
-    router.post('/forgot-password', async (req, res) => {
-        try {
-            const { email } = req.body;
-            console.log('[Forgot Password] Request empfangen für:', email);
-
-            if (!email) {
-                return res.status(400).json({ error: 'E-Mail-Adresse ist erforderlich.' });
-            }
-
-            const userQuery = 'SELECT id, first_name FROM users WHERE email = $1';
-            const { rows } = await pool.query(userQuery, [email]);
-            console.log('[Forgot Password] User gefunden:', rows.length > 0);
-
-            // Aus Sicherheitsgründen: Immer die gleiche Erfolgsmeldung senden
-            if (rows.length === 0) {
-                return res.json({ message: 'Falls die E-Mail-Adresse existiert, wurde eine Zurücksetzungs-E-Mail gesendet.' });
-            }
-
-            const userId = rows[0].id;
-            const userName = rows[0].first_name;
-            console.log('[Forgot Password] Erstelle Reset-Token für User ID:', userId);
-
-            // Erstelle Reset-Token mit tokenService
-            let resetToken;
-            try {
-                const tokenResult = await createPasswordResetToken(pool, userId);
-                resetToken = tokenResult.token;
-                console.log('[Forgot Password] Token erstellt erfolgreich');
-            } catch (tokenError) {
-                console.error('[Forgot Password] Fehler beim Erstellen des Tokens:', tokenError);
-                console.error('[Forgot Password] Token-Fehler Details:', tokenError.stack || tokenError.message);
-                throw tokenError;
-            }
-
-            // Versende E-Mail direkt (wie bei Registrierung)
-            try {
-                console.log('[Forgot Password] Starte E-Mail-Versand...');
-                const frontendUrl = getFrontendUrl(req);
-                const resetUrl = `${frontendUrl}/auth/reset-password?token=${encodeURIComponent(resetToken)}`;
-                const greeting = userName ? `Hallo ${userName},` : 'Hallo,';
-                console.log('[Forgot Password] Frontend URL:', frontendUrl);
-                
-                const emailBody = `${greeting}
-
-Du hast eine Passwort-Zurücksetzung für dein Sportify-Konto angefordert.
-
-Klicke auf folgenden Link, um dein Passwort zurückzusetzen:
-${resetUrl}
-
-Alternativ kannst du diesen Code manuell eingeben:
-${resetToken}
-
-Dieser Link ist eine Stunde lang gültig.
-
-Wenn du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren.
-
-Dein Sportify-Team`;
-
-                const emailHtml = `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .button { display: inline-block; padding: 12px 24px; background-color: #dc2626; color: #fff; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-        .button:hover { background-color: #b91c1c; }
-        .token { background-color: #f4f4f4; padding: 15px; border-radius: 5px; font-size: 14px; font-family: monospace; margin: 20px 0; word-break: break-all; }
-        .footer { margin-top: 30px; font-size: 12px; color: #666; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <p>${greeting}</p>
-        <p>Du hast eine Passwort-Zurücksetzung für dein Sportify-Konto angefordert.</p>
-        <p>Klicke auf folgenden Button, um dein Passwort zurückzusetzen:</p>
-        <div style="text-align: center;">
-            <a href="${resetUrl}" class="button">Passwort zurücksetzen</a>
-        </div>
-        <p style="margin-top: 30px;">Falls der Button nicht funktioniert, kopiere folgenden Link in deinen Browser:</p>
-        <div class="token">${resetUrl}</div>
-        <p>Alternativ kannst du diesen Code manuell eingeben:</p>
-        <div class="token">${resetToken}</div>
-        <p style="margin-top: 20px;">Dieser Link ist eine Stunde lang gültig.</p>
-        <p>Wenn du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren.</p>
-        <div class="footer">
-            <p>Dein Sportify-Team</p>
-        </div>
-    </div>
-</body>
-</html>`;
-
-                console.log('[Forgot Password] Rufe queueEmail auf für:', email);
-                await queueEmail(pool, {
-                    recipient: email,
-                    subject: 'Sportify – Passwort zurücksetzen',
-                    body: emailBody,
-                    html: emailHtml,
-                });
-                console.info(`✅ Passwort-Reset-E-Mail erfolgreich versendet an: ${email}`);
-            } catch (emailError) {
-                console.error('❌ Fehler beim Versenden der Passwort-Reset-E-Mail:', emailError);
-                console.error('Fehler-Details:', emailError.stack || emailError.message);
-                console.error('Fehler-Typ:', emailError.constructor.name);
-                console.error('Fehler-Code:', emailError.code);
-                return res.status(500).json({ error: 'Fehler beim Versenden der Zurücksetzungs-E-Mail.' });
-            }
-
-            res.json({ message: 'Falls die E-Mail-Adresse existiert, wurde eine Zurücksetzungs-E-Mail gesendet.' });
-        } catch (error) {
-            console.error('[Forgot Password] Allgemeiner Fehler:', error);
-            console.error('[Forgot Password] Fehler-Details:', error.stack || error.message);
-            console.error('[Forgot Password] Fehler-Typ:', error.constructor.name);
-            console.error('[Forgot Password] Fehler-Code:', error.code);
-            res.status(500).json({ error: 'Serverfehler beim Zurücksetzen des Passworts.' });
-        }
-    });
-
-    // POST /api/auth/reset-password/confirm - Complete Password Reset
+    // POST /api/auth/reset-password/confirm - Complete Password Reset (with token)
+    // Wird verwendet um das Passwort mit einem Token zurückzusetzen
     router.post('/reset-password/confirm', async (req, res) => {
         try {
             const { token, password } = req.body;
@@ -503,34 +283,12 @@ Dein Sportify-Team`;
         }
     });
 
-    // POST /api/auth/confirm-reset-password - Alternative endpoint for password reset
+    // POST /api/auth/confirm-reset-password - Alias für /reset-password/confirm (für Frontend-Kompatibilität)
     router.post('/confirm-reset-password', async (req, res) => {
-        try {
-            const { token, newPassword } = req.body;
-
-            if (!token || !newPassword) {
-                return res.status(400).json({ error: 'Token und neues Passwort sind erforderlich.' });
-            }
-
-            if (newPassword.length < 8) {
-                return res.status(400).json({ error: 'Passwort muss mindestens 8 Zeichen lang sein.' });
-            }
-
-            const tokenData = await validatePasswordResetToken(pool, token);
-            const salt = await bcrypt.genSalt(10);
-            const passwordHash = await bcrypt.hash(newPassword, salt);
-
-            await pool.query('UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [passwordHash, tokenData.userId]);
-            await markPasswordResetTokenUsed(pool, tokenData.id);
-
-            res.json({ message: 'Passwort wurde erfolgreich aktualisiert.' });
-        } catch (error) {
-            if (error instanceof TokenError) {
-                return res.status(400).json({ error: error.message });
-            }
-            console.error('Confirm reset password error:', error);
-            res.status(500).json({ error: 'Serverfehler beim Aktualisieren des Passworts.' });
-        }
+        // Weiterleitung zu /reset-password/confirm
+        req.url = '/reset-password/confirm';
+        req.path = '/reset-password/confirm';
+        return router.handle(req, res);
     });
 
     // POST /api/auth/verify-email
@@ -891,6 +649,224 @@ Dein Sportify-Team`;
         } catch (error) {
             console.error('Disable 2FA error:', error);
             res.status(500).json({ error: 'Serverfehler beim Deaktivieren der 2FA.' });
+        }
+    });
+
+    // POST /api/auth/forgot-password - Request Password Reset
+    router.post('/forgot-password', async (req, res) => {
+        const requestId = Math.random().toString(36).substring(7);
+        console.log(`\n🔵 [${requestId}] ========== FORGOT PASSWORD REQUEST START ==========`);
+        console.log(`[${requestId}] Timestamp:`, new Date().toISOString());
+        console.log(`[${requestId}] Request Body:`, JSON.stringify(req.body, null, 2));
+        console.log(`[${requestId}] Request Headers:`, {
+            origin: req.headers.origin,
+            referer: req.headers.referer,
+            host: req.headers.host,
+        });
+
+        try {
+            const { email } = req.body;
+            console.log(`[${requestId}] Schritt 1: E-Mail aus Request extrahiert:`, email);
+
+            // Validierung
+            if (!email || typeof email !== 'string' || !email.trim()) {
+                console.log(`[${requestId}] ❌ Validierung fehlgeschlagen: E-Mail fehlt oder ist kein String`);
+                return res.status(400).json({ error: 'E-Mail-Adresse ist erforderlich.' });
+            }
+
+            const normalizedEmail = email.trim().toLowerCase();
+            console.log(`[${requestId}] Schritt 2: E-Mail normalisiert: "${email}" -> "${normalizedEmail}"`);
+
+            // E-Mail-Format validieren
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(normalizedEmail)) {
+                console.log(`[${requestId}] ❌ E-Mail-Format ungültig: ${normalizedEmail}`);
+                return res.status(400).json({ error: 'Ungültige E-Mail-Adresse.' });
+            }
+            console.log(`[${requestId}] Schritt 3: E-Mail-Format ist gültig`);
+
+            // Prüfe ob User existiert - NUR wenn User existiert, versende E-Mail
+            console.log(`[${requestId}] Schritt 4: Suche User in Datenbank...`);
+            const userQuery = 'SELECT id, first_name, email FROM users WHERE LOWER(email) = $1';
+            console.log(`[${requestId}] SQL Query:`, userQuery);
+            console.log(`[${requestId}] SQL Parameter:`, [normalizedEmail]);
+
+            const userResult = await pool.query(userQuery, [normalizedEmail]);
+            console.log(`[${requestId}] Schritt 5: Datenbank-Abfrage abgeschlossen`);
+            console.log(`[${requestId}] Query Result:`, {
+                rowCount: userResult.rowCount,
+                rowsFound: userResult.rows.length,
+                rows: userResult.rows
+            });
+
+            // WICHTIG: Nur wenn User NICHT existiert - keine E-Mail versenden, aber Erfolgsmeldung senden
+            if (userResult.rows.length === 0) {
+                console.log(`[${requestId}] ⚠️ Kein User gefunden für: ${normalizedEmail}`);
+                console.log(`[${requestId}] Keine E-Mail wird versendet - User existiert nicht`);
+                console.log(`[${requestId}] ✅ Sende Erfolgsmeldung (Sicherheitsgründe)`);
+                console.log(`[${requestId}] ========== FORGOT PASSWORD REQUEST END (KEIN USER) ==========\n`);
+                return res.status(200).json({
+                    message: 'Falls die E-Mail-Adresse existiert, wurde eine Zurücksetzungs-E-Mail gesendet.',
+                    success: true
+                });
+            }
+
+            // User existiert - erstelle Token und versende E-Mail
+            const user = userResult.rows[0];
+            const userId = user.id;
+            const userName = user.first_name || 'Benutzer';
+            const userEmail = user.email;
+
+            console.log(`[${requestId}] ✅ User gefunden:`);
+            console.log(`[${requestId}]   - ID: ${userId}`);
+            console.log(`[${requestId}]   - Name: ${userName}`);
+            console.log(`[${requestId}]   - Email: ${userEmail}`);
+
+            // Erstelle Reset-Token
+            console.log(`[${requestId}] Schritt 6: Erstelle Reset-Token...`);
+            let resetToken;
+            try {
+                console.log(`[${requestId}] Rufe createPasswordResetToken auf mit:`, { userId, poolType: typeof pool });
+                const tokenResult = await createPasswordResetToken(pool, userId);
+                resetToken = tokenResult.token;
+                console.log(`[${requestId}] ✅ Token erfolgreich erstellt`);
+                console.log(`[${requestId}] Token (erste 20 Zeichen):`, resetToken.substring(0, 20) + '...');
+                console.log(`[${requestId}] Token-Länge:`, resetToken.length);
+                console.log(`[${requestId}] Token-Expiry:`, tokenResult.expiresAt);
+            } catch (tokenError) {
+                console.error(`[${requestId}] ❌ FEHLER beim Erstellen des Tokens:`);
+                console.error(`[${requestId}] Fehler-Name:`, tokenError.name);
+                console.error(`[${requestId}] Fehler-Message:`, tokenError.message);
+                console.error(`[${requestId}] Fehler-Code:`, tokenError.code);
+                console.error(`[${requestId}] Fehler-Stack:`, tokenError.stack);
+                console.error(`[${requestId}] Fehler-Objekt:`, JSON.stringify(tokenError, Object.getOwnPropertyNames(tokenError), 2));
+                // Token-Erstellung fehlgeschlagen - keine E-Mail versenden
+                console.log(`[${requestId}] ✅ Sende Erfolgsmeldung trotz Token-Fehler (Sicherheitsgründe)`);
+                console.log(`[${requestId}] ========== FORGOT PASSWORD REQUEST END (TOKEN FEHLER) ==========\n`);
+                return res.status(200).json({
+                    message: 'Falls die E-Mail-Adresse existiert, wurde eine Zurücksetzungs-E-Mail gesendet.',
+                    success: true
+                });
+            }
+
+            // Erstelle E-Mail-Inhalt
+            console.log(`[${requestId}] Schritt 7: Erstelle E-Mail-Inhalt...`);
+            const frontendUrl = getFrontendUrl(req);
+            console.log(`[${requestId}] Frontend URL:`, frontendUrl);
+
+            const resetUrl = `${frontendUrl}/auth/reset-password?token=${encodeURIComponent(resetToken)}`;
+            console.log(`[${requestId}] Reset URL:`, resetUrl);
+
+            const greeting = `Hallo ${userName},`;
+            console.log(`[${requestId}] Greeting:`, greeting);
+
+            const emailBody = `${greeting}
+
+Du hast eine Passwort-Zurücksetzung für dein Sportify-Konto angefordert.
+
+Klicke auf folgenden Link, um dein Passwort zurückzusetzen:
+${resetUrl}
+
+Alternativ kannst du diesen Code manuell eingeben:
+${resetToken}
+
+Dieser Link ist eine Stunde lang gültig.
+
+Wenn du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren.
+
+Dein Sportify-Team`;
+
+            const emailHtml = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .button { display: inline-block; padding: 12px 24px; background-color: #dc2626; color: #fff; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+        .button:hover { background-color: #b91c1c; }
+        .token { background-color: #f4f4f4; padding: 15px; border-radius: 5px; font-size: 14px; font-family: monospace; margin: 20px 0; word-break: break-all; }
+        .footer { margin-top: 30px; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <p>${greeting}</p>
+        <p>Du hast eine Passwort-Zurücksetzung für dein Sportify-Konto angefordert.</p>
+        <p>Klicke auf folgenden Button, um dein Passwort zurückzusetzen:</p>
+        <div style="text-align: center;">
+            <a href="${resetUrl}" class="button">Passwort zurücksetzen</a>
+        </div>
+        <p style="margin-top: 30px;">Falls der Button nicht funktioniert, kopiere folgenden Link in deinen Browser:</p>
+        <div class="token">${resetUrl}</div>
+        <p>Alternativ kannst du diesen Code manuell eingeben:</p>
+        <div class="token">${resetToken}</div>
+        <p style="margin-top: 20px;">Dieser Link ist eine Stunde lang gültig.</p>
+        <p>Wenn du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren.</p>
+        <div class="footer">
+            <p>Dein Sportify-Team</p>
+        </div>
+    </div>
+</body>
+</html>`;
+
+            console.log(`[${requestId}] Schritt 8: E-Mail-Inhalt erstellt`);
+            console.log(`[${requestId}] Email Body Länge:`, emailBody.length);
+            console.log(`[${requestId}] Email HTML Länge:`, emailHtml.length);
+
+            // Versende E-Mail NUR wenn User existiert
+            console.log(`[${requestId}] Schritt 9: Versende E-Mail...`);
+            try {
+                console.log(`[${requestId}] Rufe queueEmail auf mit:`);
+                console.log(`[${requestId}]   - recipient: ${userEmail}`);
+                console.log(`[${requestId}]   - subject: Sportify – Passwort zurücksetzen`);
+                console.log(`[${requestId}]   - pool Type:`, typeof pool);
+                console.log(`[${requestId}]   - pool:`, pool ? 'exists' : 'null');
+
+                const emailStartTime = Date.now();
+                await queueEmail(pool, {
+                    recipient: userEmail,
+                    subject: 'Sportify – Passwort zurücksetzen',
+                    body: emailBody,
+                    html: emailHtml,
+                });
+                const emailEndTime = Date.now();
+                const emailDuration = emailEndTime - emailStartTime;
+
+                console.log(`[${requestId}] ✅ E-Mail-Versand erfolgreich (Dauer: ${emailDuration}ms)`);
+                console.log(`[${requestId}] E-Mail wurde an ${userEmail} versendet`);
+            } catch (emailError) {
+                console.error(`[${requestId}] ❌ FEHLER beim Versenden der E-Mail:`);
+                console.error(`[${requestId}] Fehler-Name:`, emailError.name);
+                console.error(`[${requestId}] Fehler-Message:`, emailError.message);
+                console.error(`[${requestId}] Fehler-Code:`, emailError.code);
+                console.error(`[${requestId}] Fehler-Stack:`, emailError.stack);
+                console.error(`[${requestId}] Fehler-Objekt:`, JSON.stringify(emailError, Object.getOwnPropertyNames(emailError), 2));
+                // E-Mail-Versand fehlgeschlagen - aber Token wurde bereits erstellt
+            }
+
+            // Erfolgsmeldung
+            console.log(`[${requestId}] Schritt 10: Sende Erfolgs-Response`);
+            console.log(`[${requestId}] ========== FORGOT PASSWORD REQUEST END (ERFOLGREICH) ==========\n`);
+            return res.status(200).json({
+                message: 'Falls die E-Mail-Adresse existiert, wurde eine Zurücksetzungs-E-Mail gesendet.',
+                success: true
+            });
+
+        } catch (error) {
+            console.error(`[${requestId}] ❌❌❌ UNERWARTETER FEHLER ❌❌❌`);
+            console.error(`[${requestId}] Fehler-Name:`, error.name);
+            console.error(`[${requestId}] Fehler-Message:`, error.message);
+            console.error(`[${requestId}] Fehler-Code:`, error.code);
+            console.error(`[${requestId}] Fehler-Stack:`, error.stack);
+            console.error(`[${requestId}] Fehler-Objekt:`, JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+            console.error(`[${requestId}] ========== FORGOT PASSWORD REQUEST END (FEHLER) ==========\n`);
+
+            // Aus Sicherheitsgründen: Auch bei unerwarteten Fehlern Erfolgsmeldung
+            return res.status(200).json({
+                message: 'Falls die E-Mail-Adresse existiert, wurde eine Zurücksetzungs-E-Mail gesendet.',
+                success: true
+            });
         }
     });
 

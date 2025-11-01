@@ -1,3 +1,5 @@
+import { AvatarEditor } from "@/components/AvatarEditor";
+import { InviteFriendForm } from "@/components/InviteFriendForm";
 import { PageTemplate } from "@/components/PageTemplate";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -11,10 +13,11 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Invitation, useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { Award, Check, Copy, Mail, Share2, Shield } from "lucide-react";
+import { getUserInitials, parseAvatarConfig } from '@/lib/avatar';
+import { Award, Camera, Check, Copy, Mail, Share2, Shield } from "lucide-react";
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import NiceAvatar from 'react-nice-avatar';
+import NiceAvatar, { NiceAvatarProps } from 'react-nice-avatar';
 
 export function Profile() {
   const { t } = useTranslation();
@@ -39,7 +42,6 @@ export function Profile() {
   const [preferencesForm, setPreferencesForm] = useState({
     languagePreference: user?.languagePreference || 'de',
     timeFormat: user?.preferences?.timeFormat || '24h',
-    useNiceAvatar: user?.preferences?.useNiceAvatar ?? false,
     units: {
       distance: user?.preferences?.units?.distance || 'km',
       weight: user?.preferences?.units?.weight || 'kg',
@@ -62,17 +64,11 @@ export function Profile() {
     confirmPassword: ''
   });
 
-  // User invitation state
-  const [inviteForm, setInviteForm] = useState({
-    email: '',
-    firstName: '',
-    lastName: ''
-  });
-
   const [copiedLink, setCopiedLink] = useState(false);
   const [twoFAEnabled, setTwoFAEnabled] = useState(user?.has2FA || false);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loadingInvitations, setLoadingInvitations] = useState(false);
+  const [avatarEditorOpen, setAvatarEditorOpen] = useState(false);
 
   // Load invitations on mount
   useEffect(() => {
@@ -90,24 +86,6 @@ export function Profile() {
         nickname: user.nickname || '',
         displayPreference: user.displayPreference || 'firstName'
       });
-      setPreferencesForm({
-        languagePreference: user.languagePreference || 'de',
-        timeFormat: user.preferences?.timeFormat || '24h',
-        useNiceAvatar: user.preferences?.useNiceAvatar ?? false,
-        units: {
-          distance: user.preferences?.units?.distance || 'km',
-          weight: user.preferences?.units?.weight || 'kg',
-          temperature: user.preferences?.units?.temperature || 'celsius'
-        },
-        notifications: {
-          push: user.preferences?.notifications?.push ?? true,
-          email: user.preferences?.notifications?.email ?? true
-        },
-        privacy: {
-          publicProfile: user.preferences?.privacy?.publicProfile ?? true
-        },
-        theme: user.preferences?.theme || 'system'
-      });
       setTwoFAEnabled(user.has2FA || false);
     }
   }, [user]);
@@ -124,25 +102,26 @@ export function Profile() {
     }
   };
 
-  const getUserInitials = () => {
-    if (!user) return '?';
-    return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
+  const handleAvatarSave = async (config: NiceAvatarProps) => {
+    try {
+      const avatarJson = JSON.stringify(config);
+      await updateProfile({ avatar: avatarJson });
+      toast({
+        title: "Avatar gespeichert",
+        description: "Dein Avatar wurde erfolgreich aktualisiert.",
+      });
+    } catch (error) {
+      toast({
+        title: "Fehler",
+        description: error instanceof Error ? error.message : "Fehler beim Speichern des Avatars",
+        variant: "destructive",
+      });
+    }
   };
 
-  const getAvatarConfig = () => {
-    if (!user) return {};
-    // Generate consistent avatar based on user ID
-    const seed = user.id || user.email || 'default';
-    return {
-      sex: (['man', 'woman'] as const)[Math.abs(seed.charCodeAt(0)) % 2],
-      faceColor: ['#F9C9B6', '#AC6651'][Math.abs(seed.charCodeAt(0)) % 2] as string,
-      earSize: 'big' as const,
-      eyeStyle: (['circle', 'oval', 'smile'] as const)[Math.abs(seed.charCodeAt(1)) % 3],
-      noseStyle: (['short', 'long', 'round'] as const)[Math.abs(seed.charCodeAt(2)) % 3],
-      mouthStyle: (['laugh', 'smile', 'peace'] as const)[Math.abs(seed.charCodeAt(3)) % 3],
-      shirtStyle: (['polo', 'short', 'hoody'] as const)[Math.abs(seed.charCodeAt(4)) % 3],
-      bgColor: (['#F9C9B6', '#AC6651', '#D08B5B', '#F4D150', '#ED9C6E'] as const)[Math.abs(seed.charCodeAt(5)) % 5],
-    };
+  const getCurrentAvatarConfig = (): NiceAvatarProps | undefined => {
+    if (!user?.avatar) return undefined;
+    return parseAvatarConfig(user.avatar) || undefined;
   };
 
   const validateProfileForm = (): boolean => {
@@ -279,33 +258,8 @@ export function Profile() {
     }
   };
 
-  const handleInviteFriend = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!inviteForm.email || !inviteForm.firstName || !inviteForm.lastName) {
-      toast({
-        title: "Fehler",
-        description: "Bitte fülle alle Felder aus.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      await inviteFriend(inviteForm.email, inviteForm.firstName, inviteForm.lastName);
-      toast({
-        title: "Einladung gesendet",
-        description: `Einladung wurde an ${inviteForm.email} gesendet.`,
-      });
-      setInviteForm({ email: '', firstName: '', lastName: '' });
-      await loadInvitations();
-    } catch (error) {
-      toast({
-        title: "Fehler",
-        description: error instanceof Error ? error.message : "Fehler beim Senden der Einladung",
-        variant: "destructive",
-      });
-    }
+  const handleInviteSuccess = async () => {
+    await loadInvitations();
   };
 
   const copyInviteLink = async () => {
@@ -388,14 +342,25 @@ export function Profile() {
                 <div className="flex items-center gap-4 mb-4">
                   <div className="relative">
                     <Avatar className="w-20 h-20">
-                      {user.preferences?.useNiceAvatar ? (
-                        <NiceAvatar style={{ width: '80px', height: '80px' }} {...getAvatarConfig()} />
+                      {user.avatar && parseAvatarConfig(user.avatar) ? (
+                        <NiceAvatar
+                          style={{ width: '80px', height: '80px' }}
+                          {...parseAvatarConfig(user.avatar)!}
+                        />
                       ) : (
                         <AvatarFallback className="bg-primary text-primary-foreground text-2xl font-bold">
-                          {getUserInitials()}
+                          {getUserInitials(user)}
                         </AvatarFallback>
                       )}
                     </Avatar>
+                    <Button
+                      size="sm"
+                      className="absolute -bottom-2 -right-2 rounded-full w-8 h-8 p-0"
+                      variant="secondary"
+                      onClick={() => setAvatarEditorOpen(true)}
+                    >
+                      <Camera size={14} />
+                    </Button>
                   </div>
                   <div>
                     <h3 className="text-xl font-semibold">{getDisplayName()}</h3>
@@ -501,42 +466,7 @@ export function Profile() {
                   Lade deine Freunde ein und trainiert gemeinsam!
                 </p>
 
-                <form onSubmit={handleInviteFriend} className="space-y-3">
-                  <div>
-                    <Label htmlFor="invite-email">E-Mail-Adresse</Label>
-                    <Input
-                      id="invite-email"
-                      type="email"
-                      value={inviteForm.email}
-                      onChange={(e) => setInviteForm(prev => ({ ...prev, email: e.target.value }))}
-                      placeholder="freund@example.com"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="invite-firstName">Vorname</Label>
-                    <Input
-                      id="invite-firstName"
-                      value={inviteForm.firstName}
-                      onChange={(e) => setInviteForm(prev => ({ ...prev, firstName: e.target.value }))}
-                      placeholder="Max"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="invite-lastName">Nachname</Label>
-                    <Input
-                      id="invite-lastName"
-                      value={inviteForm.lastName}
-                      onChange={(e) => setInviteForm(prev => ({ ...prev, lastName: e.target.value }))}
-                      placeholder="Mustermann"
-                    />
-                  </div>
-
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? "Wird gesendet..." : "Einladung senden"}
-                  </Button>
-                </form>
+                <InviteFriendForm onSuccess={handleInviteSuccess} />
 
                 <Separator />
 
@@ -765,20 +695,6 @@ export function Profile() {
                       </SelectContent>
                     </Select>
                   </div>
-
-                  {/* Avatar Style */}
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-sm font-medium">Avatar-Stil</Label>
-                      <p className="text-xs text-muted-foreground">
-                        Verwende einen generierten Avatar statt Initialen
-                      </p>
-                    </div>
-                    <Switch
-                      checked={preferencesForm.useNiceAvatar}
-                      onCheckedChange={(checked) => setPreferencesForm(prev => ({ ...prev, useNiceAvatar: checked }))}
-                    />
-                  </div>
                 </CardContent>
               </Card>
 
@@ -935,6 +851,13 @@ export function Profile() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <AvatarEditor
+        open={avatarEditorOpen}
+        onOpenChange={setAvatarEditorOpen}
+        currentConfig={getCurrentAvatarConfig()}
+        onSave={handleAvatarSave}
+      />
     </PageTemplate>
   );
 }

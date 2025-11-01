@@ -1,5 +1,6 @@
+import { InviteFriendForm } from '@/components/InviteFriendForm';
 import { PageTemplate } from '@/components/PageTemplate';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDebounce } from '@/hooks/use-debounce';
 import { API_URL } from '@/lib/api';
+import { parseAvatarConfig } from '@/lib/avatar';
 import {
   Check,
   Search,
@@ -18,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import NiceAvatar from 'react-nice-avatar';
 import { toast } from 'sonner';
 
 // Type definitions based on API responses
@@ -231,10 +234,16 @@ function FriendsList() {
               <div key={friend.id} className="flex items-center justify-between p-3 md:p-0">
                 <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
                   <Avatar className="w-10 h-10 md:w-12 md:h-12">
-                    <AvatarImage src={friend.avatarUrl} alt={friend.displayName} />
-                    <AvatarFallback className="text-xs md:text-sm">
-                      {getInitials(friend.firstName, friend.lastName)}
-                    </AvatarFallback>
+                    {friend.avatarUrl && parseAvatarConfig(friend.avatarUrl) ? (
+                      <NiceAvatar
+                        style={{ width: friend.avatarUrl ? '48px' : '40px', height: friend.avatarUrl ? '48px' : '40px' }}
+                        {...parseAvatarConfig(friend.avatarUrl)!}
+                      />
+                    ) : (
+                      <AvatarFallback className="text-xs md:text-sm">
+                        {getInitials(friend.firstName, friend.lastName)}
+                      </AvatarFallback>
+                    )}
                   </Avatar>
                   <p className="font-semibold text-sm md:text-base truncate">{friend.displayName}</p>
                 </div>
@@ -373,10 +382,16 @@ function FriendRequestsList({ onFriendAccepted }: { onFriendAccepted?: () => voi
                 <div key={req.requestId} className="flex items-center justify-between p-3 md:p-0">
                   <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
                     <Avatar className="w-10 h-10 md:w-12 md:h-12">
-                      <AvatarImage src={req.user.avatarUrl} alt={req.user.displayName} />
-                      <AvatarFallback className="text-xs md:text-sm">
-                        {getInitials(req.user.firstName, req.user.lastName)}
-                      </AvatarFallback>
+                      {req.user.avatarUrl && parseAvatarConfig(req.user.avatarUrl) ? (
+                        <NiceAvatar
+                          style={{ width: '48px', height: '48px' }}
+                          {...parseAvatarConfig(req.user.avatarUrl)!}
+                        />
+                      ) : (
+                        <AvatarFallback className="text-xs md:text-sm">
+                          {getInitials(req.user.firstName, req.user.lastName)}
+                        </AvatarFallback>
+                      )}
                     </Avatar>
                     <p className="font-semibold text-sm md:text-base truncate">{req.user.displayName}</p>
                   </div>
@@ -420,10 +435,16 @@ function FriendRequestsList({ onFriendAccepted }: { onFriendAccepted?: () => voi
                 <div key={req.requestId} className="flex items-center justify-between p-3 md:p-0">
                   <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
                     <Avatar className="w-10 h-10 md:w-12 md:h-12">
-                      <AvatarImage src={req.user.avatarUrl} alt={req.user.displayName} />
-                      <AvatarFallback className="text-xs md:text-sm">
-                        {getInitials(req.user.firstName, req.user.lastName)}
-                      </AvatarFallback>
+                      {req.user.avatarUrl && parseAvatarConfig(req.user.avatarUrl) ? (
+                        <NiceAvatar
+                          style={{ width: '48px', height: '48px' }}
+                          {...parseAvatarConfig(req.user.avatarUrl)!}
+                        />
+                      ) : (
+                        <AvatarFallback className="text-xs md:text-sm">
+                          {getInitials(req.user.firstName, req.user.lastName)}
+                        </AvatarFallback>
+                      )}
                     </Avatar>
                     <p className="font-semibold text-sm md:text-base truncate">{req.user.displayName}</p>
                   </div>
@@ -576,7 +597,16 @@ function UserSearch() {
         {loading && <Skeleton className="h-20 w-full" />}
 
         {!loading && debouncedQuery.length > 1 && results.length === 0 && (
-          <p className="text-muted-foreground text-center py-4 text-sm md:text-base">Keine Benutzer gefunden.</p>
+          <div className="space-y-4">
+            <p className="text-muted-foreground text-center py-2 text-sm md:text-base">Keine Benutzer gefunden.</p>
+            <div className="border rounded-lg p-4 bg-muted/50">
+              <h4 className="text-sm font-semibold mb-2">Person einladen</h4>
+              <p className="text-xs text-muted-foreground mb-3">
+                Die Person wurde nicht gefunden. Lade sie ein, Sportify zu nutzen.
+              </p>
+              <InviteFriendForm />
+            </div>
+          </div>
         )}
 
         <div className="space-y-3 md:space-y-4">
@@ -584,10 +614,16 @@ function UserSearch() {
             <div key={user.id} className="flex items-center justify-between p-3 md:p-0">
               <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
                 <Avatar className="w-10 h-10 md:w-12 md:h-12">
-                  <AvatarImage src={user.avatarUrl} alt={user.displayName} />
-                  <AvatarFallback className="text-xs md:text-sm">
-                    {getInitials(user.firstName, user.lastName)}
-                  </AvatarFallback>
+                  {user.avatarUrl && parseAvatarConfig(user.avatarUrl) ? (
+                    <NiceAvatar
+                      style={{ width: '48px', height: '48px' }}
+                      {...parseAvatarConfig(user.avatarUrl)!}
+                    />
+                  ) : (
+                    <AvatarFallback className="text-xs md:text-sm">
+                      {getInitials(user.firstName, user.lastName)}
+                    </AvatarFallback>
+                  )}
                 </Avatar>
                 <p className="font-semibold text-sm md:text-base truncate">{user.displayName}</p>
               </div>

@@ -6,6 +6,8 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { z } from 'zod';
 
+import LanguageSwitcher from '@/components/LanguageSwitcher';
+import ThemeSwitcher from '@/components/ThemeSwitcher';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,8 +21,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import LanguageSwitcher from '@/components/LanguageSwitcher';
-import ThemeSwitcher from '@/components/ThemeSwitcher';
 import { API_URL } from '@/lib/api';
 import { toast } from 'sonner';
 
@@ -115,7 +115,7 @@ export default function ForgotPassword() {
                 <ThemeSwitcher />
               </div>
             </div>
-            
+
             {/* Mobile: Settings Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

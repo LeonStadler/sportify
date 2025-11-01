@@ -1,8 +1,9 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
-import { useCallback, useEffect, useState } from "react";
 import { API_URL } from '@/lib/api';
+import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from 'react-i18next';
 
 interface LeaderboardUser {
   id: string;
@@ -24,26 +25,27 @@ interface ScoreboardTableProps {
   period: string;
 }
 
-const getUnitForActivity = (activity: string) => {
-    switch (activity) {
-      case "pullups":
-      case "pushups":
-      case "situps":
-        return "Wdh.";
-      case "running":
-      case "cycling":
-        return "km";
-      case "other":
-        return "Einheiten";
-      default:
-        return "Punkte";
-    }
-}
-
 export function ScoreboardTable({ activity, period }: ScoreboardTableProps) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
+  const { t } = useTranslation();
+
+  const getUnitForActivity = (activityType: string) => {
+    switch (activityType) {
+      case "pullups":
+      case "pushups":
+      case "situps":
+        return t('scoreboard.units.repetitions');
+      case "running":
+      case "cycling":
+        return t('scoreboard.units.kilometers');
+      case "other":
+        return t('scoreboard.units.units');
+      default:
+        return t('scoreboard.units.points');
+    }
+  }
 
   const fetchLeaderboard = useCallback(async () => {
     setIsLoading(true);
@@ -51,9 +53,9 @@ export function ScoreboardTable({ activity, period }: ScoreboardTableProps) {
       const token = localStorage.getItem("token");
       let url = `${API_URL}/scoreboard/`;
       if (activity === 'all') {
-          url += `overall?period=${period}`;
+        url += `overall?period=${period}`;
       } else {
-          url += `activity/${activity}?period=${period}`;
+        url += `activity/${activity}?period=${period}`;
       }
 
       const response = await fetch(url, {
@@ -63,9 +65,9 @@ export function ScoreboardTable({ activity, period }: ScoreboardTableProps) {
       });
 
       if (!response.ok) {
-        throw new Error("Fehler beim Laden des Scoreboards");
+        throw new Error(t('scoreboard.errorLoading'));
       }
-      
+
       const data = await response.json();
       setLeaderboard(data.leaderboard);
 
@@ -74,12 +76,12 @@ export function ScoreboardTable({ activity, period }: ScoreboardTableProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [activity, period]);
+  }, [activity, period, t]);
 
   useEffect(() => {
     fetchLeaderboard();
   }, [fetchLeaderboard]);
-  
+
   const getAvatarFallback = (name: string) => {
     if (!name) return '??';
     const parts = name.split(' ');
@@ -88,12 +90,12 @@ export function ScoreboardTable({ activity, period }: ScoreboardTableProps) {
     }
     return name.substring(0, 2).toUpperCase();
   };
-  
+
   const getRankColor = (rank: number) => {
-      if (rank === 1) return "text-yellow-500";
-      if (rank === 2) return "text-gray-400";
-      if (rank === 3) return "text-orange-600";
-      return "text-gray-600";
+    if (rank === 1) return "text-yellow-500";
+    if (rank === 2) return "text-gray-400";
+    if (rank === 3) return "text-orange-600";
+    return "text-gray-600";
   }
 
   if (isLoading) {
@@ -107,61 +109,61 @@ export function ScoreboardTable({ activity, period }: ScoreboardTableProps) {
   }
 
   if (leaderboard.length === 0) {
-      return (
-          <div className="text-center py-12">
-              <p className="text-gray-500">Keine Daten für diese Rangliste vorhanden.</p>
-              <p className="text-sm text-gray-400 mt-1">Nimm an Workouts teil, um in der Rangliste zu erscheinen.</p>
-          </div>
-      )
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-500">{t('scoreboard.noData')}</p>
+        <p className="text-sm text-gray-400 mt-1">{t('scoreboard.participateToAppear')}</p>
+      </div>
+    )
   }
 
   return (
-        <div className="space-y-4">
+    <div className="space-y-4">
       {leaderboard.map((player) => (
-            <div 
-          key={player.id} 
-              className={`
+        <div
+          key={player.id}
+          className={`
                 flex items-center justify-between p-4 rounded-lg border transition-all duration-200 hover:shadow-md
             ${player.isCurrentUser ? "bg-orange-50 border-orange-200" : "bg-white border-gray-200"}
               `}
-            >
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-3">
+        >
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <span className={`text-lg font-bold w-8 text-center ${getRankColor(player.rank)}`}>
                 {player.rank}
-                  </span>
+              </span>
               <Avatar>
                 <AvatarImage src={player.avatarUrl || undefined} alt={player.displayName} />
                 <AvatarFallback className={`${player.isCurrentUser ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white'}`}>
-                    {getAvatarFallback(player.displayName)}
+                  {getAvatarFallback(player.displayName)}
                 </AvatarFallback>
               </Avatar>
-                </div>
-                <div>
+            </div>
+            <div>
               <p className="font-semibold text-gray-900">{player.displayName}</p>
-              {activity === 'overall' && (
+              {activity === 'all' && (
                 <div className="flex flex-wrap gap-2 mt-1">
                   <Badge variant="outline" className="text-xs">
-                    Klimmzüge: {player.totalPullups || 0}
+                    {t('scoreboard.stats.pullups')}: {player.totalPullups || 0}
                   </Badge>
-                    <Badge variant="outline" className="text-xs">
-                    Liegestütze: {player.totalPushups || 0}
-                    </Badge>
-                    <Badge variant="outline" className="text-xs">
-                    Laufen: {player.totalRunning || 0} km
-                    </Badge>
-                  </div>
-              )}
+                  <Badge variant="outline" className="text-xs">
+                    {t('scoreboard.stats.pushups')}: {player.totalPushups || 0}
+                  </Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {t('scoreboard.stats.running')}: {player.totalRunning || 0} {t('scoreboard.units.kilometers')}
+                  </Badge>
                 </div>
-              </div>
-              <div className="text-right">
+              )}
+            </div>
+          </div>
+          <div className="text-right">
             <p className="text-xl font-bold text-gray-900">
-                {activity === 'overall' ? player.totalPoints : player.totalAmount}
+              {activity === 'all' ? player.totalPoints : (player.totalAmount ?? 0)}
             </p>
             <p className="text-sm text-gray-500">{getUnitForActivity(activity)}</p>
-              </div>
-            </div>
-          ))}
+          </div>
         </div>
+      ))}
+    </div>
   );
 }

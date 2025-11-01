@@ -1,10 +1,10 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS preferences JSONB DEFAULT '{}'::jsonb;
-
-ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS language_preference VARCHAR(5) DEFAULT 'de';
+    ADD COLUMN IF NOT EXISTS preferences JSONB DEFAULT '{}'::jsonb,
+    ADD COLUMN IF NOT EXISTS language_preference VARCHAR(5) DEFAULT 'de',
+    ADD COLUMN IF NOT EXISTS totp_secret TEXT,
+    ADD COLUMN IF NOT EXISTS totp_confirmed BOOLEAN DEFAULT false;
 
 CREATE INDEX IF NOT EXISTS idx_users_language_preference ON users (language_preference);
 
@@ -29,40 +29,75 @@ CREATE TABLE IF NOT EXISTS friendships (
 );
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
 
-CREATE TABLE IF NOT EXISTS password_reset_tokens (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token_hash TEXT NOT NULL,
-    expires_at TIMESTAMPTZ NOT NULL,
-    used BOOLEAN DEFAULT false,
-    used_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
+DO $$
+DECLARE
+    user_id_type text;
+    workout_id_type text;
+BEGIN
+    SELECT format_type(atttypid, atttypmod)
+    INTO user_id_type
+    FROM pg_attribute
+    WHERE attrelid = 'users'::regclass
+      AND attname = 'id'
+      AND NOT attisdropped;
 
-CREATE TABLE IF NOT EXISTS email_verification_tokens (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token_hash TEXT NOT NULL,
-    expires_at TIMESTAMPTZ NOT NULL,
-    used BOOLEAN DEFAULT false,
-    used_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
+    IF user_id_type IS NULL THEN
+        user_id_type := 'uuid';
+    END IF;
 
-CREATE TABLE IF NOT EXISTS invitations (
-    id SERIAL PRIMARY KEY,
-    email TEXT NOT NULL,
-    first_name TEXT NOT NULL,
-    last_name TEXT NOT NULL,
-    invited_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    token_hash TEXT NOT NULL,
-    status TEXT DEFAULT 'pending',
-    expires_at TIMESTAMPTZ NOT NULL,
-    used BOOLEAN DEFAULT false,
-    used_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE (email, status)
-);
+    EXECUTE format('
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id SERIAL PRIMARY KEY,
+            user_id %s NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            token_hash TEXT NOT NULL,
+            expires_at TIMESTAMPTZ NOT NULL,
+            used BOOLEAN DEFAULT false,
+            used_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+    ', user_id_type);
+
+    EXECUTE format('
+        CREATE TABLE IF NOT EXISTS email_verification_tokens (
+            id SERIAL PRIMARY KEY,
+            user_id %s NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            token_hash TEXT NOT NULL,
+            expires_at TIMESTAMPTZ NOT NULL,
+            used BOOLEAN DEFAULT false,
+            used_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+    ', user_id_type);
+
+    EXECUTE format('
+        CREATE TABLE IF NOT EXISTS invitations (
+            id SERIAL PRIMARY KEY,
+            email TEXT NOT NULL,
+            first_name TEXT NOT NULL,
+            last_name TEXT NOT NULL,
+            invited_by %s REFERENCES users(id) ON DELETE SET NULL,
+            token_hash TEXT NOT NULL,
+            status TEXT DEFAULT ''pending'',
+            expires_at TIMESTAMPTZ NOT NULL,
+            used BOOLEAN DEFAULT false,
+            used_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            UNIQUE (email, status)
+        );
+    ', user_id_type);
+
+    EXECUTE format('
+        CREATE TABLE IF NOT EXISTS user_backup_codes (
+            id SERIAL PRIMARY KEY,
+            user_id %s NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            code_hash TEXT NOT NULL,
+            used_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+    ', user_id_type);
+
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_user_backup_codes_user_id ON user_backup_codes(user_id)';
+END $$;
 
 CREATE TABLE IF NOT EXISTS outbound_emails (
     id SERIAL PRIMARY KEY,
@@ -72,6 +107,19 @@ CREATE TABLE IF NOT EXISTS outbound_emails (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     sent_at TIMESTAMPTZ
 );
+
+-- Migration: Füge sent_at Spalte hinzu, falls sie nicht existiert
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'outbound_emails' 
+        AND column_name = 'sent_at'
+    ) THEN
+        ALTER TABLE outbound_emails ADD COLUMN sent_at TIMESTAMPTZ;
+    END IF;
+END $$;
+
 DO $$
 DECLARE
     user_id_type text;

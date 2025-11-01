@@ -2,10 +2,16 @@ import {
     ArrowRight,
     BarChart3,
     Check,
+    Flame,
+    Globe,
+    Heart,
+    Palette,
+    Settings,
     Shield,
     Smartphone,
     Star,
     Trophy,
+    TrendingUp,
     Users,
     Zap
 } from 'lucide-react';
@@ -15,6 +21,16 @@ import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
+import ThemeSwitcher from '@/components/ThemeSwitcher';
 
 export default function Landing() {
   const { t } = useTranslation();
@@ -22,33 +38,33 @@ export default function Landing() {
   const features = [
     {
       icon: Trophy,
-      title: 'Live Scoreboard',
-      description: 'Verfolge deine Leistungen in Echtzeit und vergleiche dich mit anderen Athleten.'
+      title: t('landing.featuresList.liveScoreboard'),
+      description: t('landing.featureDescriptions.liveScoreboard')
     },
     {
       icon: BarChart3,
-      title: 'Detaillierte Statistiken',
-      description: 'Analysiere deine Fortschritte mit umfassenden Charts und Metriken.'
+      title: t('landing.featureTitles.detailedStats'),
+      description: t('landing.featureDescriptions.detailedStats')
     },
     {
       icon: Users,
-      title: 'Community Features',
-      description: 'Verbinde dich mit Freunden, lade sie ein und motiviert euch gegenseitig.'
+      title: t('landing.featuresList.community'),
+      description: t('landing.featureDescriptions.community')
     },
     {
       icon: Zap,
-      title: 'Echtzeit Updates',
-      description: 'Erhalte sofortige Updates über deine Aktivitäten und Erfolge.'
+      title: t('landing.featureTitles.realtime'),
+      description: t('landing.featureDescriptions.realtime')
     },
     {
       icon: Shield,
-      title: 'Sichere Daten',
-      description: 'Deine persönlichen Daten sind mit modernster Verschlüsselung geschützt.'
+      title: t('landing.featureTitles.secure'),
+      description: t('landing.featureDescriptions.secure')
     },
     {
       icon: Smartphone,
-      title: 'Mobile First',
-      description: 'Perfekt optimiert für mobile Geräte - trainiere und tracke überall.'
+      title: t('landing.featureTitles.mobile'),
+      description: t('landing.featureDescriptions.mobile')
     }
   ];
 
@@ -74,86 +90,163 @@ export default function Landing() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border/40 bg-background/95 backdrop-blur-sm sticky top-0 z-50">
+      <header className="border-b border-border/40 bg-background/95 backdrop-blur-md sticky top-0 z-50 shadow-sm">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Trophy className="w-5 h-5 text-primary-foreground" />
+          <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary/80 rounded-xl flex items-center justify-center shadow-lg">
+              <Trophy className="w-6 h-6 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-foreground">Sportify</h1>
+              <h1 className="text-xl font-bold text-foreground bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">Sportify</h1>
               <p className="text-xs text-muted-foreground">by Leon Stadler</p>
             </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="ghost" asChild>
-              <Link to="/contact">Kontakt</Link>
-            </Button>
-            <Button variant="outline" asChild>
-              <Link to="/auth/login">Anmelden</Link>
-            </Button>
-            <Button asChild>
-              <Link to="/auth/register">Registrieren</Link>
-            </Button>
+          </Link>
+          <div className="flex items-center gap-3">
+            {/* Desktop: Language & Theme Switchers */}
+            <div className="hidden sm:flex items-center gap-2">
+              <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
+                <LanguageSwitcher />
+              </div>
+              <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
+                <ThemeSwitcher />
+              </div>
+            </div>
+            
+            {/* Mobile: Settings Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="sm:hidden">
+                  <Settings className="h-5 w-5" />
+                  <span className="sr-only">{t('landing.openSettings')}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>{t('landing.settings')}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Globe className="h-4 w-4" />
+                    <span>{t('landing.language')}</span>
+                  </div>
+                  <LanguageSwitcher />
+                </DropdownMenuItem>
+                <DropdownMenuItem className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Palette className="h-4 w-4" />
+                    <span>{t('landing.theme')}</span>
+                  </div>
+                  <ThemeSwitcher />
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
+            {/* Buttons */}
+            <div className="flex gap-2">
+              <Button variant="ghost" asChild className="hidden sm:flex">
+                <Link to="/contact">{t('landing.contact')}</Link>
+              </Button>
+              <Button variant="outline" asChild>
+                <Link to="/auth/login">{t('landing.login')}</Link>
+              </Button>
+              <Button asChild className="bg-primary hover:bg-primary/90 shadow-md">
+                <Link to="/auth/register">
+                  <span className="hidden sm:inline">{t('landing.register')}</span>
+                  <span className="sm:hidden">{t('landing.registerShort')}</span>
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Hero Section */}
-      <section className="container mx-auto px-4 py-20 text-center">
-        <Badge variant="secondary" className="mb-4">
-          🚀 Neu: Multi-Language Support
+      <section className="relative container mx-auto px-4 py-16 md:py-24 text-center overflow-hidden">
+        {/* Background Decorations */}
+        <div className="absolute inset-0 -z-10">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl"></div>
+        </div>
+        
+        <Badge variant="secondary" className="mb-6 px-4 py-1.5 text-sm font-medium">
+          <Flame className="w-3.5 h-3.5 mr-1.5 text-primary" />
+          {t('landing.newFeature')}
         </Badge>
-        <h1 className="text-4xl md:text-6xl font-bold text-foreground mb-6">
-          Deine ultimative
-          <span className="text-primary"> Sports Analytics</span>
-          <br />Plattform
+        
+        <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-foreground mb-6 leading-tight">
+          {t('landing.heroTitle')}
+          <br />
+          <span className="bg-gradient-to-r from-primary via-primary/90 to-primary bg-clip-text text-transparent">
+            {t('landing.heroSubtitle')}
+          </span>
+          <br />
+          {t('landing.heroSubtitle2')}
         </h1>
-        <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-          Tracke deine Workouts, analysiere deine Fortschritte und erreiche deine Fitnessziele 
-          mit der modernsten Sports Analytics Plattform von Leon Stadler.
+        
+        <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto leading-relaxed">
+          {t('landing.heroDescription')}
         </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Button size="lg" asChild className="text-lg px-8">
+        
+        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
+          <Button size="lg" asChild className="text-lg px-8 py-6 shadow-lg hover:shadow-xl transition-all bg-primary hover:bg-primary/90">
             <Link to="/auth/register">
-              Kostenlos starten
+              {t('landing.startFree')}
               <ArrowRight className="ml-2 h-5 w-5" />
             </Link>
           </Button>
-          <Button size="lg" variant="outline" asChild className="text-lg px-8">
-            <Link to="/contact">Kontakt aufnehmen</Link>
+          <Button size="lg" variant="outline" asChild className="text-lg px-8 py-6 border-2 hover:bg-accent">
+            <Link to="/contact">{t('landing.contactUs')}</Link>
           </Button>
         </div>
-        <p className="text-sm text-muted-foreground mt-4">
-          ✨ Keine Kreditkarte erforderlich • 🔒 100% sicher • 🎯 Sofort loslegen
-        </p>
+        
+        <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <Check className="w-4 h-4 text-green-500" />
+            <span>{t('landing.noCreditCard')}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Shield className="w-4 h-4 text-green-500" />
+            <span>{t('landing.secure')}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Zap className="w-4 h-4 text-primary" />
+            <span>{t('landing.startNow')}</span>
+          </div>
+        </div>
       </section>
 
       {/* Features Section */}
-      <section className="container mx-auto px-4 py-20">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-            Alles was du brauchst
+      <section className="container mx-auto px-4 py-20 md:py-28">
+        <div className="text-center mb-16 md:mb-20">
+          <Badge variant="outline" className="mb-4">
+            {t('landing.features')}
+          </Badge>
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">
+            {t('landing.featuresTitle')}
           </h2>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Von Live-Tracking bis zu detaillierten Analytics - Sportify bietet 
-            alle Tools für deinen Fitness-Erfolg.
+          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
+            {t('landing.featuresDescription')}
           </p>
         </div>
         
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
           {features.map((feature, index) => (
-            <Card key={index} className="border-border/50 hover:border-primary/20 transition-colors">
+            <Card 
+              key={index} 
+              className="group border-border/50 hover:border-primary/30 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-1 bg-card"
+            >
               <CardHeader>
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                  <feature.icon className="w-6 h-6 text-primary" />
+                <div className="w-14 h-14 bg-primary/10 dark:bg-primary/20 rounded-xl flex items-center justify-center mb-4 group-hover:bg-primary/20 dark:group-hover:bg-primary/30 transition-colors group-hover:scale-110 duration-300">
+                  <feature.icon className="w-7 h-7 text-primary" />
                 </div>
-                <CardTitle className="text-xl">{feature.title}</CardTitle>
+                <CardTitle className="text-xl group-hover:text-primary transition-colors">
+                  {feature.title}
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <CardDescription className="text-base">
+                <CardDescription className="text-base leading-relaxed">
                   {feature.description}
                 </CardDescription>
               </CardContent>
@@ -163,34 +256,50 @@ export default function Landing() {
       </section>
 
       {/* Testimonials Section */}
-      <section className="bg-muted/30 py-20">
+      <section className="bg-muted/30 dark:bg-muted/20 py-20 md:py-28 border-y border-border/40">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Was unsere Nutzer sagen
+          <div className="text-center mb-16 md:mb-20">
+            <Badge variant="outline" className="mb-4">
+              {t('landing.testimonials')}
+            </Badge>
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">
+              {t('landing.testimonialsTitle')}
             </h2>
-            <p className="text-xl text-muted-foreground">
-              Tausende von Athleten vertrauen bereits auf Sportify
+            <p className="text-lg md:text-xl text-muted-foreground">
+              {t('landing.testimonialsDescription')}
             </p>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-3 gap-6 md:gap-8">
             {testimonials.map((testimonial, index) => (
-              <Card key={index} className="border-border/50">
+              <Card 
+                key={index} 
+                className="border-border/50 hover:border-primary/30 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 bg-card"
+              >
                 <CardHeader>
-                  <div className="flex items-center gap-1 mb-2">
+                  <div className="flex items-center gap-1 mb-4">
                     {[...Array(testimonial.rating)].map((_, i) => (
-                      <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                      <Star 
+                        key={i} 
+                        className="w-5 h-5 fill-yellow-400 dark:fill-yellow-500 text-yellow-400 dark:text-yellow-500" 
+                      />
                     ))}
                   </div>
-                  <CardDescription className="text-base italic">
+                  <CardDescription className="text-base italic leading-relaxed">
                     "{testimonial.content}"
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div>
-                    <p className="font-semibold text-foreground">{testimonial.name}</p>
-                    <p className="text-sm text-muted-foreground">{testimonial.role}</p>
+                <CardContent className="pt-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
+                      <span className="text-primary font-semibold">
+                        {testimonial.name.charAt(0)}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-foreground">{testimonial.name}</p>
+                      <p className="text-sm text-muted-foreground">{testimonial.role}</p>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -200,90 +309,165 @@ export default function Landing() {
       </section>
 
       {/* CTA Section */}
-      <section className="container mx-auto px-4 py-20 text-center">
-        <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-          Bereit durchzustarten?
-        </h2>
-        <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-          Schließe dich tausenden von Athleten an und beginne noch heute 
-          deine Fitness-Reise mit Sportify.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Button size="lg" asChild className="text-lg px-8">
+      <section className="relative container mx-auto px-4 py-20 md:py-28 text-center overflow-hidden">
+        {/* Background Gradient */}
+        <div className="absolute inset-0 -z-10">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-4xl h-full bg-gradient-to-r from-primary/10 via-primary/5 to-transparent blur-3xl"></div>
+        </div>
+        
+        <div className="relative">
+          <Badge variant="secondary" className="mb-4">
+            <TrendingUp className="w-3.5 h-3.5 mr-1.5" />
+            {t('landing.ctaBadge')}
+          </Badge>
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">
+            {t('landing.ctaTitle')}
+          </h2>
+          <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto">
+            {t('landing.ctaDescription')}
+          </p>
+          
+          <Button size="lg" asChild className="text-lg px-10 py-6 shadow-xl hover:shadow-2xl transition-all bg-primary hover:bg-primary/90 mb-12">
             <Link to="/auth/register">
-              Jetzt kostenlos registrieren
+              {t('landing.ctaButton')}
               <ArrowRight className="ml-2 h-5 w-5" />
             </Link>
           </Button>
-        </div>
-        
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-          <div className="flex items-center justify-center gap-2">
-            <Check className="w-5 h-5 text-green-500" />
-            <span className="text-muted-foreground">Kostenlos starten</span>
-          </div>
-          <div className="flex items-center justify-center gap-2">
-            <Check className="w-5 h-5 text-green-500" />
-            <span className="text-muted-foreground">Keine Bindung</span>
-          </div>
-          <div className="flex items-center justify-center gap-2">
-            <Check className="w-5 h-5 text-green-500" />
-            <span className="text-muted-foreground">Sofort loslegen</span>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 max-w-4xl mx-auto">
+            <Card className="border-border/50 bg-card/50 hover:bg-card transition-colors">
+              <CardContent className="pt-6">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-green-500/10 dark:bg-green-500/20 flex items-center justify-center">
+                    <Check className="w-6 h-6 text-green-500" />
+                  </div>
+                  <span className="text-foreground font-medium">{t('landing.freeStart')}</span>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 bg-card/50 hover:bg-card transition-colors">
+              <CardContent className="pt-6">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-green-500/10 dark:bg-green-500/20 flex items-center justify-center">
+                    <Check className="w-6 h-6 text-green-500" />
+                  </div>
+                  <span className="text-foreground font-medium">{t('landing.noCommitment')}</span>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 bg-card/50 hover:bg-card transition-colors">
+              <CardContent className="pt-6">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-green-500/10 dark:bg-green-500/20 flex items-center justify-center">
+                    <Check className="w-6 h-6 text-green-500" />
+                  </div>
+                  <span className="text-foreground font-medium">{t('landing.startImmediately')}</span>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border/40 py-12">
+      <footer className="border-t border-border/40 bg-muted/20 dark:bg-muted/10 py-12 md:py-16">
         <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12">
+            <div className="lg:col-span-1">
               <div className="flex items-center gap-2 mb-4">
-                <div className="w-6 h-6 bg-primary rounded flex items-center justify-center">
-                  <Trophy className="w-4 h-4 text-primary-foreground" />
+                <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center shadow-md">
+                  <Trophy className="w-5 h-5 text-primary-foreground" />
                 </div>
-                <span className="font-bold text-foreground">Sportify</span>
+                <span className="font-bold text-xl text-foreground">Sportify</span>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Die moderne Sports Analytics Plattform für ambitionierte Athleten.
-                Entwickelt mit ❤️ von Leon Stadler.
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {t('landing.footerDescription')}
+                <br />
+                {t('landing.footerDeveloped')} <Heart className="w-4 h-4 inline text-red-500" /> {t('landing.footerBy')}
               </p>
             </div>
             
             <div>
-              <h3 className="font-semibold text-foreground mb-4">Features</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>Live Scoreboard</li>
-                <li>Workout Tracking</li>
-                <li>Statistiken & Analytics</li>
-                <li>Community Features</li>
+              <h3 className="font-semibold text-foreground mb-4">{t('landing.footerFeatures')}</h3>
+              <ul className="space-y-3 text-sm text-muted-foreground">
+                <li>
+                  <Link to="/dashboard" className="hover:text-primary transition-colors inline-flex items-center gap-2">
+                    {t('landing.featuresList.liveScoreboard')}
+                    <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/training" className="hover:text-primary transition-colors inline-flex items-center gap-2">
+                    {t('landing.featuresList.workoutTracking')}
+                    <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/stats" className="hover:text-primary transition-colors inline-flex items-center gap-2">
+                    {t('landing.featuresList.statistics')}
+                    <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/friends" className="hover:text-primary transition-colors inline-flex items-center gap-2">
+                    {t('landing.featuresList.community')}
+                    <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </li>
               </ul>
             </div>
             
             <div>
-              <h3 className="font-semibold text-foreground mb-4">Entwickler</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>Leon Stadler</li>
-                <li>React & TypeScript</li>
-                <li>Moderne Web-Technologien</li>
-                <li>Open Source Komponenten</li>
+              <h3 className="font-semibold text-foreground mb-4">{t('landing.footerDeveloper')}</h3>
+              <ul className="space-y-3 text-sm text-muted-foreground">
+                <li className="flex items-center gap-2">
+                  <span>Leon Stadler</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4" />
+                  <span>{t('landing.footerTech.react')}</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Zap className="w-4 h-4" />
+                  <span>{t('landing.footerTech.modern')}</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Shield className="w-4 h-4" />
+                  <span>{t('landing.footerTech.opensource')}</span>
+                </li>
               </ul>
             </div>
             
             <div>
-              <h3 className="font-semibold text-foreground mb-4">Rechtliches</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link to="/privacy" className="hover:text-foreground">Datenschutz</Link></li>
-                <li><Link to="/terms" className="hover:text-foreground">AGB</Link></li>
-                <li><Link to="/imprint" className="hover:text-foreground">Impressum</Link></li>
-                <li><Link to="/contact" className="hover:text-foreground">Kontakt</Link></li>
+              <h3 className="font-semibold text-foreground mb-4">{t('landing.footerLegal')}</h3>
+              <ul className="space-y-3 text-sm text-muted-foreground">
+                <li>
+                  <Link to="/privacy" className="hover:text-primary transition-colors">
+                    {t('landing.footerLinks.privacy')}
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/terms" className="hover:text-primary transition-colors">
+                    {t('landing.footerLinks.terms')}
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/imprint" className="hover:text-primary transition-colors">
+                    {t('landing.footerLinks.imprint')}
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/contact" className="hover:text-primary transition-colors">
+                    {t('landing.footerLinks.contact')}
+                  </Link>
+                </li>
               </ul>
             </div>
           </div>
           
-          <div className="border-t border-border/40 mt-8 pt-8 text-center">
+          <div className="border-t border-border/40 mt-12 pt-8 text-center">
             <p className="text-sm text-muted-foreground">
-              © 2024 Sportify. Alle Rechte vorbehalten. Entwickelt von Leon Stadler.
+              {t('landing.footerCopyright')}
             </p>
           </div>
         </div>

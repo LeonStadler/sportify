@@ -1,4 +1,5 @@
 import { ActivityFeed } from "@/components/ActivityFeed";
+import { PageTemplate } from "@/components/PageTemplate";
 import { StatCard } from "@/components/StatCard";
 import { WeeklyChallengeCard } from "@/components/WeeklyChallengeCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { BarChart, Dumbbell, TrendingUp, Trophy } from "lucide-react";
 import { useEffect, useState } from 'react';
 import { API_URL } from '@/lib/api';
+import { useTranslation } from 'react-i18next';
 
 interface DashboardStats {
   totalPoints: number;
@@ -45,6 +47,7 @@ interface RecentWorkout {
 export function Dashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const [stats, setStats] = useState<DashboardStats>({
     totalPoints: 0,
@@ -91,8 +94,8 @@ export function Dashboard() {
     } catch (error) {
       console.error('Error loading dashboard data:', error);
       toast({
-        title: "Fehler",
-        description: "Fehler beim Laden der Dashboard-Daten",
+        title: t('dashboard.error'),
+        description: t('dashboard.errorLoadingData'),
         variant: "destructive",
       });
     } finally {
@@ -139,7 +142,7 @@ export function Dashboard() {
 
       if (!token) {
         setRecentWorkouts([]);
-        setRecentWorkoutsError('Bitte melde dich an, um deine letzten Workouts zu sehen.');
+        setRecentWorkoutsError(t('dashboard.pleaseLoginWorkouts'));
         return;
       }
 
@@ -162,37 +165,35 @@ export function Dashboard() {
           })));
         } else {
           setRecentWorkouts([]);
-          setRecentWorkoutsError('Unerwartetes Datenformat für Workouts erhalten.');
+          setRecentWorkoutsError(t('dashboard.unexpectedFormat'));
         }
       } else {
         setRecentWorkouts([]);
-        setRecentWorkoutsError('Letzte Workouts konnten nicht geladen werden.');
+        setRecentWorkoutsError(t('dashboard.workoutsNotLoaded'));
         toast({
-          title: 'Fehler',
-          description: 'Die letzten Workouts konnten nicht geladen werden.',
+          title: t('dashboard.error'),
+          description: t('dashboard.errorLoadingWorkouts'),
           variant: 'destructive',
         });
       }
     } catch (error) {
       console.error('Error loading recent workouts:', error);
       setRecentWorkouts([]);
-      setRecentWorkoutsError('Letzte Workouts konnten nicht geladen werden.');
+      setRecentWorkoutsError(t('dashboard.workoutsNotLoaded'));
       toast({
-        title: 'Fehler',
-        description: 'Die letzten Workouts konnten nicht geladen werden.',
+        title: t('dashboard.error'),
+        description: t('dashboard.errorLoadingWorkouts'),
         variant: 'destructive',
       });
     }
   };
 
   const formatActivityName = (activityType: string) => {
-    switch (activityType) {
-      case 'pullup': return 'Klimmzüge';
-      case 'pushup': return 'Liegestütze';
-      case 'running': return 'Laufen';
-      case 'cycling': return 'Radfahren';
-      default: return activityType;
-    }
+    const activityKey = activityType.toLowerCase();
+    const translationKey = `dashboard.activityTypes.${activityKey}`;
+    const translation = t(translationKey);
+    // Fallback to original if translation key doesn't exist
+    return translation !== translationKey ? translation : activityType;
   };
 
   const formatActivityAmount = (activityType: string, amount: number) => {
@@ -217,13 +218,13 @@ export function Dashboard() {
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
     if (diffMins < 60) {
-      return `vor ${diffMins} Minuten`;
+      return t('dashboard.timeAgo.minutes', { count: diffMins });
     } else if (diffHours < 24) {
-      return `vor ${diffHours} Stunden`;
+      return t('dashboard.timeAgo.hours', { count: diffHours });
     } else if (diffDays === 1) {
-      return 'gestern';
+      return t('dashboard.timeAgo.yesterday');
     } else {
-      return `vor ${diffDays} Tagen`;
+      return t('dashboard.timeAgo.days', { count: diffDays });
     }
   };
 
@@ -249,11 +250,10 @@ export function Dashboard() {
 
   if (isLoading) {
   return (
-    <div className="space-y-6">
-      <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground mt-2">Lädt deine sportlichen Fortschritte...</p>
-        </div>
+      <PageTemplate
+        title={t('dashboard.title')}
+        subtitle={t('dashboard.loadingProgress')}
+      >
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {[1, 2, 3, 4].map((i) => (
             <Card key={i}>
@@ -266,68 +266,67 @@ export function Dashboard() {
             </Card>
           ))}
         </div>
-      </div>
+      </PageTemplate>
     );
   }
 
   return (
-    <div className="space-y-4 md:space-y-6 pb-20 md:pb-0">
-      <div className="px-4 md:px-0">
-        <h1 className="text-2xl md:text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground mt-2 text-sm md:text-base">Deine sportlichen Fortschritte auf einen Blick</p>
-      </div>
+    <PageTemplate
+      title={t('dashboard.title')}
+      subtitle={t('dashboard.subtitle')}
+    >
 
       {recentWorkoutsError && (
         <div
           role="alert"
-          className="mx-4 md:mx-0 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+          className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
         >
           {recentWorkoutsError}
         </div>
       )}
 
       {/* Stats Grid - Mobile optimiert */}
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 px-4 md:px-0">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
         <StatCard
-          title="Gesamtpunkte"
+          title={t('dashboard.totalPoints')}
           value={stats.totalPoints.toLocaleString()}
           icon={Trophy}
-          trend={`+${stats.weekPoints} diese Woche`}
+          trend={`+${stats.weekPoints} ${t('dashboard.thisWeek')}`}
           color="orange"
         />
         <StatCard
-          title="Klimmzüge"
+          title={t('dashboard.pullups')}
           value={stats.activities.pullups.total.toString()}
           icon={Dumbbell}
-          trend={`+${stats.activities.pullups.week} diese Woche`}
+          trend={`+${stats.activities.pullups.week} ${t('dashboard.thisWeek')}`}
           color="blue"
         />
         <StatCard
-          title="Laufdistanz"
+          title={t('dashboard.runningDistance')}
           value={`${stats.activities.running.total} km`}
           icon={TrendingUp}
-          trend={`+${stats.activities.running.week} km diese Woche`}
+          trend={`+${stats.activities.running.week} km ${t('dashboard.thisWeek')}`}
           color="green"
         />
         <StatCard
-          title="Rang"
+          title={t('dashboard.rank')}
           value={`#${stats.userRank}`}
           icon={BarChart}
-          trend={`von ${stats.totalUsers} Athleten`}
+          trend={t('dashboard.ofAthletes', { count: stats.totalUsers })}
           color="purple"
         />
       </div>
 
       {/* Progress Section - Mobile Stack Layout */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6 px-4 md:px-0">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">
         <Card>
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg md:text-xl">Wochenziele</CardTitle>
+            <CardTitle className="text-lg md:text-xl">{t('dashboard.weeklyGoals')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
               <div className="flex justify-between text-sm mb-2">
-                <span>Klimmzüge (Ziel: {goals.pullups.target})</span>
+                <span>{t('dashboard.pullups')} ({t('dashboard.goal')}: {goals.pullups.target})</span>
                 <span className="font-medium">{goals.pullups.current}/{goals.pullups.target}</span>
               </div>
               <Progress 
@@ -337,7 +336,7 @@ export function Dashboard() {
             </div>
             <div>
               <div className="flex justify-between text-sm mb-2">
-                <span>Liegestütze (Ziel: {goals.pushups.target})</span>
+                <span>{t('dashboard.pushups')} ({t('dashboard.goal')}: {goals.pushups.target})</span>
                 <span className="font-medium">{goals.pushups.current}/{goals.pushups.target}</span>
               </div>
               <Progress 
@@ -347,7 +346,7 @@ export function Dashboard() {
             </div>
             <div>
               <div className="flex justify-between text-sm mb-2">
-                <span>Laufen (Ziel: {goals.running.target} km)</span>
+                <span>{t('dashboard.running')} ({t('dashboard.goal')}: {goals.running.target} km)</span>
                 <span className="font-medium">{goals.running.current}/{goals.running.target} km</span>
               </div>
               <Progress 
@@ -357,7 +356,7 @@ export function Dashboard() {
             </div>
             <div>
               <div className="flex justify-between text-sm mb-2">
-                <span>Radfahren (Ziel: {goals.cycling.target} km)</span>
+                <span>{t('dashboard.cycling')} ({t('dashboard.goal')}: {goals.cycling.target} km)</span>
                 <span className="font-medium">{goals.cycling.current}/{goals.cycling.target} km</span>
               </div>
               <Progress 
@@ -370,9 +369,7 @@ export function Dashboard() {
         <WeeklyChallengeCard className="xl:col-span-2" />
       </div>
 
-      <div className="px-4 md:px-0">
         <ActivityFeed />
-      </div>
-    </div>
+    </PageTemplate>
   );
 }

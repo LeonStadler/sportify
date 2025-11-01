@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { useEffect, useState } from 'react';
 import { API_URL } from '@/lib/api';
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface ActivityFeedItem {
   id: string;
@@ -26,33 +27,33 @@ const getInitials = (displayName: string) => {
   return names.map(name => name.charAt(0)).join('').toUpperCase().slice(0, 2);
 };
 
-const formatActivity = (activity: ActivityFeedItem) => {
+const formatActivity = (activity: ActivityFeedItem, t: (key: string, params?: any) => string) => {
   const { activityType, amount, workoutTitle } = activity;
-  
+
   let formatted = `${amount}`;
-  
+
   // Add unit based on activity type
   switch (activityType) {
     case 'pushups':
-    case 'pullups': 
+    case 'pullups':
     case 'situps':
-      formatted += ' Wiederholungen';
+      formatted += ` ${t('activityFeed.repetitions')}`;
       break;
     case 'running':
     case 'cycling':
       formatted += ' km';
       break;
     case 'other':
-      formatted += ' Einheiten';
+      formatted += ` ${t('activityFeed.units')}`;
       break;
     default:
-      formatted += ' Einheiten';
+      formatted += ` ${t('activityFeed.units')}`;
   }
-  
+
   if (workoutTitle) {
-    formatted += ` in "${workoutTitle}"`;
+    formatted += ` ${t('activityFeed.inWorkout', { title: workoutTitle })}`;
   }
-  
+
   return formatted;
 };
 
@@ -75,23 +76,11 @@ const getActivityIcon = (activityType: string) => {
   }
 };
 
-const getActivityName = (activityType: string) => {
-  switch (activityType) {
-    case 'pullups':
-      return 'Klimmzüge';
-    case 'pushups':
-      return 'Liegestütze';
-    case 'situps':
-      return 'Sit-ups';
-    case 'running':
-      return 'Laufen';
-    case 'cycling':
-      return 'Radfahren';
-    case 'other':
-      return 'Sonstiges';
-    default:
-      return 'Unbekannte Aktivität';
-  }
+const getActivityName = (activityType: string, t: (key: string) => string) => {
+  const translationKey = `activityFeed.activityTypes.${activityType.toLowerCase()}`;
+  const translation = t(translationKey);
+  // Fallback to original if translation key doesn't exist
+  return translation !== translationKey ? translation : t('activityFeed.activityTypes.unknown');
 };
 
 const getActivityColor = (activityType: string) => {
@@ -106,7 +95,7 @@ const getActivityColor = (activityType: string) => {
   }
 };
 
-const formatTimeAgo = (dateString: string) => {
+const formatTimeAgo = (dateString: string, t: (key: string, params?: any) => string) => {
   const date = new Date(dateString);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
@@ -115,13 +104,13 @@ const formatTimeAgo = (dateString: string) => {
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
   if (diffMins < 60) {
-    return `vor ${diffMins} Min`;
+    return t('activityFeed.timeAgoShort.minutes', { count: diffMins });
   } else if (diffHours < 24) {
-    return `vor ${diffHours}h`;
+    return t('activityFeed.timeAgoShort.hours', { count: diffHours });
   } else if (diffDays === 1) {
-    return 'gestern';
+    return t('activityFeed.timeAgoShort.yesterday');
   } else {
-    return `vor ${diffDays}d`;
+    return t('activityFeed.timeAgoShort.days', { count: diffDays });
   }
 };
 
@@ -134,6 +123,7 @@ const getUserInitials = (firstName: string, lastName: string) => {
 export function ActivityFeed() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [activities, setActivities] = useState<ActivityFeedItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -151,7 +141,7 @@ export function ActivityFeed() {
       const token = localStorage.getItem('token');
       if (!token) {
         setActivities([]);
-        setError('Bitte melde dich an, um Aktivitäten zu sehen.');
+        setError(t('activityFeed.pleaseLogin'));
         return;
       }
 
@@ -167,24 +157,24 @@ export function ActivityFeed() {
           setActivities(payload);
         } else {
           setActivities([]);
-          setError('Unerwartetes Datenformat vom Server.');
+          setError(t('activityFeed.unexpectedFormat'));
         }
       } else {
         setActivities([]);
-        setError('Aktivitäten konnten nicht geladen werden.');
+        setError(t('activityFeed.couldNotLoad'));
         toast({
-          title: 'Fehler',
-          description: 'Der Activity Feed konnte nicht geladen werden.',
+          title: t('dashboard.error'),
+          description: t('activityFeed.errorLoading'),
           variant: 'destructive'
         });
       }
     } catch (error) {
       console.error('Error loading activity feed:', error);
       setActivities([]);
-      setError('Aktivitäten konnten nicht geladen werden.');
+      setError(t('activityFeed.couldNotLoad'));
       toast({
-        title: 'Fehler',
-        description: 'Der Activity Feed konnte nicht geladen werden.',
+        title: t('dashboard.error'),
+        description: t('activityFeed.errorLoading'),
         variant: 'destructive',
       });
     } finally {
@@ -196,7 +186,7 @@ export function ActivityFeed() {
     return (
       <Card>
         <CardHeader className="pb-4">
-          <CardTitle className="text-lg md:text-xl">Aktivitäten der Freunde</CardTitle>
+          <CardTitle className="text-lg md:text-xl">{t('activityFeed.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -218,7 +208,7 @@ export function ActivityFeed() {
   return (
     <Card>
       <CardHeader className="pb-4">
-        <CardTitle className="text-lg md:text-xl">Aktivitäten der Freunde</CardTitle>
+        <CardTitle className="text-lg md:text-xl">{t('activityFeed.title')}</CardTitle>
       </CardHeader>
       <CardContent>
         {error ? (
@@ -246,20 +236,20 @@ export function ActivityFeed() {
                         variant="secondary"
                         className={`text-xs ${getActivityColor(activity.activityType)}`}
                       >
-                        {getActivityIcon(activity.activityType)} {getActivityName(activity.activityType)}
+                        {getActivityIcon(activity.activityType)} {getActivityName(activity.activityType, t)}
                       </Badge>
                     </div>
 
                     <p className="text-xs md:text-sm text-muted-foreground mb-1">
-                      <span className="font-medium">{formatActivity(activity)}</span>
+                      <span className="font-medium">{formatActivity(activity, t)}</span>
                     </p>
 
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">
-                        {formatTimeAgo(activity.createdAt)}
+                        {formatTimeAgo(activity.createdAt, t)}
                       </span>
                       <span className="text-xs font-medium text-primary">
-                        {activity.points} Punkte
+                        {activity.points} {t('activityFeed.points')}
                       </span>
                     </div>
                   </div>
@@ -268,9 +258,9 @@ export function ActivityFeed() {
             ) : (
               <div className="text-center py-8">
                 <div className="text-4xl mb-4">👥</div>
-                <p className="text-muted-foreground mb-2">Keine Aktivitäten von Freunden</p>
+                <p className="text-muted-foreground mb-2">{t('activityFeed.noActivities')}</p>
                 <p className="text-xs md:text-sm text-muted-foreground">
-                  Füge Freunde hinzu, um ihre Workouts zu sehen!
+                  {t('activityFeed.addFriends')}
                 </p>
               </div>
             )}

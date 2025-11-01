@@ -1,13 +1,16 @@
 
+import { PageTemplate } from "@/components/PageTemplate";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Activity, Award, Calendar, TrendingUp } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export function Stats() {
+  const { t } = useTranslation();
   const [timeRange, setTimeRange] = useState("week");
   const [selectedMetrics, setSelectedMetrics] = useState(["pullups", "pushups"]);
 
@@ -59,12 +62,24 @@ export function Stats() {
   };
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Statistiken</h1>
-        <p className="text-gray-600 mt-2">Detaillierte Analyse deiner sportlichen Leistungen</p>
-      </div>
-
+    <PageTemplate
+      title={t('stats.title', 'Statistiken')}
+      subtitle={t('stats.subtitle', 'Detaillierte Analyse deiner sportlichen Leistungen')}
+      headerActions={
+        <Select value={timeRange} onValueChange={setTimeRange}>
+          <SelectTrigger className="w-32">
+            <Calendar className="w-4 h-4 mr-2" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="week">{t('stats.thisWeek', 'Diese Woche')}</SelectItem>
+            <SelectItem value="month">{t('stats.thisMonth', 'Dieser Monat')}</SelectItem>
+            <SelectItem value="quarter">{t('stats.thisQuarter', 'Dieses Quartal')}</SelectItem>
+          </SelectContent>
+        </Select>
+      }
+      className="space-y-4 md:space-y-6"
+    >
       {/* Controls */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div className="flex flex-wrap gap-2">
@@ -353,6 +368,6 @@ export function Stats() {
           </div>
         </TabsContent>
       </Tabs>
-    </div>
+    </PageTemplate>
   );
 }

@@ -12,10 +12,13 @@ import TwoFactor from "@/pages/auth/TwoFactor";
 import Contact from "@/pages/Contact";
 import { Dashboard } from "@/pages/Dashboard";
 import { Friends } from "@/pages/Friends";
+import Imprint from "@/pages/Imprint";
 import Landing from "@/pages/Landing";
+import Privacy from "@/pages/Privacy";
 import { Profile } from "@/pages/Profile";
 import { Scoreboard } from "@/pages/Scoreboard";
 import { Stats } from "@/pages/Stats";
+import Terms from "@/pages/Terms";
 import { Training } from "@/pages/Training";
 import { Route, Routes } from "react-router-dom";
 import NotFound from "./pages/NotFound";
@@ -40,6 +43,9 @@ const App = () => {
       <TooltipProvider>
         <Routes>
           <Route path="/contact" element={<Contact />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/imprint" element={<Imprint />} />
           <Route path="/auth/login" element={<Login />} />
           <Route path="/auth/register" element={<Register />} />
           <Route path="/auth/forgot-password" element={<ForgotPassword />} />
@@ -56,7 +62,7 @@ const App = () => {
         <SidebarProvider>
           <div className="min-h-screen flex w-full">
             <AppSidebar />
-            <main className="flex-1 p-3 md:p-6 bg-gray-50 pb-20 md:pb-6">
+            <main className="flex-1 p-3 md:p-6 bg-background pb-20 md:pb-6">
               <div className="mb-4">
                 <SidebarTrigger className="lg:hidden" />
               </div>
@@ -70,6 +76,10 @@ const App = () => {
               <Route path="/friends" element={<Friends />} />
                 <Route path="/admin" element={<Admin />} />
                 <Route path="/admin/users" element={<Admin />} />
+                <Route path="/contact" element={<Contact />} />
+                <Route path="/privacy" element={<Privacy />} />
+                <Route path="/terms" element={<Terms />} />
+                <Route path="/imprint" element={<Imprint />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </main>

@@ -96,9 +96,24 @@
     @apply font-sans antialiased;
   }
 
-  /* Verbesserte Dark Theme Styles */
+  html {
+    @apply bg-background;
+  }
+
+  /* Optimierte Theme-Übergänge */
   .dark {
     color-scheme: dark;
+  }
+
+  /* Schnelle Übergänge nur für wichtige Eigenschaften */
+  *,
+  *::before,
+  *::after {
+    transition: background-color 0.1s ease-out,
+      border-color 0.1s ease-out,
+      color 0.1s ease-out,
+      fill 0.1s ease-out,
+      stroke 0.1s ease-out;
   }
 
   /* Bessere Kontraste für Cards im Dark Mode */
@@ -153,11 +168,6 @@
     @apply bg-popover/95 backdrop-blur-sm;
   }
 
-  /* Smooth transitions */
-  * {
-    @apply transition-colors duration-200;
-  }
-
   /* Improved scrollbars */
   ::-webkit-scrollbar {
     @apply w-2 h-2;
@@ -179,6 +189,16 @@
     @apply bg-border/80;
   }
 
+  /* Hide scrollbar for horizontal tabs */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
   /* Leon Stadler Branding */
   .brand-gradient {
     background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary)) 100%);
@@ -186,5 +206,16 @@
 
   .dark .brand-gradient {
     background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary)) 100%);
+  }
+
+  /* Performance-Optimierungen */
+  .sidebar {
+    will-change: transform;
+    transform: translateZ(0);
+  }
+
+  /* Bessere Dark Mode Unterstützung für body */
+  body.dark {
+    @apply bg-background text-foreground;
   }
 }

@@ -1,21 +1,13 @@
-import { BarChart, Dumbbell, Globe, Home, LogOut, Menu, Palette, Settings, Shield, Trophy, User, UserPlus } from "lucide-react";
-import ThemeSwitcher from './ThemeSwitcher';
-import LanguageSwitcher from './LanguageSwitcher';
+import { BarChart, Dumbbell, Globe, Home, LogOut, Palette, Settings, Shield, Trophy, User, UserCircle, UserPlus } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import LanguageSwitcher from './LanguageSwitcher';
+import ThemeSwitcher from './ThemeSwitcher';
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -31,27 +23,27 @@ export function MobileBottomNav() {
   // Mock admin check
   const isAdmin = user?.email === 'admin@sportify.com';
 
-const navItems = [
-  {
+  const navItems = [
+    {
       title: t('navigation.dashboard'),
-    url: "/",
-    icon: Home,
-  },
-  {
+      url: "/",
+      icon: Home,
+    },
+    {
       title: t('navigation.scoreboard'),
-    url: "/scoreboard",
-    icon: Trophy,
-  },
-  {
+      url: "/scoreboard",
+      icon: Trophy,
+    },
+    {
       title: t('navigation.training'),
-    url: "/training",
-    icon: Dumbbell,
-  },
-  {
+      url: "/training",
+      icon: Dumbbell,
+    },
+    {
       title: t('navigation.stats'),
-    url: "/stats",
-    icon: BarChart,
-  },
+      url: "/stats",
+      icon: BarChart,
+    },
   ];
 
   const adminItems = [
@@ -104,19 +96,18 @@ const navItems = [
             <Link
               key={item.title}
               to={item.url}
-              className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
-                isActive
-                  ? "text-primary bg-primary/10"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${isActive
+                ? "text-primary bg-primary/10"
+                : "text-muted-foreground hover:text-foreground"
+                }`}
             >
               <item.icon size={20} />
               <span className="text-xs font-medium">{item.title}</span>
             </Link>
           );
         })}
-        
-        {/* Burger Menu */}
+
+        {/* Account Menu */}
         <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
           <SheetTrigger asChild>
             <Button
@@ -124,8 +115,8 @@ const navItems = [
               size="sm"
               className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg h-auto"
             >
-              <Menu size={20} />
-              <span className="text-xs font-medium">Menü</span>
+              <UserCircle size={20} />
+              <span className="text-xs font-medium">{t('account.title', 'Account')}</span>
             </Button>
           </SheetTrigger>
           <SheetContent side="bottom" className="h-[80vh] p-0">
@@ -168,11 +159,11 @@ const navItems = [
                     <Button
                       variant="outline"
                       className="justify-start h-auto p-3"
-                      onClick={() => handleNavigation('/friends/invite')}
+                      onClick={() => handleNavigation('/friends')}
                     >
                       <div className="text-left">
                         <UserPlus className="h-4 w-4 mb-1" />
-                        <div className="text-xs">{t('navigation.friends')}</div>
+                        <div className="text-xs">{t('navigation.friends', 'Freunde')}</div>
                       </div>
                     </Button>
                   </div>
@@ -185,10 +176,10 @@ const navItems = [
                   <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
                     {t('navigation.settings')}
                   </h3>
-                  
+
                   {/* Language Setting */}
                   <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
                       <Globe className="h-4 w-4" />
                       <span className="text-sm">{t('settings.language')}</span>
                     </div>

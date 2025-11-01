@@ -60,36 +60,36 @@ const App = () => {
 
   return (
     <TooltipProvider>
-        <SidebarProvider>
-          <InviteLinkHandler />
-          <div className="min-h-screen flex w-full">
-            <AppSidebar />
-            <main className="flex-1 p-3 md:p-6 bg-background pb-20 md:pb-6">
-              <div className="mb-4">
-                <SidebarTrigger className="lg:hidden" />
-              </div>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
+      <SidebarProvider>
+        <InviteLinkHandler />
+        <div className="min-h-screen flex w-full">
+          <AppSidebar />
+          <main className="flex-1 p-3 md:p-6 bg-background pb-20 md:pb-6">
+            <div className="mb-4">
+              <SidebarTrigger className="lg:hidden" />
+            </div>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
               <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/scoreboard" element={<Scoreboard />} />
-                <Route path="/training" element={<Training />} />
-                <Route path="/stats" element={<Stats />} />
-                <Route path="/profile" element={<Profile />} />
+              <Route path="/scoreboard" element={<Scoreboard />} />
+              <Route path="/training" element={<Training />} />
+              <Route path="/stats" element={<Stats />} />
+              <Route path="/profile" element={<Profile />} />
               <Route path="/friends" element={<Friends />} />
-                <Route path="/admin" element={<Admin />} />
-                <Route path="/admin/users" element={<Admin />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/privacy" element={<Privacy />} />
-                <Route path="/terms" element={<Terms />} />
-                <Route path="/imprint" element={<Imprint />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </main>
-            <MobileBottomNav />
-          </div>
-        </SidebarProvider>
+              <Route path="/admin" element={<Admin />} />
+              <Route path="/admin/users" element={<Admin />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/imprint" element={<Imprint />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </main>
+          <MobileBottomNav />
+        </div>
+      </SidebarProvider>
     </TooltipProvider>
-);
+  );
 };
 
 export default App;

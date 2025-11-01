@@ -24,7 +24,7 @@ export const createWorkoutsRouter = (pool) => {
                     w.id,
                     w.title,
                     w.description,
-                    w.workout_date,
+                    COALESCE(w.workout_date::text, NULL) as workout_date,
                     w.duration,
                     w.created_at,
                     w.updated_at,
@@ -73,8 +73,27 @@ export const createWorkoutsRouter = (pool) => {
                     sets: a.setsData ? JSON.parse(a.setsData) : null
                 })).filter(a => a.id !== null) : [];
 
+                const workout = toCamelCase(row);
+
+                // Stelle sicher, dass workoutDate als ISO-String zurückgegeben wird
+                if (workout.workoutDate) {
+                    if (workout.workoutDate instanceof Date) {
+                        workout.workoutDate = workout.workoutDate.toISOString();
+                    } else if (typeof workout.workoutDate !== 'string') {
+                        // Versuche es in ein Date-Objekt zu konvertieren und dann zu ISO-String
+                        const dateObj = new Date(workout.workoutDate);
+                        if (!isNaN(dateObj.getTime())) {
+                            workout.workoutDate = dateObj.toISOString();
+                        } else {
+                            workout.workoutDate = null;
+                        }
+                    }
+                } else {
+                    workout.workoutDate = null;
+                }
+
                 return {
-                    ...toCamelCase(row),
+                    ...workout,
                     activities,
                 };
             });
@@ -186,7 +205,7 @@ export const createWorkoutsRouter = (pool) => {
                 const activitiesData = [];
                 for (let i = 0; i < activities.length; i++) {
                     const activity = activities[i];
-                    
+
                     // Berechne Gesamtmenge: Wenn Sets vorhanden sind, summiere alle Reps
                     let activityAmount = activity.quantity || activity.amount;
                     if (activity.sets && Array.isArray(activity.sets) && activity.sets.length > 0) {
@@ -196,7 +215,7 @@ export const createWorkoutsRouter = (pool) => {
                             activityAmount = totalFromSets;
                         }
                     }
-                    
+
                     const points = calculateActivityPoints(activity.activityType, activityAmount);
 
                     const activityQuery = `
@@ -228,8 +247,26 @@ export const createWorkoutsRouter = (pool) => {
 
                 await client.query('COMMIT');
 
+                const workout = toCamelCase(workoutRows[0]);
+
+                // Stelle sicher, dass workoutDate als ISO-String zurückgegeben wird
+                if (workout.workoutDate) {
+                    if (workout.workoutDate instanceof Date) {
+                        workout.workoutDate = workout.workoutDate.toISOString();
+                    } else if (typeof workout.workoutDate !== 'string') {
+                        const dateObj = new Date(workout.workoutDate);
+                        if (!isNaN(dateObj.getTime())) {
+                            workout.workoutDate = dateObj.toISOString();
+                        } else {
+                            workout.workoutDate = null;
+                        }
+                    }
+                } else {
+                    workout.workoutDate = null;
+                }
+
                 const newWorkout = {
-                    ...toCamelCase(workoutRows[0]),
+                    ...workout,
                     activities: activitiesData
                 };
 
@@ -252,7 +289,9 @@ export const createWorkoutsRouter = (pool) => {
             const workoutId = req.params.id;
             const query = `
                 SELECT
-                    w.id, w.title, w.description, w.workout_date, w.duration,
+                    w.id, w.title, w.description, 
+                    COALESCE(w.workout_date::text, NULL) as workout_date, 
+                    w.duration,
                     w.created_at, w.updated_at,
                     COALESCE(
                         JSON_AGG(
@@ -289,7 +328,25 @@ export const createWorkoutsRouter = (pool) => {
                     sets: a.setsData ? JSON.parse(a.setsData) : null,
                 })).filter(a => a.id !== null)
                 : [];
-            res.json({ ...toCamelCase(row), activities });
+            const workout = toCamelCase(row);
+
+            // Stelle sicher, dass workoutDate als ISO-String zurückgegeben wird
+            if (workout.workoutDate) {
+                if (workout.workoutDate instanceof Date) {
+                    workout.workoutDate = workout.workoutDate.toISOString();
+                } else if (typeof workout.workoutDate !== 'string') {
+                    const dateObj = new Date(workout.workoutDate);
+                    if (!isNaN(dateObj.getTime())) {
+                        workout.workoutDate = dateObj.toISOString();
+                    } else {
+                        workout.workoutDate = null;
+                    }
+                }
+            } else {
+                workout.workoutDate = null;
+            }
+
+            res.json({ ...workout, activities });
         } catch (error) {
             console.error('Get workout error:', error);
             res.status(500).json({ error: 'Serverfehler beim Laden des Workouts.' });
@@ -367,7 +424,7 @@ export const createWorkoutsRouter = (pool) => {
                 const activitiesData = [];
                 for (let i = 0; i < activities.length; i++) {
                     const activity = activities[i];
-                    
+
                     // Berechne Gesamtmenge: Wenn Sets vorhanden sind, summiere alle Reps
                     let activityAmount = activity.quantity || activity.amount;
                     if (activity.sets && Array.isArray(activity.sets) && activity.sets.length > 0) {
@@ -377,7 +434,7 @@ export const createWorkoutsRouter = (pool) => {
                             activityAmount = totalFromSets;
                         }
                     }
-                    
+
                     const points = calculateActivityPoints(activity.activityType, activityAmount);
                     const activityQuery = `
                         INSERT INTO workout_activities (workout_id, activity_type, quantity, points_earned, notes, order_index, sets_data, unit)
@@ -408,8 +465,26 @@ export const createWorkoutsRouter = (pool) => {
 
                 await client.query('COMMIT');
 
+                const workout = toCamelCase(workoutRows[0]);
+
+                // Stelle sicher, dass workoutDate als ISO-String zurückgegeben wird
+                if (workout.workoutDate) {
+                    if (workout.workoutDate instanceof Date) {
+                        workout.workoutDate = workout.workoutDate.toISOString();
+                    } else if (typeof workout.workoutDate !== 'string') {
+                        const dateObj = new Date(workout.workoutDate);
+                        if (!isNaN(dateObj.getTime())) {
+                            workout.workoutDate = dateObj.toISOString();
+                        } else {
+                            workout.workoutDate = null;
+                        }
+                    }
+                } else {
+                    workout.workoutDate = null;
+                }
+
                 const updatedWorkout = {
-                    ...toCamelCase(workoutRows[0]),
+                    ...workout,
                     activities: activitiesData,
                 };
                 res.json(updatedWorkout);

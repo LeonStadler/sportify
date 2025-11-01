@@ -1,4 +1,6 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { parseAvatarConfig } from '@/lib/avatar';
+import NiceAvatar from 'react-nice-avatar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -221,10 +223,16 @@ export function ActivityFeed() {
               activities.map((activity) => (
                 <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30">
                   <Avatar className="w-10 h-10 md:w-12 md:h-12">
-                    <AvatarImage src={activity.userAvatar} alt={activity.userName} />
-                    <AvatarFallback className="text-xs md:text-sm">
-                      {getUserInitials(activity.userFirstName, activity.userLastName)}
-                    </AvatarFallback>
+                    {activity.userAvatar && parseAvatarConfig(activity.userAvatar) ? (
+                      <NiceAvatar 
+                        style={{ width: '48px', height: '48px' }} 
+                        {...parseAvatarConfig(activity.userAvatar)!} 
+                      />
+                    ) : (
+                      <AvatarFallback className="text-xs md:text-sm">
+                        {getUserInitials(activity.userFirstName, activity.userLastName)}
+                      </AvatarFallback>
+                    )}
                   </Avatar>
 
                   <div className="flex-1 min-w-0">

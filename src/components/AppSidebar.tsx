@@ -6,6 +6,8 @@ import LanguageSwitcher from './LanguageSwitcher';
 import ThemeSwitcher from './ThemeSwitcher';
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { parseAvatarConfig, getUserInitials } from "@/lib/avatar";
+import NiceAvatar from "react-nice-avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -104,25 +106,6 @@ export function AppSidebar() {
   };
 
 
-  const getUserInitials = () => {
-    if (!user) return '?';
-    return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
-  };
-
-  const getAvatarConfig = () => {
-    if (!user) return {};
-    const seed = user.id || user.email || 'default';
-    return {
-      sex: (['man', 'woman'] as const)[Math.abs(seed.charCodeAt(0)) % 2],
-      faceColor: ['#F9C9B6', '#AC6651'][Math.abs(seed.charCodeAt(0)) % 2] as string,
-      earSize: 'big' as const,
-      eyeStyle: (['circle', 'oval', 'smile'] as const)[Math.abs(seed.charCodeAt(1)) % 3],
-      noseStyle: (['short', 'long', 'round'] as const)[Math.abs(seed.charCodeAt(2)) % 3],
-      mouthStyle: (['laugh', 'smile', 'peace'] as const)[Math.abs(seed.charCodeAt(3)) % 3],
-      shirtStyle: (['polo', 'short', 'hoody'] as const)[Math.abs(seed.charCodeAt(4)) % 3],
-      bgColor: (['#F9C9B6', '#AC6651', '#D08B5B', '#F4D150', '#ED9C6E'] as const)[Math.abs(seed.charCodeAt(5)) % 5],
-    };
-  };
 
   if (!isAuthenticated) {
     return null; // Don't render sidebar if not authenticated
@@ -236,12 +219,13 @@ export function AppSidebar() {
             <DropdownMenuTrigger asChild>
               <div className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-accent transition-colors">
                 <Avatar className="h-9 w-9">
-                  {user?.preferences?.useNiceAvatar ? (
-                    <NiceAvatar style={{ width: '36px', height: '36px' }} {...getAvatarConfig()} />
+                  {user?.avatar && parseAvatarConfig(user.avatar) ? (
+                    <NiceAvatar 
+                      style={{ width: '36px', height: '36px' }} 
+                      {...parseAvatarConfig(user.avatar)!} 
+                    />
                   ) : (
-                    <AvatarFallback className="bg-primary text-primary-foreground text-sm font-bold">
-                      {getUserInitials()}
-                    </AvatarFallback>
+                    <AvatarFallback>{getUserInitials(user)}</AvatarFallback>
                   )}
                 </Avatar>
                 <div className="flex-1">

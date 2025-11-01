@@ -52,23 +52,10 @@ const resolveNow = (options) => {
 
 export const createPasswordResetToken = async (pool, userId, options = {}) => {
   const now = resolveNow(options);
-  // Versuche zuerst mit used_at, falls das fehlschlägt, ohne used_at
-  try {
-    await pool.query(
-      'UPDATE password_reset_tokens SET used = true, used_at = $2 WHERE user_id = $1 AND used = false',
-      [userId, now]
-    );
-  } catch (error) {
-    // Falls used_at nicht existiert, verwende nur used
-    if (error.code === '42703') { // Column does not exist
-      await pool.query(
-        'UPDATE password_reset_tokens SET used = true WHERE user_id = $1 AND used = false',
-        [userId]
-      );
-    } else {
-      throw error;
-    }
-  }
+  await pool.query(
+    'UPDATE password_reset_tokens SET used = true, used_at = $2 WHERE user_id = $1 AND used = false',
+    [userId, now]
+  );
 
   const rawToken = options.generateToken ? options.generateToken() : generateRawToken();
   const tokenHash = await (options.hashToken ? options.hashToken(rawToken) : defaultHash(rawToken));
@@ -124,36 +111,15 @@ export const validatePasswordResetToken = async (pool, compositeToken, options =
 
 export const markPasswordResetTokenUsed = async (pool, tokenId, options = {}) => {
   const now = resolveNow(options);
-  try {
-    await pool.query('UPDATE password_reset_tokens SET used = true, used_at = $2 WHERE id = $1', [tokenId, now]);
-  } catch (error) {
-    // Falls used_at nicht existiert, verwende nur used
-    if (error.code === '42703') { // Column does not exist
-      await pool.query('UPDATE password_reset_tokens SET used = true WHERE id = $1', [tokenId]);
-    } else {
-      throw error;
-    }
-  }
+  await pool.query('UPDATE password_reset_tokens SET used = true, used_at = $2 WHERE id = $1', [tokenId, now]);
 };
 
 export const createEmailVerificationToken = async (pool, userId, options = {}) => {
   const now = resolveNow(options);
-  try {
-    await pool.query(
-      'UPDATE email_verification_tokens SET used = true, used_at = $2 WHERE user_id = $1 AND used = false',
-      [userId, now]
-    );
-  } catch (error) {
-    // Falls used_at nicht existiert, verwende nur used
-    if (error.code === '42703') { // Column does not exist
-      await pool.query(
-        'UPDATE email_verification_tokens SET used = true WHERE user_id = $1 AND used = false',
-        [userId]
-      );
-    } else {
-      throw error;
-    }
-  }
+  await pool.query(
+    'UPDATE email_verification_tokens SET used = true, used_at = $2 WHERE user_id = $1 AND used = false',
+    [userId, now]
+  );
 
   const rawToken = options.generateToken ? options.generateToken() : generateRawToken();
   const tokenHash = await (options.hashToken ? options.hashToken(rawToken) : defaultHash(rawToken));
@@ -209,14 +175,5 @@ export const validateEmailVerificationToken = async (pool, compositeToken, optio
 
 export const markEmailVerificationTokenUsed = async (pool, tokenId, options = {}) => {
   const now = resolveNow(options);
-  try {
-    await pool.query('UPDATE email_verification_tokens SET used = true, used_at = $2 WHERE id = $1', [tokenId, now]);
-  } catch (error) {
-    // Falls used_at nicht existiert, verwende nur used
-    if (error.code === '42703') { // Column does not exist
-      await pool.query('UPDATE email_verification_tokens SET used = true WHERE id = $1', [tokenId]);
-    } else {
-      throw error;
-    }
-  }
+  await pool.query('UPDATE email_verification_tokens SET used = true, used_at = $2 WHERE id = $1', [tokenId, now]);
 };

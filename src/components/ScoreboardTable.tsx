@@ -1,4 +1,6 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { parseAvatarConfig } from "@/lib/avatar";
+import NiceAvatar from "react-nice-avatar";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { API_URL } from '@/lib/api';
@@ -133,10 +135,16 @@ export function ScoreboardTable({ activity, period }: ScoreboardTableProps) {
                 {player.rank}
               </span>
               <Avatar>
-                <AvatarImage src={player.avatarUrl || undefined} alt={player.displayName} />
-                <AvatarFallback className={`${player.isCurrentUser ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white'}`}>
-                  {getAvatarFallback(player.displayName)}
-                </AvatarFallback>
+                {player.avatarUrl && parseAvatarConfig(player.avatarUrl) ? (
+                  <NiceAvatar 
+                    style={{ width: '40px', height: '40px' }} 
+                    {...parseAvatarConfig(player.avatarUrl)!} 
+                  />
+                ) : (
+                  <AvatarFallback className={`${player.isCurrentUser ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white'}`}>
+                    {getAvatarFallback(player.displayName)}
+                  </AvatarFallback>
+                )}
               </Avatar>
             </div>
             <div>

@@ -503,10 +503,7 @@ Dein Sportify-Team`;
 </html>`;
 
     console.info(`[Password Reset] Sende E-Mail an: ${recipientEmail}`);
-
-    // Verwende queueEmail direkt (wie bei Registrierung)
     const { queueEmail } = await import('../services/emailService.js');
-
     await queueEmail(pool, {
         recipient: recipientEmail,
         subject: 'Sportify – Passwort zurücksetzen',

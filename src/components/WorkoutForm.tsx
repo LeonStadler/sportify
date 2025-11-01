@@ -33,7 +33,7 @@ interface WorkoutActivity {
 
 interface WorkoutFormProps {
   workout?: Workout;
-  onWorkoutCreated?: () => void;
+  onWorkoutCreated?: (workoutId?: string) => void;
   onWorkoutUpdated?: () => void;
   onCancelEdit?: () => void;
 }
@@ -359,7 +359,7 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
       if (workout) {
         onWorkoutUpdated?.();
       } else {
-        onWorkoutCreated?.();
+        onWorkoutCreated?.(savedWorkout.id);
       }
 
     } catch (error) {

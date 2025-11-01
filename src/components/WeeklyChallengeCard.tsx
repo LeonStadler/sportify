@@ -307,13 +307,13 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
                         {...parseAvatarConfig(entry.avatarUrl)!} 
                       />
                     ) : (
-                      <AvatarFallback className={cn(
-                        entry.isCurrentUser
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-muted-foreground"
-                      )}>
-                        {getAvatarFallback(entry.displayName)}
-                      </AvatarFallback>
+                    <AvatarFallback className={cn(
+                      entry.isCurrentUser
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground"
+                    )}>
+                      {getAvatarFallback(entry.displayName)}
+                    </AvatarFallback>
                     )}
                   </Avatar>
                   <div className="flex-1 min-w-0">

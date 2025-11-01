@@ -1,10 +1,21 @@
 import { PageTemplate } from "@/components/PageTemplate";
 import { TrainingDiarySection } from "@/components/TrainingDiarySection";
 import { WorkoutForm } from "@/components/WorkoutForm";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from '@/lib/api';
@@ -37,6 +48,9 @@ export function Training() {
     hasPrev: false,
   });
   const [editingWorkout, setEditingWorkout] = useState<Workout | null>(null);
+  const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
+  const [createdWorkoutId, setCreatedWorkoutId] = useState<string | undefined>(undefined);
+  const [activeTab, setActiveTab] = useState("trainings");
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -95,9 +109,26 @@ export function Training() {
     loadWorkouts(1, filterType);
   }, [loadWorkouts, filterType]);
 
-  const handleWorkoutCreated = () => {
+  const handleWorkoutCreated = (workoutId?: string) => {
     // Lade die erste Seite neu um das neue Workout zu zeigen
     loadWorkouts(1, filterType);
+
+    // Zeige Dialog an, wenn ein neues Workout erstellt wurde
+    if (workoutId) {
+      setCreatedWorkoutId(workoutId);
+      setShowRecoveryDialog(true);
+    }
+  };
+
+  const handleRecoveryDialogConfirm = () => {
+    setShowRecoveryDialog(false);
+    // Wechsle zum Erholungstagebuch-Tab
+    setActiveTab("recovery");
+  };
+
+  const handleRecoveryDialogCancel = () => {
+    setShowRecoveryDialog(false);
+    setCreatedWorkoutId(undefined);
   };
 
   const handleFilterChange = (value: string) => {
@@ -281,157 +312,184 @@ export function Training() {
       title={t('training.title', 'Training Log')}
       subtitle={t('training.subtitle', 'Trage deine Workouts ein und verfolge deinen Fortschritt')}
     >
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
-        <WorkoutForm
-          workout={editingWorkout ?? undefined}
-          onWorkoutCreated={handleWorkoutCreated}
-          onWorkoutUpdated={handleWorkoutUpdated}
-          onCancelEdit={handleCancelEdit}
-        />
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsTrigger value="trainings">Trainingsstagebuch</TabsTrigger>
+          <TabsTrigger value="recovery">Erholungstagebuch</TabsTrigger>
+        </TabsList>
 
-        <Card>
-          <CardHeader className="pb-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <CardTitle className="text-lg md:text-xl">Deine Workouts</CardTitle>
-              <Select value={filterType} onValueChange={handleFilterChange}>
-                <SelectTrigger className="w-full sm:w-48">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {exerciseTypes.map((type) => (
-                    <SelectItem key={type.id} value={type.id}>
-                      {type.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-3">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="animate-pulse">
-                    <div className="h-20 bg-muted rounded-lg"></div>
+        <TabsContent value="trainings" className="space-y-4 md:space-y-6">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
+            <WorkoutForm
+              workout={editingWorkout ?? undefined}
+              onWorkoutCreated={handleWorkoutCreated}
+              onWorkoutUpdated={handleWorkoutUpdated}
+              onCancelEdit={handleCancelEdit}
+            />
+
+            <Card>
+              <CardHeader className="pb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <CardTitle className="text-lg md:text-xl">Deine Workouts</CardTitle>
+                  <Select value={filterType} onValueChange={handleFilterChange}>
+                    <SelectTrigger className="w-full sm:w-48">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {exerciseTypes.map((type) => (
+                        <SelectItem key={type.id} value={type.id}>
+                          {type.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="space-y-3">
+                    {[...Array(5)].map((_, i) => (
+                      <div key={i} className="animate-pulse">
+                        <div className="h-20 bg-muted rounded-lg"></div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : workouts.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground mb-2">
-                  {filterType === "all"
-                    ? "Noch keine Workouts vorhanden."
-                    : `Keine Workouts für ${getExerciseName(filterType)} gefunden.`
-                  }
-                </p>
-                <p className="text-xs md:text-sm text-muted-foreground">
-                  Erstelle dein erstes Workout mit dem Formular {window.innerWidth >= 1280 ? 'links' : 'oben'}.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {workouts.map((workout) => (
-                  <div key={workout.id} className="p-3 md:p-4 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-medium text-foreground text-sm md:text-base truncate">{workout.title}</h3>
-                          {workout.duration && (
-                            <Badge variant="outline" className="text-xs">
-                              ⏱️ {formatDuration(workout.duration)}
-                            </Badge>
-                          )}
-                        </div>
-
-                        {workout.description && (
-                          <p className="text-xs md:text-sm text-muted-foreground mb-2 line-clamp-2">{workout.description}</p>
-                        )}
-
-                        <div className="flex flex-wrap gap-1 mb-2">
-                          {workout.activities.map((activity) => (
-                            <div key={activity.id} className="flex items-center gap-1">
-                              <Badge
-                                className={`text-xs ${getExerciseColor(activity.activityType)}`}
-                                variant="secondary"
-                              >
-                                {getExerciseIcon(activity.activityType)} {activity.amount} {activity.unit}
-                              </Badge>
-                              {activity.sets && activity.sets.length > 0 && (
-                                <span className="text-xs text-muted-foreground">
-                                  ({activity.sets.length} Sets)
-                                </span>
+                ) : workouts.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground mb-2">
+                      {filterType === "all"
+                        ? "Noch keine Workouts vorhanden."
+                        : `Keine Workouts für ${getExerciseName(filterType)} gefunden.`
+                      }
+                    </p>
+                    <p className="text-xs md:text-sm text-muted-foreground">
+                      Erstelle dein erstes Workout mit dem Formular {window.innerWidth >= 1280 ? 'links' : 'oben'}.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {workouts.map((workout) => (
+                      <div key={workout.id} className="p-3 md:p-4 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-medium text-foreground text-sm md:text-base truncate">{workout.title}</h3>
+                              {workout.duration && (
+                                <Badge variant="outline" className="text-xs">
+                                  ⏱️ {formatDuration(workout.duration)}
+                                </Badge>
                               )}
                             </div>
-                          ))}
-                        </div>
 
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span>📅 {workout.workoutDate ? formatWorkoutDateTime(workout.workoutDate) : formatDate(workout.createdAt)}</span>
+                            {workout.description && (
+                              <p className="text-xs md:text-sm text-muted-foreground mb-2 line-clamp-2">{workout.description}</p>
+                            )}
+
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {workout.activities.map((activity) => (
+                                <div key={activity.id} className="flex items-center gap-1">
+                                  <Badge
+                                    className={`text-xs ${getExerciseColor(activity.activityType)}`}
+                                    variant="secondary"
+                                  >
+                                    {getExerciseIcon(activity.activityType)} {activity.amount} {activity.unit}
+                                  </Badge>
+                                  {activity.sets && activity.sets.length > 0 && (
+                                    <span className="text-xs text-muted-foreground">
+                                      ({activity.sets.length} Sets)
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>📅 {workout.workoutDate ? formatWorkoutDateTime(workout.workoutDate) : formatDate(workout.createdAt)}</span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            {isWorkoutEditable(workout.workoutDate, workout.createdAt) && (
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditClick(workout)}
+                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 flex-shrink-0"
+                                >
+                                  <span className="hidden sm:inline">Bearbeiten</span>
+                                  <span className="sm:hidden">✏️</span>
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => deleteWorkout(workout.id)}
+                                  className="text-destructive hover:text-destructive-foreground hover:bg-destructive flex-shrink-0"
+                                >
+                                  <span className="hidden sm:inline">Löschen</span>
+                                  <span className="sm:hidden">×</span>
+                                </Button>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        {isWorkoutEditable(workout.workoutDate, workout.createdAt) && (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleEditClick(workout)}
-                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 flex-shrink-0"
-                            >
-                              <span className="hidden sm:inline">Bearbeiten</span>
-                              <span className="sm:hidden">✏️</span>
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => deleteWorkout(workout.id)}
-                              className="text-destructive hover:text-destructive-foreground hover:bg-destructive flex-shrink-0"
-                            >
-                              <span className="hidden sm:inline">Löschen</span>
-                              <span className="sm:hidden">×</span>
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                    ))}
 
-                {/* Pagination - Mobile optimiert */}
-                {pagination.totalPages > 1 && (
-                  <div className="flex items-center justify-between pt-4 border-t">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handlePageChange(currentPage - 1)}
-                      disabled={!pagination.hasPrev}
-                      className="text-xs md:text-sm"
-                    >
-                      <span className="hidden sm:inline">Vorherige</span>
-                      <span className="sm:hidden">←</span>
-                    </Button>
-                    <span className="text-xs md:text-sm text-muted-foreground">
-                      {pagination.currentPage}/{pagination.totalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handlePageChange(currentPage + 1)}
-                      disabled={!pagination.hasNext}
-                      className="text-xs md:text-sm"
-                    >
-                      <span className="hidden sm:inline">Nächste</span>
-                      <span className="sm:hidden">→</span>
-                    </Button>
+                    {/* Pagination - Mobile optimiert */}
+                    {pagination.totalPages > 1 && (
+                      <div className="flex items-center justify-between pt-4 border-t">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePageChange(currentPage - 1)}
+                          disabled={!pagination.hasPrev}
+                          className="text-xs md:text-sm"
+                        >
+                          <span className="hidden sm:inline">Vorherige</span>
+                          <span className="sm:hidden">←</span>
+                        </Button>
+                        <span className="text-xs md:text-sm text-muted-foreground">
+                          {pagination.currentPage}/{pagination.totalPages}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePageChange(currentPage + 1)}
+                          disabled={!pagination.hasNext}
+                          className="text-xs md:text-sm"
+                        >
+                          <span className="hidden sm:inline">Nächste</span>
+                          <span className="sm:hidden">→</span>
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
-        <TrainingDiarySection className="xl:col-span-2" />
-      </div>
+        <TabsContent value="recovery" className="space-y-4 md:space-y-6">
+          <TrainingDiarySection preselectedWorkoutId={createdWorkoutId} />
+        </TabsContent>
+      </Tabs>
+
+      <AlertDialog open={showRecoveryDialog} onOpenChange={setShowRecoveryDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Erholung dokumentieren?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Möchtest du auch deine Erholung und Regeneration zu diesem Training dokumentieren?
+              Du wirst zum Erholungstagebuch weitergeleitet, wo das Workout bereits verknüpft ist.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleRecoveryDialogCancel}>Nein, später</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRecoveryDialogConfirm}>Ja, dokumentieren</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageTemplate>
   );
 }

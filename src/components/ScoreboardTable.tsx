@@ -141,9 +141,9 @@ export function ScoreboardTable({ activity, period }: ScoreboardTableProps) {
                     {...parseAvatarConfig(player.avatarUrl)!} 
                   />
                 ) : (
-                  <AvatarFallback className={`${player.isCurrentUser ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white'}`}>
-                    {getAvatarFallback(player.displayName)}
-                  </AvatarFallback>
+                <AvatarFallback className={`${player.isCurrentUser ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white'}`}>
+                  {getAvatarFallback(player.displayName)}
+                </AvatarFallback>
                 )}
               </Avatar>
             </div>

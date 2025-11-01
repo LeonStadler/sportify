@@ -127,8 +127,20 @@ export const createWorkoutsRouter = (pool) => {
                 return res.status(400).json({ error: 'Mindestens eine Aktivität ist erforderlich.' });
             }
 
+            // Load valid activity types from database
+            const { rows: validExercises } = await pool.query(`
+                SELECT id FROM exercises WHERE is_active = true
+            `);
+            const validActivityTypes = validExercises.map(ex => ex.id);
+            // Add legacy types as fallback
+            const legacyTypes = ['pullups', 'pushups', 'running', 'cycling', 'situps', 'other'];
+            legacyTypes.forEach(type => {
+                if (!validActivityTypes.includes(type)) {
+                    validActivityTypes.push(type);
+                }
+            });
+
             // Validate activities
-            const validActivityTypes = ['pullups', 'pushups', 'running', 'cycling', 'situps', 'other'];
             for (const activity of activities) {
                 if (!activity.activityType || !validActivityTypes.includes(activity.activityType)) {
                     return res.status(400).json({ error: `Ungültiger Aktivitätstyp: ${activity.activityType}` });
@@ -174,8 +186,24 @@ export const createWorkoutsRouter = (pool) => {
 
                 const workoutId = workoutRows[0].id;
 
-                // Calculate points based on activity type and amount
+                // Load exercises with points from database
+                const { rows: exerciseRows } = await client.query(`
+                    SELECT id, points_per_unit, is_active
+                    FROM exercises
+                    WHERE is_active = true
+                `);
+                
+                const exercisePointsMap = {};
+                exerciseRows.forEach(ex => {
+                    exercisePointsMap[ex.id] = parseFloat(ex.points_per_unit) || 0;
+                });
+
+                // Calculate points based on activity type and amount from database
                 const calculateActivityPoints = (activityType, amount) => {
+                    if (exercisePointsMap[activityType] !== undefined) {
+                        return amount * exercisePointsMap[activityType];
+                    }
+                    // Fallback for legacy exercises not in database
                     switch (activityType) {
                         case 'pullups': return amount * 3;
                         case 'pushups': return amount * 1;

@@ -55,7 +55,7 @@ export interface AuthContextType extends AuthState {
   updateProfile: (data: Partial<User>) => Promise<void>;
   deleteAccount: (password: string) => Promise<void>;
   inviteUser: (email: string, firstName: string, lastName: string) => Promise<void>;
-  inviteFriend: (email: string) => Promise<void>;
+  inviteFriend: (email: string) => Promise<{ type: 'friend_request' | 'invitation'; message: string }>;
   getInvitations: () => Promise<Invitation[]>;
   acceptInvitation: (invitationToken: string) => Promise<void>;
   getDisplayName: () => string;
@@ -487,7 +487,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const inviteFriend = async (email: string): Promise<void> => {
+  const inviteFriend = async (email: string): Promise<{ type: 'friend_request' | 'invitation'; message: string }> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
@@ -512,6 +512,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       setState(prev => ({ ...prev, isLoading: false }));
+
+      return {
+        type: data.type || 'invitation',
+        message: data.message || 'Einladung gesendet.'
+      };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.';
       setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));
@@ -523,7 +528,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        throw new Error('Nicht angemeldet');
+        // Wenn nicht angemeldet, gib leeres Array zurück statt Fehler zu werfen
+        return [];
       }
 
       const response = await fetch(`${API_URL}/profile/invitations`, {
@@ -535,13 +541,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Fehler beim Laden der Einladungen');
+        // Bei Fehlern gib leeres Array zurück statt Fehler zu werfen
+        console.warn('Fehler beim Laden der Einladungen:', data.error || 'Unbekannter Fehler');
+        return [];
       }
 
-      return data;
+      // Stelle sicher, dass wir ein Array zurückgeben
+      return Array.isArray(data) ? data : [];
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.';
-      throw new Error(errorMessage);
+      // Bei Netzwerkfehlern oder anderen Fehlern, gib leeres Array zurück
+      console.warn('Fehler beim Laden der Einladungen:', error instanceof Error ? error.message : 'Unbekannter Fehler');
+      return [];
     }
   };
 

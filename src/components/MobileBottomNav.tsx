@@ -5,15 +5,15 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import LanguageSwitcher from './LanguageSwitcher';
 import ThemeSwitcher from './ThemeSwitcher';
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { parseAvatarConfig, getUserInitials } from "@/lib/avatar";
-import NiceAvatar from "react-nice-avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/contexts/AuthContext";
+import { getUserInitials, parseAvatarConfig } from "@/lib/avatar";
+import NiceAvatar from "react-nice-avatar";
 
 export function MobileBottomNav() {
   const { t } = useTranslation();
@@ -53,11 +53,6 @@ export function MobileBottomNav() {
       title: t('navigation.admin'),
       url: "/admin",
       icon: Settings,
-    },
-    {
-      title: "User Management",
-      url: "/admin/users",
-      icon: Shield,
     },
   ];
 
@@ -120,9 +115,9 @@ export function MobileBottomNav() {
                 <div className="flex items-center gap-3">
                   <Avatar className="w-12 h-12">
                     {user?.avatar && parseAvatarConfig(user.avatar) ? (
-                      <NiceAvatar 
-                        style={{ width: '48px', height: '48px' }} 
-                        {...parseAvatarConfig(user.avatar)!} 
+                      <NiceAvatar
+                        style={{ width: '48px', height: '48px' }}
+                        {...parseAvatarConfig(user.avatar)!}
                       />
                     ) : (
                       <AvatarFallback className="bg-primary text-primary-foreground">

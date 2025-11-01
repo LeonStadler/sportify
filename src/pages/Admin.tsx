@@ -4,14 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { Eye, EyeOff, Globe, Monitor, Moon, Palette, Settings, Shield, Sun, UserPlus, Users } from "lucide-react";
-import { useTheme } from 'next-themes';
-import React, { useEffect, useState } from 'react';
 import { API_URL } from '@/lib/api';
+import { Edit, Eye, EyeOff, Plus, Settings, Shield, Trophy, Users, X } from "lucide-react";
+import { useEffect, useState } from 'react';
 
 interface AdminUser {
   id: string;
@@ -27,38 +27,40 @@ interface AdminUser {
   lastLoginAt?: string;
 }
 
-interface Invitation {
+interface Exercise {
   id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  status: string;
+  name: string;
+  pointsPerUnit: number;
+  unit: string;
+  hasWeight: boolean;
+  hasSetMode: boolean;
+  unitOptions: Array<{ value: string; label: string; multiplier: number }>;
+  isActive: boolean;
   createdAt: string;
-  expiresAt: string;
-  invitedByFirstName?: string;
-  invitedByLastName?: string;
+  updatedAt: string;
 }
 
 
+
 export function Admin() {
-  const { user, inviteUser } = useAuth();
-  const { theme, setTheme } = useTheme();
+  const { user } = useAuth();
   const { toast } = useToast();
 
   const [users, setUsers] = useState<AdminUser[]>([]);
-  const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [exercises, setExercises] = useState<Exercise[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  
-  // Form states
-  const [inviteForm, setInviteForm] = useState({
-    email: '',
-    firstName: '',
-    lastName: ''
-  });
-
-  // Settings states
-  const [defaultTheme, setDefaultTheme] = useState(theme || 'system');
   const [showEmails, setShowEmails] = useState(false);
+  const [isExerciseFormOpen, setIsExerciseFormOpen] = useState(false);
+  const [editingExercise, setEditingExercise] = useState<Exercise | null>(null);
+  const [exerciseForm, setExerciseForm] = useState({
+    id: '',
+    name: '',
+    pointsPerUnit: 1,
+    unit: 'Wiederholungen',
+    hasWeight: false,
+    hasSetMode: true,
+    isActive: true,
+  });
 
   // Lade Daten beim Komponenten-Mount
   useEffect(() => {
@@ -89,7 +91,7 @@ export function Admin() {
   const loadAdminData = async () => {
     setIsLoading(true);
     try {
-      await Promise.all([loadUsers(), loadInvitations()]);
+      await Promise.all([loadUsers(), loadExercises()]);
     } catch (error) {
       toast({
         title: "Fehler",
@@ -119,71 +121,166 @@ export function Admin() {
     }
   };
 
-  const loadInvitations = async () => {
+  const loadExercises = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/admin/invitations`, {
+      const response = await fetch(`${API_URL}/admin/exercises`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
 
       if (response.ok) {
-        const invitationsData = await response.json();
-        setInvitations(invitationsData);
+        const exercisesData = await response.json();
+        setExercises(exercisesData);
       }
     } catch (error) {
-      console.error('Error loading invitations:', error);
+      console.error('Error loading exercises:', error);
     }
   };
 
-  const handleInviteUser = async (e: React.FormEvent) => {
+  const handleCreateExercise = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!inviteForm.email || !inviteForm.firstName || !inviteForm.lastName) {
+
+    if (!exerciseForm.id || !exerciseForm.name || exerciseForm.pointsPerUnit <= 0) {
       toast({
         title: "Fehler",
-        description: "Bitte füllen Sie alle Felder aus.",
+        description: "Bitte füllen Sie alle erforderlichen Felder aus.",
         variant: "destructive",
       });
       return;
     }
 
     try {
-      await inviteUser(inviteForm.email, inviteForm.firstName, inviteForm.lastName);
-      toast({
-        title: "Einladung gesendet",
-        description: `Einladung wurde an ${inviteForm.email} gesendet.`,
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/admin/exercises`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          id: exerciseForm.id.toLowerCase().replace(/\s+/g, '-'),
+          name: exerciseForm.name,
+          pointsPerUnit: exerciseForm.pointsPerUnit,
+          unit: exerciseForm.unit,
+          hasWeight: exerciseForm.hasWeight,
+          hasSetMode: exerciseForm.hasSetMode,
+          unitOptions: exerciseForm.hasSetMode
+            ? [{ value: exerciseForm.unit, label: exerciseForm.unit, multiplier: 1 }]
+            : [],
+          isActive: exerciseForm.isActive,
+        })
       });
-      
-      // Reset form and reload data
-      setInviteForm({ email: '', firstName: '', lastName: '' });
-      await loadInvitations();
+
+      if (response.ok) {
+        toast({
+          title: "Erfolg",
+          description: "Übung erfolgreich erstellt.",
+        });
+        resetExerciseForm();
+        await loadExercises();
+      } else {
+        const errorData = await response.json();
+        toast({
+          title: "Fehler",
+          description: errorData.error || "Fehler beim Erstellen der Übung",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       toast({
         title: "Fehler",
-        description: error instanceof Error ? error.message : "Fehler beim Senden der Einladung",
+        description: "Fehler beim Erstellen der Übung",
         variant: "destructive",
       });
     }
   };
 
-  const handleSaveThemeSettings = () => {
-    setTheme(defaultTheme);
-    toast({
-      title: "Einstellungen gespeichert",
-      description: `Standard-Theme auf "${defaultTheme}" gesetzt.`,
-    });
+  const handleUpdateExercise = async (exercise: Exercise, field: keyof Exercise, value: any) => {
+    try {
+      const token = localStorage.getItem('token');
+      const updateData: any = { [field]: value };
+
+      const response = await fetch(`${API_URL}/admin/exercises/${exercise.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updateData)
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Erfolg",
+          description: "Übung erfolgreich aktualisiert.",
+        });
+        await loadExercises();
+      } else {
+        const errorData = await response.json();
+        toast({
+          title: "Fehler",
+          description: errorData.error || "Fehler beim Aktualisieren der Übung",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Fehler",
+        description: "Fehler beim Aktualisieren der Übung",
+        variant: "destructive",
+      });
+    }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('de-DE', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+  const resetExerciseForm = () => {
+    setExerciseForm({
+      id: '',
+      name: '',
+      pointsPerUnit: 1,
+      unit: 'Wiederholungen',
+      hasWeight: false,
+      hasSetMode: true,
+      isActive: true,
     });
+    setIsExerciseFormOpen(false);
+    setEditingExercise(null);
+  };
+
+  const startEditExercise = (exercise: Exercise) => {
+    setEditingExercise(exercise);
+    setExerciseForm({
+      id: exercise.id,
+      name: exercise.name,
+      pointsPerUnit: exercise.pointsPerUnit,
+      unit: exercise.unit,
+      hasWeight: exercise.hasWeight,
+      hasSetMode: exercise.hasSetMode,
+      isActive: exercise.isActive,
+    });
+    setIsExerciseFormOpen(true);
+  };
+
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return "Nie";
+
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return "Ungültiges Datum";
+      }
+      return date.toLocaleString('de-DE', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      console.error('Date formatting error:', error, 'Input:', dateString);
+      return "Ungültiges Datum";
+    }
   };
 
   const maskEmail = (email: string) => {
@@ -208,291 +305,373 @@ export function Admin() {
         </AlertDescription>
       </Alert>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* User Invitation */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <UserPlus className="w-5 h-5" />
-              Benutzer einladen
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleInviteUser} className="space-y-4">
-            <div>
-                <Label htmlFor="invite-email">E-Mail-Adresse</Label>
-                <Input 
-                  id="invite-email"
-                  type="email"
-                  value={inviteForm.email}
-                  onChange={(e) => setInviteForm(prev => ({ ...prev, email: e.target.value }))}
-                  placeholder="benutzer@example.com"
-                />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label htmlFor="invite-firstname">Vorname</Label>
-                  <Input
-                    id="invite-firstname"
-                    value={inviteForm.firstName}
-                    onChange={(e) => setInviteForm(prev => ({ ...prev, firstName: e.target.value }))}
-                    placeholder="Max"
-                  />
-            </div>
-            <div>
-                  <Label htmlFor="invite-lastname">Nachname</Label>
-                <Input 
-                    id="invite-lastname"
-                    value={inviteForm.lastName}
-                    onChange={(e) => setInviteForm(prev => ({ ...prev, lastName: e.target.value }))}
-                    placeholder="Mustermann"
-                  />
-              </div>
-            </div>
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="overview">Übersicht</TabsTrigger>
+          <TabsTrigger value="users">Benutzerverwaltung</TabsTrigger>
+          <TabsTrigger value="scoring">Wertung</TabsTrigger>
+        </TabsList>
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Wird gesendet..." : "Einladung senden"}
-            </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        {/* Theme Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Palette className="w-5 h-5" />
-              Theme-Einstellungen
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Aktuelles Theme</Label>
-              <Select value={defaultTheme} onValueChange={setDefaultTheme}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Theme auswählen" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="light">
-                    <div className="flex items-center gap-2">
-                      <Sun className="w-4 h-4" />
-                      Hell
-            </div>
-                  </SelectItem>
-                  <SelectItem value="dark">
-                    <div className="flex items-center gap-2">
-                      <Moon className="w-4 h-4" />
-                      Dunkel
-            </div>
-                  </SelectItem>
-                  <SelectItem value="system">
-                    <div className="flex items-center gap-2">
-                      <Monitor className="w-4 h-4" />
-                      System
-            </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <Button onClick={handleSaveThemeSettings} className="w-full" variant="outline">
-              Theme anwenden
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* App Statistics */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Settings className="w-5 h-5" />
-              App-Statistiken
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="p-4 border rounded-lg">
-                <p className="text-2xl font-bold text-primary">{users.length}</p>
-                <p className="text-sm text-muted-foreground">Registrierte Benutzer</p>
+        <TabsContent value="overview" className="space-y-6 mt-6">
+          {/* App Statistics */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="w-5 h-5" />
+                App-Statistiken
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 border rounded-lg">
+                  <p className="text-2xl font-bold text-primary">{users.length}</p>
+                  <p className="text-sm text-muted-foreground">Registrierte Benutzer</p>
+                </div>
+                <div className="p-4 border rounded-lg">
+                  <p className="text-2xl font-bold text-green-600">
+                    {users.filter(u => u.isEmailVerified).length}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Verifizierte E-Mails</p>
+                </div>
+                <div className="p-4 border rounded-lg">
+                  <p className="text-2xl font-bold text-blue-600">
+                    {users.filter(u => u.isAdmin).length}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Administratoren</p>
+                </div>
               </div>
-              <div className="p-4 border rounded-lg">
-                <p className="text-2xl font-bold text-green-600">
-                  {users.filter(u => u.isEmailVerified).length}
-                </p>
-                <p className="text-sm text-muted-foreground">Verifizierte E-Mails</p>
-              </div>
-              <div className="p-4 border rounded-lg">
-                <p className="text-2xl font-bold text-blue-600">
-                  {users.filter(u => u.isAdmin).length}
-                </p>
-                <p className="text-sm text-muted-foreground">Administratoren</p>
-            </div>
-              <div className="p-4 border rounded-lg">
-                <p className="text-2xl font-bold text-orange-600">
-                  {invitations.filter(i => i.status === 'pending').length}
-                </p>
-                <p className="text-sm text-muted-foreground">Ausstehende Einladungen</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        {/* User Management */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 justify-between">
-              <div className="flex items-center gap-2">
-                <Users className="w-5 h-5" />
-                Benutzer-Verwaltung
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowEmails(!showEmails)}
-              >
-                {showEmails ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                {showEmails ? "E-Mails verbergen" : "E-Mails anzeigen"}
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>E-Mail</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Erstellt</TableHead>
-                      <TableHead>Letzter Login</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users.map((adminUser) => (
-                      <TableRow key={adminUser.id}>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">
-                              {adminUser.firstName} {adminUser.lastName}
-                            </p>
-                            {adminUser.nickname && (
-                              <p className="text-sm text-muted-foreground">
-                                "{adminUser.nickname}"
-                              </p>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <p className="font-mono text-sm">
-                            {maskEmail(adminUser.email)}
-                          </p>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col gap-1">
-                            {adminUser.isAdmin && (
-                              <Badge variant="secondary">
-                                <Shield className="w-3 h-3 mr-1" />
-                                Admin
-                              </Badge>
-                            )}
-                            {adminUser.isEmailVerified && (
-                              <Badge variant="outline" className="text-green-600">
-                                ✓ Verifiziert
-                              </Badge>
-                            )}
-                            {adminUser.has2FA && (
-                              <Badge variant="outline" className="text-blue-600">
-                                🔒 2FA
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {formatDate(adminUser.createdAt)}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {adminUser.lastLoginAt 
-                            ? formatDate(adminUser.lastLoginAt)
-                            : "Nie"
-                          }
-                        </TableCell>
+          <Button
+            onClick={loadAdminData}
+            variant="outline"
+            disabled={isLoading}
+            className="w-full"
+          >
+            {isLoading ? "Wird geladen..." : "Daten aktualisieren"}
+          </Button>
+        </TabsContent>
+
+        <TabsContent value="users" className="space-y-6 mt-6">
+          {/* User Management */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 justify-between">
+                <div className="flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  Benutzer-Verwaltung
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowEmails(!showEmails)}
+                >
+                  {showEmails ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showEmails ? "E-Mails verbergen" : "E-Mails anzeigen"}
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>E-Mail</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Erstellt</TableHead>
+                        <TableHead>Letzter Login</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-            </div>
-
-              {users.length === 0 && (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">Keine Benutzer gefunden</p>
+                    </TableHeader>
+                    <TableBody>
+                      {users.map((adminUser) => (
+                        <TableRow key={adminUser.id}>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium">
+                                {adminUser.firstName} {adminUser.lastName}
+                              </p>
+                              {adminUser.nickname && (
+                                <p className="text-sm text-muted-foreground">
+                                  "{adminUser.nickname}"
+                                </p>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <p className="font-mono text-sm">
+                              {maskEmail(adminUser.email)}
+                            </p>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1">
+                              {adminUser.isAdmin && (
+                                <Badge variant="secondary">
+                                  <Shield className="w-3 h-3 mr-1" />
+                                  Admin
+                                </Badge>
+                              )}
+                              {adminUser.isEmailVerified && (
+                                <Badge variant="outline" className="text-green-600">
+                                  ✓ Verifiziert
+                                </Badge>
+                              )}
+                              {adminUser.has2FA && (
+                                <Badge variant="outline" className="text-blue-600">
+                                  🔒 2FA
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {formatDate(adminUser.createdAt)}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {formatDate(adminUser.lastLoginAt)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Pending Invitations */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Globe className="w-5 h-5" />
-              Ausstehende Einladungen
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {invitations.length > 0 ? (
-                <div className="space-y-2">
-                  {invitations.map((invitation) => (
-                    <div 
-                      key={invitation.id} 
-                      className="flex items-center justify-between p-3 border rounded-lg"
-                    >
-                      <div className="flex-1">
-                        <p className="font-medium">
-                          {invitation.firstName} {invitation.lastName}
-                        </p>
-                        <p className="text-sm text-muted-foreground font-mono">
-                          {maskEmail(invitation.email)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Eingeladen: {formatDate(invitation.createdAt)}
-                          {invitation.invitedByFirstName && (
-                            <span> von {invitation.invitedByFirstName} {invitation.invitedByLastName}</span>
-                          )}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge 
-                          variant={invitation.status === 'pending' ? 'outline' : 'secondary'}
-                          className={invitation.status === 'pending' ? 'text-orange-600' : ''}
-                        >
-                          {invitation.status === 'pending' ? 'Ausstehend' : invitation.status}
-                        </Badge>
+                {users.length === 0 && (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">Keine Benutzer gefunden</p>
+                  </div>
+                )}
               </div>
-            </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">Keine ausstehenden Einladungen</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
 
-      <Button 
-        onClick={loadAdminData} 
-        variant="outline" 
-        disabled={isLoading}
-        className="w-full"
-      >
-        {isLoading ? "Wird geladen..." : "Daten aktualisieren"}
-      </Button>
+          <Button
+            onClick={loadAdminData}
+            variant="outline"
+            disabled={isLoading}
+            className="w-full"
+          >
+            {isLoading ? "Wird geladen..." : "Daten aktualisieren"}
+          </Button>
+        </TabsContent>
+
+        <TabsContent value="scoring" className="space-y-6 mt-6">
+          {/* Exercise Management */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 justify-between">
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-5 h-5" />
+                  Übungs-Wertung
+                </div>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => {
+                    resetExerciseForm();
+                    setIsExerciseFormOpen(true);
+                  }}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Neue Übung
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {isExerciseFormOpen && (
+                  <Card className="border-2">
+                    <CardHeader>
+                      <CardTitle className="flex items-center justify-between">
+                        <span>{editingExercise ? 'Übung bearbeiten' : 'Neue Übung erstellen'}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={resetExerciseForm}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <form onSubmit={editingExercise ? async (e) => {
+                        e.preventDefault();
+                        await handleUpdateExercise(editingExercise, 'name', exerciseForm.name);
+                        await handleUpdateExercise(editingExercise, 'pointsPerUnit', exerciseForm.pointsPerUnit);
+                        await handleUpdateExercise(editingExercise, 'unit', exerciseForm.unit);
+                        await handleUpdateExercise(editingExercise, 'hasWeight', exerciseForm.hasWeight);
+                        await handleUpdateExercise(editingExercise, 'hasSetMode', exerciseForm.hasSetMode);
+                        await handleUpdateExercise(editingExercise, 'isActive', exerciseForm.isActive);
+                        resetExerciseForm();
+                      } : handleCreateExercise} className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="exercise-id">ID (eindeutig, z.B. "burpees")</Label>
+                            <Input
+                              id="exercise-id"
+                              value={exerciseForm.id}
+                              onChange={(e) => setExerciseForm(prev => ({ ...prev, id: e.target.value }))}
+                              placeholder="burpees"
+                              disabled={!!editingExercise}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="exercise-name">Name</Label>
+                            <Input
+                              id="exercise-name"
+                              value={exerciseForm.name}
+                              onChange={(e) => setExerciseForm(prev => ({ ...prev, name: e.target.value }))}
+                              placeholder="Burpees"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="exercise-points">Punkte pro Einheit</Label>
+                            <Input
+                              id="exercise-points"
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              value={exerciseForm.pointsPerUnit}
+                              onChange={(e) => setExerciseForm(prev => ({ ...prev, pointsPerUnit: parseFloat(e.target.value) || 0 }))}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="exercise-unit">Einheit</Label>
+                            <Input
+                              id="exercise-unit"
+                              value={exerciseForm.unit}
+                              onChange={(e) => setExerciseForm(prev => ({ ...prev, unit: e.target.value }))}
+                              placeholder="Wiederholungen"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-6">
+                          <div className="flex items-center space-x-2">
+                            <Switch
+                              id="has-set-mode"
+                              checked={exerciseForm.hasSetMode}
+                              onCheckedChange={(checked) => setExerciseForm(prev => ({ ...prev, hasSetMode: checked }))}
+                            />
+                            <Label htmlFor="has-set-mode">Set-Modus</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Switch
+                              id="has-weight"
+                              checked={exerciseForm.hasWeight}
+                              onCheckedChange={(checked) => setExerciseForm(prev => ({ ...prev, hasWeight: checked }))}
+                            />
+                            <Label htmlFor="has-weight">Mit Gewicht</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Switch
+                              id="is-active"
+                              checked={exerciseForm.isActive}
+                              onCheckedChange={(checked) => setExerciseForm(prev => ({ ...prev, isActive: checked }))}
+                            />
+                            <Label htmlFor="is-active">Aktiv</Label>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button type="submit" className="flex-1">
+                            {editingExercise ? 'Speichern' : 'Erstellen'}
+                          </Button>
+                          <Button type="button" variant="outline" onClick={resetExerciseForm}>
+                            Abbrechen
+                          </Button>
+                        </div>
+                      </form>
+                    </CardContent>
+                  </Card>
+                )}
+
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>ID</TableHead>
+                        <TableHead>Punkte/Einheit</TableHead>
+                        <TableHead>Einheit</TableHead>
+                        <TableHead>Eigenschaften</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Aktionen</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {exercises.map((exercise) => (
+                        <TableRow key={exercise.id}>
+                          <TableCell className="font-medium">{exercise.name}</TableCell>
+                          <TableCell className="font-mono text-sm">{exercise.id}</TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              value={exercise.pointsPerUnit}
+                              onChange={(e) => handleUpdateExercise(exercise, 'pointsPerUnit', parseFloat(e.target.value) || 0)}
+                              className="w-24"
+                            />
+                          </TableCell>
+                          <TableCell>{exercise.unit}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1">
+                              {exercise.hasSetMode && (
+                                <Badge variant="outline" className="text-xs w-fit">Set-Modus</Badge>
+                              )}
+                              {exercise.hasWeight && (
+                                <Badge variant="outline" className="text-xs w-fit">Mit Gewicht</Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={exercise.isActive ? "default" : "secondary"}>
+                              {exercise.isActive ? "Aktiv" : "Inaktiv"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => startEditExercise(exercise)}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {exercises.length === 0 && (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">Keine Übungen gefunden</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Button
+            onClick={loadExercises}
+            variant="outline"
+            disabled={isLoading}
+            className="w-full"
+          >
+            {isLoading ? "Wird geladen..." : "Übungen aktualisieren"}
+          </Button>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

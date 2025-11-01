@@ -196,32 +196,12 @@ export function Training() {
   };
 
   // Datum- und Uhrzeitformatierung basierend auf Benutzereinstellungen
-  const formatDate = (dateString: string | null | undefined) => {
+  const formatDate = (dateString: string) => {
     if (!dateString) return "Unbekanntes Datum";
 
     try {
-      // Handle different date formats
-      let date: Date;
-      if (typeof dateString === 'string') {
-        // Try parsing as ISO string first
-        date = new Date(dateString);
-        // If invalid, try other formats
-        if (isNaN(date.getTime())) {
-          // Try parsing as timestamp
-          const timestamp = Date.parse(dateString);
-          if (!isNaN(timestamp)) {
-            date = new Date(timestamp);
-          } else {
-            return "Ungültiges Datum";
-          }
-        }
-      } else {
-        date = new Date(dateString);
-      }
-
-      if (isNaN(date.getTime())) {
-        return "Ungültiges Datum";
-      }
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return "Invalid Date";
 
       const now = new Date();
       const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
@@ -237,49 +217,27 @@ export function Training() {
         year: 'numeric',
       });
     } catch (error) {
-      console.error('Date formatting error:', error, 'Input:', dateString);
-      return "Ungültiges Datum";
+      console.error('Date formatting error:', error);
+      return "Invalid Date";
     }
   };
 
-  const formatWorkoutDateTime = (dateString: string | null | undefined | Date) => {
-    if (!dateString) return null;
+  const formatWorkoutDateTime = (dateString: string | null | undefined) => {
+    if (!dateString) return "Unbekanntes Datum";
 
     try {
       // Handle different date formats
       let date: Date;
-
-      // If it's already a Date object
-      if (dateString instanceof Date) {
-        date = dateString;
-      } else if (typeof dateString === 'string') {
-        // Try parsing as ISO string first
+      if (typeof dateString === 'string') {
         date = new Date(dateString);
-
-        // If invalid, try other parsing methods
-        if (isNaN(date.getTime())) {
-          // Remove any timezone info that might cause issues
-          const cleanString = dateString.replace(/[^\d\-T:.\sZ]/g, '');
-          date = new Date(cleanString);
-
-          // If still invalid, try timestamp
-          if (isNaN(date.getTime())) {
-            const timestamp = Date.parse(dateString);
-            if (!isNaN(timestamp)) {
-              date = new Date(timestamp);
-            } else {
-              console.warn('Could not parse date:', dateString);
-              return null;
-            }
-          }
-        }
       } else {
-        date = new Date(dateString);
+        // Fallback für andere Typen
+        date = new Date(dateString as any);
       }
 
       if (isNaN(date.getTime())) {
-        console.warn('Invalid date after parsing:', dateString);
-        return null;
+        console.warn('Invalid date:', dateString);
+        return "Unbekanntes Datum";
       }
 
       const locale = user?.languagePreference === 'en' ? 'en-US' : 'de-DE';
@@ -295,7 +253,7 @@ export function Training() {
       });
     } catch (error) {
       console.error('Date formatting error:', error, 'Input:', dateString);
-      return null;
+      return "Unbekanntes Datum";
     }
   };
 
@@ -380,7 +338,7 @@ export function Training() {
                           <h3 className="font-medium text-foreground text-sm md:text-base truncate">{workout.title}</h3>
                           {workout.duration && (
                             <Badge variant="outline" className="text-xs">
-                              ⏱️ {formatDuration(workout.duration) || `${workout.duration}min`}
+                              ⏱️ {formatDuration(workout.duration)}
                             </Badge>
                           )}
                         </div>
@@ -390,15 +348,15 @@ export function Training() {
                         )}
 
                         <div className="flex flex-wrap gap-1 mb-2">
-                          {workout.activities.map((activity, actIdx) => (
-                            <div key={activity.id || `activity-${actIdx}`} className="flex items-center gap-1">
+                          {workout.activities.map((activity) => (
+                            <div key={activity.id} className="flex items-center gap-1">
                               <Badge
-                                className={`text-xs ${getExerciseColor(activity.activityType || 'other')}`}
+                                className={`text-xs ${getExerciseColor(activity.activityType)}`}
                                 variant="secondary"
                               >
-                                {getExerciseIcon(activity.activityType || 'other')} {String(activity.amount || 0)} {String(activity.unit || '')}
+                                {getExerciseIcon(activity.activityType)} {activity.amount} {activity.unit}
                               </Badge>
-                              {activity.sets && Array.isArray(activity.sets) && activity.sets.length > 0 && (
+                              {activity.sets && activity.sets.length > 0 && (
                                 <span className="text-xs text-muted-foreground">
                                   ({activity.sets.length} Sets)
                                 </span>
@@ -408,16 +366,7 @@ export function Training() {
                         </div>
 
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span>📅 {(() => {
-                            // Versuche zuerst workoutDate zu formatieren
-                            if (workout.workoutDate) {
-                              const formatted = formatWorkoutDateTime(workout.workoutDate);
-                              if (formatted && typeof formatted === 'string') return formatted;
-                            }
-                            // Fallback zu createdAt
-                            const fallback = formatDate(workout.createdAt);
-                            return (typeof fallback === 'string' ? fallback : String(fallback || 'Unbekanntes Datum'));
-                          })()}</span>
+                          <span>📅 {workout.workoutDate ? formatWorkoutDateTime(workout.workoutDate) : formatDate(workout.createdAt)}</span>
                         </div>
                       </div>
                       <div className="flex gap-2">

@@ -121,9 +121,20 @@ export function TrainingDiarySection({ className }: TrainingDiarySectionProps) {
   const formatDate = useCallback(
     (dateString?: string | null) => {
       if (!dateString) return "–";
-      const parsed = new Date(dateString);
-      if (Number.isNaN(parsed.getTime())) return dateString;
-      return format(parsed, "PPP", { locale });
+
+      // Stelle sicher, dass dateString ein String ist
+      const stringDate = typeof dateString === 'string' ? dateString : String(dateString);
+
+      try {
+        const parsed = new Date(stringDate);
+        if (Number.isNaN(parsed.getTime())) {
+          return "–";
+        }
+        return format(parsed, "PPP", { locale });
+      } catch (error) {
+        console.warn('Date formatting error:', error, 'Input:', dateString);
+        return "–";
+      }
     },
     [locale],
   );
@@ -143,24 +154,26 @@ export function TrainingDiarySection({ className }: TrainingDiarySectionProps) {
       }
 
       const data = await response.json();
-      const options: RecentWorkoutOption[] = Array.isArray(data.workouts)
-        ? (data.workouts
-          .map((workout: Record<string, unknown>) => {
-            const id = typeof workout.id === "string" ? workout.id : null;
-            if (!id) return null;
+      // Unterstütze sowohl { workouts: [...] } als auch direktes Array für Kompatibilität
+      const workoutsArray = Array.isArray(data) ? data : (Array.isArray(data.workouts) ? data.workouts : []);
 
-            const title = typeof workout.title === "string" ? workout.title : "Workout";
-            const workoutDate =
-              typeof workout.workoutDate === "string"
-                ? workout.workoutDate
-                : typeof workout.createdAt === "string"
-                  ? workout.createdAt
-                  : undefined;
+      const options: RecentWorkoutOption[] = workoutsArray
+        .map((workout: Record<string, unknown>) => {
+          const id = typeof workout.id === "string" ? workout.id : null;
+          if (!id) return null;
 
-            return { id, title, workoutDate } satisfies RecentWorkoutOption;
-          })
-          .filter(Boolean) as RecentWorkoutOption[])
-        : [];
+          const title = typeof workout.title === "string" ? workout.title : "Workout";
+          const workoutDate =
+            typeof workout.workoutDate === "string" && workout.workoutDate
+              ? workout.workoutDate
+              : typeof workout.createdAt === "string" && workout.createdAt
+                ? workout.createdAt
+                : undefined;
+
+          return { id, title, workoutDate } satisfies RecentWorkoutOption;
+        })
+        .filter((item): item is RecentWorkoutOption => item !== null);
+
       setRecentWorkouts(options);
     } catch (error) {
       console.error("Recent workouts error:", error);

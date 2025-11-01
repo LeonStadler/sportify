@@ -1,4 +1,5 @@
 import { AppSidebar } from "@/components/AppSidebar";
+import { InviteLinkHandler } from "@/components/InviteLinkHandler";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -60,6 +61,7 @@ const App = () => {
   return (
     <TooltipProvider>
         <SidebarProvider>
+          <InviteLinkHandler />
           <div className="min-h-screen flex w-full">
             <AppSidebar />
             <main className="flex-1 p-3 md:p-6 bg-background pb-20 md:pb-6">

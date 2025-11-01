@@ -106,10 +106,22 @@ export function AppSidebar() {
 
   const getUserInitials = () => {
     if (!user) return '?';
-    if (user.displayPreference === 'nickname' && user.nickname) {
-      return user.nickname.substring(0, 2).toUpperCase();
-    }
     return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
+  };
+
+  const getAvatarConfig = () => {
+    if (!user) return {};
+    const seed = user.id || user.email || 'default';
+    return {
+      sex: (['man', 'woman'] as const)[Math.abs(seed.charCodeAt(0)) % 2],
+      faceColor: ['#F9C9B6', '#AC6651'][Math.abs(seed.charCodeAt(0)) % 2] as string,
+      earSize: 'big' as const,
+      eyeStyle: (['circle', 'oval', 'smile'] as const)[Math.abs(seed.charCodeAt(1)) % 3],
+      noseStyle: (['short', 'long', 'round'] as const)[Math.abs(seed.charCodeAt(2)) % 3],
+      mouthStyle: (['laugh', 'smile', 'peace'] as const)[Math.abs(seed.charCodeAt(3)) % 3],
+      shirtStyle: (['polo', 'short', 'hoody'] as const)[Math.abs(seed.charCodeAt(4)) % 3],
+      bgColor: (['#F9C9B6', '#AC6651', '#D08B5B', '#F4D150', '#ED9C6E'] as const)[Math.abs(seed.charCodeAt(5)) % 5],
+    };
   };
 
   if (!isAuthenticated) {
@@ -205,13 +217,13 @@ export function AppSidebar() {
 
               {/* Theme Switch */}
               <SidebarMenuItem>
-                <SidebarMenuButton className="hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200 justify-between">
+                <div className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200">
                   <div className="flex items-center gap-3">
                     <Palette size={20} />
                     <span>{t('settings.theme')}</span>
                   </div>
                   <ThemeSwitcher />
-                </SidebarMenuButton>
+                </div>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
@@ -224,8 +236,13 @@ export function AppSidebar() {
             <DropdownMenuTrigger asChild>
               <div className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-accent transition-colors">
                 <Avatar className="h-9 w-9">
-                  <AvatarImage src={user?.avatar} alt={getDisplayName()} />
-                  <AvatarFallback>{getUserInitials()}</AvatarFallback>
+                  {user?.preferences?.useNiceAvatar ? (
+                    <NiceAvatar style={{ width: '36px', height: '36px' }} {...getAvatarConfig()} />
+                  ) : (
+                    <AvatarFallback className="bg-primary text-primary-foreground text-sm font-bold">
+                      {getUserInitials()}
+                    </AvatarFallback>
+                  )}
                 </Avatar>
                 <div className="flex-1">
                   <p className="text-sm font-semibold truncate">{getDisplayName()}</p>

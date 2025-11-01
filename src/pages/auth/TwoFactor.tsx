@@ -1,26 +1,38 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowLeft, Shield, Trophy } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { ArrowLeft, Globe, Palette, Settings, Shield, Trophy } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
+import ThemeSwitcher from '@/components/ThemeSwitcher';
 import { toast } from 'sonner';
 
-const twoFactorSchema = z.object({
-  code: z.string().length(6, '2FA-Code muss genau 6 Zeichen lang sein').regex(/^\d+$/, '2FA-Code darf nur Zahlen enthalten')
-});
-
-type TwoFactorData = z.infer<typeof twoFactorSchema>;
-
 export default function TwoFactor() {
+  const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
+
+  const twoFactorSchema = useMemo(() => z.object({
+    code: z.string().length(6, t('validation.codeLength')).regex(/^\d+$/, t('validation.codeNumbers'))
+  }), [t]);
+
+  type TwoFactorData = z.infer<typeof twoFactorSchema>;
 
   const {
     register,
@@ -54,23 +66,14 @@ export default function TwoFactor() {
       
       console.log('2FA code submitted:', data.code);
       
-      // Simulate success/failure
-      if (data.code === '123456') {
-        toast.success('Erfolgreich verifiziert!', {
-          description: 'Sie werden zur App weitergeleitet.'
-        });
-        // Hier würde normalerweise die Weiterleitung zur App erfolgen
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 1000);
-      } else {
-        toast.error('Ungültiger Code', {
-          description: 'Der eingegebene 2FA-Code ist nicht korrekt.'
-        });
-      }
+      // Simulate success/failure - hier würde normalerweise der Code gegen die Authenticator-App verifiziert werden
+      // Placeholder: Im echten System würde hier die API-Anfrage zur Verifizierung erfolgen
+      toast.error(t('common.error'), {
+        description: t('common.error')
+      });
     } catch (error) {
-      toast.error('Fehler bei der Verifizierung', {
-        description: 'Bitte versuchen Sie es später erneut.'
+      toast.error(t('common.error'), {
+        description: t('common.error')
       });
     } finally {
       setIsLoading(false);
@@ -84,14 +87,14 @@ export default function TwoFactor() {
       // Mock API call - hier würde normalerweise ein neuer 2FA-Code gesendet werden
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      toast.success('Neuer Code gesendet!', {
-        description: 'Überprüfen Sie Ihre Authenticator-App.'
+      toast.success(t('common.success'), {
+        description: t('common.success')
       });
       
       setCountdown(60); // 60 Sekunden Countdown
     } catch (error) {
-      toast.error('Fehler beim Senden', {
-        description: 'Bitte versuchen Sie es später erneut.'
+      toast.error(t('common.error'), {
+        description: t('common.error')
       });
     }
   };
@@ -111,7 +114,7 @@ export default function TwoFactor() {
           <Button variant="ghost" size="sm" asChild>
             <Link to="/auth/login">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Zurück zur Anmeldung
+              {t('authPages.twoFactor.backToLogin')}
             </Link>
           </Button>
           
@@ -125,7 +128,45 @@ export default function TwoFactor() {
             </div>
           </div>
 
-          <div className="w-20" /> {/* Spacer */}
+          <div className="flex items-center gap-3">
+            {/* Desktop: Language & Theme Switchers */}
+            <div className="hidden sm:flex items-center gap-2">
+              <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
+                <LanguageSwitcher />
+              </div>
+              <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
+                <ThemeSwitcher />
+              </div>
+            </div>
+            
+            {/* Mobile: Settings Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="sm:hidden">
+                  <Settings className="h-5 w-5" />
+                  <span className="sr-only">{t('landing.openSettings')}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>{t('landing.settings')}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Globe className="h-4 w-4" />
+                    <span>{t('landing.language')}</span>
+                  </div>
+                  <LanguageSwitcher />
+                </DropdownMenuItem>
+                <DropdownMenuItem className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Palette className="h-4 w-4" />
+                    <span>{t('landing.theme')}</span>
+                  </div>
+                  <ThemeSwitcher />
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </header>
 
@@ -137,28 +178,28 @@ export default function TwoFactor() {
               <Shield className="w-8 h-8 text-primary" />
             </div>
             <h1 className="text-3xl font-bold text-foreground mb-2">
-              Zwei-Faktor-Authentifizierung
+              {t('authPages.twoFactor.title')}
             </h1>
             <p className="text-muted-foreground">
-              Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App ein, um die Anmeldung abzuschließen.
+              {t('authPages.twoFactor.description')}
             </p>
           </div>
 
           <Card>
             <CardHeader>
-              <CardTitle>Sicherheitscode eingeben</CardTitle>
+              <CardTitle>{t('authPages.twoFactor.enterCode')}</CardTitle>
               <CardDescription>
-                Der Code wird alle 30 Sekunden neu generiert
+                {t('authPages.twoFactor.codeRegenerates')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="code">6-stelliger Code</Label>
+                  <Label htmlFor="code">{t('authPages.twoFactor.sixDigitCode')}</Label>
                   <Input
                     id="code"
                     type="text"
-                    placeholder="000000"
+                    placeholder={t('authPages.twoFactor.codePlaceholder')}
                     maxLength={6}
                     {...register('code')}
                     className={`text-center text-2xl tracking-widest font-mono ${errors.code ? 'border-destructive' : ''}`}
@@ -170,20 +211,14 @@ export default function TwoFactor() {
                   )}
                 </div>
 
-                <Alert>
-                  <AlertDescription>
-                    <strong>Demo-Code:</strong> Verwenden Sie <code className="bg-muted px-1 rounded">123456</code> für die Demo-Anmeldung.
-                  </AlertDescription>
-                </Alert>
-
                 <Button type="submit" className="w-full" disabled={isLoading || code?.length !== 6}>
                   {isLoading ? (
                     <>
                       <div className="w-4 h-4 border-2 border-background border-t-transparent rounded-full animate-spin mr-2" />
-                      Wird verifiziert...
+                      {t('authPages.twoFactor.verifying')}
                     </>
                   ) : (
-                    'Code verifizieren'
+                    t('authPages.twoFactor.verifyCode')
                   )}
                 </Button>
 
@@ -196,8 +231,8 @@ export default function TwoFactor() {
                     className="text-sm"
                   >
                     {countdown > 0 
-                      ? `Neuen Code anfordern (${countdown}s)`
-                      : 'Neuen Code anfordern'
+                      ? t('authPages.twoFactor.requestNewCodeCountdown', { count: countdown })
+                      : t('authPages.twoFactor.requestNewCode')
                     }
                   </Button>
                 </div>
@@ -207,9 +242,9 @@ export default function TwoFactor() {
 
           <div className="mt-8 text-center">
             <p className="text-sm text-muted-foreground">
-              Probleme mit der Authentifizierung?{' '}
+              {t('authPages.twoFactor.problems')}{' '}
               <Link to="/contact" className="text-primary hover:underline font-medium">
-                Kontaktieren Sie uns
+                {t('authPages.twoFactor.contactUs')}
               </Link>
             </p>
           </div>
@@ -220,7 +255,7 @@ export default function TwoFactor() {
       <footer className="border-t border-border/40 py-6">
         <div className="container mx-auto px-4 text-center">
           <p className="text-sm text-muted-foreground">
-            © 2024 Sportify. Entwickelt mit ❤️ von Leon Stadler.
+            {t('common.copyright')}
           </p>
         </div>
       </footer>

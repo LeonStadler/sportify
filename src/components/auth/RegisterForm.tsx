@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
@@ -14,22 +14,6 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { RegisterData, useAuth } from '@/contexts/AuthContext';
 
-const registerSchema = z.object({
-  firstName: z.string().min(2, 'Vorname muss mindestens 2 Zeichen lang sein'),
-  lastName: z.string().min(2, 'Nachname muss mindestens 2 Zeichen lang sein'),
-  nickname: z.string().optional(),
-  displayPreference: z.enum(['nickname', 'firstName', 'fullName']),
-  email: z.string().email('Ungültige E-Mail-Adresse'),
-  password: z.string().min(8, 'Passwort muss mindestens 8 Zeichen lang sein'),
-  confirmPassword: z.string(),
-  terms: z.boolean().refine(val => val === true, 'Sie müssen den Nutzungsbedingungen zustimmen')
-}).refine((data) => data.password === data.confirmPassword, {
-  message: 'Passwörter stimmen nicht überein',
-  path: ['confirmPassword'],
-});
-
-type RegisterFormData = z.infer<typeof registerSchema>;
-
 interface RegisterFormProps {
   onSuccess?: () => void;
   redirectTo?: string;
@@ -41,6 +25,22 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const navigate = useNavigate();
+
+  const registerSchema = useMemo(() => z.object({
+    firstName: z.string().min(2, t('validation.firstNameMin')),
+    lastName: z.string().min(2, t('validation.lastNameMin')),
+    nickname: z.string().optional(),
+    displayPreference: z.enum(['nickname', 'firstName', 'fullName']),
+    email: z.string().email(t('validation.invalidEmail')),
+    password: z.string().min(8, t('validation.passwordMin8')),
+    confirmPassword: z.string(),
+    terms: z.boolean().refine(val => val === true, t('validation.termsRequired'))
+  }).refine((data) => data.password === data.confirmPassword, {
+    message: t('validation.passwordsNotMatch'),
+    path: ['confirmPassword'],
+  }), [t]);
+
+  type RegisterFormData = z.infer<typeof registerSchema>;
 
   const {
     register,
@@ -70,11 +70,11 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
   const getDisplayPreview = () => {
     switch (displayPreference) {
       case 'nickname':
-        return nickname || 'Dein Spitzname';
+        return nickname || t('auth.nickname');
       case 'firstName':
-        return firstName || 'Dein Vorname';
+        return firstName || t('auth.firstName');
       case 'fullName':
-        return `${firstName || 'Vorname'} ${lastName || 'Nachname'}`;
+        return `${firstName || t('auth.firstName')} ${lastName || t('auth.lastName')}`;
       default:
         return '';
     }
@@ -83,7 +83,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
   const onSubmit = async (data: RegisterFormData) => {
     try {
       clearError();
-      
+
       const registerData: RegisterData = {
         email: data.email,
         password: data.password,
@@ -94,7 +94,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
       };
 
       const result = await registerUser(registerData);
-      
+
       if (onSuccess) {
         onSuccess();
       } else if (result.needsVerification) {
@@ -113,7 +113,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
           {t('auth.createAccount')}
         </CardTitle>
         <CardDescription className="text-center">
-          Erstelle dein kostenloses Sportify-Konto
+          {t('authPages.createAccount')}
         </CardDescription>
       </CardHeader>
 
@@ -130,7 +130,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
               <Label htmlFor="firstName">{t('auth.firstName')}</Label>
               <Input
                 id="firstName"
-                placeholder="Max"
+                placeholder={t('auth.firstName')}
                 {...register('firstName')}
                 className={errors.firstName ? 'border-destructive' : ''}
               />
@@ -143,7 +143,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
               <Label htmlFor="lastName">{t('auth.lastName')}</Label>
               <Input
                 id="lastName"
-                placeholder="Mustermann"
+                placeholder={t('auth.lastName')}
                 {...register('lastName')}
                 className={errors.lastName ? 'border-destructive' : ''}
               />
@@ -154,10 +154,10 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="nickname">{t('auth.nickname')} (optional)</Label>
+            <Label htmlFor="nickname">{t('auth.nickname')} {t('common.optional')}</Label>
             <Input
               id="nickname"
-              placeholder="SportFreund123"
+              placeholder={t('auth.nickname')}
               {...register('nickname')}
             />
           </div>
@@ -184,7 +184,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
               )}
             </RadioGroup>
             <div className="text-sm text-muted-foreground">
-              Anzeige: <span className="font-medium">{getDisplayPreview()}</span>
+              {t('common.displayPreview')} <span className="font-medium">{getDisplayPreview()}</span>
             </div>
           </div>
 
@@ -193,7 +193,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
             <Input
               id="email"
               type="email"
-              placeholder="deine@email.com"
+              placeholder={t('auth.email')}
               {...register('email')}
               className={errors.email ? 'border-destructive' : ''}
             />
@@ -268,15 +268,15 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
               className="h-4 w-4 rounded border-gray-300"
             />
             <Label htmlFor="terms" className="text-sm">
-              Ich stimme den{' '}
+              {t('common.agreeTerms')}{' '}
               <Link to="/terms" className="text-primary hover:underline">
-                Nutzungsbedingungen
+                {t('common.termsOfService')}
               </Link>{' '}
-              und der{' '}
+              {t('common.and')}{' '}
               <Link to="/privacy" className="text-primary hover:underline">
-                Datenschutzerklärung
+                {t('common.privacyPolicy')}
               </Link>{' '}
-              zu
+              {t('common.to')}
             </Label>
           </div>
           {errors.terms && (

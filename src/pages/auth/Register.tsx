@@ -1,10 +1,23 @@
-import { ArrowLeft, Trophy } from 'lucide-react';
+import { ArrowLeft, Globe, Palette, Settings, Trophy } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 import { RegisterForm } from '@/components/auth/RegisterForm';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
+import ThemeSwitcher from '@/components/ThemeSwitcher';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export default function Register() {
+  const { t } = useTranslation();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex flex-col">
       {/* Header */}
@@ -13,7 +26,7 @@ export default function Register() {
           <Button variant="ghost" size="sm" asChild>
             <Link to="/">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Zurück zur Startseite
+              {t('authPages.backToHome')}
             </Link>
           </Button>
           
@@ -27,10 +40,50 @@ export default function Register() {
             </div>
           </div>
 
-          <div className="flex gap-2">
-            <Button variant="outline" asChild>
-              <Link to="/auth/login">Anmelden</Link>
-            </Button>
+          <div className="flex items-center gap-3">
+            {/* Desktop: Language & Theme Switchers */}
+            <div className="hidden sm:flex items-center gap-2">
+              <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
+                <LanguageSwitcher />
+              </div>
+              <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
+                <ThemeSwitcher />
+              </div>
+            </div>
+            
+            {/* Mobile: Settings Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="sm:hidden">
+                  <Settings className="h-5 w-5" />
+                  <span className="sr-only">{t('landing.openSettings')}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>{t('landing.settings')}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Globe className="h-4 w-4" />
+                    <span>{t('landing.language')}</span>
+                  </div>
+                  <LanguageSwitcher />
+                </DropdownMenuItem>
+                <DropdownMenuItem className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Palette className="h-4 w-4" />
+                    <span>{t('landing.theme')}</span>
+                  </div>
+                  <ThemeSwitcher />
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <div className="flex gap-2">
+              <Button variant="outline" asChild>
+                <Link to="/auth/login">{t('auth.login')}</Link>
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -40,10 +93,10 @@ export default function Register() {
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-foreground mb-2">
-              Jetzt kostenfrei starten!
+              {t('authPages.startFree')}
             </h1>
             <p className="text-muted-foreground">
-              Erstelle dein Sportify-Konto und beginne deine Fitness-Reise
+              {t('authPages.createAccount')}
             </p>
           </div>
           <RegisterForm />
@@ -54,7 +107,7 @@ export default function Register() {
       <footer className="border-t border-border/40 py-6">
         <div className="container mx-auto px-4 text-center">
           <p className="text-sm text-muted-foreground">
-            © 2024 Sportify. Entwickelt mit ❤️ von Leon Stadler.
+            {t('common.copyright')}
           </p>
         </div>
       </footer>

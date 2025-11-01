@@ -1,81 +1,86 @@
+import { PageTemplate } from "@/components/PageTemplate";
 import { ScoreboardTable } from "@/components/ScoreboardTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 export function Scoreboard() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState("all");
   const [period, setPeriod] = useState("all");
 
-  const activityTypes = [
-    { id: "all", name: "Alle", icon: "🏆" },
-    { id: "pullups", name: "Klimmzüge", icon: "💪" },
-    { id: "pushups", name: "Liegestütze", icon: "🔥" },
-    { id: "running", name: "Laufen", icon: "🏃" },
-    { id: "cycling", name: "Radfahren", icon: "🚴" },
-    { id: "situps", name: "Sit-ups", icon: "🚀" },
-    { id: "other", name: "Sonstiges", icon: "🔗" },
-  ];
+  const activityTypes = useMemo(() => [
+    { id: "all", name: t('scoreboard.activityTypes.all'), icon: "🏆" },
+    { id: "pullups", name: t('scoreboard.activityTypes.pullups'), icon: "💪" },
+    { id: "pushups", name: t('scoreboard.activityTypes.pushups'), icon: "🔥" },
+    { id: "running", name: t('scoreboard.activityTypes.running'), icon: "🏃" },
+    { id: "cycling", name: t('scoreboard.activityTypes.cycling'), icon: "🚴" },
+    { id: "situps", name: t('scoreboard.activityTypes.situps'), icon: "🚀" },
+    { id: "other", name: t('scoreboard.activityTypes.other'), icon: "🔗" },
+  ], [t]);
 
-  const periods = [
-      { id: "all", name: "Gesamt" },
-      { id: "week", name: "Letzte 7 Tage" },
-      { id: "month", name: "Letzte 30 Tage" },
-      { id: "year", name: "Letztes Jahr" },
-  ];
+  const periods = useMemo(() => [
+    { id: "all", name: t('scoreboard.periods.all') },
+    { id: "week", name: t('scoreboard.periods.week') },
+    { id: "month", name: t('scoreboard.periods.month') },
+    { id: "year", name: t('scoreboard.periods.year') },
+  ], [t]);
 
   if (!user) {
     return (
       <div className="flex items-center justify-center h-96">
-        <p className="text-gray-500">Du musst angemeldet sein, um das Scoreboard zu sehen.</p>
+        <p className="text-gray-500">{t('scoreboard.mustBeLoggedIn')}</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Scoreboard</h1>
-            <p className="text-gray-600 mt-2">Vergleiche deine Leistungen mit anderen Athleten</p>
-          </div>
-          <div className="mt-4 sm:mt-0">
-            <Select value={period} onValueChange={setPeriod}>
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {periods.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
+    <PageTemplate
+      title={t('scoreboard.title')}
+      subtitle={t('scoreboard.subtitle')}
+      headerActions={
+        <Select value={period} onValueChange={setPeriod}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {periods.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      }
+      className="space-y-6"
+    >
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 md:grid-cols-7">
-          {activityTypes.map((activity) => (
-            <TabsTrigger key={activity.id} value={activity.id} className="text-xs">
-              <span className="mr-1">{activity.icon}</span>
-              {activity.name}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+        <div className="w-full overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
+          <TabsList className="flex h-auto flex-wrap items-center justify-start rounded-lg bg-muted/50 dark:bg-muted/30 p-1.5 gap-1.5 sm:grid sm:w-full sm:grid-cols-4 md:grid-cols-7 sm:gap-2 sm:h-10">
+            {activityTypes.map((activity) => (
+              <TabsTrigger
+                key={activity.id}
+                value={activity.id}
+                className="text-xs sm:text-sm whitespace-nowrap px-3 py-2 sm:py-1.5 flex-shrink-0 rounded-md transition-all bg-transparent hover:bg-muted data-[state=active]:bg-background dark:data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=active]:font-semibold"
+              >
+                <span className="mr-1.5 text-sm sm:text-base">{activity.icon}</span>
+                <span>{activity.name}</span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
 
         {activityTypes.map((activity) => (
           <TabsContent key={activity.id} value={activity.id} className="mt-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  {activity.icon} {activity.name} Rangliste ({periods.find(p => p.id === period)?.name})
+                  {activity.icon} {activity.name} {t('scoreboard.leaderboard')} ({periods.find(p => p.id === period)?.name})
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -85,6 +90,6 @@ export function Scoreboard() {
           </TabsContent>
         ))}
       </Tabs>
-    </div>
+    </PageTemplate>
   );
 }

@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
@@ -11,16 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
-
-const loginSchema = z.object({
-  email: z.string().email('Ungültige E-Mail-Adresse'),
-  password: z.string().min(6, 'Passwort muss mindestens 6 Zeichen lang sein'),
-  twoFactorCode: z.string().optional()
-});
-
-type LoginFormData = z.infer<typeof loginSchema>;
 
 interface LoginFormProps {
   onSuccess?: () => void;
@@ -34,12 +25,18 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
   const [showTwoFactor, setShowTwoFactor] = useState(false);
   const navigate = useNavigate();
 
+  const loginSchema = useMemo(() => z.object({
+    email: z.string().email(t('validation.invalidEmail')),
+    password: z.string().min(6, t('validation.passwordMin')),
+    twoFactorCode: z.string().optional()
+  }), [t]);
+
+  type LoginFormData = z.infer<typeof loginSchema>;
+
   const {
     register,
     handleSubmit,
-    formState: { errors },
-    watch,
-    reset
+    formState: { errors }
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -53,7 +50,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
     try {
       clearError();
       await login(data.email, data.password, data.twoFactorCode);
-      
+
       if (onSuccess) {
         onSuccess();
       } else {
@@ -68,14 +65,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
     }
   };
 
-  const handleDemo = () => {
-    reset({
-      email: 'demo@sportify.com',
-      password: 'demo123',
-      twoFactorCode: ''
-    });
-  };
-
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader className="space-y-1">
@@ -83,7 +72,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
           {t('auth.login')}
         </CardTitle>
         <CardDescription className="text-center">
-          Melde dich bei deinem Sportify-Konto an
+          {t('auth.login')}
         </CardDescription>
       </CardHeader>
 
@@ -100,7 +89,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
             <Input
               id="email"
               type="email"
-              placeholder="deine@email.com"
+              placeholder={t('auth.email')}
               {...register('email')}
               className={errors.email ? 'border-destructive' : ''}
             />
@@ -167,17 +156,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
           <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {t('auth.login')}
-          </Button>
-
-          <Separator />
-
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={handleDemo}
-          >
-            Demo-Anmeldung verwenden
           </Button>
         </form>
       </CardContent>

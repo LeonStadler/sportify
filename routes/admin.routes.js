@@ -1,6 +1,6 @@
 import express from 'express';
-import { InvitationError, createInvitation } from '../services/invitationService.js';
 import { queueEmail } from '../services/emailService.js';
+import { InvitationError, createInvitation } from '../services/invitationService.js';
 import { toCamelCase } from '../utils/helpers.js';
 
 export const createAdminRouter = (pool) => {
@@ -79,11 +79,22 @@ export const createAdminRouter = (pool) => {
                 invitedBy: req.user.id,
             });
 
-            await queueEmail(pool, {
-                recipient: email,
-                subject: 'Sportify – Einladung',
-                body: `Hallo ${firstName},\n\nDu wurdest zu Sportify eingeladen.\nVerwende diesen Code, um dich zu registrieren: ${token}\n\nDie Einladung läuft am ${new Date(invitation.expires_at).toISOString()} ab.`,
-            });
+            try {
+                await queueEmail(pool, {
+                    recipient: email,
+                    subject: 'Sportify – Einladung',
+                    body: `Hallo ${firstName},\n\nDu wurdest zu Sportify eingeladen.\nVerwende diesen Code, um dich zu registrieren: ${token}\n\nDie Einladung läuft am ${new Date(invitation.expires_at).toISOString()} ab.`,
+                });
+                console.log(`✅ Admin-Einladungs-E-Mail erfolgreich versendet an: ${email}`);
+            } catch (emailError) {
+                console.error(`❌ Fehler beim Versenden der Admin-Einladungs-E-Mail an ${email}:`, emailError);
+                console.error('   Fehler-Details:', {
+                    message: emailError.message,
+                    code: emailError.code,
+                    response: emailError.response
+                });
+                throw new Error(`Einladung wurde erstellt, aber E-Mail konnte nicht versendet werden: ${emailError.message}`);
+            }
 
             res.status(201).json({
                 message: 'Einladung gesendet.',

@@ -5,9 +5,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import LanguageSwitcher from './LanguageSwitcher';
 import ThemeSwitcher from './ThemeSwitcher';
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { parseAvatarConfig, getUserInitials } from "@/lib/avatar";
-import NiceAvatar from "react-nice-avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +29,8 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/contexts/AuthContext";
+import { getUserInitials, parseAvatarConfig } from "@/lib/avatar";
+import NiceAvatar from "react-nice-avatar";
 import { Notifications } from './Notifications';
 
 export function AppSidebar() {
@@ -88,11 +88,6 @@ export function AppSidebar() {
       title: t('navigation.admin'),
       url: "/admin",
       icon: Shield,
-    },
-    {
-      title: "User Management",
-      url: "/admin/users",
-      icon: Users,
     },
   ];
 
@@ -220,9 +215,9 @@ export function AppSidebar() {
               <div className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-accent transition-colors">
                 <Avatar className="h-9 w-9">
                   {user?.avatar && parseAvatarConfig(user.avatar) ? (
-                    <NiceAvatar 
-                      style={{ width: '36px', height: '36px' }} 
-                      {...parseAvatarConfig(user.avatar)!} 
+                    <NiceAvatar
+                      style={{ width: '36px', height: '36px' }}
+                      {...parseAvatarConfig(user.avatar)!}
                     />
                   ) : (
                     <AvatarFallback>{getUserInitials(user)}</AvatarFallback>

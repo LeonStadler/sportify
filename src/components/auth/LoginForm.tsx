@@ -146,7 +146,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
 
           <div className="flex items-center justify-between">
             <Link
-              to="/auth/forgot-password"
+              to="/auth/reset-password"
               className="text-sm text-primary hover:underline"
             >
               {t('auth.forgotPassword')}

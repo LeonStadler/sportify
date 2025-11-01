@@ -6,6 +6,7 @@ import { queueEmail } from '../services/emailService.js';
 import {
     TokenError,
     createEmailVerificationToken,
+    createPasswordResetToken,
     markEmailVerificationTokenUsed,
     markPasswordResetTokenUsed,
     validateEmailVerificationToken,
@@ -53,6 +54,12 @@ export const createAuthRouter = (pool) => {
                 user.preferences = {};
             }
 
+            // Ensure avatar field is correctly mapped (avatar_url -> avatarUrl -> avatar)
+            if (user.avatarUrl !== undefined) {
+                user.avatar = user.avatarUrl;
+                delete user.avatarUrl;
+            }
+
             res.json(user);
         } catch (error) {
             console.error('Get user error:', error);
@@ -93,6 +100,8 @@ export const createAuthRouter = (pool) => {
             const { rows } = await pool.query(newUserQuery, values);
             const rawUser = rows[0];
 
+            // Versuche Verifizierungs-E-Mail zu senden
+            let verificationEmailSent = false;
             try {
                 const { token: verificationToken } = await createEmailVerificationToken(pool, rawUser.id);
 
@@ -151,8 +160,18 @@ Dein Sportify-Team`;
                     body: emailBody,
                     html: emailHtml,
                 });
+                verificationEmailSent = true;
+                console.log('✅ Verifizierungs-E-Mail erfolgreich versendet an:', email);
             } catch (mailError) {
-                console.error('Verification email error:', mailError);
+                console.error('❌ Fehler beim Versenden der Verifizierungs-E-Mail:', mailError);
+                console.error('   Fehler-Details:', {
+                    message: mailError.message,
+                    code: mailError.code,
+                    response: mailError.response
+                });
+                // User wurde erstellt, aber E-Mail konnte nicht versendet werden
+                // Das ist nicht kritisch - User kann später erneut anfordern
+                console.warn('⚠️ User wurde erstellt, aber Verifizierungs-E-Mail konnte nicht versendet werden');
             }
 
             // Convert snake_case to camelCase
@@ -407,14 +426,25 @@ Dein Sportify-Team`;
 </body>
 </html>`;
 
-            await queueEmail(pool, {
-                recipient: user.email,
-                subject: 'Sportify – E-Mail bestätigen',
-                body: emailBody,
-                html: emailHtml,
-            });
+            try {
+                await queueEmail(pool, {
+                    recipient: user.email,
+                    subject: 'Sportify – E-Mail bestätigen',
+                    body: emailBody,
+                    html: emailHtml,
+                });
 
-            res.json({ message: 'Verifizierungs-E-Mail wurde erneut gesendet.' });
+                console.log('✅ Verifizierungs-E-Mail erfolgreich erneut versendet an:', user.email);
+                res.json({ message: 'Verifizierungs-E-Mail wurde erneut gesendet.' });
+            } catch (mailError) {
+                console.error('❌ Fehler beim erneuten Versenden der Verifizierungs-E-Mail:', mailError);
+                console.error('   Fehler-Details:', {
+                    message: mailError.message,
+                    code: mailError.code,
+                    response: mailError.response
+                });
+                return res.status(500).json({ error: 'Verifizierungs-E-Mail konnte nicht versendet werden. Bitte versuche es später erneut.' });
+            }
         } catch (error) {
             if (error instanceof TokenError) {
                 return res.status(400).json({ error: error.message });
@@ -654,57 +684,30 @@ Dein Sportify-Team`;
 
     // POST /api/auth/forgot-password - Request Password Reset
     router.post('/forgot-password', async (req, res) => {
-        const requestId = Math.random().toString(36).substring(7);
-        console.log(`\n🔵 [${requestId}] ========== FORGOT PASSWORD REQUEST START ==========`);
-        console.log(`[${requestId}] Timestamp:`, new Date().toISOString());
-        console.log(`[${requestId}] Request Body:`, JSON.stringify(req.body, null, 2));
-        console.log(`[${requestId}] Request Headers:`, {
-            origin: req.headers.origin,
-            referer: req.headers.referer,
-            host: req.headers.host,
-        });
-
         try {
-            const { email } = req.body;
-            console.log(`[${requestId}] Schritt 1: E-Mail aus Request extrahiert:`, email);
+            const { email } = req.body || {};
 
             // Validierung
             if (!email || typeof email !== 'string' || !email.trim()) {
-                console.log(`[${requestId}] ❌ Validierung fehlgeschlagen: E-Mail fehlt oder ist kein String`);
                 return res.status(400).json({ error: 'E-Mail-Adresse ist erforderlich.' });
             }
 
             const normalizedEmail = email.trim().toLowerCase();
-            console.log(`[${requestId}] Schritt 2: E-Mail normalisiert: "${email}" -> "${normalizedEmail}"`);
 
             // E-Mail-Format validieren
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             if (!emailRegex.test(normalizedEmail)) {
-                console.log(`[${requestId}] ❌ E-Mail-Format ungültig: ${normalizedEmail}`);
                 return res.status(400).json({ error: 'Ungültige E-Mail-Adresse.' });
             }
-            console.log(`[${requestId}] Schritt 3: E-Mail-Format ist gültig`);
 
-            // Prüfe ob User existiert - NUR wenn User existiert, versende E-Mail
-            console.log(`[${requestId}] Schritt 4: Suche User in Datenbank...`);
-            const userQuery = 'SELECT id, first_name, email FROM users WHERE LOWER(email) = $1';
-            console.log(`[${requestId}] SQL Query:`, userQuery);
-            console.log(`[${requestId}] SQL Parameter:`, [normalizedEmail]);
+            // Prüfe ob User existiert
+            const userResult = await pool.query(
+                'SELECT id, first_name, email FROM users WHERE LOWER(email) = $1',
+                [normalizedEmail]
+            );
 
-            const userResult = await pool.query(userQuery, [normalizedEmail]);
-            console.log(`[${requestId}] Schritt 5: Datenbank-Abfrage abgeschlossen`);
-            console.log(`[${requestId}] Query Result:`, {
-                rowCount: userResult.rowCount,
-                rowsFound: userResult.rows.length,
-                rows: userResult.rows
-            });
-
-            // WICHTIG: Nur wenn User NICHT existiert - keine E-Mail versenden, aber Erfolgsmeldung senden
+            // Aus Sicherheitsgründen: Erfolgsmeldung senden, auch wenn User nicht existiert
             if (userResult.rows.length === 0) {
-                console.log(`[${requestId}] ⚠️ Kein User gefunden für: ${normalizedEmail}`);
-                console.log(`[${requestId}] Keine E-Mail wird versendet - User existiert nicht`);
-                console.log(`[${requestId}] ✅ Sende Erfolgsmeldung (Sicherheitsgründe)`);
-                console.log(`[${requestId}] ========== FORGOT PASSWORD REQUEST END (KEIN USER) ==========\n`);
                 return res.status(200).json({
                     message: 'Falls die E-Mail-Adresse existiert, wurde eine Zurücksetzungs-E-Mail gesendet.',
                     success: true
@@ -717,32 +720,14 @@ Dein Sportify-Team`;
             const userName = user.first_name || 'Benutzer';
             const userEmail = user.email;
 
-            console.log(`[${requestId}] ✅ User gefunden:`);
-            console.log(`[${requestId}]   - ID: ${userId}`);
-            console.log(`[${requestId}]   - Name: ${userName}`);
-            console.log(`[${requestId}]   - Email: ${userEmail}`);
-
             // Erstelle Reset-Token
-            console.log(`[${requestId}] Schritt 6: Erstelle Reset-Token...`);
             let resetToken;
             try {
-                console.log(`[${requestId}] Rufe createPasswordResetToken auf mit:`, { userId, poolType: typeof pool });
                 const tokenResult = await createPasswordResetToken(pool, userId);
                 resetToken = tokenResult.token;
-                console.log(`[${requestId}] ✅ Token erfolgreich erstellt`);
-                console.log(`[${requestId}] Token (erste 20 Zeichen):`, resetToken.substring(0, 20) + '...');
-                console.log(`[${requestId}] Token-Länge:`, resetToken.length);
-                console.log(`[${requestId}] Token-Expiry:`, tokenResult.expiresAt);
             } catch (tokenError) {
-                console.error(`[${requestId}] ❌ FEHLER beim Erstellen des Tokens:`);
-                console.error(`[${requestId}] Fehler-Name:`, tokenError.name);
-                console.error(`[${requestId}] Fehler-Message:`, tokenError.message);
-                console.error(`[${requestId}] Fehler-Code:`, tokenError.code);
-                console.error(`[${requestId}] Fehler-Stack:`, tokenError.stack);
-                console.error(`[${requestId}] Fehler-Objekt:`, JSON.stringify(tokenError, Object.getOwnPropertyNames(tokenError), 2));
-                // Token-Erstellung fehlgeschlagen - keine E-Mail versenden
-                console.log(`[${requestId}] ✅ Sende Erfolgsmeldung trotz Token-Fehler (Sicherheitsgründe)`);
-                console.log(`[${requestId}] ========== FORGOT PASSWORD REQUEST END (TOKEN FEHLER) ==========\n`);
+                console.error('Fehler beim Erstellen des Passwort-Reset-Tokens:', tokenError);
+                // Token-Erstellung fehlgeschlagen - Erfolgsmeldung aus Sicherheitsgründen
                 return res.status(200).json({
                     message: 'Falls die E-Mail-Adresse existiert, wurde eine Zurücksetzungs-E-Mail gesendet.',
                     success: true
@@ -750,15 +735,9 @@ Dein Sportify-Team`;
             }
 
             // Erstelle E-Mail-Inhalt
-            console.log(`[${requestId}] Schritt 7: Erstelle E-Mail-Inhalt...`);
             const frontendUrl = getFrontendUrl(req);
-            console.log(`[${requestId}] Frontend URL:`, frontendUrl);
-
             const resetUrl = `${frontendUrl}/auth/reset-password?token=${encodeURIComponent(resetToken)}`;
-            console.log(`[${requestId}] Reset URL:`, resetUrl);
-
             const greeting = `Hallo ${userName},`;
-            console.log(`[${requestId}] Greeting:`, greeting);
 
             const emailBody = `${greeting}
 
@@ -810,58 +789,27 @@ Dein Sportify-Team`;
 </body>
 </html>`;
 
-            console.log(`[${requestId}] Schritt 8: E-Mail-Inhalt erstellt`);
-            console.log(`[${requestId}] Email Body Länge:`, emailBody.length);
-            console.log(`[${requestId}] Email HTML Länge:`, emailHtml.length);
-
-            // Versende E-Mail NUR wenn User existiert
-            console.log(`[${requestId}] Schritt 9: Versende E-Mail...`);
+            // Versende E-Mail
             try {
-                console.log(`[${requestId}] Rufe queueEmail auf mit:`);
-                console.log(`[${requestId}]   - recipient: ${userEmail}`);
-                console.log(`[${requestId}]   - subject: Sportify – Passwort zurücksetzen`);
-                console.log(`[${requestId}]   - pool Type:`, typeof pool);
-                console.log(`[${requestId}]   - pool:`, pool ? 'exists' : 'null');
-
-                const emailStartTime = Date.now();
                 await queueEmail(pool, {
                     recipient: userEmail,
                     subject: 'Sportify – Passwort zurücksetzen',
                     body: emailBody,
                     html: emailHtml,
                 });
-                const emailEndTime = Date.now();
-                const emailDuration = emailEndTime - emailStartTime;
-
-                console.log(`[${requestId}] ✅ E-Mail-Versand erfolgreich (Dauer: ${emailDuration}ms)`);
-                console.log(`[${requestId}] E-Mail wurde an ${userEmail} versendet`);
             } catch (emailError) {
-                console.error(`[${requestId}] ❌ FEHLER beim Versenden der E-Mail:`);
-                console.error(`[${requestId}] Fehler-Name:`, emailError.name);
-                console.error(`[${requestId}] Fehler-Message:`, emailError.message);
-                console.error(`[${requestId}] Fehler-Code:`, emailError.code);
-                console.error(`[${requestId}] Fehler-Stack:`, emailError.stack);
-                console.error(`[${requestId}] Fehler-Objekt:`, JSON.stringify(emailError, Object.getOwnPropertyNames(emailError), 2));
+                console.error('Fehler beim Versenden der Passwort-Reset-E-Mail:', emailError);
                 // E-Mail-Versand fehlgeschlagen - aber Token wurde bereits erstellt
             }
 
             // Erfolgsmeldung
-            console.log(`[${requestId}] Schritt 10: Sende Erfolgs-Response`);
-            console.log(`[${requestId}] ========== FORGOT PASSWORD REQUEST END (ERFOLGREICH) ==========\n`);
             return res.status(200).json({
                 message: 'Falls die E-Mail-Adresse existiert, wurde eine Zurücksetzungs-E-Mail gesendet.',
                 success: true
             });
 
         } catch (error) {
-            console.error(`[${requestId}] ❌❌❌ UNERWARTETER FEHLER ❌❌❌`);
-            console.error(`[${requestId}] Fehler-Name:`, error.name);
-            console.error(`[${requestId}] Fehler-Message:`, error.message);
-            console.error(`[${requestId}] Fehler-Code:`, error.code);
-            console.error(`[${requestId}] Fehler-Stack:`, error.stack);
-            console.error(`[${requestId}] Fehler-Objekt:`, JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-            console.error(`[${requestId}] ========== FORGOT PASSWORD REQUEST END (FEHLER) ==========\n`);
-
+            console.error('Unerwarteter Fehler beim Passwort-Reset:', error);
             // Aus Sicherheitsgründen: Auch bei unerwarteten Fehlern Erfolgsmeldung
             return res.status(200).json({
                 message: 'Falls die E-Mail-Adresse existiert, wurde eine Zurücksetzungs-E-Mail gesendet.',

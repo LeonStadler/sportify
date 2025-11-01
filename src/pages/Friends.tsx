@@ -1,7 +1,6 @@
 import { InviteFriendForm } from '@/components/InviteFriendForm';
 import { PageTemplate } from '@/components/PageTemplate';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -363,6 +362,45 @@ function FriendRequestsList({ onFriendAccepted }: { onFriendAccepted?: () => voi
     });
   };
 
+  const handleCancelRequest = async (requestId: string, userName: string) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      toast.error('Nicht angemeldet.');
+      return;
+    }
+
+    const promise = fetch(`${API_URL}/friends/requests/${requestId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    }).then(async (response) => {
+      if (!response.ok) {
+        const contentType = response.headers.get('content-type');
+        let errorMessage = 'Fehler beim Zurückziehen der Anfrage.';
+
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            const error = await response.json();
+            errorMessage = error.error || error.message || errorMessage;
+          } catch (parseError) {
+            // If JSON parsing fails, use default message
+          }
+        }
+
+        throw new Error(errorMessage);
+      }
+      return response;
+    });
+
+    toast.promise(promise, {
+      loading: 'Ziehe Anfrage zurück...',
+      success: () => {
+        fetchRequests();
+        return `Anfrage an ${userName} wurde zurückgezogen.`;
+      },
+      error: (error) => error instanceof Error ? error.message : 'Fehler beim Zurückziehen der Anfrage.'
+    });
+  };
+
   if (loading) {
     return <Card><CardContent className="p-4 md:p-6"><Skeleton className="h-24 w-full" /></CardContent></Card>;
   }
@@ -448,7 +486,16 @@ function FriendRequestsList({ onFriendAccepted }: { onFriendAccepted?: () => voi
                     </Avatar>
                     <p className="font-semibold text-sm md:text-base truncate">{req.user.displayName}</p>
                   </div>
-                  <Badge variant="secondary" className="flex-shrink-0 text-xs">Ausstehend</Badge>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleCancelRequest(req.requestId, req.user.displayName)}
+                    className="text-destructive hover:text-destructive-foreground hover:bg-destructive flex-shrink-0 text-xs md:text-sm"
+                  >
+                    <X className="w-3 h-3 md:w-4 md:h-4 mr-1" />
+                    <span className="hidden sm:inline">Zurückziehen</span>
+                    <span className="sm:hidden">×</span>
+                  </Button>
                 </div>
               ))}
             </div>

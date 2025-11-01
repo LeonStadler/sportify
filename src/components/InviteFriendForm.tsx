@@ -32,10 +32,18 @@ export function InviteFriendForm({ onSuccess, className }: InviteFriendFormProps
 
         try {
             // Nur Email wird gesendet, Name und Nachname werden beim Registrieren eingegeben
-            await inviteFriend(email);
-            toast.success('Einladung gesendet', {
-                description: `Eine Einladung wurde an ${email} gesendet.`,
-            });
+            const result = await inviteFriend(email);
+            
+            // Zeige unterschiedliche Nachrichten basierend auf Ergebnis
+            if (result?.type === 'friend_request') {
+                toast.success('Freundschaftsanfrage gesendet', {
+                    description: `Eine Freundschaftsanfrage wurde an ${email} gesendet.`,
+                });
+            } else {
+                toast.success('Einladung gesendet', {
+                    description: `Eine Einladung wurde an ${email} gesendet.`,
+                });
+            }
             setEmail('');
             if (onSuccess) {
                 onSuccess();

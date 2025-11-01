@@ -229,9 +229,9 @@ export function ActivityFeed() {
                         {...parseAvatarConfig(activity.userAvatar)!} 
                       />
                     ) : (
-                      <AvatarFallback className="text-xs md:text-sm">
-                        {getUserInitials(activity.userFirstName, activity.userLastName)}
-                      </AvatarFallback>
+                    <AvatarFallback className="text-xs md:text-sm">
+                      {getUserInitials(activity.userFirstName, activity.userLastName)}
+                    </AvatarFallback>
                     )}
                   </Avatar>
 

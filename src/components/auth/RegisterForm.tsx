@@ -19,7 +19,7 @@ interface RegisterFormProps {
   redirectTo?: string;
 }
 
-export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
+export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, redirectTo }) => {
   const { t } = useTranslation();
   const { register: registerUser, isLoading, error, clearError } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
@@ -100,6 +100,9 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
 
       if (onSuccess) {
         onSuccess();
+      } else if (redirectTo) {
+        // Navigate to redirect URL (e.g., invite page)
+        navigate(redirectTo);
       } else if (result.needsVerification) {
         // Umleitung zur E-Mail-Verifizierung
         navigate(`/auth/email-verification?email=${encodeURIComponent(result.email)}`);

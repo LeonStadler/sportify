@@ -105,7 +105,12 @@ export function Profile() {
   const handleAvatarSave = async (config: NiceAvatarProps) => {
     try {
       const avatarJson = JSON.stringify(config);
-      await updateProfile({ avatar: avatarJson });
+      // Backend erfordert firstName und lastName, also müssen wir sie mitsenden
+      await updateProfile({
+        avatar: avatarJson,
+        firstName: user?.firstName || '',
+        lastName: user?.lastName || '',
+      });
       toast({
         title: "Avatar gespeichert",
         description: "Dein Avatar wurde erfolgreich aktualisiert.",
@@ -263,7 +268,8 @@ export function Profile() {
   };
 
   const copyInviteLink = async () => {
-    const inviteLink = `https://sportify.app/invite/${user?.id}`;
+    const frontendUrl = window.location.origin;
+    const inviteLink = `${frontendUrl}/invite/${user?.id}`;
     try {
       await navigator.clipboard.writeText(inviteLink);
       setCopiedLink(true);
@@ -376,6 +382,16 @@ export function Profile() {
 
                 <Separator />
 
+                <div className="bg-accent p-3 rounded-lg">
+                  <p className="text-sm font-medium">E-Mail Verifizierung</p>
+                  <p className="text-sm text-muted-foreground">
+                    {user.isEmailVerified
+                      ? "✓ Deine E-Mail ist verifiziert"
+                      : "⚠ Bitte verifiziere deine E-Mail-Adresse"
+                    }
+                  </p>
+                </div>
+
                 <form onSubmit={handleProfileUpdate} className="space-y-3">
                   <div>
                     <Label htmlFor="firstName">Vorname *</Label>
@@ -475,7 +491,7 @@ export function Profile() {
                   <div className="flex gap-2 mt-1">
                     <Input
                       id="invite-link"
-                      value={`https://sportify.app/invite/${user.id}`}
+                      value={`${window.location.origin}/invite/${user.id}`}
                       readOnly
                     />
                     <Button variant="outline" onClick={copyInviteLink}>
@@ -520,16 +536,6 @@ export function Profile() {
                       ))}
                     </div>
                   )}
-                </div>
-
-                <div className="bg-accent p-3 rounded-lg">
-                  <p className="text-sm font-medium">E-Mail Verifizierung</p>
-                  <p className="text-sm text-muted-foreground">
-                    {user.isEmailVerified
-                      ? "✓ Deine E-Mail ist verifiziert"
-                      : "⚠ Bitte verifiziere deine E-Mail-Adresse"
-                    }
-                  </p>
                 </div>
               </CardContent>
             </Card>

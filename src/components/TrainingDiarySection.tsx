@@ -19,6 +19,7 @@ import { Calendar } from "./ui/calendar";
 
 interface TrainingDiarySectionProps {
   className?: string;
+  preselectedWorkoutId?: string;
 }
 
 interface PaginationState {
@@ -67,7 +68,7 @@ const formatNumber = (value?: number | null) =>
 const formatScaleValue = (value?: number | null) =>
   typeof value === "number" && !Number.isNaN(value) ? `${value}/10` : "–";
 
-export function TrainingDiarySection({ className }: TrainingDiarySectionProps) {
+export function TrainingDiarySection({ className, preselectedWorkoutId }: TrainingDiarySectionProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [entries, setEntries] = useState<TrainingJournalEntry[]>([]);
@@ -244,7 +245,7 @@ export function TrainingDiarySection({ className }: TrainingDiarySectionProps) {
         });
 
         if (!response.ok) {
-          throw new Error("Fehler beim Laden des Trainingstagebuchs");
+          throw new Error("Fehler beim Laden des Erholungstagebuchs");
         }
 
         const data: JournalApiResponse = await response.json();
@@ -255,7 +256,7 @@ export function TrainingDiarySection({ className }: TrainingDiarySectionProps) {
         console.error("Load training journal error:", error);
         toast({
           title: "Fehler",
-          description: "Das Trainingstagebuch konnte nicht geladen werden.",
+          description: "Das Erholungstagebuch konnte nicht geladen werden.",
           variant: "destructive",
         });
       } finally {
@@ -271,6 +272,16 @@ export function TrainingDiarySection({ className }: TrainingDiarySectionProps) {
     loadSummary();
     fetchRecentWorkouts();
   }, [user, loadEntries, loadSummary, fetchRecentWorkouts]);
+
+  // Setze das vorgewählte Workout, wenn es übergeben wurde
+  useEffect(() => {
+    if (preselectedWorkoutId && preselectedWorkoutId !== "none") {
+      // Lade aktuelle Workouts neu, damit das neue Workout in der Liste verfügbar ist
+      fetchRecentWorkouts().then(() => {
+        setWorkoutId(preselectedWorkoutId);
+      });
+    }
+  }, [preselectedWorkoutId, fetchRecentWorkouts]);
 
   useEffect(() => {
     if (!user) return;
@@ -364,8 +375,8 @@ export function TrainingDiarySection({ className }: TrainingDiarySectionProps) {
       toast({
         title: editingEntry ? "Eintrag aktualisiert" : "Eintrag gespeichert",
         description: editingEntry
-          ? "Der Trainingstagebuch-Eintrag wurde aktualisiert."
-          : "Der Trainingstagebuch-Eintrag wurde hinzugefügt.",
+          ? "Der Erholungstagebuch-Eintrag wurde aktualisiert."
+          : "Der Erholungstagebuch-Eintrag wurde hinzugefügt.",
       });
     } catch (error) {
       console.error("Save training journal entry error:", error);
@@ -380,9 +391,38 @@ export function TrainingDiarySection({ className }: TrainingDiarySectionProps) {
     }
   };
 
-  const handleEdit = (entry: TrainingJournalEntry) => {
+  const handleEdit = async (entry: TrainingJournalEntry) => {
     setEditingEntry(entry);
-    setEntryDate(new Date(entry.entryDate));
+    
+    // Parse Datum sicher - unterstütze verschiedene Formate
+    try {
+      let parsedDate: Date;
+      if (typeof entry.entryDate === 'string') {
+        // Wenn es im Format YYYY-MM-DD ist, parsen wir es direkt
+        if (/^\d{4}-\d{2}-\d{2}$/.test(entry.entryDate)) {
+          const [year, month, day] = entry.entryDate.split('-').map(Number);
+          parsedDate = new Date(year, month - 1, day);
+        } else {
+          parsedDate = new Date(entry.entryDate);
+        }
+        
+        // Prüfe ob das Datum gültig ist
+        if (Number.isNaN(parsedDate.getTime())) {
+          console.warn('Invalid date in entry:', entry.entryDate);
+          parsedDate = new Date();
+        }
+      } else {
+        parsedDate = new Date(entry.entryDate);
+        if (Number.isNaN(parsedDate.getTime())) {
+          parsedDate = new Date();
+        }
+      }
+      setEntryDate(parsedDate);
+    } catch (error) {
+      console.error('Error parsing date:', error, entry.entryDate);
+      setEntryDate(new Date());
+    }
+    
     setMood(entry.mood);
     setEnergyLevel(entry.energyLevel ? String(entry.energyLevel) : "");
     setFocusLevel(entry.focusLevel ? String(entry.focusLevel) : "");
@@ -391,10 +431,53 @@ export function TrainingDiarySection({ className }: TrainingDiarySectionProps) {
     setPerceivedExertion(entry.perceivedExertion ? String(entry.perceivedExertion) : "");
     setNotes(entry.notes ?? "");
     setTagsInput(entry.tags.join(", "));
-    setWorkoutId(entry.workoutId ?? "none");
+    
+    // Wenn ein Workout verknüpft ist, lade es explizit falls es nicht in recentWorkouts ist
+    if (entry.workoutId && entry.workoutId !== "none") {
+      await fetchRecentWorkouts();
+      
+      // Prüfe ob das Workout in der Liste ist, wenn nicht, lade es direkt
+      const workoutExists = recentWorkouts.some(w => w.id === entry.workoutId);
+      if (!workoutExists) {
+        try {
+          const token = localStorage.getItem("token");
+          const response = await fetch(`${API_URL}/workouts/${entry.workoutId}`, {
+            headers: {
+              Authorization: `Bearer ${token ?? ""}`,
+            },
+          });
+          
+          if (response.ok) {
+            const workout = await response.json();
+            // Füge das Workout zur Liste hinzu
+            setRecentWorkouts(prev => {
+              // Prüfe ob es schon in der Liste ist
+              if (prev.some(w => w.id === workout.id)) {
+                return prev;
+              }
+              return [{
+                id: workout.id,
+                title: workout.title,
+                workoutDate: workout.workoutDate || workout.createdAt,
+              }, ...prev];
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching workout:', error);
+        }
+      }
+      
+      setWorkoutId(entry.workoutId);
+    } else {
+      setWorkoutId("none");
+    }
+    
     setSleepDuration(entry.metrics?.sleepDurationHours ? String(entry.metrics.sleepDurationHours) : "");
     setRestingHeartRate(entry.metrics?.restingHeartRate ? String(entry.metrics.restingHeartRate) : "");
     setHydrationLevel(entry.metrics?.hydrationLevel ? String(entry.metrics.hydrationLevel) : "");
+    
+    // Scroll zum Formular
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = async (entryId: string) => {
@@ -418,7 +501,7 @@ export function TrainingDiarySection({ className }: TrainingDiarySectionProps) {
 
       toast({
         title: "Eintrag gelöscht",
-        description: "Der Trainingstagebuch-Eintrag wurde entfernt.",
+        description: "Der Erholungstagebuch-Eintrag wurde entfernt.",
       });
 
       await loadEntries(currentPage);
@@ -454,10 +537,10 @@ export function TrainingDiarySection({ className }: TrainingDiarySectionProps) {
           <div>
             <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
               <NotebookPen className="h-5 w-5 text-primary" />
-              Trainingstagebuch
+              Erholungstagebuch
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Dokumentiere Tagesform, Regeneration und persönliche Notizen für deine Einheiten.
+              Dokumentiere deine Erholung, Regeneration, Tagesform und persönliche Notizen.
             </p>
           </div>
           <Button variant="ghost" size="icon" onClick={handleResetFilters} title="Filter zurücksetzen">
@@ -609,7 +692,11 @@ export function TrainingDiarySection({ className }: TrainingDiarySectionProps) {
               <Label htmlFor="workout-reference">Workout-Verknüpfung</Label>
               <Select value={workoutId} onValueChange={(value) => setWorkoutId(value)}>
                 <SelectTrigger id="workout-reference">
-                  <SelectValue placeholder="Optional verknüpfen" />
+                  <SelectValue placeholder="Optional verknüpfen">
+                    {workoutId && workoutId !== "none" && !recentWorkouts.find(w => w.id === workoutId) && (
+                      <span className="text-sm">Workout geladen...</span>
+                    )}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Kein Workout verknüpft</SelectItem>
@@ -789,7 +876,7 @@ export function TrainingDiarySection({ className }: TrainingDiarySectionProps) {
             </div>
           ) : entries.length === 0 ? (
             <div className="rounded-lg border border-dashed bg-muted/20 p-8 text-center text-sm text-muted-foreground">
-              Noch keine Einträge im Trainingstagebuch vorhanden.
+              Noch keine Einträge im Erholungstagebuch vorhanden.
             </div>
           ) : (
             <div className="space-y-3">

@@ -67,7 +67,7 @@ const corsOptions = {
             'http://vertic-id.com',
             'http://www.vertic-id.com'
         ].filter(Boolean);
-        
+
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);

@@ -96,8 +96,8 @@ export const createScoreboardRouter = (pool) => {
                 LEFT JOIN workouts w ON u.id = w.user_id ${dateFilter}
                 LEFT JOIN workout_activities wa ON w.id = wa.workout_id AND wa.activity_type = $1
                 GROUP BY u.id, u.first_name, u.last_name, u.nickname, u.display_preference, u.avatar_url
-                HAVING COALESCE(SUM(wa.quantity), 0) > 0
-                ORDER BY total_amount DESC
+                HAVING COALESCE(SUM(wa.points_earned), 0) > 0
+                ORDER BY total_points DESC
                 LIMIT 50
             `;
 

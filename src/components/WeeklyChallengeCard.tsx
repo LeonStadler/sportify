@@ -1,4 +1,6 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { parseAvatarConfig } from "@/lib/avatar";
+import NiceAvatar from "react-nice-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -299,7 +301,12 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
                     #{entry.rank}
                   </Badge>
                   <Avatar className="h-10 w-10 shrink-0">
-                    <AvatarImage src={entry.avatarUrl ?? undefined} alt={entry.displayName} />
+                    {entry.avatarUrl && parseAvatarConfig(entry.avatarUrl) ? (
+                      <NiceAvatar 
+                        style={{ width: '40px', height: '40px' }} 
+                        {...parseAvatarConfig(entry.avatarUrl)!} 
+                      />
+                    ) : (
                     <AvatarFallback className={cn(
                       entry.isCurrentUser
                         ? "bg-primary text-primary-foreground"
@@ -307,6 +314,7 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
                     )}>
                       {getAvatarFallback(entry.displayName)}
                     </AvatarFallback>
+                    )}
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium leading-tight truncate">

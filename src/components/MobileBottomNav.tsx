@@ -5,13 +5,15 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import LanguageSwitcher from './LanguageSwitcher';
 import ThemeSwitcher from './ThemeSwitcher';
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/contexts/AuthContext";
+import { getUserInitials, parseAvatarConfig } from "@/lib/avatar";
+import NiceAvatar from "react-nice-avatar";
 
 export function MobileBottomNav() {
   const { t } = useTranslation();
@@ -52,11 +54,6 @@ export function MobileBottomNav() {
       url: "/admin",
       icon: Settings,
     },
-    {
-      title: "User Management",
-      url: "/admin/users",
-      icon: Shield,
-    },
   ];
 
   const handleLogout = async () => {
@@ -70,13 +67,6 @@ export function MobileBottomNav() {
   };
 
 
-  const getUserInitials = () => {
-    if (!user) return '?';
-    if (user.displayPreference === 'nickname' && user.nickname) {
-      return user.nickname.substring(0, 2).toUpperCase();
-    }
-    return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
-  };
 
   const handleNavigation = (url: string) => {
     navigate(url);
@@ -124,10 +114,16 @@ export function MobileBottomNav() {
               <SheetHeader className="p-6 pb-4">
                 <div className="flex items-center gap-3">
                   <Avatar className="w-12 h-12">
-                    <AvatarImage src={user?.avatar} alt={getDisplayName()} />
-                    <AvatarFallback className="bg-primary text-primary-foreground">
-                      {getUserInitials()}
-                    </AvatarFallback>
+                    {user?.avatar && parseAvatarConfig(user.avatar) ? (
+                      <NiceAvatar
+                        style={{ width: '48px', height: '48px' }}
+                        {...parseAvatarConfig(user.avatar)!}
+                      />
+                    ) : (
+                      <AvatarFallback className="bg-primary text-primary-foreground">
+                        {getUserInitials(user)}
+                      </AvatarFallback>
+                    )}
                   </Avatar>
                   <div className="flex-1 text-left">
                     <SheetTitle className="text-lg">{getDisplayName()}</SheetTitle>

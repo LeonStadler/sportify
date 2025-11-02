@@ -1,18 +1,20 @@
 import { AppSidebar } from "@/components/AppSidebar";
+import { InviteLinkHandler } from "@/components/InviteLinkHandler";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
 import { Admin } from "@/pages/Admin";
 import EmailVerification from "@/pages/auth/EmailVerification";
-import ForgotPassword from "@/pages/auth/ForgotPassword";
 import Login from "@/pages/auth/Login";
 import Register from "@/pages/auth/Register";
+import ResetPassword from "@/pages/auth/ResetPassword";
 import TwoFactor from "@/pages/auth/TwoFactor";
 import Contact from "@/pages/Contact";
 import { Dashboard } from "@/pages/Dashboard";
 import { Friends } from "@/pages/Friends";
 import Imprint from "@/pages/Imprint";
+import { Invite } from "@/pages/Invite";
 import Landing from "@/pages/Landing";
 import Privacy from "@/pages/Privacy";
 import { Profile } from "@/pages/Profile";
@@ -46,9 +48,10 @@ const App = () => {
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/imprint" element={<Imprint />} />
+          <Route path="/invite/:userId" element={<Invite />} />
           <Route path="/auth/login" element={<Login />} />
           <Route path="/auth/register" element={<Register />} />
-          <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+          <Route path="/auth/reset-password" element={<ResetPassword />} />
           <Route path="/auth/two-factor" element={<TwoFactor />} />
           <Route path="/auth/email-verification" element={<EmailVerification />} />
           <Route path="*" element={<Landing />} />
@@ -59,35 +62,36 @@ const App = () => {
 
   return (
     <TooltipProvider>
-        <SidebarProvider>
-          <div className="min-h-screen flex w-full">
-            <AppSidebar />
-            <main className="flex-1 p-3 md:p-6 bg-background pb-20 md:pb-6">
-              <div className="mb-4">
-                <SidebarTrigger className="lg:hidden" />
-              </div>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
+      <SidebarProvider>
+        <InviteLinkHandler />
+        <div className="min-h-screen flex w-full">
+          <AppSidebar />
+          <main className="flex-1 p-3 md:p-6 bg-background pb-20 md:pb-6">
+            <div className="mb-4">
+              <SidebarTrigger className="lg:hidden" />
+            </div>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
               <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/scoreboard" element={<Scoreboard />} />
-                <Route path="/training" element={<Training />} />
-                <Route path="/stats" element={<Stats />} />
-                <Route path="/profile" element={<Profile />} />
+              <Route path="/scoreboard" element={<Scoreboard />} />
+              <Route path="/training" element={<Training />} />
+              <Route path="/stats" element={<Stats />} />
+              <Route path="/profile" element={<Profile />} />
               <Route path="/friends" element={<Friends />} />
-                <Route path="/admin" element={<Admin />} />
-                <Route path="/admin/users" element={<Admin />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/privacy" element={<Privacy />} />
-                <Route path="/terms" element={<Terms />} />
-                <Route path="/imprint" element={<Imprint />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </main>
-            <MobileBottomNav />
-          </div>
-        </SidebarProvider>
+              <Route path="/invite/:userId" element={<Invite />} />
+              <Route path="/admin" element={<Admin />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/imprint" element={<Imprint />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </main>
+          <MobileBottomNav />
+        </div>
+      </SidebarProvider>
     </TooltipProvider>
-);
+  );
 };
 
 export default App;

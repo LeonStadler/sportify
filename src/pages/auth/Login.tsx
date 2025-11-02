@@ -1,6 +1,6 @@
 import { ArrowLeft, Globe, Palette, Settings, Trophy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { LoginForm } from '@/components/auth/LoginForm';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
@@ -17,6 +17,8 @@ import {
 
 export default function Login() {
   const { t } = useTranslation();
+  const [searchParams] = useSearchParams();
+  const redirectTo = searchParams.get('redirect') || '/dashboard';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex flex-col">
@@ -100,7 +102,7 @@ export default function Login() {
             </p>
           </div>
 
-          <LoginForm />
+          <LoginForm redirectTo={redirectTo} />
         </div>
       </div>
 

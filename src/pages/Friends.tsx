@@ -1,6 +1,6 @@
+import { InviteFriendForm } from '@/components/InviteFriendForm';
 import { PageTemplate } from '@/components/PageTemplate';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDebounce } from '@/hooks/use-debounce';
 import { API_URL } from '@/lib/api';
+import { parseAvatarConfig } from '@/lib/avatar';
 import {
   Check,
   Search,
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import NiceAvatar from 'react-nice-avatar';
 import { toast } from 'sonner';
 
 // Type definitions based on API responses
@@ -231,10 +233,16 @@ function FriendsList() {
               <div key={friend.id} className="flex items-center justify-between p-3 md:p-0">
                 <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
                   <Avatar className="w-10 h-10 md:w-12 md:h-12">
-                    <AvatarImage src={friend.avatarUrl} alt={friend.displayName} />
-                    <AvatarFallback className="text-xs md:text-sm">
-                      {getInitials(friend.firstName, friend.lastName)}
-                    </AvatarFallback>
+                    {friend.avatarUrl && parseAvatarConfig(friend.avatarUrl) ? (
+                      <NiceAvatar
+                        style={{ width: friend.avatarUrl ? '48px' : '40px', height: friend.avatarUrl ? '48px' : '40px' }}
+                        {...parseAvatarConfig(friend.avatarUrl)!}
+                      />
+                    ) : (
+                      <AvatarFallback className="text-xs md:text-sm">
+                        {getInitials(friend.firstName, friend.lastName)}
+                      </AvatarFallback>
+                    )}
                   </Avatar>
                   <p className="font-semibold text-sm md:text-base truncate">{friend.displayName}</p>
                 </div>
@@ -354,6 +362,45 @@ function FriendRequestsList({ onFriendAccepted }: { onFriendAccepted?: () => voi
     });
   };
 
+  const handleCancelRequest = async (requestId: string, userName: string) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      toast.error('Nicht angemeldet.');
+      return;
+    }
+
+    const promise = fetch(`${API_URL}/friends/requests/${requestId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    }).then(async (response) => {
+      if (!response.ok) {
+        const contentType = response.headers.get('content-type');
+        let errorMessage = 'Fehler beim Zurückziehen der Anfrage.';
+
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            const error = await response.json();
+            errorMessage = error.error || error.message || errorMessage;
+          } catch (parseError) {
+            // If JSON parsing fails, use default message
+          }
+        }
+
+        throw new Error(errorMessage);
+      }
+      return response;
+    });
+
+    toast.promise(promise, {
+      loading: 'Ziehe Anfrage zurück...',
+      success: () => {
+        fetchRequests();
+        return `Anfrage an ${userName} wurde zurückgezogen.`;
+      },
+      error: (error) => error instanceof Error ? error.message : 'Fehler beim Zurückziehen der Anfrage.'
+    });
+  };
+
   if (loading) {
     return <Card><CardContent className="p-4 md:p-6"><Skeleton className="h-24 w-full" /></CardContent></Card>;
   }
@@ -373,10 +420,16 @@ function FriendRequestsList({ onFriendAccepted }: { onFriendAccepted?: () => voi
                 <div key={req.requestId} className="flex items-center justify-between p-3 md:p-0">
                   <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
                     <Avatar className="w-10 h-10 md:w-12 md:h-12">
-                      <AvatarImage src={req.user.avatarUrl} alt={req.user.displayName} />
-                      <AvatarFallback className="text-xs md:text-sm">
-                        {getInitials(req.user.firstName, req.user.lastName)}
-                      </AvatarFallback>
+                      {req.user.avatarUrl && parseAvatarConfig(req.user.avatarUrl) ? (
+                        <NiceAvatar
+                          style={{ width: '48px', height: '48px' }}
+                          {...parseAvatarConfig(req.user.avatarUrl)!}
+                        />
+                      ) : (
+                        <AvatarFallback className="text-xs md:text-sm">
+                          {getInitials(req.user.firstName, req.user.lastName)}
+                        </AvatarFallback>
+                      )}
                     </Avatar>
                     <p className="font-semibold text-sm md:text-base truncate">{req.user.displayName}</p>
                   </div>
@@ -420,14 +473,29 @@ function FriendRequestsList({ onFriendAccepted }: { onFriendAccepted?: () => voi
                 <div key={req.requestId} className="flex items-center justify-between p-3 md:p-0">
                   <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
                     <Avatar className="w-10 h-10 md:w-12 md:h-12">
-                      <AvatarImage src={req.user.avatarUrl} alt={req.user.displayName} />
-                      <AvatarFallback className="text-xs md:text-sm">
-                        {getInitials(req.user.firstName, req.user.lastName)}
-                      </AvatarFallback>
+                      {req.user.avatarUrl && parseAvatarConfig(req.user.avatarUrl) ? (
+                        <NiceAvatar
+                          style={{ width: '48px', height: '48px' }}
+                          {...parseAvatarConfig(req.user.avatarUrl)!}
+                        />
+                      ) : (
+                        <AvatarFallback className="text-xs md:text-sm">
+                          {getInitials(req.user.firstName, req.user.lastName)}
+                        </AvatarFallback>
+                      )}
                     </Avatar>
                     <p className="font-semibold text-sm md:text-base truncate">{req.user.displayName}</p>
                   </div>
-                  <Badge variant="secondary" className="flex-shrink-0 text-xs">Ausstehend</Badge>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleCancelRequest(req.requestId, req.user.displayName)}
+                    className="text-destructive hover:text-destructive-foreground hover:bg-destructive flex-shrink-0 text-xs md:text-sm"
+                  >
+                    <X className="w-3 h-3 md:w-4 md:h-4 mr-1" />
+                    <span className="hidden sm:inline">Zurückziehen</span>
+                    <span className="sm:hidden">×</span>
+                  </Button>
                 </div>
               ))}
             </div>
@@ -576,7 +644,16 @@ function UserSearch() {
         {loading && <Skeleton className="h-20 w-full" />}
 
         {!loading && debouncedQuery.length > 1 && results.length === 0 && (
-          <p className="text-muted-foreground text-center py-4 text-sm md:text-base">Keine Benutzer gefunden.</p>
+          <div className="space-y-4">
+            <p className="text-muted-foreground text-center py-2 text-sm md:text-base">Keine Benutzer gefunden.</p>
+            <div className="border rounded-lg p-4 bg-muted/50">
+              <h4 className="text-sm font-semibold mb-2">Person einladen</h4>
+              <p className="text-xs text-muted-foreground mb-3">
+                Die Person wurde nicht gefunden. Lade sie ein, Sportify zu nutzen.
+              </p>
+              <InviteFriendForm />
+            </div>
+          </div>
         )}
 
         <div className="space-y-3 md:space-y-4">
@@ -584,10 +661,16 @@ function UserSearch() {
             <div key={user.id} className="flex items-center justify-between p-3 md:p-0">
               <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
                 <Avatar className="w-10 h-10 md:w-12 md:h-12">
-                  <AvatarImage src={user.avatarUrl} alt={user.displayName} />
-                  <AvatarFallback className="text-xs md:text-sm">
-                    {getInitials(user.firstName, user.lastName)}
-                  </AvatarFallback>
+                  {user.avatarUrl && parseAvatarConfig(user.avatarUrl) ? (
+                    <NiceAvatar
+                      style={{ width: '48px', height: '48px' }}
+                      {...parseAvatarConfig(user.avatarUrl)!}
+                    />
+                  ) : (
+                    <AvatarFallback className="text-xs md:text-sm">
+                      {getInitials(user.firstName, user.lastName)}
+                    </AvatarFallback>
+                  )}
                 </Avatar>
                 <p className="font-semibold text-sm md:text-base truncate">{user.displayName}</p>
               </div>

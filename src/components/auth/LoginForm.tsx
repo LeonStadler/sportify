@@ -8,7 +8,7 @@ import { z } from 'zod';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
@@ -71,9 +71,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
         <CardTitle className="text-2xl font-bold text-center">
           {t('auth.login')}
         </CardTitle>
-        <CardDescription className="text-center">
-          {t('auth.login')}
-        </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -146,7 +143,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
 
           <div className="flex items-center justify-between">
             <Link
-              to="/auth/forgot-password"
+              to="/auth/reset-password"
               className="text-sm text-primary hover:underline"
             >
               {t('auth.forgotPassword')}

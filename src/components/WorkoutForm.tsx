@@ -12,9 +12,10 @@ import { API_URL } from '@/lib/api';
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { de } from "date-fns/locale";
+import { de, enUS } from "date-fns/locale";
 import { CalendarIcon, Clock, Plus, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import type { Workout } from '@/types/workout';
 
 interface WorkoutSet {
@@ -38,78 +39,81 @@ interface WorkoutFormProps {
   onCancelEdit?: () => void;
 }
 
-// Aktivitätstypen mit fixen Einheiten und verschiedenen Größenordnungen
-const exerciseTypes = [
-  { 
-    id: "pullups", 
-    name: "Klimmzüge", 
-    hasWeight: false, 
-    hasSetMode: true,
-    unitOptions: [
-      { value: "Wiederholungen", label: "Wiederholungen", multiplier: 1 }
-    ]
-  },
-  { 
-    id: "pushups", 
-    name: "Liegestütze", 
-    hasWeight: false, 
-    hasSetMode: true,
-    unitOptions: [
-      { value: "Wiederholungen", label: "Wiederholungen", multiplier: 1 }
-    ]
-  },
-  { 
-    id: "situps", 
-    name: "Sit-ups", 
-    hasWeight: false, 
-    hasSetMode: true,
-    unitOptions: [
-      { value: "Wiederholungen", label: "Wiederholungen", multiplier: 1 }
-    ]
-  },
-  { 
-    id: "running", 
-    name: "Laufen", 
-    hasWeight: false, 
-    hasSetMode: false,
-    unitOptions: [
-      { value: "km", label: "Kilometer", multiplier: 1 },
-      { value: "m", label: "Meter", multiplier: 0.001 },
-      { value: "Meilen", label: "Meilen", multiplier: 1.609 }
-    ]
-  },
-  { 
-    id: "cycling", 
-    name: "Radfahren", 
-    hasWeight: false, 
-    hasSetMode: false,
-    unitOptions: [
-      { value: "km", label: "Kilometer", multiplier: 1 },
-      { value: "m", label: "Meter", multiplier: 0.001 },
-      { value: "Meilen", label: "Meilen", multiplier: 1.609 }
-    ]
-  },
-  { 
-    id: "other", 
-    name: "Sonstiges", 
-    hasWeight: false, 
-    hasSetMode: true,
-    unitOptions: [
-      { value: "Einheiten", label: "Einheiten", multiplier: 1 }
-    ]
-  }
-];
-
 export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCancelEdit }: WorkoutFormProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t, i18n } = useTranslation();
+  
+  const locale = useMemo(() => (i18n.language === 'en' ? enUS : de), [i18n.language]);
+
+  // Aktivitätstypen mit fixen Einheiten und verschiedenen Größenordnungen
+  const exerciseTypes = useMemo(() => [
+    { 
+      id: "pullups", 
+      name: t('training.pullups'), 
+      hasWeight: false, 
+      hasSetMode: true,
+      unitOptions: [
+        { value: "Wiederholungen", label: t('training.form.units.repetitions'), multiplier: 1 }
+      ]
+    },
+    { 
+      id: "pushups", 
+      name: t('training.pushups'), 
+      hasWeight: false, 
+      hasSetMode: true,
+      unitOptions: [
+        { value: "Wiederholungen", label: t('training.form.units.repetitions'), multiplier: 1 }
+      ]
+    },
+    { 
+      id: "situps", 
+      name: t('training.situps'), 
+      hasWeight: false, 
+      hasSetMode: true,
+      unitOptions: [
+        { value: "Wiederholungen", label: t('training.form.units.repetitions'), multiplier: 1 }
+      ]
+    },
+    { 
+      id: "running", 
+      name: t('training.running'), 
+      hasWeight: false, 
+      hasSetMode: false,
+      unitOptions: [
+        { value: "km", label: t('training.form.units.kilometers'), multiplier: 1 },
+        { value: "m", label: t('training.form.units.meters'), multiplier: 0.001 },
+        { value: "Meilen", label: t('training.form.units.miles'), multiplier: 1.609 }
+      ]
+    },
+    { 
+      id: "cycling", 
+      name: t('training.cycling'), 
+      hasWeight: false, 
+      hasSetMode: false,
+      unitOptions: [
+        { value: "km", label: t('training.form.units.kilometers'), multiplier: 1 },
+        { value: "m", label: t('training.form.units.meters'), multiplier: 0.001 },
+        { value: "Meilen", label: t('training.form.units.miles'), multiplier: 1.609 }
+      ]
+    },
+    { 
+      id: "other", 
+      name: t('training.other'), 
+      hasWeight: false, 
+      hasSetMode: true,
+      unitOptions: [
+        { value: "Einheiten", label: t('training.form.units.units'), multiplier: 1 }
+      ]
+    }
+  ], [t]);
 
   // Automatischer Default-Titel basierend auf Tageszeit
   const getDefaultTitle = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return "Morgen-Training";
-    if (hour < 17) return "Mittags-Training";
-    return "Abend-Training";
+    if (hour < 12) return t('training.form.defaultTitles.morning');
+    if (hour < 17) return t('training.form.defaultTitles.afternoon');
+    return t('training.form.defaultTitles.evening');
   };
 
   // Benutzereinstellungen für Distanzeinheiten
@@ -123,10 +127,12 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
   const [workoutDate, setWorkoutDate] = useState<Date>(new Date());
   const [workoutTime, setWorkoutTime] = useState(format(new Date(), "HH:mm"));
   const [duration, setDuration] = useState<string>(""); // in Minuten, optional
+  const getDefaultUnit = () => t('training.form.units.repetitions');
+  
   const [activities, setActivities] = useState<WorkoutActivity[]>([{
     activityType: "",
     totalAmount: 0,
-    unit: "Wiederholungen",
+    unit: getDefaultUnit(),
     useSetMode: false,
     sets: [{ reps: 0 }],
     notes: ""
@@ -161,7 +167,7 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
     setActivities([...activities, {
       activityType: "",
       totalAmount: 0,
-      unit: "Wiederholungen",
+      unit: getDefaultUnit(),
       useSetMode: false,
       sets: [{ reps: 0 }],
       notes: ""
@@ -249,8 +255,8 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
     
     if (!user) {
       toast({
-        title: "Fehler",
-        description: "Du musst angemeldet sein, um ein Workout zu erstellen.",
+        title: t('common.error'),
+        description: t('training.form.mustBeLoggedIn'),
         variant: "destructive",
       });
       return;
@@ -258,22 +264,31 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
 
     if (!title.trim()) {
       toast({
-        title: "Fehler", 
-        description: "Bitte gib einen Titel für dein Workout ein.",
+        title: t('common.error'), 
+        description: t('training.form.titleRequired'),
         variant: "destructive",
       });
       return;
     }
 
     // Validiere Aktivitäten
-    const validActivities = activities.filter(activity => 
-      activity.activityType && activity.totalAmount > 0
-    );
+    const validActivities = activities.filter(activity => {
+      if (!activity.activityType) return false;
+      
+      // Wenn Sets-Modus aktiviert ist, prüfe ob es gültige Sets gibt
+      if (activity.useSetMode && activity.sets && activity.sets.length > 0) {
+        const validSets = activity.sets.filter(set => set && (set.reps || 0) > 0);
+        return validSets.length > 0;
+      }
+      
+      // Ansonsten prüfe die Gesamtmenge
+      return activity.totalAmount > 0;
+    });
 
     if (validActivities.length === 0) {
       toast({
-        title: "Fehler",
-        description: "Bitte füge mindestens eine gültige Aktivität hinzu.",
+        title: t('common.error'),
+        description: t('training.form.activityRequired'),
         variant: "destructive",
       });
       return;
@@ -290,14 +305,25 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
       workoutDateTime.setHours(hours, minutes, 0, 0);
 
       // Backend-Format: activities mit quantity statt amount
-      const backendActivities = validActivities.map(activity => ({
-        activityType: activity.activityType,
-        quantity: activity.totalAmount, // Backend erwartet 'quantity'
-        amount: activity.totalAmount, // Für Kompatibilität auch amount senden
-        notes: activity.notes || null,
-        sets: activity.useSetMode && activity.sets.length > 0 ? activity.sets : null,
-        unit: activity.unit
-      }));
+      const backendActivities = validActivities.map(activity => {
+        // Filtere ungültige Sets heraus (reps <= 0)
+        let setsToSend = null;
+        if (activity.useSetMode && activity.sets && activity.sets.length > 0) {
+          const validSets = activity.sets.filter(set => set && (set.reps || 0) > 0);
+          if (validSets.length > 0) {
+            setsToSend = validSets;
+          }
+        }
+
+        return {
+          activityType: activity.activityType,
+          quantity: activity.totalAmount, // Backend erwartet 'quantity'
+          amount: activity.totalAmount, // Für Kompatibilität auch amount senden
+          notes: activity.notes || null,
+          sets: setsToSend,
+          unit: activity.unit
+        };
+      });
 
       console.log('Sending workout data:', {
         title: title.trim(),
@@ -326,17 +352,32 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Backend error:', errorData);
-        throw new Error(errorData.error || 'Fehler beim Erstellen des Workouts');
+        let errorMessage = t('training.form.saveError');
+        let errorDetails = '';
+        try {
+          const errorData = await response.json();
+          console.error('Backend error:', errorData);
+          errorMessage = errorData.error || errorMessage;
+          if (errorData.details) {
+            errorDetails = errorData.details;
+          }
+          if (errorData.code) {
+            errorDetails += errorDetails ? ` (Code: ${errorData.code})` : `Code: ${errorData.code}`;
+          }
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+          errorMessage = `Server-Fehler (${response.status}): ${response.statusText}`;
+        }
+        const fullErrorMessage = errorDetails ? `${errorMessage}: ${errorDetails}` : errorMessage;
+        throw new Error(fullErrorMessage);
       }
 
       const savedWorkout = await response.json();
       console.log('Workout saved successfully:', savedWorkout);
 
       toast({
-        title: workout ? 'Workout aktualisiert! 🎉' : 'Workout erstellt! 🎉',
-        description: `${savedWorkout.title} wurde erfolgreich gespeichert.`,
+        title: workout ? t('training.form.workoutUpdated') : t('training.form.workoutCreated'),
+        description: `${savedWorkout.title} ${t('training.form.workoutSavedSuccess')}`,
       });
 
       // Form zurücksetzen
@@ -349,7 +390,7 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
         {
           activityType: "",
           totalAmount: 0,
-          unit: "Wiederholungen",
+          unit: getDefaultUnit(),
           useSetMode: false,
           sets: [{ reps: 0 }],
           notes: "",
@@ -365,8 +406,8 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
     } catch (error) {
       console.error('Save workout error:', error);
       toast({
-        title: "Fehler",
-        description: error instanceof Error ? error.message : "Fehler beim Speichern des Workouts.",
+        title: t('common.error'),
+        description: error instanceof Error ? error.message : t('training.form.saveError'),
         variant: "destructive",
       });
     } finally {
@@ -378,7 +419,7 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
     <Card>
       <CardHeader className="pb-4">
         <CardTitle className="text-lg md:text-xl">
-          {workout ? 'Workout bearbeiten' : 'Neues Workout eintragen'}
+          {workout ? t('training.form.editWorkout') : t('training.form.newWorkout')}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -386,7 +427,7 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
           {/* Workout-Grunddaten */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="title" className="text-sm font-medium">Workout-Titel</Label>
+              <Label htmlFor="title" className="text-sm font-medium">{t('training.form.workoutTitle')}</Label>
               <Input
                 id="title"
                 value={title}
@@ -396,13 +437,13 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
               />
             </div>
             <div>
-              <Label htmlFor="duration" className="text-sm font-medium">Dauer (Min., optional)</Label>
+              <Label htmlFor="duration" className="text-sm font-medium">{t('training.form.duration')}</Label>
               <Input
                 id="duration"
                 type="number"
                 value={duration}
                 onChange={(e) => setDuration(e.target.value)}
-                placeholder="z.B. 60"
+                placeholder={t('training.form.durationPlaceholder')}
                 min="1"
                 className="mt-1"
               />
@@ -412,7 +453,7 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
           {/* Datum und Uhrzeit */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="date" className="text-sm font-medium">Datum *</Label>
+              <Label htmlFor="date" className="text-sm font-medium">{t('training.form.dateRequired')}</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -423,7 +464,7 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {workoutDate ? format(workoutDate, "PPP", { locale: de }) : "Wähle ein Datum"}
+                    {workoutDate ? format(workoutDate, "PPP", { locale }) : t('training.form.selectDate')}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
@@ -432,12 +473,13 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
                     selected={workoutDate}
                     onSelect={(date) => date && setWorkoutDate(date)}
                     initialFocus
+                    locale={locale}
                   />
                 </PopoverContent>
               </Popover>
             </div>
             <div>
-              <Label htmlFor="time" className="text-sm font-medium">Uhrzeit *</Label>
+              <Label htmlFor="time" className="text-sm font-medium">{t('training.form.timeRequired')}</Label>
               <div className="relative mt-1">
                 <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -452,12 +494,12 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
           </div>
 
           <div>
-            <Label htmlFor="description" className="text-sm font-medium">Beschreibung (optional)</Label>
+            <Label htmlFor="description" className="text-sm font-medium">{t('training.form.description')}</Label>
             <Textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Zusätzliche Notizen zu deinem Workout..."
+              placeholder={t('training.form.descriptionPlaceholder')}
               rows={2}
               className="w-full mt-1"
             />
@@ -465,7 +507,7 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
 
           {/* Aktivitäten */}
           <div>
-            <Label className="text-sm font-medium">Aktivitäten *</Label>
+            <Label className="text-sm font-medium">{t('training.form.activitiesRequired')}</Label>
             <div className="space-y-4 mt-2">
               {activities.map((activity, index) => {
                 const exercise = exerciseTypes.find(ex => ex.id === activity.activityType);
@@ -473,7 +515,7 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
                 return (
                   <div key={index} className="p-3 md:p-4 border rounded-lg space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Aktivität {index + 1}</span>
+                      <span className="text-sm font-medium">{t('training.form.activity')} {index + 1}</span>
                       {activities.length > 1 && (
                         <Button
                           type="button"
@@ -490,13 +532,13 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
                     {/* Aktivitätstyp und Einheit */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <Label className="text-xs md:text-sm">Übung</Label>
+                        <Label className="text-xs md:text-sm">{t('training.form.exercise')}</Label>
                         <Select 
                           value={activity.activityType} 
                           onValueChange={(value) => updateActivity(index, 'activityType', value)}
                         >
                           <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Wähle eine Übung" />
+                <SelectValue placeholder={t('training.form.selectExercise')} />
               </SelectTrigger>
               <SelectContent>
                             {exerciseTypes.map((ex) => (
@@ -510,7 +552,7 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
 
                       {exercise && (
           <div>
-                          <Label className="text-xs md:text-sm">Einheit</Label>
+                          <Label className="text-xs md:text-sm">{t('training.form.unit')}</Label>
                           <Select 
                             value={activity.unit} 
                             onValueChange={(value) => updateActivity(index, 'unit', value)}
@@ -539,7 +581,7 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
                           onCheckedChange={(checked) => updateActivity(index, 'useSetMode', checked)}
                         />
                         <Label htmlFor={`setMode-${index}`} className="text-sm">
-                          Sets & Wiederholungen verwenden
+                          {t('training.form.useSetsReps')}
                         </Label>
                       </div>
                     )}
@@ -548,14 +590,14 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
                     {activity.useSetMode && exercise ? (
                       // Sets & Reps Modus
                       <div className="space-y-3">
-                        <Label className="text-sm font-medium">Sets</Label>
+                        <Label className="text-sm font-medium">{t('training.form.sets')}</Label>
                         {activity.sets.map((set, setIndex) => (
                           <div key={setIndex} className="flex gap-2 items-center">
-                            <span className="text-sm w-12">Set {setIndex + 1}:</span>
+                            <span className="text-sm w-12">{t('training.form.set')} {setIndex + 1}:</span>
                             <div className="flex gap-2 flex-1">
                               <Input
                                 type="number"
-                                placeholder="Wdh."
+                                placeholder={t('training.form.reps')}
                                 value={set.reps || ""}
                                 onChange={(e) => updateSet(index, setIndex, 'reps', parseInt(e.target.value) || 0)}
                                 className="flex-1"
@@ -594,16 +636,16 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
                           className="w-full"
                         >
                           <Plus className="w-4 h-4 mr-2" />
-                          Set hinzufügen
+                          {t('training.form.addSet')}
                         </Button>
                         <div className="text-sm text-muted-foreground">
-                          Gesamt: {activity.totalAmount} {activity.unit}
+                          {t('training.form.total')}: {activity.totalAmount} {activity.unit}
                         </div>
                       </div>
                     ) : (
                       // Gesamtmenge Modus
                       <div>
-                        <Label className="text-xs md:text-sm">Gesamtmenge</Label>
+                        <Label className="text-xs md:text-sm">{t('training.form.totalAmount')}</Label>
                         <Input
                           type="number"
                           min="0"
@@ -627,7 +669,7 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
               className="w-full mt-3 text-sm"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Weitere Aktivität hinzufügen
+              {t('training.form.addActivity')}
             </Button>
           </div>
 
@@ -636,7 +678,7 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
             className="w-full bg-orange-500 hover:bg-orange-600 text-sm md:text-base"
             disabled={isSubmitting}
           >
-            {isSubmitting ? "Speichere..." : "Workout speichern"}
+            {isSubmitting ? t('training.form.saving') : t('training.form.save')}
           </Button>
           {workout && (
             <Button
@@ -645,7 +687,7 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
               onClick={onCancelEdit}
               className="w-full mt-2 text-sm"
             >
-              Abbrechen
+              {t('training.form.cancel')}
             </Button>
           )}
         </form>

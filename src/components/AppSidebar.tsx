@@ -116,67 +116,69 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
 
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-muted-foreground text-xs uppercase tracking-wider px-6 py-3">
-            Navigation
-          </SidebarGroupLabel>
-          <SidebarGroupContent className="px-3">
-            <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    className={`
-                      hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200
-                      ${location.pathname === item.url ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''}
-                    `}
-                  >
-                    <Link to={item.url} className="flex items-center gap-3 px-3 py-2">
-                      <item.icon size={20} />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+      <SidebarContent className="flex flex-col">
+        <div className="flex-1">
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-muted-foreground text-xs uppercase tracking-wider px-6 py-3">
+              Navigation
+            </SidebarGroupLabel>
+            <SidebarGroupContent className="px-3">
+              <SidebarMenu>
+                {menuItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      className={`
+                        hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200
+                        ${location.pathname === item.url ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''}
+                      `}
+                    >
+                      <Link to={item.url} className="flex items-center gap-3 px-3 py-2">
+                        <item.icon size={20} />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
 
-        {isAdmin && (
-          <>
-            <SidebarSeparator className="mx-6 my-2" />
-            <SidebarGroup>
-              <SidebarGroupLabel className="text-muted-foreground text-xs uppercase tracking-wider px-6 py-3">
-                <Shield size={14} className="inline mr-2" />
-                Administration
-              </SidebarGroupLabel>
-              <SidebarGroupContent className="px-3">
-                <SidebarMenu>
-                  {adminItems.map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton
-                        asChild
-                        className={`
-                          hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200
-                          ${location.pathname === item.url ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''}
-                        `}
-                      >
-                        <Link to={item.url} className="flex items-center gap-3 px-3 py-2">
-                          <item.icon size={20} />
-                          <span>{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </>
-        )}
+          {isAdmin && (
+            <>
+              <SidebarSeparator className="mx-6 my-2" />
+              <SidebarGroup>
+                <SidebarGroupLabel className="text-muted-foreground text-xs uppercase tracking-wider px-6 py-3">
+                  <Shield size={14} className="inline mr-2" />
+                  Administration
+                </SidebarGroupLabel>
+                <SidebarGroupContent className="px-3">
+                  <SidebarMenu>
+                    {adminItems.map((item) => (
+                      <SidebarMenuItem key={item.title}>
+                        <SidebarMenuButton
+                          asChild
+                          className={`
+                            hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200
+                            ${location.pathname === item.url ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''}
+                          `}
+                        >
+                          <Link to={item.url} className="flex items-center gap-3 px-3 py-2">
+                            <item.icon size={20} />
+                            <span>{item.title}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            </>
+          )}
+        </div>
 
         <SidebarSeparator className="mx-6 my-2" />
-        <SidebarGroup>
+        <SidebarGroup className="mt-auto">
           <SidebarGroupLabel className="text-muted-foreground text-xs uppercase tracking-wider px-6 py-3">
             Einstellungen
           </SidebarGroupLabel>
@@ -230,20 +232,20 @@ export function AppSidebar() {
               </div>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56 mb-2" side="top" align="start">
-              <DropdownMenuLabel>Mein Account</DropdownMenuLabel>
+              <DropdownMenuLabel>{t('navigation.profile', 'Mein Account')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => navigate('/profile')}>
                 <User className="w-4 h-4 mr-2" />
-                <span>Profil</span>
+                <span>{t('navigation.profile', 'Profil')}</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate('/settings')}>
+              <DropdownMenuItem onClick={() => navigate('/profile?tab=preferences')}>
                 <Settings className="w-4 h-4 mr-2" />
-                <span>Einstellungen</span>
+                <span>{t('navigation.settings', 'Einstellungen')}</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="w-4 h-4 mr-2" />
-                <span>Abmelden</span>
+                <span>{t('navigation.logout', 'Abmelden')}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

@@ -172,11 +172,11 @@ export const createProfileRouter = (pool) => {
 
             // Sende E-Mail mit Einladungslink
             try {
-                await queueEmail(pool, {
-                    recipient: email,
-                    subject: 'Sportify – Einladung',
-                    body: `Hallo!\n\nDu wurdest zu Sportify eingeladen.\n\nKlicke auf folgenden Link, um dich zu registrieren:\n${inviteLink}\n\nOder verwende diesen Code bei der Registrierung: ${token}\n\nDie Einladung läuft am ${new Date(invitation.expires_at).toLocaleDateString('de-DE')} ab.`,
-                });
+            await queueEmail(pool, {
+                recipient: email,
+                subject: 'Sportify – Einladung',
+                body: `Hallo!\n\nDu wurdest zu Sportify eingeladen.\n\nKlicke auf folgenden Link, um dich zu registrieren:\n${inviteLink}\n\nOder verwende diesen Code bei der Registrierung: ${token}\n\nDie Einladung läuft am ${new Date(invitation.expires_at).toLocaleDateString('de-DE')} ab.`,
+            });
                 console.log(`✅ Einladungs-E-Mail erfolgreich versendet an: ${email}`);
             } catch (emailError) {
                 console.error(`❌ Fehler beim Versenden der Einladungs-E-Mail an ${email}:`, emailError);

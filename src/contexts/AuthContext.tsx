@@ -218,7 +218,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Fehler beim Zurücksetzen des Passworts');
+        const error = new Error(data.error || 'Fehler beim Zurücksetzen des Passworts');
+        (error as any).status = response.status;
+        (error as any).retryAfter = data.retryAfter;
+        throw error;
       }
 
       setState(prev => ({ ...prev, isLoading: false }));
@@ -519,8 +522,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.';
-      setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));
-      throw error;
+      setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));      throw error;
     }
   };
 

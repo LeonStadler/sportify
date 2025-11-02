@@ -63,15 +63,32 @@ export const createWorkoutsRouter = (pool) => {
             const { rows: countRows } = await pool.query(countQuery, countParams);
 
             const workouts = rows.map(row => {
-                const activities = Array.isArray(row.activities) ? row.activities.map(a => ({
-                    id: a.id,
-                    activityType: a.activityType,
-                    amount: a.quantity,
-                    points: a.points,
-                    notes: a.notes,
-                    unit: a.unit,
-                    sets: a.setsData ? JSON.parse(a.setsData) : null
-                })).filter(a => a.id !== null) : [];
+                const activities = Array.isArray(row.activities) ? row.activities.map(a => {
+                    let sets = null;
+                    if (a.setsData) {
+                        // JSONB wird von PostgreSQL manchmal als Objekt zurückgegeben, manchmal als String
+                        if (typeof a.setsData === 'string') {
+                            try {
+                                sets = JSON.parse(a.setsData);
+                            } catch (parseError) {
+                                console.error('Error parsing setsData:', parseError);
+                                sets = null;
+                            }
+                        } else {
+                            // Bereits ein Objekt
+                            sets = a.setsData;
+                        }
+                    }
+                    return {
+                        id: a.id,
+                        activityType: a.activityType,
+                        amount: a.quantity,
+                        points: a.points,
+                        notes: a.notes,
+                        unit: a.unit,
+                        sets
+                    };
+                }).filter(a => a.id !== null) : [];
 
                 const workout = toCamelCase(row);
 
@@ -118,6 +135,18 @@ export const createWorkoutsRouter = (pool) => {
     router.post('/', authMiddleware, async (req, res) => {
         try {
             const { title, description, activities, workoutDate, duration } = req.body;
+            
+            console.log('Received workout data:', {
+                title,
+                activitiesCount: activities?.length,
+                activities: activities?.map(a => ({
+                    activityType: a.activityType,
+                    quantity: a.quantity,
+                    amount: a.amount,
+                    hasSets: !!a.sets,
+                    setsCount: a.sets?.length
+                }))
+            });
 
             if (!title || !title.trim()) {
                 return res.status(400).json({ error: 'Workout-Titel ist erforderlich.' });
@@ -145,8 +174,18 @@ export const createWorkoutsRouter = (pool) => {
                 if (!activity.activityType || !validActivityTypes.includes(activity.activityType)) {
                     return res.status(400).json({ error: `Ungültiger Aktivitätstyp: ${activity.activityType}` });
                 }
-                // Check both 'quantity' (new) and 'amount' (legacy) fields
-                const activityAmount = activity.quantity || activity.amount;
+                
+                // Berechne Gesamtmenge: Wenn Sets vorhanden sind, summiere alle Reps
+                let activityAmount = activity.quantity || activity.amount;
+                if (activity.sets && Array.isArray(activity.sets) && activity.sets.length > 0) {
+                    const totalFromSets = activity.sets.reduce((sum, set) => sum + (set.reps || 0), 0);
+                    // Verwende die berechnete Summe aus Sets, falls sie größer ist
+                    if (totalFromSets > 0) {
+                        activityAmount = totalFromSets;
+                    }
+                }
+                
+                // Check both 'quantity' (new) and 'amount' (legacy) fields, berücksichtige auch Sets
                 if (!activityAmount || activityAmount <= 0) {
                     return res.status(400).json({ error: 'Aktivitätsmenge muss größer als 0 sein.' });
                 }
@@ -219,13 +258,22 @@ export const createWorkoutsRouter = (pool) => {
                 const checkSetsColumnQuery = `
                     SELECT column_name 
                     FROM information_schema.columns 
-                    WHERE table_name = 'workout_activities' AND column_name = 'sets_data';
+                    WHERE table_name = 'workout_activities' AND column_name IN ('sets_data', 'unit');
                 `;
                 const { rows: setsColumnRows } = await client.query(checkSetsColumnQuery);
 
-                if (setsColumnRows.length === 0) {
+                const hasSetsData = setsColumnRows.some(row => row.column_name === 'sets_data');
+                const hasUnit = setsColumnRows.some(row => row.column_name === 'unit');
+
+                if (!hasSetsData) {
                     // Add sets_data column if it doesn't exist
+                    console.log('Adding sets_data column to workout_activities');
                     await client.query('ALTER TABLE workout_activities ADD COLUMN sets_data JSONB;');
+                }
+                
+                if (!hasUnit) {
+                    // Add unit column if it doesn't exist
+                    console.log('Adding unit column to workout_activities');
                     await client.query('ALTER TABLE workout_activities ADD COLUMN unit VARCHAR(20);');
                 }
 
@@ -236,11 +284,18 @@ export const createWorkoutsRouter = (pool) => {
 
                     // Berechne Gesamtmenge: Wenn Sets vorhanden sind, summiere alle Reps
                     let activityAmount = activity.quantity || activity.amount;
+                    let setsToStore = null;
+                    
                     if (activity.sets && Array.isArray(activity.sets) && activity.sets.length > 0) {
-                        const totalFromSets = activity.sets.reduce((sum, set) => sum + (set.reps || 0), 0);
+                        // Filtere Sets heraus, die keine Reps haben (reps <= 0)
+                        const validSets = activity.sets.filter(set => set && (set.reps || 0) > 0);
+                        const totalFromSets = validSets.reduce((sum, set) => sum + (set.reps || 0), 0);
+                        
                         // Verwende die berechnete Summe aus Sets, falls sie größer ist
                         if (totalFromSets > 0) {
                             activityAmount = totalFromSets;
+                            // Speichere nur gültige Sets (mit reps > 0)
+                            setsToStore = validSets.length > 0 ? validSets : null;
                         }
                     }
 
@@ -251,26 +306,72 @@ export const createWorkoutsRouter = (pool) => {
                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                         RETURNING id, activity_type, quantity, points_earned, notes, order_index, sets_data, unit;
                     `;
-                    const { rows: activityRows } = await client.query(activityQuery, [
-                        workoutId,
-                        activity.activityType,
-                        activityAmount,
-                        points,
-                        activity.notes ? activity.notes.trim() : null,
-                        i,
-                        activity.sets ? JSON.stringify(activity.sets) : null,
-                        activity.unit || 'Stück'
-                    ]);
-                    const row = toCamelCase(activityRows[0]);
-                    row.amount = row.quantity;
-                    row.points = row.pointsEarned;
-                    if (row.setsData) {
-                        row.sets = JSON.parse(row.setsData);
+                    
+                    let setsDataValue = null;
+                    if (setsToStore && setsToStore.length > 0) {
+                        try {
+                            // Sicherstellen, dass setsToStore ein Array von Objekten ist
+                            if (Array.isArray(setsToStore)) {
+                                setsDataValue = JSON.stringify(setsToStore);
+                                console.log(`Activity ${i}: Storing ${setsToStore.length} sets, setsDataValue:`, setsDataValue.substring(0, 100));
+                            } else if (typeof setsToStore === 'string') {
+                                // Falls es bereits ein String ist, verwenden wir ihn direkt
+                                setsDataValue = setsToStore;
+                                console.log(`Activity ${i}: Sets already stringified`);
+                            } else {
+                                // Falls es ein Objekt ist, stringify es
+                                setsDataValue = JSON.stringify(setsToStore);
+                            }
+                        } catch (jsonError) {
+                            console.error('Error stringifying sets:', jsonError);
+                            console.error('setsToStore:', setsToStore);
+                            setsDataValue = null;
+                        }
                     }
-                    delete row.quantity;
-                    delete row.pointsEarned;
-                    delete row.setsData;
-                    activitiesData.push(row);
+                    
+                    try {
+                        const { rows: activityRows } = await client.query(activityQuery, [
+                            workoutId,
+                            activity.activityType,
+                            activityAmount,
+                            points,
+                            activity.notes ? activity.notes.trim() : null,
+                            i,
+                            setsDataValue,
+                            activity.unit || 'Stück'
+                        ]);
+                        const row = toCamelCase(activityRows[0]);
+                        row.amount = row.quantity;
+                        row.points = row.pointsEarned;
+                        if (row.setsData) {
+                            // JSONB wird von PostgreSQL manchmal als Objekt zurückgegeben, manchmal als String
+                            if (typeof row.setsData === 'string') {
+                                try {
+                                    row.sets = JSON.parse(row.setsData);
+                                } catch (parseError) {
+                                    console.error('Error parsing setsData:', parseError);
+                                    row.sets = null;
+                                }
+                            } else {
+                                // Bereits ein Objekt
+                                row.sets = row.setsData;
+                            }
+                        }
+                        delete row.quantity;
+                        delete row.pointsEarned;
+                        delete row.setsData;
+                        activitiesData.push(row);
+                    } catch (queryError) {
+                        console.error(`Error inserting activity ${i}:`, queryError);
+                        console.error('Activity data:', {
+                            activityType: activity.activityType,
+                            activityAmount,
+                            points,
+                            setsDataValue,
+                            unit: activity.unit || 'Stück'
+                        });
+                        throw queryError;
+                    }
                 }
 
                 await client.query('COMMIT');
@@ -307,7 +408,34 @@ export const createWorkoutsRouter = (pool) => {
             }
         } catch (error) {
             console.error('Create workout error:', error);
-            res.status(500).json({ error: 'Serverfehler beim Erstellen des Workouts.' });
+            console.error('Error details:', {
+                message: error.message,
+                stack: error.stack,
+                name: error.name,
+                code: error.code,
+                detail: error.detail,
+                constraint: error.constraint,
+                table: error.table,
+                column: error.column
+            });
+            
+            // Sende immer Details im Development-Modus
+            const isDevelopment = process.env.NODE_ENV !== 'production';
+            
+            // Erstelle eine detaillierte Fehlermeldung
+            let errorMessage = error.message || 'Unbekannter Fehler';
+            if (error.detail) {
+                errorMessage += ` - ${error.detail}`;
+            }
+            if (error.code) {
+                errorMessage += ` (Code: ${error.code})`;
+            }
+            
+            res.status(500).json({ 
+                error: 'Serverfehler beim Erstellen des Workouts.',
+                details: isDevelopment ? errorMessage : undefined,
+                code: error.code
+            });
         }
     });
 
@@ -353,7 +481,7 @@ export const createWorkoutsRouter = (pool) => {
                     points: a.points,
                     notes: a.notes,
                     unit: a.unit,
-                    sets: a.setsData ? JSON.parse(a.setsData) : null,
+                    sets: a.setsData ? (typeof a.setsData === 'string' ? JSON.parse(a.setsData) : a.setsData) : null,
                 })).filter(a => a.id !== null)
                 : [];
             const workout = toCamelCase(row);
@@ -394,12 +522,36 @@ export const createWorkoutsRouter = (pool) => {
                 return res.status(400).json({ error: 'Mindestens eine Aktivität ist erforderlich.' });
             }
 
-            const validActivityTypes = ['pullups', 'pushups', 'running', 'cycling', 'situps', 'other'];
+            // Load valid activity types from database
+            const { rows: validExercises } = await pool.query(`
+                SELECT id FROM exercises WHERE is_active = true
+            `);
+            const validActivityTypes = validExercises.map(ex => ex.id);
+            // Add legacy types as fallback
+            const legacyTypes = ['pullups', 'pushups', 'running', 'cycling', 'situps', 'other'];
+            legacyTypes.forEach(type => {
+                if (!validActivityTypes.includes(type)) {
+                    validActivityTypes.push(type);
+                }
+            });
+
+            // Validate activities
             for (const activity of activities) {
                 if (!activity.activityType || !validActivityTypes.includes(activity.activityType)) {
                     return res.status(400).json({ error: `Ungültiger Aktivitätstyp: ${activity.activityType}` });
                 }
-                const activityAmount = activity.quantity || activity.amount;
+                
+                // Berechne Gesamtmenge: Wenn Sets vorhanden sind, summiere alle Reps
+                let activityAmount = activity.quantity || activity.amount;
+                if (activity.sets && Array.isArray(activity.sets) && activity.sets.length > 0) {
+                    const totalFromSets = activity.sets.reduce((sum, set) => sum + (set.reps || 0), 0);
+                    // Verwende die berechnete Summe aus Sets, falls sie größer ist
+                    if (totalFromSets > 0) {
+                        activityAmount = totalFromSets;
+                    }
+                }
+                
+                // Check both 'quantity' (new) and 'amount' (legacy) fields, berücksichtige auch Sets
                 if (!activityAmount || activityAmount <= 0) {
                     return res.status(400).json({ error: 'Aktivitätsmenge muss größer als 0 sein.' });
                 }
@@ -437,7 +589,24 @@ export const createWorkoutsRouter = (pool) => {
 
                 await client.query('DELETE FROM workout_activities WHERE workout_id = $1', [workoutId]);
 
+                // Load exercises with points from database
+                const { rows: exerciseRows } = await client.query(`
+                    SELECT id, points_per_unit, is_active
+                    FROM exercises
+                    WHERE is_active = true
+                `);
+                
+                const exercisePointsMap = {};
+                exerciseRows.forEach(ex => {
+                    exercisePointsMap[ex.id] = parseFloat(ex.points_per_unit) || 0;
+                });
+
+                // Calculate points based on activity type and amount from database
                 const calculateActivityPoints = (activityType, amount) => {
+                    if (exercisePointsMap[activityType] !== undefined) {
+                        return amount * exercisePointsMap[activityType];
+                    }
+                    // Fallback for legacy exercises not in database
                     switch (activityType) {
                         case 'pullups': return amount * 3;
                         case 'pushups': return amount * 1;
@@ -455,11 +624,18 @@ export const createWorkoutsRouter = (pool) => {
 
                     // Berechne Gesamtmenge: Wenn Sets vorhanden sind, summiere alle Reps
                     let activityAmount = activity.quantity || activity.amount;
+                    let setsToStore = null;
+                    
                     if (activity.sets && Array.isArray(activity.sets) && activity.sets.length > 0) {
-                        const totalFromSets = activity.sets.reduce((sum, set) => sum + (set.reps || 0), 0);
+                        // Filtere Sets heraus, die keine Reps haben (reps <= 0)
+                        const validSets = activity.sets.filter(set => set && (set.reps || 0) > 0);
+                        const totalFromSets = validSets.reduce((sum, set) => sum + (set.reps || 0), 0);
+                        
                         // Verwende die berechnete Summe aus Sets, falls sie größer ist
                         if (totalFromSets > 0) {
                             activityAmount = totalFromSets;
+                            // Speichere nur gültige Sets (mit reps > 0)
+                            setsToStore = validSets.length > 0 ? validSets : null;
                         }
                     }
 
@@ -469,6 +645,27 @@ export const createWorkoutsRouter = (pool) => {
                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                         RETURNING id, activity_type, quantity, points_earned, notes, order_index, sets_data, unit;
                     `;
+                    
+                    let setsDataValue = null;
+                    if (setsToStore && setsToStore.length > 0) {
+                        try {
+                            // Sicherstellen, dass setsToStore ein Array von Objekten ist
+                            if (Array.isArray(setsToStore)) {
+                                setsDataValue = JSON.stringify(setsToStore);
+                            } else if (typeof setsToStore === 'string') {
+                                // Falls es bereits ein String ist, verwenden wir ihn direkt
+                                setsDataValue = setsToStore;
+                            } else {
+                                // Falls es ein Objekt ist, stringify es
+                                setsDataValue = JSON.stringify(setsToStore);
+                            }
+                        } catch (jsonError) {
+                            console.error('Error stringifying sets:', jsonError);
+                            console.error('setsToStore:', setsToStore);
+                            setsDataValue = null;
+                        }
+                    }
+                    
                     const { rows: activityRows } = await client.query(activityQuery, [
                         workoutId,
                         activity.activityType,
@@ -476,14 +673,25 @@ export const createWorkoutsRouter = (pool) => {
                         points,
                         activity.notes ? activity.notes.trim() : null,
                         i,
-                        activity.sets ? JSON.stringify(activity.sets) : null,
-                        activity.unit || 'Stück',
+                        setsDataValue,
+                        activity.unit || 'Stück'
                     ]);
                     const row = toCamelCase(activityRows[0]);
                     row.amount = row.quantity;
                     row.points = row.pointsEarned;
                     if (row.setsData) {
-                        row.sets = JSON.parse(row.setsData);
+                        // JSONB wird von PostgreSQL manchmal als Objekt zurückgegeben, manchmal als String
+                        if (typeof row.setsData === 'string') {
+                            try {
+                                row.sets = JSON.parse(row.setsData);
+                            } catch (parseError) {
+                                console.error('Error parsing setsData:', parseError);
+                                row.sets = null;
+                            }
+                        } else {
+                            // Bereits ein Objekt
+                            row.sets = row.setsData;
+                        }
                     }
                     delete row.quantity;
                     delete row.pointsEarned;

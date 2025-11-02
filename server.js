@@ -48,6 +48,9 @@ const runMigrations = createMigrationRunner(pool);
 
 const adminMiddleware = createAdminMiddleware(pool);
 
+// Trust proxy for accurate IP addresses (for rate limiting)
+app.set('trust proxy', 1);
+
 // Middlewares
 app.use(cors({
     origin: [

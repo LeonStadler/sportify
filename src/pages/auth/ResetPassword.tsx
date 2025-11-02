@@ -10,7 +10,7 @@ import LanguageSwitcher from '@/components/LanguageSwitcher';
 import ThemeSwitcher from '@/components/ThemeSwitcher';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -220,9 +220,6 @@ export default function ResetPassword() {
             <Card>
               <CardHeader>
                 <CardTitle>{t('authPages.resetPassword.resetTitle')}</CardTitle>
-                <CardDescription>
-                  {t('authPages.resetPassword.resetDescription')}
-                </CardDescription>
               </CardHeader>
               <CardContent>
                 <Alert className="mb-4">
@@ -503,9 +500,6 @@ export default function ResetPassword() {
             <Card>
               <CardHeader>
                 <CardTitle>{t('authPages.resetPassword.emailRequestTitle')}</CardTitle>
-                <CardDescription>
-                  {t('authPages.resetPassword.emailRequestDescription')}
-                </CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmitEmail(onSubmitEmail)} className="space-y-4">

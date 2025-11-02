@@ -59,8 +59,11 @@ app.use(cors({
         'http://127.0.0.1:4000',
         'http://127.0.0.1:8080',
         'http://localhost:5173',
-        'http://127.0.0.1:5173'
-    ],
+        'http://127.0.0.1:5173',
+        process.env.FRONTEND_URL || 'https://vertic-id.com',
+        'https://vertic-id.com',
+        'https://www.vertic-id.com'
+    ].filter(Boolean),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
@@ -141,9 +144,9 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'Sportify API is running!' });
 });
 
-// Serve static files from dist directory in production
-// In development, Vite handles this
-if (process.env.NODE_ENV === 'production') {
+// Serve static files from dist directory in production (only if not on Vercel)
+// On Vercel, static files are served automatically, only API routes go through Express
+if (process.env.NODE_ENV === 'production' && !process.env.VERCEL) {
     import('path').then((pathModule) => {
         import('url').then((urlModule) => {
             const __filename = urlModule.fileURLToPath(import.meta.url);
@@ -162,7 +165,7 @@ if (process.env.NODE_ENV === 'production') {
         });
     });
 } else {
-    // Development: Just respond for root path
+    // Development or Vercel: Just respond for root path
     app.get('/', (req, res) => {
         res.send('Sportify API is running! Use the Vite dev server for the frontend.');
     });
@@ -184,7 +187,8 @@ const startServer = async () => {
     }
 };
 
-if (process.env.NODE_ENV !== 'test') {
+// Start server only if not running as Vercel serverless function
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
     startServer();
 }
 

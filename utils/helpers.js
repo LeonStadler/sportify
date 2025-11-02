@@ -422,6 +422,8 @@ export const getColumnSqlType = async (pool, tableName, columnName) => {
 
 export const ALLOWED_JOURNAL_MOODS = ['energized', 'balanced', 'tired', 'sore', 'stressed'];
 
+// Woche von Montag (Start) bis Sonntag (Ende)
+// PostgreSQL's date_trunc('week', ...) startet standardmäßig am Montag gemäß ISO 8601
 export const WEEK_WINDOW_CONDITION = `
     COALESCE(w.workout_date, w.created_at::date) >= date_trunc('week', CURRENT_DATE)
     AND COALESCE(w.workout_date, w.created_at::date) < date_trunc('week', CURRENT_DATE) + INTERVAL '7 days'

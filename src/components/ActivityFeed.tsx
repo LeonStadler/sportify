@@ -4,11 +4,13 @@ import NiceAvatar from 'react-nice-avatar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from '@/lib/api';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 
 interface ActivityFeedItem {
   id: string;
@@ -126,9 +128,11 @@ export function ActivityFeed() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [activities, setActivities] = useState<ActivityFeedItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasFriends, setHasFriends] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -157,12 +161,15 @@ export function ActivityFeed() {
 
         if (Array.isArray(payload)) {
           setActivities(payload);
+          setHasFriends(data?.hasFriends ?? null);
         } else {
           setActivities([]);
+          setHasFriends(data?.hasFriends ?? false);
           setError(t('activityFeed.unexpectedFormat'));
         }
       } else {
         setActivities([]);
+        setHasFriends(false);
         setError(t('activityFeed.couldNotLoad'));
         toast({
           title: t('dashboard.error'),
@@ -173,6 +180,7 @@ export function ActivityFeed() {
     } catch (error) {
       console.error('Error loading activity feed:', error);
       setActivities([]);
+      setHasFriends(false);
       setError(t('activityFeed.couldNotLoad'));
       toast({
         title: t('dashboard.error'),
@@ -266,10 +274,29 @@ export function ActivityFeed() {
             ) : (
               <div className="text-center py-8">
                 <div className="text-4xl mb-4">👥</div>
-                <p className="text-muted-foreground mb-2">{t('activityFeed.noActivities')}</p>
-                <p className="text-xs md:text-sm text-muted-foreground">
-                  {t('activityFeed.addFriends')}
-                </p>
+                {hasFriends === false ? (
+                  <>
+                    <p className="text-muted-foreground mb-2 font-medium">
+                      {t('activityFeed.noFriends', 'Du hast noch keine Freunde')}
+                    </p>
+                    <p className="text-xs md:text-sm text-muted-foreground mb-4">
+                      {t('activityFeed.addFriendsToSeeActivities', 'Füge Freunde hinzu, um deren Aktivitäten hier zu sehen.')}
+                    </p>
+                    <Button
+                      onClick={() => navigate('/friends')}
+                      className="mt-2"
+                    >
+                      {t('activityFeed.goToFriends', 'Zu Freunden')}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-muted-foreground mb-2">{t('activityFeed.noActivities')}</p>
+                    <p className="text-xs md:text-sm text-muted-foreground">
+                      {t('activityFeed.addFriends')}
+                    </p>
+                  </>
+                )}
               </div>
             )}
           </div>

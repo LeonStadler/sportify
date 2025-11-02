@@ -15,56 +15,56 @@ export function Stats() {
   const [selectedMetrics, setSelectedMetrics] = useState(["pullups", "pushups"]);
 
   const weeklyData = [
-    { day: "Mo", pullups: 12, pushups: 40, running: 3.2, cycling: 8.5 },
-    { day: "Di", pullups: 15, pushups: 45, running: 0, cycling: 12.1 },
-    { day: "Mi", pullups: 8, pushups: 30, running: 5.1, cycling: 0 },
-    { day: "Do", pullups: 18, pushups: 55, running: 2.8, cycling: 15.3 },
-    { day: "Fr", pullups: 14, pushups: 42, running: 4.2, cycling: 9.8 },
-    { day: "Sa", pullups: 20, pushups: 60, running: 7.5, cycling: 18.2 },
-    { day: "So", pullups: 10, pushups: 35, running: 3.1, cycling: 6.4 },
+    { day: "Mon", pullups: 12, pushups: 40, running: 3.2, cycling: 8.5 },
+    { day: "Tue", pullups: 15, pushups: 45, running: 0, cycling: 12.1 },
+    { day: "Wed", pullups: 8, pushups: 30, running: 5.1, cycling: 0 },
+    { day: "Thu", pullups: 18, pushups: 55, running: 2.8, cycling: 15.3 },
+    { day: "Fri", pullups: 14, pushups: 42, running: 4.2, cycling: 9.8 },
+    { day: "Sat", pullups: 20, pushups: 60, running: 7.5, cycling: 18.2 },
+    { day: "Sun", pullups: 10, pushups: 35, running: 3.1, cycling: 6.4 },
   ];
 
   const monthlyData = [
-    { week: "KW 1", pullups: 85, pushups: 320, running: 22.1, cycling: 65.2 },
-    { week: "KW 2", pullups: 92, pushups: 355, running: 18.3, cycling: 78.4 },
-    { week: "KW 3", pullups: 78, pushups: 298, running: 25.7, cycling: 82.1 },
-    { week: "KW 4", pullups: 97, pushups: 387, running: 29.2, cycling: 94.3 },
+    { week: "Week 1", pullups: 85, pushups: 320, running: 22.1, cycling: 65.2 },
+    { week: "Week 2", pullups: 92, pushups: 355, running: 18.3, cycling: 78.4 },
+    { week: "Week 3", pullups: 78, pushups: 298, running: 25.7, cycling: 82.1 },
+    { week: "Week 4", pullups: 97, pushups: 387, running: 29.2, cycling: 94.3 },
   ];
 
   const progressData = [
-    { week: "Woche 1", score: 1650 },
-    { week: "Woche 2", score: 1720 },
-    { week: "Woche 3", score: 1850 },
-    { week: "Woche 4", score: 1980 },
+    { week: t('stats.week1', 'Week 1'), score: 1650 },
+    { week: t('stats.week2', 'Week 2'), score: 1720 },
+    { week: t('stats.week3', 'Week 3'), score: 1850 },
+    { week: t('stats.week4', 'Week 4'), score: 1980 },
   ];
 
   const activityDistribution = [
-    { name: "Klimmzüge", value: 30, color: "#3b82f6" },
-    { name: "Liegestütze", value: 25, color: "#ef4444" },
-    { name: "Laufen", value: 25, color: "#22c55e" },
-    { name: "Radfahren", value: 20, color: "#8b5cf6" },
+    { name: t('stats.pullups', 'Pull-ups'), value: 30, color: "#3b82f6" },
+    { name: t('stats.pushups', 'Push-ups'), value: 25, color: "#ef4444" },
+    { name: t('stats.running', 'Running'), value: 25, color: "#22c55e" },
+    { name: t('stats.cycling', 'Cycling'), value: 20, color: "#8b5cf6" },
   ];
 
   const currentData = timeRange === "week" ? weeklyData : monthlyData;
 
   const metricColors = {
     pullups: "#3b82f6",
-    pushups: "#ef4444", 
+    pushups: "#ef4444",
     running: "#22c55e",
     cycling: "#8b5cf6"
   };
 
   const metricNames = {
-    pullups: "Klimmzüge",
-    pushups: "Liegestütze",
-    running: "Laufen (km)",
-    cycling: "Radfahren (km)"
+    pullups: t('stats.pullups', 'Pull-ups'),
+    pushups: t('stats.pushups', 'Push-ups'),
+    running: t('stats.runningKm', 'Running (km)'),
+    cycling: t('stats.cyclingKm', 'Cycling (km)')
   };
 
   return (
     <PageTemplate
-      title={t('stats.title', 'Statistiken')}
-      subtitle={t('stats.subtitle', 'Detaillierte Analyse deiner sportlichen Leistungen')}
+      title={t('stats.title', 'Statistics')}
+      subtitle={t('stats.subtitle', 'Detailed analysis of your athletic performance')}
       headerActions={
         <Select value={timeRange} onValueChange={setTimeRange}>
           <SelectTrigger className="w-32">
@@ -72,31 +72,16 @@ export function Stats() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="week">{t('stats.thisWeek', 'Diese Woche')}</SelectItem>
-            <SelectItem value="month">{t('stats.thisMonth', 'Dieser Monat')}</SelectItem>
-            <SelectItem value="quarter">{t('stats.thisQuarter', 'Dieses Quartal')}</SelectItem>
+            <SelectItem value="week">{t('stats.thisWeek', 'This Week')}</SelectItem>
+            <SelectItem value="month">{t('stats.thisMonth', 'This Month')}</SelectItem>
+            <SelectItem value="quarter">{t('stats.thisQuarter', 'This Quarter')}</SelectItem>
           </SelectContent>
         </Select>
       }
       className="space-y-4 md:space-y-6"
     >
       {/* Controls */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="flex flex-wrap gap-2">
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-32">
-              <Calendar className="w-4 h-4 mr-2" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="week">Diese Woche</SelectItem>
-              <SelectItem value="month">Dieser Monat</SelectItem>
-              <SelectItem value="quarter">Dieses Quartal</SelectItem>
-              <SelectItem value="year">Dieses Jahr</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-end">
         <div className="flex flex-wrap gap-2">
           {Object.entries(metricNames).map(([key, name]) => (
             <Button
@@ -121,10 +106,10 @@ export function Stats() {
 
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Übersicht</TabsTrigger>
-          <TabsTrigger value="trends">Trends</TabsTrigger>
-          <TabsTrigger value="records">Rekorde</TabsTrigger>
-          <TabsTrigger value="distribution">Verteilung</TabsTrigger>
+          <TabsTrigger value="overview">{t('stats.overview', 'Overview')}</TabsTrigger>
+          <TabsTrigger value="trends">{t('stats.trends', 'Trends')}</TabsTrigger>
+          <TabsTrigger value="records">{t('stats.records', 'Records')}</TabsTrigger>
+          <TabsTrigger value="distribution">{t('stats.distribution', 'Distribution')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4 md:space-y-6">
@@ -134,7 +119,7 @@ export function Stats() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Activity className="w-5 h-5" />
-                  {timeRange === "week" ? "Wöchentliche" : "Monatliche"} Aktivität
+                  {timeRange === "week" ? t('stats.weeklyActivity', 'Weekly Activity') : t('stats.monthlyActivity', 'Monthly Activity')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -145,11 +130,11 @@ export function Stats() {
                     <YAxis />
                     <Tooltip />
                     {selectedMetrics.map(metric => (
-                      <Bar 
+                      <Bar
                         key={metric}
-                        dataKey={metric} 
-                        fill={metricColors[metric]} 
-                        name={metricNames[metric]} 
+                        dataKey={metric}
+                        fill={metricColors[metric]}
+                        name={metricNames[metric]}
                       />
                     ))}
                   </BarChart>
@@ -162,7 +147,7 @@ export function Stats() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <TrendingUp className="w-5 h-5" />
-                  Fortschritt (Gesamtpunkte)
+                  {t('stats.progress', 'Progress')} ({t('stats.totalPoints', 'Total Points')})
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -172,12 +157,12 @@ export function Stats() {
                     <XAxis dataKey="week" />
                     <YAxis />
                     <Tooltip />
-                    <Line 
-                      type="monotone" 
-                      dataKey="score" 
-                      stroke="#f97316" 
+                    <Line
+                      type="monotone"
+                      dataKey="score"
+                      stroke="#f97316"
                       strokeWidth={3}
-                      name="Punkte"
+                      name={t('stats.points', 'Points')}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -187,25 +172,25 @@ export function Stats() {
             {/* Quick Stats */}
             <Card>
               <CardHeader>
-                <CardTitle>Wochenstatistiken</CardTitle>
+                <CardTitle>{t('stats.weeklyStatistics', 'Weekly Statistics')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-3 bg-blue-50 rounded-lg">
-                    <p className="text-2xl font-bold text-blue-600">97</p>
-                    <p className="text-sm text-gray-600">Klimmzüge</p>
+                  <div className="text-center p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">97</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{t('stats.pullups', 'Pull-ups')}</p>
                   </div>
-                  <div className="text-center p-3 bg-red-50 rounded-lg">
-                    <p className="text-2xl font-bold text-red-600">387</p>
-                    <p className="text-sm text-gray-600">Liegestütze</p>
+                  <div className="text-center p-3 bg-red-50 dark:bg-red-950 rounded-lg">
+                    <p className="text-2xl font-bold text-red-600 dark:text-red-400">387</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{t('stats.pushups', 'Push-ups')}</p>
                   </div>
-                  <div className="text-center p-3 bg-green-50 rounded-lg">
-                    <p className="text-2xl font-bold text-green-600">29.2</p>
-                    <p className="text-sm text-gray-600">km Laufen</p>
+                  <div className="text-center p-3 bg-green-50 dark:bg-green-950 rounded-lg">
+                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">29.2</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{t('stats.kmRunning', 'km Running')}</p>
                   </div>
-                  <div className="text-center p-3 bg-purple-50 rounded-lg">
-                    <p className="text-2xl font-bold text-purple-600">94.3</p>
-                    <p className="text-sm text-gray-600">km Radfahren</p>
+                  <div className="text-center p-3 bg-purple-50 dark:bg-purple-950 rounded-lg">
+                    <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">94.3</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{t('stats.kmCycling', 'km Cycling')}</p>
                   </div>
                 </div>
               </CardContent>
@@ -217,7 +202,7 @@ export function Stats() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Kraft-Training Trend</CardTitle>
+                <CardTitle>{t('stats.strengthTrainingTrend', 'Strength Training Trend')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -226,7 +211,7 @@ export function Stats() {
                     <XAxis dataKey="week" />
                     <YAxis />
                     <Tooltip />
-                    <Line type="monotone" dataKey="score" stroke="#3b82f6" strokeWidth={2} name="Kraft-Punkte" />
+                    <Line type="monotone" dataKey="score" stroke="#3b82f6" strokeWidth={2} name={t('stats.strengthPoints', 'Strength Points')} />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -234,7 +219,7 @@ export function Stats() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Ausdauer Trend</CardTitle>
+                <CardTitle>{t('stats.enduranceTrend', 'Endurance Trend')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -243,7 +228,7 @@ export function Stats() {
                     <XAxis dataKey="week" />
                     <YAxis />
                     <Tooltip />
-                    <Line type="monotone" dataKey="score" stroke="#22c55e" strokeWidth={2} name="Ausdauer-Punkte" />
+                    <Line type="monotone" dataKey="score" stroke="#22c55e" strokeWidth={2} name={t('stats.endurancePoints', 'Endurance Points')} />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -256,53 +241,53 @@ export function Stats() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Award className="w-5 h-5" />
-                Persönliche Rekorde
+                {t('stats.personalRecords', 'Personal Records')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="flex justify-between items-center p-4 bg-blue-50 rounded-lg">
+                <div className="flex justify-between items-center p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">💪</span>
                     <div>
-                      <p className="font-medium text-blue-900">Klimmzüge</p>
-                      <p className="text-sm text-blue-600">am Samstag</p>
+                      <p className="font-medium text-blue-900 dark:text-blue-100">{t('stats.pullups', 'Pull-ups')}</p>
+                      <p className="text-sm text-blue-600 dark:text-blue-400">{t('stats.onSaturday', 'on Saturday')}</p>
                     </div>
                   </div>
-                  <p className="text-2xl font-bold text-blue-600">20</p>
+                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">20</p>
                 </div>
-                
-                <div className="flex justify-between items-center p-4 bg-red-50 rounded-lg">
+
+                <div className="flex justify-between items-center p-4 bg-red-50 dark:bg-red-950 rounded-lg">
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">🔥</span>
                     <div>
-                      <p className="font-medium text-red-900">Liegestütze</p>
-                      <p className="text-sm text-red-600">am Samstag</p>
+                      <p className="font-medium text-red-900 dark:text-red-100">{t('stats.pushups', 'Push-ups')}</p>
+                      <p className="text-sm text-red-600 dark:text-red-400">{t('stats.onSaturday', 'on Saturday')}</p>
                     </div>
                   </div>
-                  <p className="text-2xl font-bold text-red-600">60</p>
+                  <p className="text-2xl font-bold text-red-600 dark:text-red-400">60</p>
                 </div>
-                
-                <div className="flex justify-between items-center p-4 bg-green-50 rounded-lg">
+
+                <div className="flex justify-between items-center p-4 bg-green-50 dark:bg-green-950 rounded-lg">
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">🏃</span>
                     <div>
-                      <p className="font-medium text-green-900">Längster Lauf</p>
-                      <p className="text-sm text-green-600">am Samstag</p>
+                      <p className="font-medium text-green-900 dark:text-green-100">{t('stats.longestRun', 'Longest Run')}</p>
+                      <p className="text-sm text-green-600 dark:text-green-400">{t('stats.onSaturday', 'on Saturday')}</p>
                     </div>
                   </div>
-                  <p className="text-2xl font-bold text-green-600">7.5</p>
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">7.5</p>
                 </div>
-                
-                <div className="flex justify-between items-center p-4 bg-purple-50 rounded-lg">
+
+                <div className="flex justify-between items-center p-4 bg-purple-50 dark:bg-purple-950 rounded-lg">
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">🚴</span>
                     <div>
-                      <p className="font-medium text-purple-900">Längste Tour</p>
-                      <p className="text-sm text-purple-600">am Samstag</p>
+                      <p className="font-medium text-purple-900 dark:text-purple-100">{t('stats.longestRide', 'Longest Ride')}</p>
+                      <p className="text-sm text-purple-600 dark:text-purple-400">{t('stats.onSaturday', 'on Saturday')}</p>
                     </div>
                   </div>
-                  <p className="text-2xl font-bold text-purple-600">18.2</p>
+                  <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">18.2</p>
                 </div>
               </div>
             </CardContent>
@@ -313,7 +298,7 @@ export function Stats() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Aktivitätsverteilung</CardTitle>
+                <CardTitle>{t('stats.activityDistribution', 'Activity Distribution')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -338,23 +323,23 @@ export function Stats() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Training Intensität</CardTitle>
+                <CardTitle>{t('stats.trainingIntensity', 'Training Intensity')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   {[
-                    { day: "Montag", intensity: 85, color: "bg-red-500" },
-                    { day: "Dienstag", intensity: 70, color: "bg-yellow-500" },
-                    { day: "Mittwoch", intensity: 45, color: "bg-green-500" },
-                    { day: "Donnerstag", intensity: 95, color: "bg-red-500" },
-                    { day: "Freitag", intensity: 65, color: "bg-yellow-500" },
-                    { day: "Samstag", intensity: 100, color: "bg-red-600" },
-                    { day: "Sonntag", intensity: 30, color: "bg-green-500" },
+                    { day: t('stats.monday', 'Monday'), intensity: 85, color: "bg-red-500" },
+                    { day: t('stats.tuesday', 'Tuesday'), intensity: 70, color: "bg-yellow-500" },
+                    { day: t('stats.wednesday', 'Wednesday'), intensity: 45, color: "bg-green-500" },
+                    { day: t('stats.thursday', 'Thursday'), intensity: 95, color: "bg-red-500" },
+                    { day: t('stats.friday', 'Friday'), intensity: 65, color: "bg-yellow-500" },
+                    { day: t('stats.saturday', 'Saturday'), intensity: 100, color: "bg-red-600" },
+                    { day: t('stats.sunday', 'Sunday'), intensity: 30, color: "bg-green-500" },
                   ].map((day) => (
                     <div key={day.day} className="flex items-center gap-3">
-                      <span className="w-20 text-sm text-gray-600">{day.day}</span>
+                      <span className="w-20 text-sm text-gray-600 dark:text-gray-400">{day.day}</span>
                       <div className="flex-1 bg-gray-200 rounded-full h-2">
-                        <div 
+                        <div
                           className={`h-2 rounded-full ${day.color}`}
                           style={{ width: `${day.intensity}%` }}
                         />

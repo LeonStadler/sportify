@@ -55,13 +55,13 @@ export function Training() {
   const { user } = useAuth();
 
   const exerciseTypes = [
-    { id: "all", name: "Alle Übungen" },
-    { id: "pullups", name: "Klimmzüge" },
-    { id: "pushups", name: "Liegestütze" },
-    { id: "running", name: "Laufen" },
-    { id: "cycling", name: "Radfahren" },
-    { id: "situps", name: "Sit-ups" },
-    { id: "other", name: "Sonstiges" },
+    { id: "all", name: t('training.allExercises') },
+    { id: "pullups", name: t('training.pullups') },
+    { id: "pushups", name: t('training.pushups') },
+    { id: "running", name: t('training.running') },
+    { id: "cycling", name: t('training.cycling') },
+    { id: "situps", name: t('training.situps') },
+    { id: "other", name: t('training.other') },
   ];
 
   const loadWorkouts = useCallback(async (page = 1, type = "all") => {
@@ -85,7 +85,7 @@ export function Training() {
       });
 
       if (!response.ok) {
-        throw new Error('Fehler beim Laden der Workouts');
+        throw new Error(t('training.loadError'));
       }
 
       const data: WorkoutResponse = await response.json();
@@ -96,14 +96,14 @@ export function Training() {
     } catch (error) {
       console.error('Load workouts error:', error);
       toast({
-        title: "Fehler",
-        description: "Workouts konnten nicht geladen werden.",
+        title: t('common.error'),
+        description: t('training.workoutsLoadError'),
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
-  }, [user, toast]);
+  }, [user, toast, t]);
 
   useEffect(() => {
     loadWorkouts(1, filterType);
@@ -141,7 +141,7 @@ export function Training() {
   };
 
   const deleteWorkout = async (workoutId: string) => {
-    if (!confirm('Möchtest du dieses Workout wirklich löschen?')) {
+    if (!confirm(t('training.deleteConfirm'))) {
       return;
     }
 
@@ -155,20 +155,20 @@ export function Training() {
       });
 
       if (!response.ok) {
-        throw new Error('Fehler beim Löschen des Workouts');
+        throw new Error(t('training.deleteError'));
       }
 
       toast({
-        title: "Workout gelöscht",
-        description: "Das Workout wurde erfolgreich gelöscht.",
+        title: t('training.workoutDeleted'),
+        description: t('training.workoutDeletedSuccess'),
       });
 
       loadWorkouts(currentPage, filterType);
     } catch (error) {
       console.error('Delete workout error:', error);
       toast({
-        title: "Fehler",
-        description: "Workout konnte nicht gelöscht werden.",
+        title: t('common.error'),
+        description: t('training.deleteWorkoutError'),
         variant: "destructive",
       });
     }
@@ -228,7 +228,7 @@ export function Training() {
 
   // Datum- und Uhrzeitformatierung basierend auf Benutzereinstellungen
   const formatDate = (dateString: string) => {
-    if (!dateString) return "Unbekanntes Datum";
+    if (!dateString) return t('training.unknownDate');
 
     try {
       const date = new Date(dateString);
@@ -237,9 +237,9 @@ export function Training() {
       const now = new Date();
       const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
 
-      if (diffInHours < 1) return "Vor wenigen Minuten";
-      if (diffInHours < 24) return `Vor ${diffInHours} Stunden`;
-      if (diffInHours < 48) return "Gestern";
+      if (diffInHours < 1) return t('training.fewMinutesAgo');
+      if (diffInHours < 24) return t('training.hoursAgo', { hours: diffInHours });
+      if (diffInHours < 48) return t('training.yesterday');
 
       const locale = user?.languagePreference === 'en' ? 'en-US' : 'de-DE';
       return date.toLocaleDateString(locale, {
@@ -254,7 +254,7 @@ export function Training() {
   };
 
   const formatWorkoutDateTime = (dateString: string | null | undefined) => {
-    if (!dateString) return "Unbekanntes Datum";
+    if (!dateString) return t('training.unknownDate');
 
     try {
       // Handle different date formats
@@ -268,7 +268,7 @@ export function Training() {
 
       if (isNaN(date.getTime())) {
         console.warn('Invalid date:', dateString);
-        return "Unbekanntes Datum";
+        return t('training.unknownDate');
       }
 
       const locale = user?.languagePreference === 'en' ? 'en-US' : 'de-DE';
@@ -284,7 +284,7 @@ export function Training() {
       });
     } catch (error) {
       console.error('Date formatting error:', error, 'Input:', dateString);
-      return "Unbekanntes Datum";
+      return t('training.unknownDate');
     }
   };
 
@@ -294,15 +294,15 @@ export function Training() {
     const remainingMinutes = minutes % 60;
 
     if (hours > 0) {
-      return `${hours}h ${remainingMinutes}min`;
+      return t('training.duration.hours', { hours, minutes: remainingMinutes });
     }
-    return `${minutes}min`;
+    return t('training.duration.minutes', { minutes });
   };
 
   if (!user) {
     return (
       <div className="flex items-center justify-center h-96">
-        <p className="text-gray-500">Du musst angemeldet sein, um Workouts zu sehen.</p>
+        <p className="text-gray-500">{t('training.mustBeLoggedIn')}</p>
       </div>
     );
   }
@@ -314,8 +314,8 @@ export function Training() {
     >
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2 mb-6">
-          <TabsTrigger value="trainings">Trainingsstagebuch</TabsTrigger>
-          <TabsTrigger value="recovery">Erholungstagebuch</TabsTrigger>
+          <TabsTrigger value="trainings">{t('training.trainingsDiary')}</TabsTrigger>
+          <TabsTrigger value="recovery">{t('training.recoveryDiary')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="trainings" className="space-y-4 md:space-y-6">
@@ -330,7 +330,7 @@ export function Training() {
             <Card>
               <CardHeader className="pb-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <CardTitle className="text-lg md:text-xl">Deine Workouts</CardTitle>
+                  <CardTitle className="text-lg md:text-xl">{t('training.yourWorkouts')}</CardTitle>
                   <Select value={filterType} onValueChange={handleFilterChange}>
                     <SelectTrigger className="w-full sm:w-48">
                       <SelectValue />
@@ -358,12 +358,14 @@ export function Training() {
                   <div className="text-center py-8">
                     <p className="text-muted-foreground mb-2">
                       {filterType === "all"
-                        ? "Noch keine Workouts vorhanden."
-                        : `Keine Workouts für ${getExerciseName(filterType)} gefunden.`
+                        ? t('training.noWorkouts')
+                        : t('training.noWorkoutsForType', { type: getExerciseName(filterType) })
                       }
                     </p>
                     <p className="text-xs md:text-sm text-muted-foreground">
-                      Erstelle dein erstes Workout mit dem Formular {window.innerWidth >= 1280 ? 'links' : 'oben'}.
+                      {t('training.createFirstWorkout', { 
+                        location: window.innerWidth >= 1280 ? t('training.location.left') : t('training.location.above')
+                      })}
                     </p>
                   </div>
                 ) : (
@@ -386,21 +388,42 @@ export function Training() {
                             )}
 
                             <div className="flex flex-wrap gap-1 mb-2">
-                              {workout.activities.map((activity) => (
-                                <div key={activity.id} className="flex items-center gap-1">
-                                  <Badge
-                                    className={`text-xs ${getExerciseColor(activity.activityType)}`}
-                                    variant="secondary"
-                                  >
-                                    {getExerciseIcon(activity.activityType)} {activity.amount} {activity.unit}
-                                  </Badge>
-                                  {activity.sets && activity.sets.length > 0 && (
-                                    <span className="text-xs text-muted-foreground">
-                                      ({activity.sets.length} Sets)
-                                    </span>
-                                  )}
-                                </div>
-                              ))}
+                              {workout.activities.map((activity) => {
+                                // Formatiere Sets für Anzeige: z.B. "3x10, 3x8, 3x12"
+                                const formatSets = (sets: Array<{ reps: number; weight?: number }>) => {
+                                  if (!sets || sets.length === 0) return null;
+                                  return sets.map(set => {
+                                    const reps = set.reps || 0;
+                                    const weight = set.weight;
+                                    if (weight) {
+                                      return `${reps}x${weight}kg`;
+                                    }
+                                    return `${reps}`;
+                                  }).join(', ');
+                                };
+
+                                const setsDisplay = activity.sets && activity.sets.length > 0 
+                                  ? formatSets(activity.sets) 
+                                  : null;
+
+                                return (
+                                  <div key={activity.id} className="flex flex-col gap-1">
+                                    <div className="flex items-center gap-1 flex-wrap">
+                                      <Badge
+                                        className={`text-xs ${getExerciseColor(activity.activityType)}`}
+                                        variant="secondary"
+                                      >
+                                        {getExerciseIcon(activity.activityType)} {activity.amount} {activity.unit}
+                                      </Badge>
+                                      {setsDisplay && (
+                                        <span className="text-xs text-muted-foreground">
+                                          ({setsDisplay})
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
 
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -416,7 +439,7 @@ export function Training() {
                                   onClick={() => handleEditClick(workout)}
                                   className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 flex-shrink-0"
                                 >
-                                  <span className="hidden sm:inline">Bearbeiten</span>
+                                  <span className="hidden sm:inline">{t('training.edit')}</span>
                                   <span className="sm:hidden">✏️</span>
                                 </Button>
                                 <Button
@@ -425,7 +448,7 @@ export function Training() {
                                   onClick={() => deleteWorkout(workout.id)}
                                   className="text-destructive hover:text-destructive-foreground hover:bg-destructive flex-shrink-0"
                                 >
-                                  <span className="hidden sm:inline">Löschen</span>
+                                  <span className="hidden sm:inline">{t('training.delete')}</span>
                                   <span className="sm:hidden">×</span>
                                 </Button>
                               </>
@@ -445,7 +468,7 @@ export function Training() {
                           disabled={!pagination.hasPrev}
                           className="text-xs md:text-sm"
                         >
-                          <span className="hidden sm:inline">Vorherige</span>
+                          <span className="hidden sm:inline">{t('training.previous')}</span>
                           <span className="sm:hidden">←</span>
                         </Button>
                         <span className="text-xs md:text-sm text-muted-foreground">
@@ -458,7 +481,7 @@ export function Training() {
                           disabled={!pagination.hasNext}
                           className="text-xs md:text-sm"
                         >
-                          <span className="hidden sm:inline">Nächste</span>
+                          <span className="hidden sm:inline">{t('training.next')}</span>
                           <span className="sm:hidden">→</span>
                         </Button>
                       </div>
@@ -478,15 +501,14 @@ export function Training() {
       <AlertDialog open={showRecoveryDialog} onOpenChange={setShowRecoveryDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Erholung dokumentieren?</AlertDialogTitle>
+            <AlertDialogTitle>{t('training.recoveryDialog.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Möchtest du auch deine Erholung und Regeneration zu diesem Training dokumentieren?
-              Du wirst zum Erholungstagebuch weitergeleitet, wo das Workout bereits verknüpft ist.
+              {t('training.recoveryDialog.description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleRecoveryDialogCancel}>Nein, später</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRecoveryDialogConfirm}>Ja, dokumentieren</AlertDialogAction>
+            <AlertDialogCancel onClick={handleRecoveryDialogCancel}>{t('training.recoveryDialog.noLater')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRecoveryDialogConfirm}>{t('training.recoveryDialog.yesDocument')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

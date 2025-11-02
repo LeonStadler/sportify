@@ -8,7 +8,28 @@ export const createStatsRouter = (pool) => {
     // GET /api/stats - User statistics
     router.get('/', authMiddleware, async (req, res) => {
         try {
-            // Total statistics
+            const { period = 'week' } = req.query;
+            
+            // Zeitraum-Bedingung basierend auf period
+            let periodCondition = '';
+            switch (period) {
+                case 'week':
+                    periodCondition = WEEK_WINDOW_CONDITION;
+                    break;
+                case 'month':
+                    periodCondition = `COALESCE(w.workout_date, w.created_at::date) >= date_trunc('month', CURRENT_DATE)`;
+                    break;
+                case 'quarter':
+                    periodCondition = `COALESCE(w.workout_date, w.created_at::date) >= date_trunc('quarter', CURRENT_DATE)`;
+                    break;
+                case 'year':
+                    periodCondition = `COALESCE(w.workout_date, w.created_at::date) >= date_trunc('year', CURRENT_DATE)`;
+                    break;
+                default:
+                    periodCondition = WEEK_WINDOW_CONDITION;
+            }
+
+            // Total statistics (immer alle)
             const totalQuery = `
                 SELECT 
                     COUNT(DISTINCT w.id) as total_workouts,
@@ -24,18 +45,19 @@ export const createStatsRouter = (pool) => {
                 WHERE w.user_id = $1
             `;
 
-            // Weekly statistics
-            const weekQuery = `
+            // Period statistics (basierend auf period parameter)
+            const periodQuery = `
                 SELECT 
-                    COALESCE(SUM(wa.points_earned), 0) as week_points,
-                    COALESCE(SUM(CASE WHEN wa.activity_type = 'pullups' THEN wa.quantity ELSE 0 END), 0) as week_pullups,
-                    COALESCE(SUM(CASE WHEN wa.activity_type = 'pushups' THEN wa.quantity ELSE 0 END), 0) as week_pushups,
-                    COALESCE(SUM(CASE WHEN wa.activity_type = 'running' THEN wa.quantity ELSE 0 END), 0) as week_running,
-                    COALESCE(SUM(CASE WHEN wa.activity_type = 'cycling' THEN wa.quantity ELSE 0 END), 0) as week_cycling
+                    COALESCE(SUM(wa.points_earned), 0) as period_points,
+                    COALESCE(SUM(CASE WHEN wa.activity_type = 'pullups' THEN wa.quantity ELSE 0 END), 0) as period_pullups,
+                    COALESCE(SUM(CASE WHEN wa.activity_type = 'pushups' THEN wa.quantity ELSE 0 END), 0) as period_pushups,
+                    COALESCE(SUM(CASE WHEN wa.activity_type = 'running' THEN wa.quantity ELSE 0 END), 0) as period_running,
+                    COALESCE(SUM(CASE WHEN wa.activity_type = 'cycling' THEN wa.quantity ELSE 0 END), 0) as period_cycling,
+                    COUNT(DISTINCT w.id) as period_workouts
                 FROM workouts w
                 LEFT JOIN workout_activities wa ON w.id = wa.workout_id
                 WHERE w.user_id = $1
-                  AND ${WEEK_WINDOW_CONDITION}
+                  AND ${periodCondition}
             `;
 
             // User rank and total users
@@ -62,38 +84,40 @@ export const createStatsRouter = (pool) => {
                 WHERE id = $1
             `;
 
-            const [totalResult, weekResult, rankResult] = await Promise.all([
+            const [totalResult, periodResult, rankResult] = await Promise.all([
                 pool.query(totalQuery, [req.user.id]),
-                pool.query(weekQuery, [req.user.id]),
+                pool.query(periodQuery, [req.user.id]),
                 pool.query(rankQuery, [req.user.id])
             ]);
 
             const totalStats = toCamelCase(totalResult.rows[0] || {});
-            const weekStats = toCamelCase(weekResult.rows[0] || {});
+            const periodStats = toCamelCase(periodResult.rows[0] || {});
             const rankData = rankResult.rows[0] || { rank: 1, total_users: 1 };
 
             const response = {
                 totalPoints: Number(totalStats.totalPoints) || 0,
-                weekPoints: Number(weekStats.weekPoints) || 0,
+                periodPoints: Number(periodStats.periodPoints) || 0,
                 totalWorkouts: Number(totalStats.totalWorkouts) || 0,
+                periodWorkouts: Number(periodStats.periodWorkouts) || 0,
                 userRank: Number(rankData.rank) || 1,
                 totalUsers: Number(rankData.total_users) || 1,
+                period: period,
                 activities: {
                     pullups: {
                         total: Number(totalStats.totalPullups) || 0,
-                        week: Number(weekStats.weekPullups) || 0
+                        period: Number(periodStats.periodPullups) || 0
                     },
                     pushups: {
                         total: Number(totalStats.totalPushups) || 0,
-                        week: Number(weekStats.weekPushups) || 0
+                        period: Number(periodStats.periodPushups) || 0
                     },
                     running: {
                         total: Number(totalStats.totalRunning) || 0,
-                        week: Number(weekStats.weekRunning) || 0
+                        period: Number(periodStats.periodRunning) || 0
                     },
                     cycling: {
                         total: Number(totalStats.totalCycling) || 0,
-                        week: Number(weekStats.weekCycling) || 0
+                        period: Number(periodStats.periodCycling) || 0
                     }
                 }
             };

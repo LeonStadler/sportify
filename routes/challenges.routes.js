@@ -6,6 +6,8 @@ export const createChallengesRouter = (pool) => {
     const router = express.Router();
 
     const getWeeklyWindow = async () => {
+        // PostgreSQL's date_trunc('week', ...) startet standardmäßig am Montag (ISO 8601)
+        // Um explizit Montag bis Sonntag zu gewährleisten:
         const windowQuery = `
             SELECT
                 date_trunc('week', CURRENT_DATE)::date AS start_date,

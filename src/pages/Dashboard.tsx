@@ -2,26 +2,31 @@ import { ActivityFeed } from "@/components/ActivityFeed";
 import { PageTemplate } from "@/components/PageTemplate";
 import { StatCard } from "@/components/StatCard";
 import { WeeklyChallengeCard } from "@/components/WeeklyChallengeCard";
+import { DashboardSettingsDialog, StatCardConfig } from "@/components/DashboardSettingsDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { BarChart, Dumbbell, TrendingUp, Trophy } from "lucide-react";
+import { BarChart, Dumbbell, TrendingUp, Trophy, Settings } from "lucide-react";
 import { useEffect, useState } from 'react';
 import { API_URL } from '@/lib/api';
 import { useTranslation } from 'react-i18next';
 
 interface DashboardStats {
   totalPoints: number;
-  weekPoints: number;
+  periodPoints: number;
   totalWorkouts: number;
+  periodWorkouts: number;
   userRank: number;
   totalUsers: number;
+  period: string;
   activities: {
-    pullups: { total: number; week: number; };
-    pushups: { total: number; week: number; };
-    running: { total: number; week: number; };
-    cycling: { total: number; week: number; };
+    pullups: { total: number; period: number; };
+    pushups: { total: number; period: number; };
+    running: { total: number; period: number; };
+    cycling: { total: number; period: number; };
+    situps: { total: number; period: number; };
   };
 }
 
@@ -44,22 +49,47 @@ interface RecentWorkout {
 }
 
 
+const DEFAULT_CARDS: StatCardConfig[] = [
+  { id: '1', type: 'points', period: 'week', color: 'orange' },
+  { id: '2', type: 'activity', period: 'week', activityType: 'pullups', color: 'blue' },
+  { id: '3', type: 'activity', period: 'week', activityType: 'running', color: 'green' },
+  { id: '4', type: 'rank', period: 'week', color: 'purple' },
+];
+
 export function Dashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { t } = useTranslation();
 
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [cardConfigs, setCardConfigs] = useState<StatCardConfig[]>(() => {
+    const saved = localStorage.getItem('dashboard-card-configs');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return DEFAULT_CARDS;
+      }
+    }
+    return DEFAULT_CARDS;
+  });
+
+  const [statsByPeriod, setStatsByPeriod] = useState<Record<string, DashboardStats>>({});
+
   const [stats, setStats] = useState<DashboardStats>({
     totalPoints: 0,
-    weekPoints: 0,
+    periodPoints: 0,
     totalWorkouts: 0,
+    periodWorkouts: 0,
     userRank: 1,
     totalUsers: 1,
+    period: 'week',
     activities: {
-      pullups: { total: 0, week: 0 },
-      pushups: { total: 0, week: 0 },
-      running: { total: 0, week: 0 },
-      cycling: { total: 0, week: 0 }
+      pullups: { total: 0, period: 0 },
+      pushups: { total: 0, period: 0 },
+      running: { total: 0, period: 0 },
+      cycling: { total: 0, period: 0 },
+      situps: { total: 0, period: 0 }
     }
   });
 
@@ -80,6 +110,12 @@ export function Dashboard() {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (user && cardConfigs.length > 0) {
+      loadStatsForCards();
+    }
+  }, [user, cardConfigs]);
+
   const loadDashboardData = async () => {
     setIsLoading(true);
     try {
@@ -87,7 +123,7 @@ export function Dashboard() {
       if (!token) return;
 
       await Promise.all([
-        loadStats(token),
+        loadStatsForCards(),
         loadGoals(token),
         loadRecentWorkouts(token)
       ]);
@@ -103,21 +139,48 @@ export function Dashboard() {
     }
   };
 
-  const loadStats = async (token: string) => {
+  const loadStatsForCards = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const uniquePeriods = Array.from(new Set(cardConfigs.map(c => c.period)));
+    const statsPromises = uniquePeriods.map(period => loadStats(token, period));
+
     try {
-      const response = await fetch(`${API_URL}/stats`, {
+      const results = await Promise.all(statsPromises);
+      const statsMap: Record<string, DashboardStats> = {};
+      results.forEach((stats, index) => {
+        if (stats) {
+          statsMap[uniquePeriods[index]] = stats;
+        }
+      });
+      setStatsByPeriod(statsMap);
+      
+      // Set default stats (week)
+      if (statsMap['week']) {
+        setStats(statsMap['week']);
+      }
+    } catch (error) {
+      console.error('Error loading stats for cards:', error);
+    }
+  };
+
+  const loadStats = async (token: string, period: string = 'week'): Promise<DashboardStats | null> => {
+    try {
+      const response = await fetch(`${API_URL}/stats?period=${period}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (response.ok) {
         const data = await response.json();
-        setStats(data);
+        return data;
       } else {
-        // Set default values if API fails
-        console.log('Stats API failed, using defaults');
+        console.log(`Stats API failed for period ${period}`);
+        return null;
       }
     } catch (error) {
-      console.error('Error loading stats:', error);
+      console.error(`Error loading stats for period ${period}:`, error);
+      return null;
     }
   };
 
@@ -248,6 +311,79 @@ export function Dashboard() {
     }
   };
 
+  const handleSaveCardConfigs = (configs: StatCardConfig[]) => {
+    setCardConfigs(configs);
+    localStorage.setItem('dashboard-card-configs', JSON.stringify(configs));
+    loadStatsForCards();
+    toast({
+      title: t('dashboard.settings.saved', 'Einstellungen gespeichert'),
+      description: t('dashboard.settings.savedDescription', 'Die Dashboard-Kacheln wurden aktualisiert.'),
+    });
+  };
+
+  const getPeriodLabel = (period: string) => {
+    switch (period) {
+      case 'week': return t('dashboard.thisWeek', 'diese Woche');
+      case 'month': return t('dashboard.thisMonth', 'diesen Monat');
+      case 'quarter': return t('dashboard.thisQuarter', 'dieses Quartal');
+      case 'year': return t('dashboard.thisYear', 'dieses Jahr');
+      default: return period;
+    }
+  };
+
+  const renderStatCard = (config: StatCardConfig) => {
+    const periodStats = statsByPeriod[config.period] || stats;
+    let title = '';
+    let value = '';
+    let trend = '';
+    let Icon = Trophy;
+
+    switch (config.type) {
+      case 'points':
+        title = t('dashboard.totalPoints', 'Gesamtpunkte');
+        value = periodStats.totalPoints.toLocaleString();
+        trend = `+${periodStats.periodPoints} ${getPeriodLabel(config.period)}`;
+        Icon = Trophy;
+        break;
+      case 'activity':
+        if (!config.activityType) return null;
+        const activity = periodStats.activities[config.activityType];
+        title = t(`dashboard.${config.activityType}`, config.activityType);
+        if (config.activityType === 'running' || config.activityType === 'cycling') {
+          value = `${activity?.total || 0} km`;
+          trend = `+${activity?.period || 0} km ${getPeriodLabel(config.period)}`;
+        } else {
+          value = (activity?.total || 0).toString();
+          trend = `+${activity?.period || 0} ${getPeriodLabel(config.period)}`;
+        }
+        Icon = Dumbbell;
+        break;
+      case 'rank':
+        title = t('dashboard.rank', 'Rang');
+        value = `#${periodStats.userRank}`;
+        trend = t('dashboard.ofAthletes', { count: periodStats.totalUsers });
+        Icon = BarChart;
+        break;
+      case 'workouts':
+        title = t('dashboard.workouts', 'Anzahl Trainings');
+        value = periodStats.totalWorkouts.toString();
+        trend = `+${periodStats.periodWorkouts} ${getPeriodLabel(config.period)}`;
+        Icon = TrendingUp;
+        break;
+    }
+
+    return (
+      <StatCard
+        key={config.id}
+        title={title}
+        value={value}
+        icon={Icon}
+        trend={trend}
+        color={config.color}
+      />
+    );
+  };
+
   if (isLoading) {
   return (
       <PageTemplate
@@ -286,36 +422,27 @@ export function Dashboard() {
       )}
 
       {/* Stats Grid - Mobile optimiert */}
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
-        <StatCard
-          title={t('dashboard.totalPoints')}
-          value={stats.totalPoints.toLocaleString()}
-          icon={Trophy}
-          trend={`+${stats.weekPoints} ${t('dashboard.thisWeek')}`}
-          color="orange"
-        />
-        <StatCard
-          title={t('dashboard.pullups')}
-          value={stats.activities.pullups.total.toString()}
-          icon={Dumbbell}
-          trend={`+${stats.activities.pullups.week} ${t('dashboard.thisWeek')}`}
-          color="blue"
-        />
-        <StatCard
-          title={t('dashboard.runningDistance')}
-          value={`${stats.activities.running.total} km`}
-          icon={TrendingUp}
-          trend={`+${stats.activities.running.week} km ${t('dashboard.thisWeek')}`}
-          color="green"
-        />
-        <StatCard
-          title={t('dashboard.rank')}
-          value={`#${stats.userRank}`}
-          icon={BarChart}
-          trend={t('dashboard.ofAthletes', { count: stats.totalUsers })}
-          color="purple"
-        />
+      <div className="relative">
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+          {cardConfigs.map(config => renderStatCard(config))}
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-0 right-0"
+          onClick={() => setSettingsOpen(true)}
+          title={t('dashboard.settings.title', 'Dashboard-Kacheln konfigurieren')}
+        >
+          <Settings className="h-4 w-4" />
+        </Button>
       </div>
+
+      <DashboardSettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        cards={cardConfigs}
+        onSave={handleSaveCardConfigs}
+      />
 
       {/* Progress Section - Mobile Stack Layout */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">

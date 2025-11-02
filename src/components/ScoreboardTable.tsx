@@ -166,9 +166,9 @@ export function ScoreboardTable({ activity, period }: ScoreboardTableProps) {
           </div>
           <div className="text-right">
             <p className="text-xl font-bold text-gray-900">
-              {activity === 'all' ? player.totalPoints : (player.totalAmount ?? 0)}
+              {player.totalPoints ?? 0}
             </p>
-            <p className="text-sm text-gray-500">{getUnitForActivity(activity)}</p>
+            <p className="text-sm text-gray-500">{t('scoreboard.units.points')}</p>
           </div>
         </div>
       ))}

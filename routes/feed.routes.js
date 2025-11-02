@@ -21,9 +21,10 @@ export const createFeedRouter = (pool, ensureFriendInfrastructure) => {
 
             try {
                 const friendCheckQuery = `
-                    SELECT CASE WHEN user_one_id = $1 THEN user_two_id ELSE user_one_id END AS friend_id
+                    SELECT CASE WHEN requester_id = $1 THEN addressee_id ELSE requester_id END AS friend_id
                     FROM friendships
-                    WHERE user_one_id = $1 OR user_two_id = $1
+                    WHERE (requester_id = $1 OR addressee_id = $1)
+                    AND status = 'accepted'
                 `;
                 const friendResult = await pool.query(friendCheckQuery, [req.user.id]);
                 friendIds = friendResult.rows.map(row => row.friend_id);

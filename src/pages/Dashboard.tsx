@@ -2,7 +2,9 @@ import { ActivityFeed } from "@/components/ActivityFeed";
 import { PageTemplate } from "@/components/PageTemplate";
 import { StatCard } from "@/components/StatCard";
 import { WeeklyChallengeCard } from "@/components/WeeklyChallengeCard";
+import { MonthlyGoalCard } from "@/components/MonthlyGoalCard";
 import { DashboardSettingsDialog, StatCardConfig } from "@/components/DashboardSettingsDialog";
+import { WeeklyGoalsDialog, WeeklyGoals } from "@/components/WeeklyGoalsDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -62,6 +64,7 @@ export function Dashboard() {
   const { t } = useTranslation();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [goalsDialogOpen, setGoalsDialogOpen] = useState(false);
   const [cardConfigs, setCardConfigs] = useState<StatCardConfig[]>(() => {
     const saved = localStorage.getItem('dashboard-card-configs');
     if (saved) {
@@ -321,6 +324,43 @@ export function Dashboard() {
     });
   };
 
+  const handleSaveGoals = async (newGoals: WeeklyGoals) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Nicht authentifiziert');
+      }
+
+      const response = await fetch(`${API_URL}/goals`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(newGoals),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Fehler beim Speichern' }));
+        throw new Error(errorData.error || 'Fehler beim Speichern der Ziele');
+      }
+
+      const updatedGoals = await response.json();
+      setGoals(updatedGoals);
+      toast({
+        title: t('weeklyGoals.saved', 'Wochenziele gespeichert'),
+        description: t('weeklyGoals.savedDescription', 'Deine Wochenziele wurden erfolgreich aktualisiert.'),
+      });
+    } catch (error) {
+      toast({
+        title: t('common.error', 'Fehler'),
+        description: error instanceof Error ? error.message : t('weeklyGoals.saveError', 'Fehler beim Speichern der Wochenziele'),
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+
   const getPeriodLabel = (period: string) => {
     switch (period) {
       case 'week': return t('dashboard.thisWeek', 'diese Woche');
@@ -444,11 +484,27 @@ export function Dashboard() {
         onSave={handleSaveCardConfigs}
       />
 
+      <WeeklyGoalsDialog
+        open={goalsDialogOpen}
+        onOpenChange={setGoalsDialogOpen}
+        goals={goals}
+        onSave={handleSaveGoals}
+      />
+
       {/* Progress Section - Mobile Stack Layout */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">
-        <Card>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6 mt-6 md:mt-8">
+        <Card className="relative">
           <CardHeader className="pb-4">
             <CardTitle className="text-lg md:text-xl">{t('dashboard.weeklyGoals')}</CardTitle>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-0 right-0"
+              onClick={() => setGoalsDialogOpen(true)}
+              title={t('weeklyGoals.dialog.title', 'Wochenziele einstellen')}
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -496,7 +552,12 @@ export function Dashboard() {
         <WeeklyChallengeCard className="xl:col-span-2" />
       </div>
 
-        <ActivityFeed />
+      {/* Monthly Goal Section */}
+      <div className="mt-6 md:mt-8">
+        <MonthlyGoalCard />
+      </div>
+
+      <ActivityFeed className="mt-6 md:mt-8" />
     </PageTemplate>
   );
 }

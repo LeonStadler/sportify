@@ -124,7 +124,11 @@ const getUserInitials = (firstName: string, lastName: string) => {
   return `${first}${last}`.toUpperCase();
 };
 
-export function ActivityFeed() {
+interface ActivityFeedProps {
+  className?: string;
+}
+
+export function ActivityFeed({ className }: ActivityFeedProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -160,9 +164,13 @@ export function ActivityFeed() {
         const payload = Array.isArray(data) ? data : data?.activities;
 
         if (Array.isArray(payload)) {
+          console.log('ActivityFeed: Loaded activities:', payload.length, 'hasFriends:', data?.hasFriends);
           setActivities(payload);
-          setHasFriends(data?.hasFriends ?? null);
+          // hasFriends sollte true sein, wenn es akzeptierte Freunde gibt
+          // Wenn payload leer ist, aber hasFriends true ist, bedeutet das, dass Freunde existieren, aber noch keine Aktivitäten
+          setHasFriends(data?.hasFriends ?? (payload.length > 0 ? true : null));
         } else {
+          console.warn('ActivityFeed: Unexpected data format', data);
           setActivities([]);
           setHasFriends(data?.hasFriends ?? false);
           setError(t('activityFeed.unexpectedFormat'));
@@ -194,7 +202,7 @@ export function ActivityFeed() {
 
   if (isLoading) {
     return (
-      <Card>
+      <Card className={className}>
         <CardHeader className="pb-4">
           <CardTitle className="text-lg md:text-xl">{t('activityFeed.title')}</CardTitle>
         </CardHeader>
@@ -216,7 +224,7 @@ export function ActivityFeed() {
   }
 
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader className="pb-4">
         <CardTitle className="text-lg md:text-xl">{t('activityFeed.title')}</CardTitle>
       </CardHeader>

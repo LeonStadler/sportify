@@ -16,6 +16,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "preview": "vite preview",
+    "vercel": "vercel dev",
+    "vercel:dev": "vercel dev",
+    "vercel:deploy": "vercel",
+    "vercel:prod": "vercel --prod",
     "type-check": "tsc --noEmit",
     "format": "prettier --write ."
   },

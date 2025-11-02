@@ -51,23 +51,39 @@ const adminMiddleware = createAdminMiddleware(pool);
 // Trust proxy for accurate IP addresses (for rate limiting)
 app.set('trust proxy', 1);
 
-// Middlewares
-app.use(cors({
-    origin: [
-        'http://localhost:4000',
-        'http://localhost:8080',
-        'http://127.0.0.1:4000',
-        'http://127.0.0.1:8080',
-        'http://localhost:5173',
-        'http://127.0.0.1:5173',
-        process.env.FRONTEND_URL || 'https://vertic-id.com',
-        'https://vertic-id.com',
-        'https://www.vertic-id.com'
-    ].filter(Boolean),
+// CORS Configuration
+const corsOptions = {
+    origin: (origin, callback) => {
+        const allowedOrigins = [
+            'http://localhost:4000',
+            'http://localhost:8080',
+            'http://127.0.0.1:4000',
+            'http://127.0.0.1:8080',
+            'http://localhost:5173',
+            'http://127.0.0.1:5173',
+            process.env.FRONTEND_URL,
+            'https://vertic-id.com',
+            'https://www.vertic-id.com',
+            'http://vertic-id.com',
+            'http://www.vertic-id.com'
+        ].filter(Boolean);
+        
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(null, true); // Allow all origins in production for now
+        }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    preflightContinue: false,
+    optionsSuccessStatus: 204
+};
+
+// Middlewares
+app.use(cors(corsOptions));
 app.use(express.json());
 
 const ensureFriendInfrastructure = async () => {

@@ -17,11 +17,15 @@ import { useTranslation } from "react-i18next";
 
 import { Skeleton } from "./ui/skeleton";
 
+interface Friend {
+  id: string;
+  displayName: string;
+  avatarUrl?: string | null;
+}
+
 interface WeeklyChallengeCardProps {
   className?: string;
 }
-
-type ChallengeActivityKey = "pullups" | "pushups" | "running" | "cycling";
 
 const getAvatarFallback = (name: string) => {
   const initials = name
@@ -41,40 +45,69 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
   const { t, i18n } = useTranslation();
   const [data, setData] = useState<WeeklyChallengeResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
-  const activityMeta: Record<ChallengeActivityKey, { label: string; icon: string; unit?: string }> = {
-    pullups: { label: t('dashboard.pullups'), icon: "💪" },
-    pushups: { label: t('dashboard.pushups'), icon: "🔥" },
-    running: { label: t('dashboard.running'), icon: "🏃", unit: "km" },
-    cycling: { label: t('dashboard.cycling'), icon: "🚴", unit: "km" },
-  };
-
-  const formatActivityValue = (activity: ChallengeActivityKey, value: number, localeCode?: string) => {
-    const meta = activityMeta[activity];
-    const numeric = Number.isFinite(value) ? value : 0;
-    const formattedNumber = new Intl.NumberFormat(localeCode, {
-      maximumFractionDigits: meta.unit ? 1 : 0,
-      minimumFractionDigits: 0,
-    }).format(numeric);
-    return meta.unit ? `${formattedNumber} ${meta.unit}` : `${formattedNumber}x`;
-  };
+  const [friends, setFriends] = useState<Friend[]>([]);
 
   const locale = useMemo(() => (i18n.language === "en" ? enUS : de), [i18n.language]);
   const numberLocale = i18n.language === "en" ? "en-US" : "de-DE";
+
+  const WEEKLY_POINTS_TARGET = 1500;
+
   const visibleLeaderboard = useMemo(() => {
-    if (!data) {
+    if (!data || !user) {
       return [] as WeeklyChallengeLeaderboardEntry[];
     }
 
-    const topEntries = data.leaderboard.slice(0, 5);
-    const currentUserEntry = data.leaderboard.find((entry) => entry.isCurrentUser);
+    // Erstelle Set von Freunde-IDs inklusive eigener ID
+    const friendIds = new Set([user.id, ...friends.map(f => f.id)]);
 
-    if (currentUserEntry && !topEntries.some((entry) => entry.id === currentUserEntry.id)) {
-      return [...topEntries, currentUserEntry];
+    // Filtere Leaderboard nach Freunden (sich selbst + Freunde)
+    const friendsLeaderboard = data.leaderboard
+      .filter(entry => friendIds.has(entry.id))
+      .sort((a, b) => {
+        // Sortiere nach Punkten (absteigend), dann nach Rank
+        if (b.totalPoints !== a.totalPoints) {
+          return b.totalPoints - a.totalPoints;
+        }
+        return a.rank - b.rank;
+      });
+
+    return friendsLeaderboard;
+  }, [data, friends, user]);
+
+  useEffect(() => {
+    if (!user) {
+      setFriends([]);
+      return;
     }
 
-    return topEntries;
-  }, [data]);
+    const loadFriends = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        const response = await fetch(`${API_URL}/friends`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (Array.isArray(data)) {
+            setFriends(data.map((friend: any) => ({
+              id: friend.id,
+              displayName: friend.displayName || friend.display_name || `${friend.firstName || friend.first_name} ${friend.lastName || friend.last_name}`,
+              avatarUrl: friend.avatarUrl || friend.avatar_url,
+            })));
+          }
+        }
+      } catch (error) {
+        console.error("Error loading friends:", error);
+      }
+    };
+
+    loadFriends();
+  }, [user]);
 
   useEffect(() => {
     if (!user) {
@@ -199,7 +232,7 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
   }
 
   const formattedRange = `${format(new Date(data.week.start), "PPP", { locale })} – ${format(new Date(data.week.end), "PPP", { locale })}`;
-  const challengeCompleted = data.progress.completionPercentage >= 100;
+  const challengeCompleted = data.progress.totalPoints >= WEEKLY_POINTS_TARGET;
 
   return (
     <Card className={cn("h-full", className)}>
@@ -230,32 +263,19 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
             {t('weeklyChallenge.workoutsThisWeek', { count: data.progress.workoutsCompleted })}
           </span>
           <span className="text-muted-foreground">
-            {t('weeklyChallenge.progress')}: {Math.round(data.progress.completionPercentage)}%
+            {t('weeklyChallenge.progress')}: {Math.round((data.progress.totalPoints / WEEKLY_POINTS_TARGET) * 100)}%
           </span>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="space-y-4">
-          {Object.entries(activityMeta).map(([key, meta]) => {
-            const activityKey = key as ChallengeActivityKey;
-            const progress = data.activities[activityKey];
-            const percentage = Number.isFinite(progress.percentage) ? Math.round(progress.percentage) : 0;
-
-            return (
-              <div key={activityKey} className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2 font-medium">
-                    <span className="text-base">{meta.icon}</span>
-                    {meta.label}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {formatActivityValue(activityKey, progress.current, numberLocale)} / {formatActivityValue(activityKey, progress.target, numberLocale)}
-                  </span>
-                </div>
-                <Progress value={Math.min(percentage, 100)} className="h-2" />
-              </div>
-            );
-          })}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-medium">{t('weeklyChallenge.pointsTarget', 'Punkte-Ziel')}</span>
+            <span className="text-muted-foreground">
+              {data.progress.totalPoints.toLocaleString()} / {WEEKLY_POINTS_TARGET.toLocaleString()} {t('weeklyChallenge.points')}
+            </span>
+          </div>
+          <Progress value={Math.min((data.progress.totalPoints / WEEKLY_POINTS_TARGET) * 100, 100)} className="h-2" />
         </div>
 
         <div className="space-y-3">
@@ -278,7 +298,9 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
           <div className="space-y-2">
             {visibleLeaderboard.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">
-                {t('weeklyChallenge.noActivitiesYet')}
+                {friends.length === 0 
+                  ? t('weeklyChallenge.noFriendsYet', 'Du hast noch keine Freunde. Füge Freunde hinzu, um sie hier zu sehen.')
+                  : t('weeklyChallenge.noActivitiesYet', 'Noch keine Aktivitäten in dieser Woche.')}
               </p>
             ) : (
               visibleLeaderboard.map((entry: WeeklyChallengeLeaderboardEntry) => (
@@ -326,15 +348,9 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
                       )}
                     </p>
                     <p className="text-xs text-muted-foreground truncate">
-                      {entry.totalPoints.toLocaleString()} {t('weeklyChallenge.points')} · {Math.round(entry.totalRunning)} {t('weeklyChallenge.kmRunning')}
+                      {entry.totalPoints.toLocaleString()} {t('weeklyChallenge.points')}
                     </p>
                   </div>
-                  <Badge
-                    variant="outline"
-                    className="text-xs shrink-0 font-medium border-border/50"
-                  >
-                    {Math.round(entry.totalPullups)} {t('weeklyChallenge.pullUps')}
-                  </Badge>
                 </div>
               ))
             )}

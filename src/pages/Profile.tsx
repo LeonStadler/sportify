@@ -1,6 +1,19 @@
 import { AvatarEditor } from "@/components/AvatarEditor";
 import { InviteFriendForm } from "@/components/InviteFriendForm";
 import { PageTemplate } from "@/components/PageTemplate";
+import { PasswordDialog } from "@/components/PasswordDialog";
+import { TwoFactorSetupDialog } from "@/components/TwoFactorSetupDialog";
+import { WeeklyGoals } from "@/components/WeeklyGoalsDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,16 +26,41 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Invitation, useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { API_URL } from '@/lib/api';
 import { getUserInitials, parseAvatarConfig } from '@/lib/avatar';
 import { Award, Camera, Check, Copy, Mail, Share2, Shield } from "lucide-react";
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import NiceAvatar, { NiceAvatarProps } from 'react-nice-avatar';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 export function Profile() {
   const { t } = useTranslation();
-  const { user, updateProfile, deleteAccount, enable2FA, disable2FA, isLoading, inviteFriend, getInvitations, getDisplayName } = useAuth();
+  const { user, updateProfile, deleteAccount, disable2FA, isLoading, inviteFriend, getInvitations, getDisplayName } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Get initial tab from URL query parameter
+  const getInitialTab = () => {
+    const tabParam = searchParams.get('tab');
+    const validTabs = ['profile', 'preferences', 'goals', 'achievements', 'security', 'danger'];
+    if (tabParam && validTabs.includes(tabParam)) {
+      return tabParam;
+    }
+    return 'profile';
+  };
+
+  const [activeTab, setActiveTab] = useState(getInitialTab());
+
+  // Update tab when URL query parameter changes
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    const validTabs = ['profile', 'preferences', 'goals', 'achievements', 'security', 'danger'];
+    if (tabParam && validTabs.includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
 
   // Profile form state
   const [profileForm, setProfileForm] = useState({
@@ -69,13 +107,110 @@ export function Profile() {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loadingInvitations, setLoadingInvitations] = useState(false);
   const [avatarEditorOpen, setAvatarEditorOpen] = useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [passwordDialogConfig, setPasswordDialogConfig] = useState<{
+    title: string;
+    description: string;
+    onConfirm: (password: string) => Promise<void>;
+    confirmLabel?: string;
+  } | null>(null);
+  const [deleteAccountDialogOpen, setDeleteAccountDialogOpen] = useState(false);
+  const [deleteAccountPasswordDialogOpen, setDeleteAccountPasswordDialogOpen] = useState(false);
+  const [twoFactorSetupDialogOpen, setTwoFactorSetupDialogOpen] = useState(false);
+  const [goals, setGoals] = useState<WeeklyGoals>({
+    pullups: { target: 100, current: 0 },
+    pushups: { target: 400, current: 0 },
+    running: { target: 25, current: 0 },
+    cycling: { target: 100, current: 0 }
+  });
+  const [goalsForm, setGoalsForm] = useState<WeeklyGoals>({
+    pullups: { target: 100, current: 0 },
+    pushups: { target: 400, current: 0 },
+    running: { target: 25, current: 0 },
+    cycling: { target: 100, current: 0 }
+  });
+  const [loadingGoals, setLoadingGoals] = useState(false);
+  const [savingGoals, setSavingGoals] = useState(false);
 
   // Load invitations on mount
   useEffect(() => {
     if (user) {
       loadInvitations();
+      loadGoals();
     }
   }, [user]);
+
+  const loadGoals = async () => {
+    try {
+      setLoadingGoals(true);
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch(`${API_URL}/goals`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setGoals(data);
+        setGoalsForm(data);
+      }
+    } catch (error) {
+      console.error('Error loading goals:', error);
+    } finally {
+      setLoadingGoals(false);
+    }
+  };
+
+  const handleGoalsSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingGoals(true);
+    try {
+      await handleSaveGoals(goalsForm);
+    } catch (error) {
+      // Error handling is done in handleSaveGoals
+    } finally {
+      setSavingGoals(false);
+    }
+  };
+
+  const handleSaveGoals = async (newGoals: WeeklyGoals) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Nicht authentifiziert');
+      }
+
+      const response = await fetch(`${API_URL}/goals`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(newGoals),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Fehler beim Speichern' }));
+        throw new Error(errorData.error || 'Fehler beim Speichern der Ziele');
+      }
+
+      const updatedGoals = await response.json();
+      setGoals(updatedGoals);
+      setGoalsForm(updatedGoals);
+      toast({
+        title: "Wochenziele gespeichert",
+        description: "Deine Wochenziele wurden erfolgreich aktualisiert.",
+      });
+    } catch (error) {
+      toast({
+        title: "Fehler",
+        description: error instanceof Error ? error.message : "Fehler beim Speichern der Wochenziele",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
 
   // Update form when user changes
   useEffect(() => {
@@ -86,6 +221,7 @@ export function Profile() {
         nickname: user.nickname || '',
         displayPreference: user.displayPreference || 'firstName'
       });
+      // Sync twoFAEnabled with user state - always reflect the actual backend state
       setTwoFAEnabled(user.has2FA || false);
     }
   }, [user]);
@@ -231,35 +367,53 @@ export function Profile() {
     });
   };
 
-  const handleToggle2FA = async () => {
-    try {
-      if (twoFAEnabled) {
-        // Show password prompt for disabling 2FA
-        const password = prompt("Bitte gib dein Passwort ein, um 2FA zu deaktivieren:");
-        if (!password) return;
-
-        await disable2FA(password);
-        setTwoFAEnabled(false);
-        toast({
-          title: "2FA deaktiviert",
-          description: "Zwei-Faktor-Authentifizierung wurde erfolgreich deaktiviert.",
-        });
-      } else {
-        const result = await enable2FA();
-        setTwoFAEnabled(true);
-        toast({
-          title: "2FA aktiviert",
-          description: "Zwei-Faktor-Authentifizierung wurde erfolgreich aktiviert.",
-        });
-        // In a real app, you would show the QR code and backup codes
-        console.log('2FA Data:', result);
-      }
-    } catch (error) {
-      toast({
-        title: "Fehler",
-        description: error instanceof Error ? error.message : "Fehler bei 2FA-Einstellung",
-        variant: "destructive",
+  const handleToggle2FA = (checked: boolean) => {
+    if (checked) {
+      // Temporarily set switch to checked for better UX
+      setTwoFAEnabled(true);
+      // Open 2FA setup dialog when enabling
+      setTwoFactorSetupDialogOpen(true);
+    } else {
+      // Temporarily set switch to unchecked for better UX
+      setTwoFAEnabled(false);
+      // Show password dialog for disabling 2FA
+      setPasswordDialogConfig({
+        title: "2FA deaktivieren",
+        description: "Bitte gib dein Passwort ein, um die Zwei-Faktor-Authentifizierung zu deaktivieren.",
+        confirmLabel: "2FA deaktivieren",
+        onConfirm: async (password: string) => {
+          try {
+            await disable2FA(password);
+            // Switch state already set to false
+            toast({
+              title: "2FA deaktiviert",
+              description: "Zwei-Faktor-Authentifizierung wurde erfolgreich deaktiviert.",
+            });
+          } catch (error) {
+            // Reset switch state on error
+            setTwoFAEnabled(user?.has2FA || false);
+            toast({
+              title: "Fehler",
+              description: error instanceof Error ? error.message : "Fehler beim Deaktivieren der 2FA",
+              variant: "destructive",
+            });
+            throw error;
+          }
+        },
       });
+      setPasswordDialogOpen(true);
+    }
+  };
+
+  const handlePasswordDialogConfirm = async (password: string) => {
+    if (!passwordDialogConfig) return;
+    try {
+      await passwordDialogConfig.onConfirm(password);
+      setPasswordDialogOpen(false);
+      setPasswordDialogConfig(null);
+    } catch (error) {
+      // Error is handled by the dialog component
+      throw error;
     }
   };
 
@@ -287,25 +441,34 @@ export function Profile() {
     }
   };
 
-  const handleDeleteAccount = async () => {
-    const confirmDelete = confirm("Möchtest du dein Konto wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.");
-    if (!confirmDelete) return;
+  const handleDeleteAccount = () => {
+    setDeleteAccountDialogOpen(true);
+  };
 
-    const password = prompt("Bitte gib dein Passwort ein, um das Konto zu löschen:");
-    if (!password) return;
+  const handleDeleteAccountConfirm = () => {
+    setDeleteAccountDialogOpen(false);
+    setDeleteAccountPasswordDialogOpen(true);
+  };
 
+  const handleDeleteAccountPasswordConfirm = async (password: string) => {
     try {
       await deleteAccount(password);
       toast({
         title: "Konto gelöscht",
         description: "Dein Konto wurde erfolgreich gelöscht.",
       });
+      setDeleteAccountPasswordDialogOpen(false);
+      // Redirect to login after successful account deletion
+      setTimeout(() => {
+        navigate('/auth/login');
+      }, 1000);
     } catch (error) {
       toast({
         title: "Fehler",
         description: error instanceof Error ? error.message : "Fehler beim Löschen des Kontos",
         variant: "destructive",
       });
+      throw error;
     }
   };
 
@@ -329,12 +492,19 @@ export function Profile() {
       subtitle={t('profile.subtitle', 'Verwalte deine persönlichen Einstellungen und Ziele')}
       className="space-y-6"
     >
-      <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+      <Tabs value={activeTab} onValueChange={(value) => {
+        setActiveTab(value);
+        const params = new URLSearchParams(searchParams);
+        params.set('tab', value);
+        setSearchParams(params);
+      }} className="w-full">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="profile">Profil</TabsTrigger>
-          <TabsTrigger value="security">Sicherheit</TabsTrigger>
           <TabsTrigger value="preferences">Einstellungen</TabsTrigger>
+          <TabsTrigger value="goals">Wochenziele</TabsTrigger>
           <TabsTrigger value="achievements">Erfolge</TabsTrigger>
+          <TabsTrigger value="security">Sicherheit</TabsTrigger>
+          <TabsTrigger value="danger" className="text-destructive">Gefahrenzone</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="space-y-6">
@@ -624,15 +794,6 @@ export function Profile() {
                     <p>• E-Mail verifiziert: {user.isEmailVerified ? 'Ja' : 'Nein'}</p>
                   </div>
                 </div>
-
-                <Button
-                  variant="destructive"
-                  className="w-full"
-                  onClick={handleDeleteAccount}
-                  disabled={isLoading}
-                >
-                  Konto löschen
-                </Button>
               </CardContent>
             </Card>
           </div>
@@ -841,6 +1002,132 @@ export function Profile() {
           </form>
         </TabsContent>
 
+        <TabsContent value="goals" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Wochenziele</CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                Passe deine wöchentlichen Ziele nach deinen Wünschen an. Die Fortschritte werden automatisch basierend auf deinen Trainings aktualisiert.
+              </p>
+            </CardHeader>
+            <CardContent>
+              {loadingGoals ? (
+                <p className="text-muted-foreground">Lädt...</p>
+              ) : (
+                <form onSubmit={handleGoalsSubmit} className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="goal-pullups">Klimmzüge</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="goal-pullups"
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={goalsForm.pullups.target || ''}
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value);
+                            setGoalsForm(prev => ({
+                              ...prev,
+                              pullups: { ...prev.pullups, target: isNaN(value) ? 0 : Math.max(0, value) }
+                            }));
+                          }}
+                          placeholder="100"
+                          className="flex-1"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Aktuell: {goals.pullups.current} / Ziel: {goals.pullups.target}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="goal-pushups">Liegestütze</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="goal-pushups"
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={goalsForm.pushups.target || ''}
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value);
+                            setGoalsForm(prev => ({
+                              ...prev,
+                              pushups: { ...prev.pushups, target: isNaN(value) ? 0 : Math.max(0, value) }
+                            }));
+                          }}
+                          placeholder="400"
+                          className="flex-1"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Aktuell: {goals.pushups.current} / Ziel: {goals.pushups.target}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="goal-running">Laufen (km)</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="goal-running"
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          value={goalsForm.running.target || ''}
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value);
+                            setGoalsForm(prev => ({
+                              ...prev,
+                              running: { ...prev.running, target: isNaN(value) ? 0 : Math.max(0, value) }
+                            }));
+                          }}
+                          placeholder="25"
+                          className="flex-1"
+                        />
+                        <span className="text-sm text-muted-foreground min-w-[2rem]">km</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Aktuell: {goals.running.current} km / Ziel: {goals.running.target} km
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="goal-cycling">Radfahren (km)</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="goal-cycling"
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          value={goalsForm.cycling.target || ''}
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value);
+                            setGoalsForm(prev => ({
+                              ...prev,
+                              cycling: { ...prev.cycling, target: isNaN(value) ? 0 : Math.max(0, value) }
+                            }));
+                          }}
+                          placeholder="100"
+                          className="flex-1"
+                        />
+                        <span className="text-sm text-muted-foreground min-w-[2rem]">km</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Aktuell: {goals.cycling.current} km / Ziel: {goals.cycling.target} km
+                      </p>
+                    </div>
+                  </div>
+
+                  <Button type="submit" className="w-full" disabled={savingGoals || isLoading}>
+                    {savingGoals ? "Wird gespeichert..." : "Wochenziele speichern"}
+                  </Button>
+                </form>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="achievements" className="space-y-6">
           <Card>
             <CardHeader>
@@ -856,6 +1143,44 @@ export function Profile() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="danger" className="space-y-6">
+          <Card className="border-destructive">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-destructive">
+                <Shield className="w-5 h-5" />
+                Gefahrenzone
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 space-y-3">
+                <div>
+                  <h3 className="font-semibold text-destructive mb-2">Konto löschen</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Wenn du dein Konto löschst, werden alle deine Daten unwiderruflich gelöscht.
+                    Diese Aktion kann nicht rückgängig gemacht werden.
+                    Alle deine Trainingsdaten, Erfolge, Freundschaften und Einstellungen gehen verloren.
+                  </p>
+                  <ul className="text-sm text-muted-foreground space-y-1 mb-4 list-disc list-inside">
+                    <li>Alle deine Trainingsdaten werden gelöscht</li>
+                    <li>Deine Erfolge und Statistiken gehen verloren</li>
+                    <li>Alle Freundschaften werden beendet</li>
+                    <li>Dein Profil ist nicht mehr erreichbar</li>
+                    <li>Diese Aktion ist dauerhaft und kann nicht rückgängig gemacht werden</li>
+                  </ul>
+                </div>
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  onClick={handleDeleteAccount}
+                  disabled={isLoading}
+                >
+                  Konto löschen
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       <AvatarEditor
@@ -864,6 +1189,78 @@ export function Profile() {
         currentConfig={getCurrentAvatarConfig()}
         onSave={handleAvatarSave}
       />
+
+      {/* Password Dialog for 2FA */}
+      {passwordDialogConfig && (
+        <PasswordDialog
+          open={passwordDialogOpen}
+          onOpenChange={setPasswordDialogOpen}
+          title={passwordDialogConfig.title}
+          description={passwordDialogConfig.description}
+          onConfirm={handlePasswordDialogConfirm}
+          confirmLabel={passwordDialogConfig.confirmLabel}
+        />
+      )}
+
+      {/* Delete Account Confirmation Dialog */}
+      <AlertDialog open={deleteAccountDialogOpen} onOpenChange={setDeleteAccountDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Konto löschen</AlertDialogTitle>
+            <AlertDialogDescription>
+              Möchtest du dein Konto wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
+              Alle deine Daten werden unwiderruflich gelöscht.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAccountConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Weiter
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Password Dialog for Account Deletion */}
+      <PasswordDialog
+        open={deleteAccountPasswordDialogOpen}
+        onOpenChange={setDeleteAccountPasswordDialogOpen}
+        title="Konto löschen"
+        description="Bitte gib dein Passwort ein, um das Löschen deines Kontos zu bestätigen."
+        onConfirm={handleDeleteAccountPasswordConfirm}
+        confirmLabel="Konto endgültig löschen"
+        cancelLabel="Abbrechen"
+      />
+
+      {/* 2FA Setup Dialog */}
+      <TwoFactorSetupDialog
+        open={twoFactorSetupDialogOpen}
+        onOpenChange={(open) => {
+          console.log("2FA Dialog onOpenChange:", open);
+          setTwoFactorSetupDialogOpen(open);
+          // If dialog is closed without success, reset switch state
+          if (!open) {
+            // Wait a bit for user state to update, then sync
+            setTimeout(() => {
+              setTwoFAEnabled(user?.has2FA || false);
+            }, 300);
+          }
+        }}
+        onSuccess={() => {
+          console.log("2FA setup successful");
+          // User state is automatically updated by verify2FA in the dialog
+          // Refresh user data to ensure state is synced
+          // The useEffect will sync twoFAEnabled when user changes
+          // Force a small delay to ensure backend state is loaded
+          setTimeout(() => {
+            setTwoFAEnabled(true);
+          }, 500);
+        }}
+      />
+
     </PageTemplate>
   );
 }

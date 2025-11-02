@@ -62,9 +62,9 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
   const { user } = useAuth();
   const { toast } = useToast();
   const { t, i18n } = useTranslation();
-  
+
   const locale = useMemo(() => (i18n.language === 'en' ? enUS : de), [i18n.language]);
-  
+
   const moodOptions: Array<{ value: TrainingJournalMood; label: string; helper: string; emoji: string }> = useMemo(() => [
     { value: "energized", label: t('recoveryDiary.moods.energized'), helper: t('recoveryDiary.moods.energizedHelper'), emoji: "⚡" },
     { value: "balanced", label: t('recoveryDiary.moods.balanced'), helper: t('recoveryDiary.moods.balancedHelper'), emoji: "🙂" },
@@ -72,7 +72,7 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
     { value: "sore", label: t('recoveryDiary.moods.sore'), helper: t('recoveryDiary.moods.soreHelper'), emoji: "💢" },
     { value: "stressed", label: t('recoveryDiary.moods.stressed'), helper: t('recoveryDiary.moods.stressedHelper'), emoji: "⚠️" },
   ], [t]);
-  
+
   const filterMoodOptions = useMemo(() => [
     { value: "all", label: t('recoveryDiary.moods.all') },
     ...moodOptions.map(({ value, label }) => ({ value, label })),
@@ -106,6 +106,11 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
   const [searchInput, setSearchInput] = useState<string>("");
   const [searchFilter, setSearchFilter] = useState<string>("");
 
+  // Finde das ausgewählte Workout für die Anzeige
+  const selectedWorkout = useMemo(() => {
+    if (!workoutId || workoutId === "none") return null;
+    return recentWorkouts.find(w => w.id === workoutId) || null;
+  }, [workoutId, recentWorkouts]);
 
   const resetForm = useCallback(() => {
     setEntryDate(new Date());
@@ -146,7 +151,7 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
   );
 
   const fetchRecentWorkouts = useCallback(async () => {
-    if (!user) return;
+    if (!user) return [];
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(`${API_URL}/recent-workouts`, {
@@ -181,10 +186,12 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
         .filter((item): item is RecentWorkoutOption => item !== null);
 
       setRecentWorkouts(options);
+      return options;
     } catch (error) {
       console.error("Recent workouts error:", error);
+      return [];
     }
-  }, [user]);
+  }, [user, t]);
 
   const loadSummary = useCallback(async () => {
     if (!user) return;
@@ -282,8 +289,44 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
   useEffect(() => {
     if (preselectedWorkoutId && preselectedWorkoutId !== "none") {
       // Lade aktuelle Workouts neu, damit das neue Workout in der Liste verfügbar ist
-      fetchRecentWorkouts().then(() => {
-        setWorkoutId(preselectedWorkoutId);
+      fetchRecentWorkouts().then((loadedWorkouts) => {
+        // Prüfe ob das Workout in der geladenen Liste ist, wenn nicht, lade es direkt
+        const workoutExists = loadedWorkouts.some(w => w.id === preselectedWorkoutId);
+        if (!workoutExists) {
+          const loadWorkout = async () => {
+            try {
+              const token = localStorage.getItem("token");
+              const response = await fetch(`${API_URL}/workouts/${preselectedWorkoutId}`, {
+                headers: {
+                  Authorization: `Bearer ${token ?? ""}`,
+                },
+              });
+
+              if (response.ok) {
+                const workout = await response.json();
+                // Füge das Workout zur Liste hinzu
+                setRecentWorkouts(prev => {
+                  // Prüfe ob es schon in der Liste ist
+                  if (prev.some(w => w.id === workout.id)) {
+                    return prev;
+                  }
+                  return [{
+                    id: workout.id,
+                    title: workout.title,
+                    workoutDate: workout.workoutDate || workout.createdAt,
+                  }, ...prev];
+                });
+              }
+            } catch (error) {
+              console.error('Error fetching workout:', error);
+            }
+          };
+          loadWorkout().then(() => {
+            setWorkoutId(preselectedWorkoutId);
+          });
+        } else {
+          setWorkoutId(preselectedWorkoutId);
+        }
       });
     }
   }, [preselectedWorkoutId, fetchRecentWorkouts]);
@@ -398,7 +441,7 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
 
   const handleEdit = async (entry: TrainingJournalEntry) => {
     setEditingEntry(entry);
-    
+
     // Parse Datum sicher - unterstütze verschiedene Formate
     try {
       let parsedDate: Date;
@@ -410,7 +453,7 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
         } else {
           parsedDate = new Date(entry.entryDate);
         }
-        
+
         // Prüfe ob das Datum gültig ist
         if (Number.isNaN(parsedDate.getTime())) {
           console.warn('Invalid date in entry:', entry.entryDate);
@@ -427,7 +470,7 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
       console.error('Error parsing date:', error, entry.entryDate);
       setEntryDate(new Date());
     }
-    
+
     setMood(entry.mood);
     setEnergyLevel(entry.energyLevel ? String(entry.energyLevel) : "");
     setFocusLevel(entry.focusLevel ? String(entry.focusLevel) : "");
@@ -436,11 +479,11 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
     setPerceivedExertion(entry.perceivedExertion ? String(entry.perceivedExertion) : "");
     setNotes(entry.notes ?? "");
     setTagsInput(entry.tags.join(", "));
-    
+
     // Wenn ein Workout verknüpft ist, lade es explizit falls es nicht in recentWorkouts ist
     if (entry.workoutId && entry.workoutId !== "none") {
       await fetchRecentWorkouts();
-      
+
       // Prüfe ob das Workout in der Liste ist, wenn nicht, lade es direkt
       const workoutExists = recentWorkouts.some(w => w.id === entry.workoutId);
       if (!workoutExists) {
@@ -451,7 +494,7 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
               Authorization: `Bearer ${token ?? ""}`,
             },
           });
-          
+
           if (response.ok) {
             const workout = await response.json();
             // Füge das Workout zur Liste hinzu
@@ -471,16 +514,16 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
           console.error('Error fetching workout:', error);
         }
       }
-      
+
       setWorkoutId(entry.workoutId);
     } else {
       setWorkoutId("none");
     }
-    
+
     setSleepDuration(entry.metrics?.sleepDurationHours ? String(entry.metrics.sleepDurationHours) : "");
     setRestingHeartRate(entry.metrics?.restingHeartRate ? String(entry.metrics.restingHeartRate) : "");
     setHydrationLevel(entry.metrics?.hydrationLevel ? String(entry.metrics.hydrationLevel) : "");
-    
+
     // Scroll zum Formular
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -696,25 +739,34 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
             <div className="space-y-2">
               <Label htmlFor="workout-reference">{t('recoveryDiary.workoutLink')}</Label>
               <Select value={workoutId} onValueChange={(value) => setWorkoutId(value)}>
-                <SelectTrigger id="workout-reference">
+                <SelectTrigger id="workout-reference" className="h-auto min-h-10 py-2 items-start [&>span]:line-clamp-none">
                   <SelectValue placeholder={t('recoveryDiary.workoutLinkPlaceholder')}>
-                    {workoutId && workoutId !== "none" && !recentWorkouts.find(w => w.id === workoutId) && (
-                      <span className="text-sm">{t('recoveryDiary.workoutLinkPlaceholder')}</span>
-                    )}
+                    {selectedWorkout ? (
+                      <div className="flex flex-col text-left w-full">
+                        <span className="font-medium break-words whitespace-normal">{selectedWorkout.title}</span>
+                        {selectedWorkout.workoutDate && (
+                          <span className="text-xs text-muted-foreground">
+                            {formatDate(selectedWorkout.workoutDate)}
+                          </span>
+                        )}
+                      </div>
+                    ) : workoutId === "none" ? (
+                      <span>{t('recoveryDiary.noWorkout')}</span>
+                    ) : null}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">{t('recoveryDiary.noWorkout')}</SelectItem>
                   {recentWorkouts.map((workout) => (
                     <SelectItem key={workout.id} value={workout.id}>
-                      <span className="flex flex-col text-sm">
-                        <span className="font-medium">{workout.title}</span>
+                      <div className="flex flex-col">
+                        <span>{workout.title}</span>
                         {workout.workoutDate && (
                           <span className="text-xs text-muted-foreground">
                             {formatDate(workout.workoutDate)}
                           </span>
                         )}
-                      </span>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>

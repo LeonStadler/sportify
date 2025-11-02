@@ -50,7 +50,8 @@ export interface AuthContextType extends AuthState {
   confirmResetPassword: (token: string, newPassword: string) => Promise<void>;
   verifyEmail: (token: string) => Promise<void>;
   resendVerification: () => Promise<void>;
-  enable2FA: () => Promise<{ qrCode: string; backupCodes: string[] }>;
+  enable2FA: () => Promise<{ secret: { base32: string; otpauthUrl: string }; backupCodes: string[] }>;
+  verify2FA: (token: string) => Promise<void>;
   disable2FA: (password: string) => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
   deleteAccount: (password: string) => Promise<void>;
@@ -130,14 +131,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     initializeAuth();
   }, []);
 
-  const login = async (email: string, password: string): Promise<void> => {
+  const login = async (email: string, password: string, twoFactorCode?: string): Promise<void> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
+      const body: { email: string; password: string; twoFactorCode?: string } = { email, password };
+      if (twoFactorCode) {
+        body.twoFactorCode = twoFactorCode;
+      }
+
       const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify(body)
       });
 
       const data = await response.json();
@@ -315,13 +321,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const enable2FA = async (): Promise<{ qrCode: string; backupCodes: string[] }> => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
-
+  const enable2FA = async (): Promise<{ secret: { base32: string; otpauthUrl: string }; backupCodes: string[] }> => {
+    // Don't set global isLoading - use local loading state in component instead
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        throw new Error('Nicht angemeldet');
+        const error = new Error('Nicht angemeldet');
+        setState(prev => ({ ...prev, error: error.message }));
+        throw error;
       }
 
       const response = await fetch(`${API_URL}/auth/enable-2fa`, {
@@ -338,27 +345,72 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         throw new Error(data.error || 'Fehler beim Aktivieren der 2FA');
       }
 
-      // Update user state
-      if (state.user) {
-        const updatedUser = { ...state.user, has2FA: true };
-        setState(prev => ({ ...prev, user: updatedUser, isLoading: false }));
-      }
+      // Note: 2FA is not yet fully activated - user needs to verify TOTP code first
+      // The backend sets has_2fa = false until verification is complete via /api/auth/verify-2fa
 
-      return data;
+      return {
+        secret: data.secret,
+        backupCodes: data.backupCodes
+      };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.';
-      setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));
+      setState(prev => ({ ...prev, error: errorMessage }));
+      throw error;
+    }
+  };
+
+  const verify2FA = async (token: string): Promise<void> => {
+    // Don't set global isLoading - use local loading state in component instead
+    try {
+      const authToken = localStorage.getItem('token');
+      if (!authToken) {
+        const error = new Error('Nicht angemeldet');
+        setState(prev => ({ ...prev, error: error.message }));
+        throw error;
+      }
+
+      const response = await fetch(`${API_URL}/auth/verify-2fa`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ token })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Fehler beim Verifizieren der 2FA');
+      }
+
+      // Reload user data to get updated has2FA status
+      try {
+        const userResponse = await fetch(`${API_URL}/auth/me`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          setState(prev => ({ ...prev, user: userData }));
+        }
+      } catch (refreshError) {
+        console.error('Error refreshing user data:', refreshError);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.';
+      setState(prev => ({ ...prev, error: errorMessage }));
       throw error;
     }
   };
 
   const disable2FA = async (password: string): Promise<void> => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
-
+    // Don't set global isLoading - use local loading state in component instead
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        throw new Error('Nicht angemeldet');
+        const error = new Error('Nicht angemeldet');
+        setState(prev => ({ ...prev, error: error.message }));
+        throw error;
       }
 
       const response = await fetch(`${API_URL}/auth/disable-2fa`, {
@@ -379,11 +431,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Update user state
       if (state.user) {
         const updatedUser = { ...state.user, has2FA: false };
-        setState(prev => ({ ...prev, user: updatedUser, isLoading: false }));
+        setState(prev => ({ ...prev, user: updatedUser }));
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.';
-      setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));
+      setState(prev => ({ ...prev, error: errorMessage }));
       throw error;
     }
   };
@@ -427,6 +479,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        const error = new Error('Nicht angemeldet');
+        setState(prev => ({ ...prev, isLoading: false, error: error.message }));
+        throw error;
+      }
+
       const response = await fetch(`${API_URL}/profile/account`, {
         method: 'DELETE',
         headers: {
@@ -464,7 +522,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        throw new Error('Nicht angemeldet');
+        const error = new Error('Nicht angemeldet');
+        setState(prev => ({ ...prev, isLoading: false, error: error.message }));
+        throw error;
       }
 
       const response = await fetch(`${API_URL}/admin/invite-user`, {
@@ -496,7 +556,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        throw new Error('Nicht angemeldet');
+        const error = new Error('Nicht angemeldet');
+        setState(prev => ({ ...prev, isLoading: false, error: error.message }));
+        throw error;
       }
 
       const response = await fetch(`${API_URL}/profile/invite-friend`, {
@@ -522,7 +584,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.';
-      setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));      throw error;
+      setState(prev => ({ ...prev, isLoading: false, error: errorMessage })); throw error;
     }
   };
 
@@ -621,6 +683,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     verifyEmail,
     resendVerification,
     enable2FA,
+    verify2FA,
     disable2FA,
     updateProfile,
     deleteAccount,

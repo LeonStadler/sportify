@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { de, enUS } from "date-fns/locale";
 import { CalendarIcon, Clock, Plus, Trash2 } from "lucide-react";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import type { Workout } from '@/types/workout';
 
@@ -138,6 +138,7 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
     notes: ""
   }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isTitleInitialized = useRef(false);
 
   // Initialwerte setzen oder aktualisieren wenn ein Workout editiert wird
   useEffect(() => {
@@ -158,10 +159,15 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
           notes: a.notes || "",
         }))
       );
-    } else if (!title) {
-      setTitle(getDefaultTitle());
+      isTitleInitialized.current = true;
+    } else {
+      // Wenn kein Workout vorhanden ist und Titel noch nicht initialisiert wurde, Standard-Titel setzen
+      if (!isTitleInitialized.current) {
+        setTitle(getDefaultTitle());
+        isTitleInitialized.current = true;
+      }
     }
-  }, [workout, title]);
+  }, [workout]);
 
   const addActivity = () => {
     setActivities([...activities, {
@@ -381,6 +387,7 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
       });
 
       // Form zurücksetzen
+      isTitleInitialized.current = false;
       setTitle(getDefaultTitle());
       setDescription("");
       setWorkoutDate(new Date());

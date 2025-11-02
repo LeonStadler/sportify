@@ -3,7 +3,7 @@ import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -19,12 +19,14 @@ interface RegisterFormProps {
   redirectTo?: string;
 }
 
-export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
+export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, redirectTo }) => {
   const { t } = useTranslation();
   const { register: registerUser, isLoading, error, clearError } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const invitationToken = searchParams.get('token') || undefined;
 
   const registerSchema = useMemo(() => z.object({
     firstName: z.string().min(2, t('validation.firstNameMin')),
@@ -90,13 +92,17 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
         firstName: data.firstName,
         lastName: data.lastName,
         nickname: data.nickname || undefined,
-        displayPreference: data.displayPreference
+        displayPreference: data.displayPreference,
+        invitationToken: invitationToken
       };
 
       const result = await registerUser(registerData);
 
       if (onSuccess) {
         onSuccess();
+      } else if (redirectTo) {
+        // Navigate to redirect URL (e.g., invite page)
+        navigate(redirectTo);
       } else if (result.needsVerification) {
         // Umleitung zur E-Mail-Verifizierung
         navigate(`/auth/email-verification?email=${encodeURIComponent(result.email)}`);

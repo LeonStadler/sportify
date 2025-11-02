@@ -1,10 +1,21 @@
 import { PageTemplate } from "@/components/PageTemplate";
 import { TrainingDiarySection } from "@/components/TrainingDiarySection";
 import { WorkoutForm } from "@/components/WorkoutForm";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from '@/lib/api';
@@ -37,17 +48,20 @@ export function Training() {
     hasPrev: false,
   });
   const [editingWorkout, setEditingWorkout] = useState<Workout | null>(null);
+  const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
+  const [createdWorkoutId, setCreatedWorkoutId] = useState<string | undefined>(undefined);
+  const [activeTab, setActiveTab] = useState("trainings");
   const { toast } = useToast();
   const { user } = useAuth();
 
   const exerciseTypes = [
-    { id: "all", name: "Alle Übungen" },
-    { id: "pullups", name: "Klimmzüge" },
-    { id: "pushups", name: "Liegestütze" },
-    { id: "running", name: "Laufen" },
-    { id: "cycling", name: "Radfahren" },
-    { id: "situps", name: "Sit-ups" },
-    { id: "other", name: "Sonstiges" },
+    { id: "all", name: t('training.allExercises') },
+    { id: "pullups", name: t('training.pullups') },
+    { id: "pushups", name: t('training.pushups') },
+    { id: "running", name: t('training.running') },
+    { id: "cycling", name: t('training.cycling') },
+    { id: "situps", name: t('training.situps') },
+    { id: "other", name: t('training.other') },
   ];
 
   const loadWorkouts = useCallback(async (page = 1, type = "all") => {
@@ -71,7 +85,7 @@ export function Training() {
       });
 
       if (!response.ok) {
-        throw new Error('Fehler beim Laden der Workouts');
+        throw new Error(t('training.loadError'));
       }
 
       const data: WorkoutResponse = await response.json();
@@ -82,22 +96,39 @@ export function Training() {
     } catch (error) {
       console.error('Load workouts error:', error);
       toast({
-        title: "Fehler",
-        description: "Workouts konnten nicht geladen werden.",
+        title: t('common.error'),
+        description: t('training.workoutsLoadError'),
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
-  }, [user, toast]);
+  }, [user, toast, t]);
 
   useEffect(() => {
     loadWorkouts(1, filterType);
   }, [loadWorkouts, filterType]);
 
-  const handleWorkoutCreated = () => {
+  const handleWorkoutCreated = (workoutId?: string) => {
     // Lade die erste Seite neu um das neue Workout zu zeigen
     loadWorkouts(1, filterType);
+
+    // Zeige Dialog an, wenn ein neues Workout erstellt wurde
+    if (workoutId) {
+      setCreatedWorkoutId(workoutId);
+      setShowRecoveryDialog(true);
+    }
+  };
+
+  const handleRecoveryDialogConfirm = () => {
+    setShowRecoveryDialog(false);
+    // Wechsle zum Erholungstagebuch-Tab
+    setActiveTab("recovery");
+  };
+
+  const handleRecoveryDialogCancel = () => {
+    setShowRecoveryDialog(false);
+    setCreatedWorkoutId(undefined);
   };
 
   const handleFilterChange = (value: string) => {
@@ -110,7 +141,7 @@ export function Training() {
   };
 
   const deleteWorkout = async (workoutId: string) => {
-    if (!confirm('Möchtest du dieses Workout wirklich löschen?')) {
+    if (!confirm(t('training.deleteConfirm'))) {
       return;
     }
 
@@ -124,20 +155,20 @@ export function Training() {
       });
 
       if (!response.ok) {
-        throw new Error('Fehler beim Löschen des Workouts');
+        throw new Error(t('training.deleteError'));
       }
 
       toast({
-        title: "Workout gelöscht",
-        description: "Das Workout wurde erfolgreich gelöscht.",
+        title: t('training.workoutDeleted'),
+        description: t('training.workoutDeletedSuccess'),
       });
 
       loadWorkouts(currentPage, filterType);
     } catch (error) {
       console.error('Delete workout error:', error);
       toast({
-        title: "Fehler",
-        description: "Workout konnte nicht gelöscht werden.",
+        title: t('common.error'),
+        description: t('training.deleteWorkoutError'),
         variant: "destructive",
       });
     }
@@ -196,39 +227,19 @@ export function Training() {
   };
 
   // Datum- und Uhrzeitformatierung basierend auf Benutzereinstellungen
-  const formatDate = (dateString: string | null | undefined) => {
-    if (!dateString) return "Unbekanntes Datum";
+  const formatDate = (dateString: string) => {
+    if (!dateString) return t('training.unknownDate');
 
     try {
-      // Handle different date formats
-      let date: Date;
-      if (typeof dateString === 'string') {
-        // Try parsing as ISO string first
-        date = new Date(dateString);
-        // If invalid, try other formats
-        if (isNaN(date.getTime())) {
-          // Try parsing as timestamp
-          const timestamp = Date.parse(dateString);
-          if (!isNaN(timestamp)) {
-            date = new Date(timestamp);
-          } else {
-            return "Ungültiges Datum";
-          }
-        }
-      } else {
-        date = new Date(dateString);
-      }
-
-      if (isNaN(date.getTime())) {
-        return "Ungültiges Datum";
-      }
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return "Invalid Date";
 
       const now = new Date();
       const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
 
-      if (diffInHours < 1) return "Vor wenigen Minuten";
-      if (diffInHours < 24) return `Vor ${diffInHours} Stunden`;
-      if (diffInHours < 48) return "Gestern";
+      if (diffInHours < 1) return t('training.fewMinutesAgo');
+      if (diffInHours < 24) return t('training.hoursAgo', { hours: diffInHours });
+      if (diffInHours < 48) return t('training.yesterday');
 
       const locale = user?.languagePreference === 'en' ? 'en-US' : 'de-DE';
       return date.toLocaleDateString(locale, {
@@ -237,49 +248,27 @@ export function Training() {
         year: 'numeric',
       });
     } catch (error) {
-      console.error('Date formatting error:', error, 'Input:', dateString);
-      return "Ungültiges Datum";
+      console.error('Date formatting error:', error);
+      return "Invalid Date";
     }
   };
 
-  const formatWorkoutDateTime = (dateString: string | null | undefined | Date) => {
-    if (!dateString) return null;
+  const formatWorkoutDateTime = (dateString: string | null | undefined) => {
+    if (!dateString) return t('training.unknownDate');
 
     try {
       // Handle different date formats
       let date: Date;
-
-      // If it's already a Date object
-      if (dateString instanceof Date) {
-        date = dateString;
-      } else if (typeof dateString === 'string') {
-        // Try parsing as ISO string first
+      if (typeof dateString === 'string') {
         date = new Date(dateString);
-
-        // If invalid, try other parsing methods
-        if (isNaN(date.getTime())) {
-          // Remove any timezone info that might cause issues
-          const cleanString = dateString.replace(/[^\d\-T:.\sZ]/g, '');
-          date = new Date(cleanString);
-
-          // If still invalid, try timestamp
-          if (isNaN(date.getTime())) {
-            const timestamp = Date.parse(dateString);
-            if (!isNaN(timestamp)) {
-              date = new Date(timestamp);
-            } else {
-              console.warn('Could not parse date:', dateString);
-              return null;
-            }
-          }
-        }
       } else {
-        date = new Date(dateString);
+        // Fallback für andere Typen
+        date = new Date(dateString as any);
       }
 
       if (isNaN(date.getTime())) {
-        console.warn('Invalid date after parsing:', dateString);
-        return null;
+        console.warn('Invalid date:', dateString);
+        return t('training.unknownDate');
       }
 
       const locale = user?.languagePreference === 'en' ? 'en-US' : 'de-DE';
@@ -295,7 +284,7 @@ export function Training() {
       });
     } catch (error) {
       console.error('Date formatting error:', error, 'Input:', dateString);
-      return null;
+      return t('training.unknownDate');
     }
   };
 
@@ -305,15 +294,15 @@ export function Training() {
     const remainingMinutes = minutes % 60;
 
     if (hours > 0) {
-      return `${hours}h ${remainingMinutes}min`;
+      return t('training.duration.hours', { hours, minutes: remainingMinutes });
     }
-    return `${minutes}min`;
+    return t('training.duration.minutes', { minutes });
   };
 
   if (!user) {
     return (
       <div className="flex items-center justify-center h-96">
-        <p className="text-gray-500">Du musst angemeldet sein, um Workouts zu sehen.</p>
+        <p className="text-gray-500">{t('training.mustBeLoggedIn')}</p>
       </div>
     );
   }
@@ -323,166 +312,206 @@ export function Training() {
       title={t('training.title', 'Training Log')}
       subtitle={t('training.subtitle', 'Trage deine Workouts ein und verfolge deinen Fortschritt')}
     >
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
-        <WorkoutForm
-          workout={editingWorkout ?? undefined}
-          onWorkoutCreated={handleWorkoutCreated}
-          onWorkoutUpdated={handleWorkoutUpdated}
-          onCancelEdit={handleCancelEdit}
-        />
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsTrigger value="trainings">{t('training.trainingsDiary')}</TabsTrigger>
+          <TabsTrigger value="recovery">{t('training.recoveryDiary')}</TabsTrigger>
+        </TabsList>
 
-        <Card>
-          <CardHeader className="pb-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <CardTitle className="text-lg md:text-xl">Deine Workouts</CardTitle>
-              <Select value={filterType} onValueChange={handleFilterChange}>
-                <SelectTrigger className="w-full sm:w-48">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {exerciseTypes.map((type) => (
-                    <SelectItem key={type.id} value={type.id}>
-                      {type.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-3">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="animate-pulse">
-                    <div className="h-20 bg-muted rounded-lg"></div>
+        <TabsContent value="trainings" className="space-y-4 md:space-y-6">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
+            <WorkoutForm
+              workout={editingWorkout ?? undefined}
+              onWorkoutCreated={handleWorkoutCreated}
+              onWorkoutUpdated={handleWorkoutUpdated}
+              onCancelEdit={handleCancelEdit}
+            />
+
+            <Card>
+              <CardHeader className="pb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <CardTitle className="text-lg md:text-xl">{t('training.yourWorkouts')}</CardTitle>
+                  <Select value={filterType} onValueChange={handleFilterChange}>
+                    <SelectTrigger className="w-full sm:w-48">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {exerciseTypes.map((type) => (
+                        <SelectItem key={type.id} value={type.id}>
+                          {type.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="space-y-3">
+                    {[...Array(5)].map((_, i) => (
+                      <div key={i} className="animate-pulse">
+                        <div className="h-20 bg-muted rounded-lg"></div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : workouts.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground mb-2">
-                  {filterType === "all"
-                    ? "Noch keine Workouts vorhanden."
-                    : `Keine Workouts für ${getExerciseName(filterType)} gefunden.`
-                  }
-                </p>
-                <p className="text-xs md:text-sm text-muted-foreground">
-                  Erstelle dein erstes Workout mit dem Formular {window.innerWidth >= 1280 ? 'links' : 'oben'}.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {workouts.map((workout) => (
-                  <div key={workout.id} className="p-3 md:p-4 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-medium text-foreground text-sm md:text-base truncate">{workout.title}</h3>
-                          {workout.duration && (
-                            <Badge variant="outline" className="text-xs">
-                              ⏱️ {formatDuration(workout.duration) || `${workout.duration}min`}
-                            </Badge>
-                          )}
-                        </div>
-
-                        {workout.description && (
-                          <p className="text-xs md:text-sm text-muted-foreground mb-2 line-clamp-2">{workout.description}</p>
-                        )}
-
-                        <div className="flex flex-wrap gap-1 mb-2">
-                          {workout.activities.map((activity, actIdx) => (
-                            <div key={activity.id || `activity-${actIdx}`} className="flex items-center gap-1">
-                              <Badge
-                                className={`text-xs ${getExerciseColor(activity.activityType || 'other')}`}
-                                variant="secondary"
-                              >
-                                {getExerciseIcon(activity.activityType || 'other')} {String(activity.amount || 0)} {String(activity.unit || '')}
-                              </Badge>
-                              {activity.sets && Array.isArray(activity.sets) && activity.sets.length > 0 && (
-                                <span className="text-xs text-muted-foreground">
-                                  ({activity.sets.length} Sets)
-                                </span>
+                ) : workouts.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground mb-2">
+                      {filterType === "all"
+                        ? t('training.noWorkouts')
+                        : t('training.noWorkoutsForType', { type: getExerciseName(filterType) })
+                      }
+                    </p>
+                    <p className="text-xs md:text-sm text-muted-foreground">
+                      {t('training.createFirstWorkout', { 
+                        location: window.innerWidth >= 1280 ? t('training.location.left') : t('training.location.above')
+                      })}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {workouts.map((workout) => (
+                      <div key={workout.id} className="p-3 md:p-4 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-medium text-foreground text-sm md:text-base truncate">{workout.title}</h3>
+                              {workout.duration && (
+                                <Badge variant="outline" className="text-xs">
+                                  ⏱️ {formatDuration(workout.duration)}
+                                </Badge>
                               )}
                             </div>
-                          ))}
-                        </div>
 
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span>📅 {(() => {
-                            // Versuche zuerst workoutDate zu formatieren
-                            if (workout.workoutDate) {
-                              const formatted = formatWorkoutDateTime(workout.workoutDate);
-                              if (formatted && typeof formatted === 'string') return formatted;
-                            }
-                            // Fallback zu createdAt
-                            const fallback = formatDate(workout.createdAt);
-                            return (typeof fallback === 'string' ? fallback : String(fallback || 'Unbekanntes Datum'));
-                          })()}</span>
+                            {workout.description && (
+                              <p className="text-xs md:text-sm text-muted-foreground mb-2 line-clamp-2">{workout.description}</p>
+                            )}
+
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {workout.activities.map((activity) => {
+                                // Formatiere Sets für Anzeige: z.B. "3x10, 3x8, 3x12"
+                                const formatSets = (sets: Array<{ reps: number; weight?: number }>) => {
+                                  if (!sets || sets.length === 0) return null;
+                                  return sets.map(set => {
+                                    const reps = set.reps || 0;
+                                    const weight = set.weight;
+                                    if (weight) {
+                                      return `${reps}x${weight}kg`;
+                                    }
+                                    return `${reps}`;
+                                  }).join(', ');
+                                };
+
+                                const setsDisplay = activity.sets && activity.sets.length > 0 
+                                  ? formatSets(activity.sets) 
+                                  : null;
+
+                                return (
+                                  <div key={activity.id} className="flex flex-col gap-1">
+                                    <div className="flex items-center gap-1 flex-wrap">
+                                      <Badge
+                                        className={`text-xs ${getExerciseColor(activity.activityType)}`}
+                                        variant="secondary"
+                                      >
+                                        {getExerciseIcon(activity.activityType)} {activity.amount} {activity.unit}
+                                      </Badge>
+                                      {setsDisplay && (
+                                        <span className="text-xs text-muted-foreground">
+                                          ({setsDisplay})
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>📅 {workout.workoutDate ? formatWorkoutDateTime(workout.workoutDate) : formatDate(workout.createdAt)}</span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            {isWorkoutEditable(workout.workoutDate, workout.createdAt) && (
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditClick(workout)}
+                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 flex-shrink-0"
+                                >
+                                  <span className="hidden sm:inline">{t('training.edit')}</span>
+                                  <span className="sm:hidden">✏️</span>
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => deleteWorkout(workout.id)}
+                                  className="text-destructive hover:text-destructive-foreground hover:bg-destructive flex-shrink-0"
+                                >
+                                  <span className="hidden sm:inline">{t('training.delete')}</span>
+                                  <span className="sm:hidden">×</span>
+                                </Button>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        {isWorkoutEditable(workout.workoutDate, workout.createdAt) && (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleEditClick(workout)}
-                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 flex-shrink-0"
-                            >
-                              <span className="hidden sm:inline">Bearbeiten</span>
-                              <span className="sm:hidden">✏️</span>
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => deleteWorkout(workout.id)}
-                              className="text-destructive hover:text-destructive-foreground hover:bg-destructive flex-shrink-0"
-                            >
-                              <span className="hidden sm:inline">Löschen</span>
-                              <span className="sm:hidden">×</span>
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                    ))}
 
-                {/* Pagination - Mobile optimiert */}
-                {pagination.totalPages > 1 && (
-                  <div className="flex items-center justify-between pt-4 border-t">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handlePageChange(currentPage - 1)}
-                      disabled={!pagination.hasPrev}
-                      className="text-xs md:text-sm"
-                    >
-                      <span className="hidden sm:inline">Vorherige</span>
-                      <span className="sm:hidden">←</span>
-                    </Button>
-                    <span className="text-xs md:text-sm text-muted-foreground">
-                      {pagination.currentPage}/{pagination.totalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handlePageChange(currentPage + 1)}
-                      disabled={!pagination.hasNext}
-                      className="text-xs md:text-sm"
-                    >
-                      <span className="hidden sm:inline">Nächste</span>
-                      <span className="sm:hidden">→</span>
-                    </Button>
+                    {/* Pagination - Mobile optimiert */}
+                    {pagination.totalPages > 1 && (
+                      <div className="flex items-center justify-between pt-4 border-t">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePageChange(currentPage - 1)}
+                          disabled={!pagination.hasPrev}
+                          className="text-xs md:text-sm"
+                        >
+                          <span className="hidden sm:inline">{t('training.previous')}</span>
+                          <span className="sm:hidden">←</span>
+                        </Button>
+                        <span className="text-xs md:text-sm text-muted-foreground">
+                          {pagination.currentPage}/{pagination.totalPages}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePageChange(currentPage + 1)}
+                          disabled={!pagination.hasNext}
+                          className="text-xs md:text-sm"
+                        >
+                          <span className="hidden sm:inline">{t('training.next')}</span>
+                          <span className="sm:hidden">→</span>
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
-        <TrainingDiarySection className="xl:col-span-2" />
-      </div>
+        <TabsContent value="recovery" className="space-y-4 md:space-y-6">
+          <TrainingDiarySection preselectedWorkoutId={createdWorkoutId} />
+        </TabsContent>
+      </Tabs>
+
+      <AlertDialog open={showRecoveryDialog} onOpenChange={setShowRecoveryDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('training.recoveryDialog.title')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('training.recoveryDialog.description')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleRecoveryDialogCancel}>{t('training.recoveryDialog.noLater')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRecoveryDialogConfirm}>{t('training.recoveryDialog.yesDocument')}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageTemplate>
   );
 }

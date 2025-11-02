@@ -1,5 +1,5 @@
 import { ArrowLeft, Globe, Palette, Settings, Trophy } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 import { RegisterForm } from '@/components/auth/RegisterForm';
@@ -17,6 +17,8 @@ import {
 
 export default function Register() {
   const { t } = useTranslation();
+  const [searchParams] = useSearchParams();
+  const inviteUserId = searchParams.get('invite');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex flex-col">
@@ -99,7 +101,7 @@ export default function Register() {
               {t('authPages.createAccount')}
             </p>
           </div>
-          <RegisterForm />
+          <RegisterForm redirectTo={inviteUserId ? `/invite/${inviteUserId}` : undefined} />
         </div>
       </div>
 

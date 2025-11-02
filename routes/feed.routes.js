@@ -15,33 +15,75 @@ export const createFeedRouter = (pool, ensureFriendInfrastructure) => {
             const currentPage = Math.max(1, parseInt(page, 10) || 1);
             const offset = (currentPage - 1) * limit;
 
-            const query = `
-                WITH friend_ids AS (
+            // Prüfe ob friendships-Tabelle existiert und ob der Benutzer Freunde hat
+            let hasFriends = false;
+            let friendIds = [];
+
+            try {
+                const friendCheckQuery = `
                     SELECT CASE WHEN user_one_id = $1 THEN user_two_id ELSE user_one_id END AS friend_id
                     FROM friendships
                     WHERE user_one_id = $1 OR user_two_id = $1
-                )
-                SELECT
-                    wa.id,
-                    wa.activity_type,
-                    wa.quantity as amount,
-                    COALESCE(wa.points_earned, 0) as points,
-                    COALESCE(wa.created_at, w.created_at) as created_at,
-                    w.title as workout_title,
-                    u.first_name,
-                    u.last_name,
-                    u.nickname,
-                    u.display_preference,
-                    u.avatar_url
-                FROM workout_activities wa
-                JOIN workouts w ON wa.workout_id = w.id
-                JOIN users u ON w.user_id = u.id
-                WHERE w.user_id = $1 OR w.user_id IN (SELECT friend_id FROM friend_ids)
-                ORDER BY COALESCE(wa.created_at, w.created_at) DESC
-                LIMIT $2 OFFSET $3
-            `;
+                `;
+                const friendResult = await pool.query(friendCheckQuery, [req.user.id]);
+                friendIds = friendResult.rows.map(row => row.friend_id);
+                hasFriends = friendIds.length > 0;
+            } catch (error) {
+                // Tabelle existiert möglicherweise nicht - setze hasFriends auf false
+                console.warn('Could not check friendships:', error.message);
+                hasFriends = false;
+            }
 
-            const { rows } = await pool.query(query, [req.user.id, limit, offset]);
+            let query, queryParams;
+
+            if (hasFriends && friendIds.length > 0) {
+                // Nur Aktivitäten von Freunden, nicht die eigenen
+                query = `
+                    SELECT
+                        wa.id,
+                        wa.activity_type,
+                        wa.quantity as amount,
+                        COALESCE(wa.points_earned, 0) as points,
+                        COALESCE(wa.created_at, w.created_at) as created_at,
+                        w.title as workout_title,
+                        u.first_name,
+                        u.last_name,
+                        u.nickname,
+                        u.display_preference,
+                        u.avatar_url
+                    FROM workout_activities wa
+                    JOIN workouts w ON wa.workout_id = w.id
+                    JOIN users u ON w.user_id = u.id
+                    WHERE w.user_id = ANY($1::uuid[])
+                    ORDER BY COALESCE(wa.created_at, w.created_at) DESC
+                    LIMIT $2 OFFSET $3
+                `;
+                queryParams = [friendIds, limit, offset];
+            } else {
+                // Keine Freunde - leeres Ergebnis
+                query = `
+                    SELECT
+                        wa.id,
+                        wa.activity_type,
+                        wa.quantity as amount,
+                        COALESCE(wa.points_earned, 0) as points,
+                        COALESCE(wa.created_at, w.created_at) as created_at,
+                        w.title as workout_title,
+                        u.first_name,
+                        u.last_name,
+                        u.nickname,
+                        u.display_preference,
+                        u.avatar_url
+                    FROM workout_activities wa
+                    JOIN workouts w ON wa.workout_id = w.id
+                    JOIN users u ON w.user_id = u.id
+                    WHERE 1 = 0
+                    LIMIT $1 OFFSET $2
+                `;
+                queryParams = [limit, offset];
+            }
+
+            const { rows } = await pool.query(query, queryParams);
 
             const activities = rows.map(row => {
                 const activity = toCamelCase(row);
@@ -68,7 +110,10 @@ export const createFeedRouter = (pool, ensureFriendInfrastructure) => {
                 };
             });
 
-            res.json({ activities });
+            res.json({
+                activities,
+                hasFriends
+            });
         } catch (error) {
             console.error('Activity feed error:', error);
             res.status(500).json({ error: 'Serverfehler beim Laden des Activity Feeds.' });

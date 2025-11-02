@@ -337,6 +337,54 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
     loadEntries(1);
   }, [filterMood, filterStartDate, filterEndDate, searchFilter, user, loadEntries]);
 
+  // Lade fehlende Workouts für die Einträge
+  useEffect(() => {
+    if (!user || entries.length === 0) return;
+
+    const loadMissingWorkouts = async () => {
+      const workoutIds = entries
+        .map(e => e.workoutId)
+        .filter((id): id is string => id !== null && id !== undefined && id !== "none")
+        .filter(id => !recentWorkouts.some(w => w.id === id));
+
+      if (workoutIds.length === 0) return;
+
+      const token = localStorage.getItem("token");
+      const loadedWorkouts: RecentWorkoutOption[] = [];
+
+      for (const workoutId of workoutIds) {
+        try {
+          const response = await fetch(`${API_URL}/workouts/${workoutId}`, {
+            headers: {
+              Authorization: `Bearer ${token ?? ""}`,
+            },
+          });
+
+          if (response.ok) {
+            const workout = await response.json();
+            loadedWorkouts.push({
+              id: workout.id,
+              title: workout.title,
+              workoutDate: workout.workoutDate || workout.createdAt,
+            });
+          }
+        } catch (error) {
+          console.error(`Error fetching workout ${workoutId}:`, error);
+        }
+      }
+
+      if (loadedWorkouts.length > 0) {
+        setRecentWorkouts(prev => {
+          const existingIds = new Set(prev.map(w => w.id));
+          const newWorkouts = loadedWorkouts.filter(w => !existingIds.has(w.id));
+          return [...newWorkouts, ...prev];
+        });
+      }
+    };
+
+    loadMissingWorkouts();
+  }, [entries, recentWorkouts, user]);
+
   useEffect(() => {
     const handler = setTimeout(() => {
       setSearchFilter(searchInput.trim());
@@ -939,6 +987,7 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
             <div className="space-y-3">
               {entries.map((entry) => {
                 const currentMood = moodOptions.find((m) => m.value === entry.mood);
+                const entryWorkout = entry.workoutId ? recentWorkouts.find(w => w.id === entry.workoutId) : null;
                 return (
                   <div key={entry.id} className="rounded-lg border bg-card p-4 shadow-sm">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -947,10 +996,15 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
                           <Badge variant="secondary" className="text-xs">
                             {currentMood?.emoji ?? ""} {currentMood?.label ?? entry.mood}
                           </Badge>
-                          <span className="text-sm font-medium text-foreground">{formatDate(entry.entryDate)}</span>
+                          <span className="text-sm font-semibold text-foreground">{formatDate(entry.entryDate)}</span>
                           {entry.workoutId && (
-                            <Badge variant="outline" className="text-xs">
-                              Workout #{entry.workoutId.slice(0, 8)}
+                            <Badge variant="outline" className="text-xs flex flex-col items-start gap-0.5 px-2 py-1">
+                              <span className="font-medium">{entryWorkout ? entryWorkout.title : `Workout #${entry.workoutId.slice(0, 8)}`}</span>
+                              {entryWorkout?.workoutDate && (
+                                <span className="text-[10px] text-muted-foreground">
+                                  {formatDate(entryWorkout.workoutDate)}
+                                </span>
+                              )}
                             </Badge>
                           )}
                         </div>

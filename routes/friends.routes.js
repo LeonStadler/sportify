@@ -158,7 +158,6 @@ export const createFriendsRouter = (pool, ensureFriendInfrastructure) => {
                 SELECT
                     f.id AS friendship_id,
                     CASE WHEN f.requester_id = $1 THEN f.addressee_id ELSE f.requester_id END AS friend_id,
-                    u.id,
                     u.first_name,
                     u.last_name,
                     u.nickname,
@@ -175,19 +174,13 @@ export const createFriendsRouter = (pool, ensureFriendInfrastructure) => {
             const friends = rows.map((row) => {
                 const friend = applyDisplayName(toCamelCase(row));
                 // friendshipId sollte bereits nach toCamelCase vorhanden sein (von friendship_id)
-                // friendId wird zu id umbenannt, aber id sollte bereits vorhanden sein
-                if (friend.friendId && !friend.id) {
-                    friend.id = friend.friendId;
-                }
+                // friendId wird zu id umbenannt
+                friend.id = friend.friendId;
                 // Stelle sicher, dass friendshipId vorhanden ist
                 if (!friend.friendshipId && friend.friendship_id) {
                     friend.friendshipId = friend.friendship_id;
                 }
                 delete friend.friendId;
-                // Stelle sicher, dass alle benötigten Felder vorhanden sind
-                if (!friend.id) {
-                    console.warn('Friend missing id field:', friend);
-                }
                 return friend;
             });
 
@@ -197,7 +190,6 @@ export const createFriendsRouter = (pool, ensureFriendInfrastructure) => {
             console.error('Error stack:', error.stack);
             console.error('Error code:', error.code);
             console.error('Error detail:', error.detail);
-            console.error('Error constraint:', error.constraint);
 
             // Prüfe ob es ein Datenbank-Fehler ist
             if (error.code === '42P01') {
@@ -256,36 +248,23 @@ export const createFriendsRouter = (pool, ensureFriendInfrastructure) => {
             ]);
 
             const mapRequests = (rows, type) => rows.map((row) => {
-                try {
-                    const request = toCamelCase(row);
-                    const user = applyDisplayName({
-                        id: request.userId,
-                        firstName: request.firstName,
-                        lastName: request.lastName,
-                        nickname: request.nickname,
-                        displayPreference: request.displayPreference,
-                        avatarUrl: request.avatarUrl
-                    });
+                const request = toCamelCase(row);
+                const user = applyDisplayName({
+                    id: request.userId,
+                    firstName: request.firstName,
+                    lastName: request.lastName,
+                    nickname: request.nickname,
+                    displayPreference: request.displayPreference,
+                    avatarUrl: request.avatarUrl
+                });
 
-                    // Stelle sicher, dass alle benötigten Felder vorhanden sind
-                    if (!request.requestId) {
-                        console.warn('Request missing requestId:', request);
-                    }
-                    if (!user.id) {
-                        console.warn('User missing id in request:', user);
-                    }
-
-                    return {
-                        type,
-                        requestId: request.requestId,
-                        createdAt: request.createdAt,
-                        user
-                    };
-                } catch (mapError) {
-                    console.error('Error mapping request:', mapError, row);
-                    return null;
-                }
-            }).filter(Boolean); // Entferne null-Werte
+                return {
+                    type,
+                    requestId: request.requestId,
+                    createdAt: request.createdAt,
+                    user
+                };
+            });
 
             res.json({
                 incoming: mapRequests(incomingResult.rows, 'incoming'),
@@ -293,22 +272,7 @@ export const createFriendsRouter = (pool, ensureFriendInfrastructure) => {
             });
         } catch (error) {
             console.error('Friend requests error:', error);
-            console.error('Error stack:', error.stack);
-            console.error('Error code:', error.code);
-            console.error('Error detail:', error.detail);
-            console.error('Error constraint:', error.constraint);
-
-            // Prüfe ob es ein Datenbank-Fehler ist
-            if (error.code === '42P01') {
-                return res.status(500).json({
-                    error: 'Die Freundschafts-Tabellen existieren nicht. Bitte starte den Server neu oder migriere die Datenbank.'
-                });
-            }
-
-            const errorMessage = process.env.NODE_ENV === 'development'
-                ? (error.message || error.detail || 'Serverfehler beim Laden der Freundschaftsanfragen.')
-                : 'Serverfehler beim Laden der Freundschaftsanfragen.';
-            res.status(500).json({ error: errorMessage });
+            res.status(500).json({ error: 'Serverfehler beim Laden der Freundschaftsanfragen.' });
         }
     });
 
@@ -321,10 +285,6 @@ export const createFriendsRouter = (pool, ensureFriendInfrastructure) => {
                 return res.status(400).json({ error: 'Zielbenutzer-ID ist erforderlich.' });
             }
 
-            if (typeof targetUserId !== 'string' && typeof targetUserId !== 'number') {
-                return res.status(400).json({ error: 'Ungültige Zielbenutzer-ID.' });
-            }
-
             if (targetUserId === req.user.id) {
                 return res.status(400).json({ error: 'Du kannst dir selbst keine Freundschaftsanfrage senden.' });
             }
@@ -334,7 +294,6 @@ export const createFriendsRouter = (pool, ensureFriendInfrastructure) => {
                 return res.status(429).json({ error: 'Zu viele Anfragen. Bitte versuche es später erneut.', retryAfter: rateLimit.retryAfter });
             }
 
-            // Prüfe ob Zielbenutzer existiert
             const { rows: targetRows } = await pool.query(
                 'SELECT id FROM users WHERE id = $1',
                 [targetUserId]
@@ -344,7 +303,6 @@ export const createFriendsRouter = (pool, ensureFriendInfrastructure) => {
                 return res.status(404).json({ error: 'Zielbenutzer wurde nicht gefunden.' });
             }
 
-            // Prüfe ob bereits befreundet (egal welcher Status)
             const { rowCount: existingFriends } = await pool.query(
                 `SELECT 1 FROM friendships 
                  WHERE ((requester_id = $1 AND addressee_id = $2) OR (requester_id = $2 AND addressee_id = $1))
@@ -356,20 +314,15 @@ export const createFriendsRouter = (pool, ensureFriendInfrastructure) => {
                 return res.status(409).json({ error: 'Ihr seid bereits befreundet.' });
             }
 
-            // Prüfe ob bereits eine Anfrage existiert (egal welcher Status)
-            const { rows: existingRequests } = await pool.query(
-                `SELECT id, status FROM friend_requests
-                 WHERE ((requester_id = $1 AND target_id = $2) OR (requester_id = $2 AND target_id = $1))`,
+            const { rowCount: pendingRequests } = await pool.query(
+                `SELECT 1 FROM friend_requests
+                 WHERE ((requester_id = $1 AND target_id = $2) OR (requester_id = $2 AND target_id = $1))
+                 AND status = 'pending'`,
                 [req.user.id, targetUserId]
             );
 
-            if (existingRequests.length > 0) {
-                const request = existingRequests[0];
-                if (request.status === 'pending') {
-                    return res.status(409).json({ error: 'Es besteht bereits eine ausstehende Anfrage zwischen euch.' });
-                } else {
-                    return res.status(409).json({ error: 'Es besteht bereits eine Anfrage zwischen euch.' });
-                }
+            if (pendingRequests > 0) {
+                return res.status(409).json({ error: 'Es besteht bereits eine ausstehende Anfrage zwischen euch.' });
             }
 
             const requestId = randomUUID();
@@ -423,16 +376,8 @@ export const createFriendsRouter = (pool, ensureFriendInfrastructure) => {
             const { requestId } = req.params;
             const { action } = req.body;
 
-            if (!requestId || (typeof requestId !== 'string' && typeof requestId !== 'number')) {
-                return res.status(400).json({ error: 'Ungültige Anfrage-ID.' });
-            }
-
-            if (!action || typeof action !== 'string') {
-                return res.status(400).json({ error: 'Aktion ist erforderlich.' });
-            }
-
             if (!['accept', 'decline'].includes(action)) {
-                return res.status(400).json({ error: 'Ungültige Aktion. Erlaubt sind: accept, decline.' });
+                return res.status(400).json({ error: 'Ungültige Aktion.' });
             }
 
             const { rows } = await pool.query(
@@ -446,20 +391,6 @@ export const createFriendsRouter = (pool, ensureFriendInfrastructure) => {
 
             const request = rows[0];
 
-            // Prüfe ob bereits befreundet
-            const { rowCount: existingFriends } = await pool.query(
-                `SELECT 1 FROM friendships 
-                 WHERE ((requester_id = $1 AND addressee_id = $2) OR (requester_id = $2 AND addressee_id = $1))
-                 AND status = 'accepted'`,
-                [request.requester_id, request.target_id]
-            );
-
-            if (existingFriends > 0) {
-                // Wenn bereits befreundet, aktualisiere nur den Status der Anfrage
-                await pool.query('UPDATE friend_requests SET status = $1 WHERE id = $2', ['accepted', requestId]);
-                return res.json({ status: 'accepted', message: 'Ihr seid bereits befreundet.' });
-            }
-
             if (request.target_id !== req.user.id) {
                 return res.status(403).json({ error: 'Du darfst diese Anfrage nicht bearbeiten.' });
             }
@@ -471,27 +402,18 @@ export const createFriendsRouter = (pool, ensureFriendInfrastructure) => {
             if (action === 'accept') {
                 const friendshipId = randomUUID();
 
-                // Verwende eine Transaktion für Konsistenz
-                await pool.query('BEGIN');
-                try {
-                    await pool.query('UPDATE friend_requests SET status = $1 WHERE id = $2', ['accepted', requestId]);
-                    await pool.query(
-                        `INSERT INTO friendships (id, requester_id, addressee_id, status)
-                         VALUES ($1, $2, $3, 'accepted')
-                         ON CONFLICT ON CONSTRAINT friendships_requester_id_addressee_id_key 
-                         DO UPDATE SET status = 'accepted'`,
-                        [friendshipId, request.requester_id, request.target_id]
-                    );
-                    await pool.query('COMMIT');
-                } catch (transactionError) {
-                    await pool.query('ROLLBACK');
-                    throw transactionError;
-                }
+                await pool.query('UPDATE friend_requests SET status = $1 WHERE id = $2', ['accepted', requestId]);
+                await pool.query(
+                    `INSERT INTO friendships (id, requester_id, addressee_id, status)
+                     VALUES ($1, $2, $3, 'accepted')
+                     ON CONFLICT ON CONSTRAINT friendships_requester_id_addressee_id_key 
+                     DO UPDATE SET status = 'accepted'`,
+                    [friendshipId, request.requester_id, request.target_id]
+                );
 
                 return res.json({ status: 'accepted' });
             }
 
-            // Decline action
             await pool.query('UPDATE friend_requests SET status = $1 WHERE id = $2', ['declined', requestId]);
             res.json({ status: 'declined' });
         } catch (error) {
@@ -500,20 +422,6 @@ export const createFriendsRouter = (pool, ensureFriendInfrastructure) => {
             console.error('Error code:', error.code);
             console.error('Error detail:', error.detail);
             console.error('Error constraint:', error.constraint);
-
-            // Prüfe ob es ein Datenbank-Fehler ist
-            if (error.code === '42P01') {
-                return res.status(500).json({
-                    error: 'Die Freundschafts-Tabellen existieren nicht. Bitte starte den Server neu oder migriere die Datenbank.'
-                });
-            }
-
-            if (error.code === '23505') {
-                return res.status(409).json({
-                    error: error.detail || 'Es besteht bereits eine Freundschaft zwischen euch.'
-                });
-            }
-
             const errorMessage = process.env.NODE_ENV === 'development'
                 ? (error.message || error.detail || 'Serverfehler beim Aktualisieren der Freundschaftsanfrage.')
                 : 'Serverfehler beim Aktualisieren der Freundschaftsanfrage.';
@@ -526,11 +434,6 @@ export const createFriendsRouter = (pool, ensureFriendInfrastructure) => {
             await ensureFriendInfrastructure();
 
             const { requestId } = req.params;
-
-            if (!requestId || (typeof requestId !== 'string' && typeof requestId !== 'number')) {
-                return res.status(400).json({ error: 'Ungültige Anfrage-ID.' });
-            }
-
             const { rows } = await pool.query(
                 'SELECT id, requester_id, target_id, status FROM friend_requests WHERE id = $1',
                 [requestId]
@@ -558,15 +461,6 @@ export const createFriendsRouter = (pool, ensureFriendInfrastructure) => {
             console.error('Error stack:', error.stack);
             console.error('Error code:', error.code);
             console.error('Error detail:', error.detail);
-            console.error('Error constraint:', error.constraint);
-
-            // Prüfe ob es ein Datenbank-Fehler ist
-            if (error.code === '42P01') {
-                return res.status(500).json({
-                    error: 'Die Freundschafts-Tabellen existieren nicht. Bitte starte den Server neu oder migriere die Datenbank.'
-                });
-            }
-
             const errorMessage = process.env.NODE_ENV === 'development'
                 ? (error.message || error.detail || 'Serverfehler beim Zurückziehen der Anfrage.')
                 : 'Serverfehler beim Zurückziehen der Anfrage.';
@@ -579,13 +473,8 @@ export const createFriendsRouter = (pool, ensureFriendInfrastructure) => {
             await ensureFriendInfrastructure();
 
             const { friendshipId } = req.params;
-
-            if (!friendshipId || (typeof friendshipId !== 'string' && typeof friendshipId !== 'number')) {
-                return res.status(400).json({ error: 'Ungültige Freundschafts-ID.' });
-            }
-
             const { rows } = await pool.query(
-                'SELECT id, requester_id, addressee_id, status FROM friendships WHERE id = $1',
+                'SELECT id, requester_id, addressee_id FROM friendships WHERE id = $1',
                 [friendshipId]
             );
 
@@ -602,22 +491,7 @@ export const createFriendsRouter = (pool, ensureFriendInfrastructure) => {
             res.json({ message: 'Freund wurde entfernt.' });
         } catch (error) {
             console.error('Delete friendship error:', error);
-            console.error('Error stack:', error.stack);
-            console.error('Error code:', error.code);
-            console.error('Error detail:', error.detail);
-            console.error('Error constraint:', error.constraint);
-
-            // Prüfe ob es ein Datenbank-Fehler ist
-            if (error.code === '42P01') {
-                return res.status(500).json({
-                    error: 'Die Freundschafts-Tabellen existieren nicht. Bitte starte den Server neu oder migriere die Datenbank.'
-                });
-            }
-
-            const errorMessage = process.env.NODE_ENV === 'development'
-                ? (error.message || error.detail || 'Serverfehler beim Entfernen des Freundes.')
-                : 'Serverfehler beim Entfernen des Freundes.';
-            res.status(500).json({ error: errorMessage });
+            res.status(500).json({ error: 'Serverfehler beim Entfernen des Freundes.' });
         }
     });
 

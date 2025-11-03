@@ -100,12 +100,27 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, redirectT
 
       if (onSuccess) {
         onSuccess();
-      } else if (redirectTo) {
-        // Navigate to redirect URL (e.g., invite page)
-        navigate(redirectTo);
       } else if (result.needsVerification) {
-        // Umleitung zur E-Mail-Verifizierung
-        navigate(`/auth/email-verification?email=${encodeURIComponent(result.email)}`);
+        // Speichere Invite-Parameter im localStorage, falls vorhanden
+        if (redirectTo && redirectTo.startsWith('/invite/')) {
+          const userId = redirectTo.replace('/invite/', '');
+          if (userId) {
+            localStorage.setItem('pendingInvite', userId);
+          }
+        }
+        // Umleitung zur E-Mail-Verifizierung mit invite-Parameter, falls vorhanden
+        const emailVerificationUrl = `/auth/email-verification?email=${encodeURIComponent(result.email)}`;
+        let finalUrl = emailVerificationUrl;
+        if (redirectTo && redirectTo.startsWith('/invite/')) {
+          const userId = redirectTo.replace('/invite/', '');
+          if (userId) {
+            finalUrl = `${emailVerificationUrl}&invite=${encodeURIComponent(userId)}`;
+          }
+        }
+        navigate(finalUrl);
+      } else if (redirectTo) {
+        // Navigate to redirect URL (e.g., invite page) - nur wenn keine Verifizierung benötigt wird
+        navigate(redirectTo);
       }
     } catch (err) {
       // Error is handled by auth context

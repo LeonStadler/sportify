@@ -444,3 +444,54 @@ BEGIN
     
     RAISE NOTICE 'Migration abgeschlossen: Alle Foreign Keys haben jetzt CASCADE DELETE';
 END $$;
+
+-- Zusätzliche Migration: Stelle sicher, dass 'used' und 'used_at' Spalten in invitations Tabelle existieren
+-- Dies ist eine robustere Version, die auch dann funktioniert, wenn die vorherige Migration fehlgeschlagen ist
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'invitations'
+    ) THEN
+        -- Füge 'used' Spalte hinzu, falls sie nicht existiert
+        IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_schema = 'public'
+            AND table_name = 'invitations' 
+            AND column_name = 'used'
+        ) THEN
+            ALTER TABLE invitations ADD COLUMN used BOOLEAN DEFAULT false;
+            -- Setze NOT NULL nach dem Hinzufügen
+            ALTER TABLE invitations ALTER COLUMN used SET NOT NULL;
+            RAISE NOTICE '[Migration] Spalte "used" zur invitations Tabelle hinzugefügt';
+        ELSE
+            -- Stelle sicher, dass der Standardwert gesetzt ist
+            ALTER TABLE invitations ALTER COLUMN used SET DEFAULT false;
+            -- Setze NULL Werte auf false
+            UPDATE invitations SET used = false WHERE used IS NULL;
+            -- Setze NOT NULL, wenn alle Werte gesetzt sind
+            BEGIN
+                ALTER TABLE invitations ALTER COLUMN used SET NOT NULL;
+            EXCEPTION WHEN others THEN
+                RAISE NOTICE '[Migration] Konnte NOT NULL für "used" nicht setzen: %', SQLERRM;
+            END;
+            RAISE NOTICE '[Migration] Spalte "used" existiert bereits in invitations Tabelle';
+        END IF;
+        
+        -- Füge 'used_at' Spalte hinzu, falls sie nicht existiert
+        IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_schema = 'public'
+            AND table_name = 'invitations' 
+            AND column_name = 'used_at'
+        ) THEN
+            ALTER TABLE invitations ADD COLUMN used_at TIMESTAMPTZ;
+            RAISE NOTICE '[Migration] Spalte "used_at" zur invitations Tabelle hinzugefügt';
+        ELSE
+            RAISE NOTICE '[Migration] Spalte "used_at" existiert bereits in invitations Tabelle';
+        END IF;
+    ELSE
+        RAISE NOTICE '[Migration] Tabelle "invitations" existiert nicht, Migration wird übersprungen';
+    END IF;
+END $$;

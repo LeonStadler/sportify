@@ -110,6 +110,7 @@ export const createAuthRouter = (pool) => {
                 const frontendUrl = getFrontendUrl(req);
                 const verificationUrl = `${frontendUrl}/auth/email-verification?token=${encodeURIComponent(verificationToken)}&email=${encodeURIComponent(email)}`;
 
+                // Plain-Text-Version für Fallback
                 const emailBody = `Hallo ${firstName},
 
 bitte bestätige deine E-Mail-Adresse, indem du auf folgenden Link klickst:
@@ -123,38 +124,20 @@ Dieser Link ist 24 Stunden lang gültig.
 
 Dein Sportify-Team`;
 
-                const emailHtml = `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .button { display: inline-block; padding: 12px 24px; background-color: #007bff; color: #fff; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-        .button:hover { background-color: #0056b3; }
-        .code { background-color: #f4f4f4; padding: 15px; border-radius: 5px; font-size: 14px; font-family: monospace; margin: 20px 0; word-break: break-all; }
-        .footer { margin-top: 30px; font-size: 12px; color: #666; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <p>Hallo ${firstName},</p>
-        <p>bitte bestätige deine E-Mail-Adresse, indem du auf folgenden Button klickst:</p>
-        <div style="text-align: center;">
-            <a href="${verificationUrl}" class="button">E-Mail-Adresse bestätigen</a>
-        </div>
-        <p style="margin-top: 30px;">Falls der Button nicht funktioniert, kopiere folgenden Link in deinen Browser:</p>
-        <div class="code">${verificationUrl}</div>
-        <p>Alternativ kannst du diesen Code manuell eingeben:</p>
-        <div class="code">${verificationToken}</div>
-        <p style="margin-top: 20px;">Dieser Link ist 24 Stunden lang gültig.</p>
-        <div class="footer">
-            <p>Dein Sportify-Team</p>
-        </div>
-    </div>
-</body>
-</html>`;
+                // Verwende das neue E-Mail-Template
+                const { createActionEmail } = await import('../utils/emailTemplates.js');
+                const emailHtml = createActionEmail({
+                    greeting: `Hallo ${firstName},`,
+                    title: 'E-Mail-Adresse bestätigen',
+                    message: 'Bitte bestätige deine E-Mail-Adresse, um dein Sportify-Konto zu aktivieren.',
+                    buttonText: 'E-Mail-Adresse bestätigen',
+                    buttonUrl: verificationUrl,
+                    token: verificationToken,
+                    tokenLabel: 'Alternativ kannst du diesen Code manuell eingeben:',
+                    additionalText: 'Dieser Link ist 24 Stunden lang gültig.',
+                    frontendUrl,
+                    preheader: 'E-Mail-Adresse bestätigen'
+                });
 
                 await queueEmail(pool, {
                     recipient: email,
@@ -312,6 +295,8 @@ Dein Sportify-Team`;
 
     // POST /api/auth/verify-email
     router.post('/verify-email', async (req, res) => {
+        const client = await pool.connect();
+        let transactionStarted = false;
         try {
             const { token } = req.body;
 
@@ -319,17 +304,57 @@ Dein Sportify-Team`;
                 return res.status(400).json({ error: 'Verifizierungstoken ist erforderlich.' });
             }
 
-            const tokenData = await validateEmailVerificationToken(pool, token);
-            await pool.query('UPDATE users SET is_email_verified = true, updated_at = CURRENT_TIMESTAMP WHERE id = $1', [tokenData.userId]);
-            await markEmailVerificationTokenUsed(pool, tokenData.id);
+            await client.query('BEGIN');
+            transactionStarted = true;
 
+            // Validiere Token (innerhalb der Transaktion um Race Conditions zu vermeiden)
+            const tokenData = await validateEmailVerificationToken(client, token);
+
+            // Prüfe ob User bereits verifiziert ist
+            const userCheck = await client.query(
+                'SELECT is_email_verified FROM users WHERE id = $1 FOR UPDATE',
+                [tokenData.userId]
+            );
+
+            if (userCheck.rows.length === 0) {
+                await client.query('ROLLBACK');
+                transactionStarted = false;
+                return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
+            }
+
+            // Wenn bereits verifiziert, Token trotzdem als verwendet markieren
+            if (userCheck.rows[0].is_email_verified) {
+                await markEmailVerificationTokenUsed(client, tokenData.id);
+                await client.query('COMMIT');
+                transactionStarted = false;
+                return res.json({ message: 'E-Mail wurde bereits verifiziert.' });
+            }
+
+            // Verifiziere User und markiere Token als verwendet (in Transaktion)
+            await client.query(
+                'UPDATE users SET is_email_verified = true, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+                [tokenData.userId]
+            );
+            await markEmailVerificationTokenUsed(client, tokenData.id);
+
+            await client.query('COMMIT');
+            transactionStarted = false;
             res.json({ message: 'E-Mail erfolgreich verifiziert.' });
         } catch (error) {
+            if (transactionStarted) {
+                try {
+                    await client.query('ROLLBACK');
+                } catch (rollbackError) {
+                    console.error('Rollback error:', rollbackError);
+                }
+            }
             if (error instanceof TokenError) {
                 return res.status(400).json({ error: error.message });
             }
-            console.error('Verify email error:', error);
+            console.error('Verify email error:', error.message);
             res.status(500).json({ error: 'Serverfehler bei der E-Mail-Verifizierung.' });
+        } finally {
+            client.release();
         }
     });
 

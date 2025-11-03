@@ -60,23 +60,18 @@ export const ensureAllTablesExist = async (pool) => {
         'user_backup_codes': ['id', 'user_id', 'code_hash', 'used_at']
     };
 
-    console.log('[Migration] Prüfe ob alle Tabellen und Spalten existieren...');
     const missingTables = [];
     const missingColumns = [];
 
     for (const [tableName, columns] of Object.entries(requiredTables)) {
         const tableExistsResult = await tableExists(pool, tableName);
         if (!tableExistsResult) {
-            console.warn(`[Migration] ⚠️  Tabelle ${tableName} existiert nicht!`);
             missingTables.push(tableName);
         } else {
-            console.log(`[Migration] ✅ Tabelle ${tableName} existiert`);
-            
             // Prüfe Spalten
             for (const column of columns) {
                 const columnExistsResult = await columnExists(pool, tableName, column);
                 if (!columnExistsResult) {
-                    console.warn(`[Migration] ⚠️  Spalte ${tableName}.${column} existiert nicht!`);
                     missingColumns.push(`${tableName}.${column}`);
                 }
             }
@@ -92,8 +87,6 @@ export const ensureAllTablesExist = async (pool) => {
         console.error(`[Migration] ❌ Fehlende Spalten: ${missingColumns.join(', ')}`);
         throw new Error(`Folgende Spalten fehlen: ${missingColumns.join(', ')}. Bitte führen Sie die Migrationen aus.`);
     }
-
-    console.log('[Migration] ✅ Alle Tabellen und Spalten existieren');
     return true;
 };
 
@@ -104,10 +97,8 @@ export const createMigrationRunner = (pool) => {
         if (!migrationPromise) {
             migrationPromise = (async () => {
                 try {
-                    console.log('[Migration] Starte Migrationen...');
                     const sql = await fs.readFile(MIGRATION_FILE_PATH, 'utf-8');
                     await pool.query(sql);
-                    console.log('[Migration] ✅ Migrationen erfolgreich ausgeführt');
                     
                     // Prüfe ob alle Tabellen existieren
                     await ensureAllTablesExist(pool);

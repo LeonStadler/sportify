@@ -18,7 +18,11 @@ import {
 export default function Login() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
-  const redirectTo = searchParams.get('redirect') || '/dashboard';
+  // Prüfe ob ein Invite-Parameter im localStorage gespeichert ist
+  const pendingInvite = localStorage.getItem('pendingInvite');
+  const redirectFromUrl = searchParams.get('redirect');
+  // Priorisiere URL-Parameter, dann localStorage, dann Standard
+  const redirectTo = redirectFromUrl || (pendingInvite ? `/invite/${pendingInvite}` : '/dashboard');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex flex-col">

@@ -24,6 +24,13 @@ export function Invite() {
     const [processing, setProcessing] = useState(false);
 
     useEffect(() => {
+        // Entferne pendingInvite aus localStorage, wenn wir auf der Invite-Seite sind
+        // (entweder direkt oder nach Login)
+        const pendingInvite = localStorage.getItem('pendingInvite');
+        if (pendingInvite && pendingInvite === userId) {
+            localStorage.removeItem('pendingInvite');
+        }
+        
         const fetchInviterInfo = async () => {
             if (!userId) {
                 toast.error('Ungültiger Einladungslink.');

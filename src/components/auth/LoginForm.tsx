@@ -28,7 +28,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [backupCode, setBackupCode] = useState('');
   const [useBackupCode, setUseBackupCode] = useState(false);
+  const [showBackupCodeField, setShowBackupCodeField] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [lastSubmittedCode, setLastSubmittedCode] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const loginSchema = useMemo(() => z.object({
@@ -60,6 +62,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
         if (!twoFactorCode && !backupCode) {
           return;
         }
+        // Track submitted code to prevent auto-resubmit on error
+        if (twoFactorCode) {
+          setLastSubmittedCode(twoFactorCode);
+        }
         setIsLoggingIn(true);
         try {
           const result = await login(
@@ -71,12 +77,29 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
           
           if (!result.requires2FA) {
             // Login successful
+            // Prüfe ob ein Invite-Parameter im localStorage gespeichert ist
+            const pendingInvite = localStorage.getItem('pendingInvite');
+            const finalRedirect = pendingInvite ? `/invite/${pendingInvite}` : redirectTo;
+            
+            // Entferne den Invite-Parameter aus localStorage nach erfolgreichem Login
+            if (pendingInvite) {
+              localStorage.removeItem('pendingInvite');
+            }
+            
             if (onSuccess) {
               onSuccess();
             } else {
-              navigate(redirectTo);
+              navigate(finalRedirect);
             }
+          } else {
+            // If still requires 2FA after submitting, clear code
+            setLastSubmittedCode(null);
+            setTwoFactorCode('');
           }
+        } catch (err) {
+          // On error, clear the code to prevent auto-resubmit loop
+          setLastSubmittedCode(null);
+          setTwoFactorCode('');
         } finally {
           setIsLoggingIn(false);
         }
@@ -94,10 +117,19 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
             clearError();
           } else {
             // Login successful (no 2FA)
+            // Prüfe ob ein Invite-Parameter im localStorage gespeichert ist
+            const pendingInvite = localStorage.getItem('pendingInvite');
+            const finalRedirect = pendingInvite ? `/invite/${pendingInvite}` : redirectTo;
+            
+            // Entferne den Invite-Parameter aus localStorage nach erfolgreichem Login
+            if (pendingInvite) {
+              localStorage.removeItem('pendingInvite');
+            }
+            
             if (onSuccess) {
               onSuccess();
             } else {
-              navigate(redirectTo);
+              navigate(finalRedirect);
             }
           }
         } catch (err) {
@@ -119,6 +151,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
     setTwoFactorCode(cleaned);
     setBackupCode('');
     setUseBackupCode(false);
+    // Reset lastSubmittedCode when user manually changes the code
+    if (cleaned.length < 6 || cleaned !== lastSubmittedCode) {
+      setLastSubmittedCode(null);
+    }
+    clearError();
   };
 
   const handleBackupCodeInput = (value: string) => {
@@ -134,12 +171,37 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
     setTwoFactorCode('');
     setBackupCode('');
     setUseBackupCode(false);
+    setShowBackupCodeField(false);
+    setLastSubmittedCode(null);
     clearError();
+  };
+
+  const handleShowBackupCode = () => {
+    setShowBackupCodeField(true);
+    setTwoFactorCode('');
+    setLastSubmittedCode(null);
   };
 
   // Auto-submit when 6 digits are entered in 2FA code
   useEffect(() => {
-    if (showTwoFactor && twoFactorCode.length === 6 && savedCredentials && !isLoggingIn && !backupCode) {
+    // Only auto-submit if:
+    // - 2FA step is shown
+    // - Backup code field is not shown (only submit normal 2FA code automatically)
+    // - Code has exactly 6 digits
+    // - Credentials are saved
+    // - Not currently logging in
+    // - Not using backup code
+    // - Code is different from last submitted code (prevents loop on error)
+    if (
+      showTwoFactor &&
+      !showBackupCodeField &&
+      twoFactorCode.length === 6 &&
+      savedCredentials &&
+      !isLoggingIn &&
+      !backupCode &&
+      twoFactorCode !== lastSubmittedCode
+    ) {
+      setLastSubmittedCode(twoFactorCode);
       setIsLoggingIn(true);
       const submit = async () => {
         try {
@@ -158,9 +220,15 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
             } else {
               navigate(redirectTo);
             }
+          } else {
+            // If still requires 2FA after submitting, reset to allow new code
+            setLastSubmittedCode(null);
+            setTwoFactorCode('');
           }
         } catch (err) {
-          // Error is already handled by AuthContext
+          // On error, clear the code to prevent auto-resubmit loop
+          setLastSubmittedCode(null);
+          setTwoFactorCode('');
         } finally {
           setIsLoggingIn(false);
         }
@@ -168,7 +236,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
       submit();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [twoFactorCode, showTwoFactor, savedCredentials, isLoggingIn, backupCode]);
+  }, [twoFactorCode, showTwoFactor, showBackupCodeField, savedCredentials, isLoggingIn, backupCode, lastSubmittedCode]);
 
   return (
     <Card className="w-full max-w-md mx-auto">
@@ -206,41 +274,66 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
             )}
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="twoFactorCode">2FA-Code</Label>
-                <Input
-                  id="twoFactorCode"
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  placeholder="000000"
-                  maxLength={6}
-                  value={twoFactorCode}
-                  onChange={(e) => handleTwoFactorInput(e.target.value)}
-                  className="text-center text-2xl tracking-widest font-mono"
-                  autoFocus
-                  autoComplete="one-time-code"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Gib den 6-stelligen Code aus deiner Authenticator-App ein
-                </p>
-              </div>
+              {!showBackupCodeField ? (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="twoFactorCode">2FA-Code</Label>
+                    <Input
+                      id="twoFactorCode"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      placeholder="000000"
+                      maxLength={6}
+                      value={twoFactorCode}
+                      onChange={(e) => handleTwoFactorInput(e.target.value)}
+                      className="text-center text-2xl tracking-widest font-mono"
+                      autoFocus
+                      autoComplete="one-time-code"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Gib den 6-stelligen Code aus deiner Authenticator-App ein
+                    </p>
+                  </div>
 
-              <Separator />
-
-              <div className="space-y-2">
-                <Label htmlFor="backupCode" className="text-sm text-muted-foreground">
-                  Oder verwende einen Backup-Code:
-                </Label>
-                <Input
-                  id="backupCode"
-                  type="text"
-                  placeholder="XXXX-XXXX-XXXX"
-                  value={backupCode}
-                  onChange={(e) => handleBackupCodeInput(e.target.value)}
-                  className="font-mono"
-                />
-              </div>
+                  <div className="text-center">
+                    <button
+                      type="button"
+                      onClick={handleShowBackupCode}
+                      className="text-sm text-muted-foreground hover:text-primary underline"
+                    >
+                      2FA verloren?
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="backupCode">Backup-Code</Label>
+                  <Input
+                    id="backupCode"
+                    type="text"
+                    placeholder="XXXX-XXXX-XXXX"
+                    value={backupCode}
+                    onChange={(e) => handleBackupCodeInput(e.target.value)}
+                    className="font-mono"
+                    autoFocus
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Gib einen deiner Backup-Codes ein, die du beim Einrichten der 2FA erhalten hast
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowBackupCodeField(false);
+                      setBackupCode('');
+                      setUseBackupCode(false);
+                    }}
+                    className="text-sm text-muted-foreground hover:text-primary underline"
+                  >
+                    Zurück zum 2FA-Code
+                  </button>
+                </div>
+              )}
 
               <div className="flex gap-2">
                 <Button
@@ -254,7 +347,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
                 <Button
                   type="submit"
                   className="flex-1"
-                  disabled={isLoggingIn || (!twoFactorCode && !backupCode)}
+                  disabled={isLoggingIn || (!showBackupCodeField && !twoFactorCode) || (showBackupCodeField && !backupCode)}
                 >
                   {isLoggingIn && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Anmelden

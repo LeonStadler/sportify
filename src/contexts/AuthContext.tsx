@@ -56,7 +56,8 @@ export interface AuthContextType extends AuthState {
   updateProfile: (data: Partial<User>) => Promise<void>;
   deleteAccount: (password: string) => Promise<void>;
   inviteUser: (email: string, firstName: string, lastName: string) => Promise<void>;
-  inviteFriend: (email: string) => Promise<{ type: 'friend_request' | 'invitation'; message: string }>;
+  inviteFriend: (email: string) => Promise<{ type: 'friend_request' | 'invitation' | 'user_exists'; message: string; userId?: string; displayName?: string; email?: string }>;
+  sendFriendRequest: (targetUserId: string) => Promise<void>;
   getInvitations: () => Promise<Invitation[]>;
   acceptInvitation: (invitationToken: string) => Promise<void>;
   getDisplayName: () => string;
@@ -576,7 +577,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const inviteFriend = async (email: string): Promise<{ type: 'friend_request' | 'invitation'; message: string }> => {
+  const inviteFriend = async (email: string): Promise<{ type: 'friend_request' | 'invitation' | 'user_exists'; message: string; userId?: string; displayName?: string; email?: string }> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
@@ -604,6 +605,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       setState(prev => ({ ...prev, isLoading: false }));
 
+      // Wenn Benutzer bereits existiert, gib speziellen Typ zurück
+      if (data.userExists) {
+        return {
+          type: 'user_exists',
+          message: data.message || 'Dieser Benutzer ist bereits registriert.',
+          userId: data.userId,
+          displayName: data.displayName,
+          email: data.email
+        };
+      }
+
       return {
         type: data.type || 'invitation',
         message: data.message || 'Einladung gesendet.'
@@ -611,6 +623,40 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.';
       setState(prev => ({ ...prev, isLoading: false, error: errorMessage })); throw error;
+    }
+  };
+
+  const sendFriendRequest = async (targetUserId: string): Promise<void> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        const error = new Error('Nicht angemeldet');
+        setState(prev => ({ ...prev, isLoading: false, error: error.message }));
+        throw error;
+      }
+
+      const response = await fetch(`${API_URL}/friends/requests`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ targetUserId })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Fehler beim Senden der Freundschaftsanfrage');
+      }
+
+      setState(prev => ({ ...prev, isLoading: false }));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.';
+      setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));
+      throw error;
     }
   };
 
@@ -715,6 +761,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     deleteAccount,
     inviteUser,
     inviteFriend,
+    sendFriendRequest,
     getInvitations,
     acceptInvitation,
     getDisplayName,

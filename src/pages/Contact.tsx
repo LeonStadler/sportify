@@ -59,8 +59,6 @@ export default function Contact() {
       // Mock API call - hier würde normalerweise die E-Mail versendet werden
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      console.log('Contact form submission:', data);
-      
       toast.success(t('contact.messageSent'), {
         description: t('contact.thankYouMessage')
       });

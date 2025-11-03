@@ -164,7 +164,6 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
         const payload = Array.isArray(data) ? data : data?.activities;
 
         if (Array.isArray(payload)) {
-          console.log('ActivityFeed: Loaded activities:', payload.length, 'hasFriends:', data?.hasFriends);
           setActivities(payload);
           // hasFriends sollte true sein, wenn es akzeptierte Freunde gibt
           // Wenn payload leer ist, aber hasFriends true ist, bedeutet das, dass Freunde existieren, aber noch keine Aktivitäten

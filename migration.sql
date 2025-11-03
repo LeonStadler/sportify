@@ -130,6 +130,37 @@ BEGIN
     END IF;
 END $$;
 
+-- Migration: Füge fehlende Spalten zu invitations Tabelle hinzu, falls sie nicht existieren
+DO $$
+BEGIN
+    -- Füge token_hash hinzu, falls fehlend
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'invitations' 
+        AND column_name = 'token_hash'
+    ) THEN
+        ALTER TABLE invitations ADD COLUMN token_hash TEXT;
+    END IF;
+    
+    -- Füge used hinzu, falls fehlend
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'invitations' 
+        AND column_name = 'used'
+    ) THEN
+        ALTER TABLE invitations ADD COLUMN used BOOLEAN DEFAULT false;
+    END IF;
+    
+    -- Füge used_at hinzu, falls fehlend
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'invitations' 
+        AND column_name = 'used_at'
+    ) THEN
+        ALTER TABLE invitations ADD COLUMN used_at TIMESTAMPTZ;
+    END IF;
+END $$;
+
 DO $$
 DECLARE
     user_id_type text;

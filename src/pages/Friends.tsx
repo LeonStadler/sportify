@@ -135,7 +135,6 @@ function FriendsList() {
       }
 
       const data = await response.json();
-      console.log('Friends API response:', { status: response.status, data });
 
       if (Array.isArray(data)) {
         const mappedFriends: Friend[] = data.map((friend: any) => {

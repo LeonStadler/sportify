@@ -127,25 +127,56 @@ export const markPasswordResetTokenUsed = async (pool, tokenId, options = {}) =>
 
 export const createEmailVerificationToken = async (pool, userId, options = {}) => {
   const now = resolveNow(options);
-  await pool.query(
-    'UPDATE email_verification_tokens SET used = true, used_at = $2 WHERE user_id = $1 AND used = false',
-    [userId, now]
-  );
+  
+  // Markiere alte Tokens als verwendet (mit used_at falls vorhanden)
+  try {
+    await pool.query(
+      'UPDATE email_verification_tokens SET used = true, used_at = $2 WHERE user_id = $1 AND used = false',
+      [userId, now]
+    );
+  } catch (error) {
+    // Falls used_at nicht existiert, nur used setzen
+    if (error.code === '42703') { // undefined_column
+      await pool.query(
+        'UPDATE email_verification_tokens SET used = true WHERE user_id = $1 AND used = false',
+        [userId]
+      );
+    } else if (error.code === '42P01') {
+      // Tabelle existiert noch nicht - das ist ok beim ersten Aufruf
+      // Ignoriere den Fehler und fahre fort
+    } else {
+      throw error;
+    }
+  }
 
   const rawToken = options.generateToken ? options.generateToken() : generateRawToken();
   const tokenHash = await (options.hashToken ? options.hashToken(rawToken) : defaultHash(rawToken));
   const expiresAt = new Date(now.getTime() + EMAIL_VERIFICATION_TOKEN_TTL);
 
-  const { rows } = await pool.query(
-    'INSERT INTO email_verification_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3) RETURNING id, expires_at',
-    [userId, tokenHash, expiresAt]
-  );
+  try {
+    const { rows } = await pool.query(
+      'INSERT INTO email_verification_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3) RETURNING id, expires_at',
+      [userId, tokenHash, expiresAt]
+    );
 
-  const record = rows[0];
-  return {
-    token: createCompositeToken(record.id, rawToken),
-    expiresAt: record.expires_at ?? expiresAt,
-  };
+    if (rows.length === 0) {
+      throw new Error('Token konnte nicht erstellt werden - keine Zeile zurückgegeben');
+    }
+
+    const record = rows[0];
+    const token = createCompositeToken(record.id, rawToken);
+    return {
+      token,
+      expiresAt: record.expires_at ?? expiresAt,
+    };
+  } catch (error) {
+    // Wenn die Tabelle nicht existiert, wirf einen aussagekräftigen Fehler
+    if (error.code === '42P01') {
+      throw new Error('email_verification_tokens Tabelle existiert nicht. Bitte führen Sie die Datenbank-Migrationen aus.');
+    }
+    // Andere Datenbankfehler weiterwerfen
+    throw error;
+  }
 };
 
 export const validateEmailVerificationToken = async (pool, compositeToken, options = {}) => {
@@ -186,5 +217,15 @@ export const validateEmailVerificationToken = async (pool, compositeToken, optio
 
 export const markEmailVerificationTokenUsed = async (pool, tokenId, options = {}) => {
   const now = resolveNow(options);
-  await pool.query('UPDATE email_verification_tokens SET used = true, used_at = $2 WHERE id = $1', [tokenId, now]);
+  // Prüfe ob used_at Spalte existiert
+  try {
+    await pool.query('UPDATE email_verification_tokens SET used = true, used_at = $2 WHERE id = $1', [tokenId, now]);
+  } catch (error) {
+    // Falls used_at nicht existiert, nur used setzen
+    if (error.code === '42703') { // undefined_column
+      await pool.query('UPDATE email_verification_tokens SET used = true WHERE id = $1', [tokenId]);
+    } else {
+      throw error;
+    }
+  }
 };

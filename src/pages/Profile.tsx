@@ -28,7 +28,7 @@ import { Invitation, useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { API_URL } from '@/lib/api';
 import { getUserInitials, parseAvatarConfig } from '@/lib/avatar';
-import { Award, Camera, Check, Copy, Mail, Share2, Shield } from "lucide-react";
+import { Award, Camera, Check, Copy, Mail, Share2, Shield, Trash2 } from "lucide-react";
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import NiceAvatar, { NiceAvatarProps } from 'react-nice-avatar';
@@ -241,11 +241,13 @@ export function Profile() {
   const handleAvatarSave = async (config: NiceAvatarProps) => {
     try {
       const avatarJson = JSON.stringify(config);
-      // Backend erfordert firstName und lastName, also müssen wir sie mitsenden
+      // Stelle sicher, dass alle Profildaten mitgesendet werden, damit sie nicht überschrieben werden
       await updateProfile({
         avatar: avatarJson,
         firstName: user?.firstName || '',
         lastName: user?.lastName || '',
+        nickname: user?.nickname || '',
+        displayPreference: user?.displayPreference || 'firstName',
       });
       toast({
         title: "Avatar gespeichert",
@@ -255,6 +257,29 @@ export function Profile() {
       toast({
         title: "Fehler",
         description: error instanceof Error ? error.message : "Fehler beim Speichern des Avatars",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAvatarRemove = async () => {
+    try {
+      // Setze Avatar auf null und stelle sicher, dass alle anderen Profildaten erhalten bleiben
+      await updateProfile({
+        avatar: null,
+        firstName: user?.firstName || '',
+        lastName: user?.lastName || '',
+        nickname: user?.nickname || '',
+        displayPreference: user?.displayPreference || 'firstName',
+      });
+      toast({
+        title: "Avatar entfernt",
+        description: "Dein Profilbild wurde erfolgreich entfernt.",
+      });
+    } catch (error) {
+      toast({
+        title: "Fehler",
+        description: error instanceof Error ? error.message : "Fehler beim Entfernen des Avatars",
         variant: "destructive",
       });
     }
@@ -303,7 +328,11 @@ export function Profile() {
     }
 
     try {
-      await updateProfile(profileForm);
+      // Stelle sicher, dass das bestehende Avatar mitgesendet wird, damit es nicht überschrieben wird
+      await updateProfile({
+        ...profileForm,
+        avatar: user?.avatar || undefined,
+      });
       setValidationErrors({});
       toast({
         title: "Profil aktualisiert",
@@ -322,9 +351,15 @@ export function Profile() {
     e.preventDefault();
 
     try {
+      // Stelle sicher, dass alle erforderlichen Felder und das Avatar mitgesendet werden
       await updateProfile({
+        firstName: user?.firstName || '',
+        lastName: user?.lastName || '',
+        nickname: user?.nickname || '',
+        displayPreference: user?.displayPreference || 'firstName',
         languagePreference: preferencesForm.languagePreference as 'de' | 'en',
-        preferences: preferencesForm
+        preferences: preferencesForm,
+        avatar: user?.avatar || undefined,
       });
       toast({
         title: "Einstellungen gespeichert",
@@ -531,12 +566,25 @@ export function Profile() {
                     </Avatar>
                     <Button
                       size="sm"
-                      className="absolute -bottom-2 -right-2 rounded-full w-8 h-8 p-0"
+                      className="absolute -bottom-2 -right-2 rounded-full w-8 h-8 p-0 shrink-0"
                       variant="secondary"
                       onClick={() => setAvatarEditorOpen(true)}
+                      disabled={isLoading}
                     >
                       <Camera size={14} />
                     </Button>
+                    {user.avatar && parseAvatarConfig(user.avatar) && (
+                      <Button
+                        size="sm"
+                        className="absolute -bottom-2 -left-2 rounded-full w-8 h-8 p-0 shrink-0"
+                        variant="destructive"
+                        onClick={handleAvatarRemove}
+                        disabled={isLoading}
+                        title="Avatar entfernen"
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    )}
                   </div>
                   <div>
                     <h3 className="text-xl font-semibold">{getDisplayName()}</h3>

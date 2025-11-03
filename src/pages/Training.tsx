@@ -76,8 +76,6 @@ export function Training() {
         ...(type !== "all" && { type }),
       });
 
-      console.log('Loading workouts with params:', params.toString());
-
       const response = await fetch(`${API_URL}/workouts?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -89,7 +87,6 @@ export function Training() {
       }
 
       const data: WorkoutResponse = await response.json();
-      console.log('Loaded workouts:', data);
       setWorkouts(data.workouts);
       setPagination(data.pagination);
       setCurrentPage(page);

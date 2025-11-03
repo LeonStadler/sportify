@@ -2,15 +2,17 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { API_URL } from '@/lib/api';
+import { parseAvatarConfig } from '@/lib/avatar';
 import { Check, UserPlus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import NiceAvatar from 'react-nice-avatar';
 import { toast } from 'sonner';
 
 interface InviterInfo {
     id: string;
     displayName: string;
-    avatarUrl?: string;
+    avatarUrl?: string; // Dies ist eigentlich ein JSON-String mit Avatar-Konfiguration
 }
 
 export function Invite() {
@@ -141,18 +143,23 @@ export function Invite() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="flex flex-col items-center space-y-4">
-                        <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
-                            {inviter.avatarUrl ? (
-                                <img
-                                    src={inviter.avatarUrl}
-                                    alt={inviter.displayName}
-                                    className="w-20 h-20 rounded-full object-cover"
-                                />
-                            ) : (
-                                <span className="text-2xl font-bold text-primary">
-                                    {inviter.displayName.charAt(0).toUpperCase()}
-                                </span>
-                            )}
+                        <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
+                            {(() => {
+                                const avatarConfig = inviter.avatarUrl ? parseAvatarConfig(inviter.avatarUrl) : null;
+                                if (avatarConfig) {
+                                    return (
+                                        <NiceAvatar
+                                            style={{ width: '80px', height: '80px' }}
+                                            {...avatarConfig}
+                                        />
+                                    );
+                                }
+                                return (
+                                    <span className="text-2xl font-bold text-primary">
+                                        {inviter.displayName.charAt(0).toUpperCase()}
+                                    </span>
+                                );
+                            })()}
                         </div>
                         <p className="text-lg font-semibold">{inviter.displayName}</p>
                     </div>

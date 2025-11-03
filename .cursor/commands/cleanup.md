@@ -1,0 +1,3 @@
+Räume auf, das heißt du bereinigst den code soweit dass er producin ready ist. entferne unnötige der gar gefählcihe cnosole logs oder error detectioon logiken, debuggin oder implementiereungen die nicht mehr benötigt werden aufgrund von beseren umsetztungen. sorge dafür dass der code sauber und gut lesbar ist und frei vono lint fehlern ist.
+gehe sicher dass falls wir neue tabels oder columns nutztten, dass diese auch in der datenbnk vorhanden sind oder erstelle ein migration dafür.
+gehe sicher dass das feature was wir implementtiert haben keine konflike mit anderen ausübt., gebe mir zudem nch feedback darpber wie robust die umsetztung is und ob es irgendwo verbesserungspotenzial gibt oder wir was auslagern können um dem dry prinzip zu entsprechen.

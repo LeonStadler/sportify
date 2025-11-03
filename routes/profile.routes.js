@@ -109,11 +109,12 @@ export const createProfileRouter = (pool) => {
             }
 
             // Prüfe ob Benutzer bereits existiert
-            const { rows: existingUsers } = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+            const { rows: existingUsers } = await pool.query('SELECT id, first_name, last_name, nickname, display_preference FROM users WHERE email = $1', [email]);
 
             if (existingUsers.length > 0) {
-                // Benutzer existiert bereits - erstelle Freundschaftsanfrage direkt
-                const targetUserId = existingUsers[0].id;
+                // Benutzer existiert bereits - gib Status zurück, damit Frontend Dialog anzeigen kann
+                const targetUser = existingUsers[0];
+                const targetUserId = targetUser.id;
 
                 if (targetUserId === req.user.id) {
                     return res.status(400).json({ error: 'Du kannst dir selbst keine Freundschaftsanfrage senden.' });
@@ -142,19 +143,19 @@ export const createProfileRouter = (pool) => {
                     return res.status(409).json({ error: 'Es besteht bereits eine ausstehende Anfrage zwischen euch.' });
                 }
 
-                // Erstelle Freundschaftsanfrage
-                const { randomUUID } = await import('crypto');
-                const requestId = randomUUID();
-                await pool.query(
-                    `INSERT INTO friend_requests (id, requester_id, target_id, status)
-                     VALUES ($1, $2, $3, 'pending')`,
-                    [requestId, req.user.id, targetUserId]
-                );
+                // Gebe zurück, dass Benutzer existiert, damit Frontend Dialog anzeigen kann
+                const displayName = targetUser.display_preference === 'nickname' && targetUser.nickname
+                    ? targetUser.nickname
+                    : targetUser.display_preference === 'fullName'
+                        ? `${targetUser.first_name} ${targetUser.last_name}`
+                        : targetUser.first_name;
 
-                return res.status(201).json({
-                    message: 'Freundschaftsanfrage wurde gesendet.',
-                    type: 'friend_request',
-                    requestId
+                return res.status(200).json({
+                    userExists: true,
+                    userId: targetUserId,
+                    displayName: displayName,
+                    email: email,
+                    message: 'Dieser Benutzer ist bereits registriert.'
                 });
             }
 
@@ -169,13 +170,42 @@ export const createProfileRouter = (pool) => {
             // Frontend URL für Einladungslink
             const frontendUrl = getFrontendUrl(req);
             const inviteLink = `${frontendUrl}/invite/${req.user.id}`;
+            const expiresDate = new Date(invitation.expires_at).toLocaleDateString('de-DE');
+
+            // Plain-Text-Version für Fallback
+            const emailBody = `Hallo!
+
+Du wurdest zu Sportify eingeladen.
+
+Klicke auf folgenden Link, um dich zu registrieren:
+${inviteLink}
+
+Oder verwende diesen Code bei der Registrierung: ${token}
+
+Die Einladung läuft am ${expiresDate} ab.`;
+
+            // Verwende das neue E-Mail-Template
+            const { createActionEmail } = await import('../utils/emailTemplates.js');
+            const emailHtml = createActionEmail({
+                greeting: 'Hallo!',
+                title: 'Du wurdest zu Sportify eingeladen',
+                message: 'Jemand hat dich eingeladen, Teil der Sportify-Community zu werden. Registriere dich jetzt und starte dein Training!',
+                buttonText: 'Jetzt registrieren',
+                buttonUrl: inviteLink,
+                token: token,
+                tokenLabel: 'Oder verwende diesen Code bei der Registrierung:',
+                additionalText: `Die Einladung läuft am ${expiresDate} ab.`,
+                frontendUrl,
+                preheader: 'Du wurdest zu Sportify eingeladen'
+            });
 
             // Sende E-Mail mit Einladungslink
             try {
             await queueEmail(pool, {
                 recipient: email,
                 subject: 'Sportify – Einladung',
-                body: `Hallo!\n\nDu wurdest zu Sportify eingeladen.\n\nKlicke auf folgenden Link, um dich zu registrieren:\n${inviteLink}\n\nOder verwende diesen Code bei der Registrierung: ${token}\n\nDie Einladung läuft am ${new Date(invitation.expires_at).toLocaleDateString('de-DE')} ab.`,
+                body: emailBody,
+                html: emailHtml,
             });
                 console.log(`✅ Einladungs-E-Mail erfolgreich versendet an: ${email}`);
             } catch (emailError) {
@@ -201,7 +231,15 @@ export const createProfileRouter = (pool) => {
                 return res.status(400).json({ error: error.message });
             }
             console.error('Invite friend error:', error);
-            res.status(500).json({ error: 'Serverfehler beim Senden der Einladung.' });
+            console.error('Error details:', {
+                message: error.message,
+                stack: error.stack,
+                name: error.name
+            });
+            res.status(500).json({ 
+                error: 'Serverfehler beim Senden der Einladung.',
+                details: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
         }
     });
 

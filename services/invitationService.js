@@ -34,25 +34,51 @@ const resolveNow = (options) => {
 
 export const createInvitation = async (pool, payload, options = {}) => {
   const now = resolveNow(options);
-  await pool.query(
-    'UPDATE invitations SET used = true, used_at = $2, status = $3 WHERE email = $1 AND status = $4 AND used = false',
-    [payload.email, now, 'cancelled', 'pending']
-  );
+  
+  try {
+    // Lösche alte ausstehende Einladungen für diese E-Mail, um UNIQUE Constraint (email, status) zu erfüllen
+    // und um sicherzustellen, dass nur eine aktive Einladung pro E-Mail existiert
+    await pool.query(
+      'DELETE FROM invitations WHERE email = $1 AND status = $2 AND used = false',
+      [payload.email, 'pending']
+    );
 
-  const rawToken = options.generateToken ? options.generateToken() : generateRawToken();
-  const tokenHash = await (options.hashToken ? options.hashToken(rawToken) : defaultHash(rawToken));
-  const expiresAt = new Date(now.getTime() + INVITATION_TOKEN_TTL);
+    const rawToken = options.generateToken ? options.generateToken() : generateRawToken();
+    const tokenHash = await (options.hashToken ? options.hashToken(rawToken) : defaultHash(rawToken));
+    const expiresAt = new Date(now.getTime() + INVITATION_TOKEN_TTL);
 
-  const { rows } = await pool.query(
-    'INSERT INTO invitations (email, first_name, last_name, invited_by, token_hash, expires_at, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, email, first_name, last_name, status, expires_at, created_at, invited_by',
-    [payload.email, payload.firstName, payload.lastName, payload.invitedBy ?? null, tokenHash, expiresAt, 'pending']
-  );
+    // Stelle sicher, dass first_name und last_name nicht null sind (leerer String ist erlaubt)
+    const firstName = payload.firstName || '';
+    const lastName = payload.lastName || '';
 
-  const invitation = rows[0];
-  return {
-    invitation,
-    token: createCompositeToken(invitation.id, rawToken),
-  };
+    // Erstelle einen kurzen Einladungscode (max 50 Zeichen) für die Anzeige
+    // Verwende nur die ersten 45 Zeichen des rawTokens als Code
+    const shortCode = rawToken.substring(0, 45);
+
+    const { rows } = await pool.query(
+      'INSERT INTO invitations (email, first_name, last_name, invited_by, token_hash, expires_at, status, used, invitation_code) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, email, first_name, last_name, status, expires_at, created_at, invited_by, used, used_at',
+      [payload.email, firstName, lastName, payload.invitedBy ?? null, tokenHash, expiresAt, 'pending', false, shortCode]
+    );
+
+    if (!rows || rows.length === 0) {
+      throw new InvitationError('INVITATION_CREATE_FAILED', 'Einladung konnte nicht erstellt werden.');
+    }
+
+    const invitation = rows[0];
+    // Erstelle den finalen Token mit der tatsächlichen Invitation ID
+    const finalToken = createCompositeToken(invitation.id, rawToken);
+    
+    return {
+      invitation: { ...invitation, invitation_code: shortCode },
+      token: finalToken,
+    };
+  } catch (error) {
+    if (error instanceof InvitationError) {
+      throw error;
+    }
+    // Wrappe Datenbankfehler in InvitationError
+    throw new InvitationError('DATABASE_ERROR', `Datenbankfehler: ${error.message}`);
+  }
 };
 
 export const validateInvitationToken = async (pool, compositeToken, options = {}) => {

@@ -1,9 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowLeft, CheckCircle, Globe, Mail, Palette, RotateCcw, Settings, Trophy } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -26,13 +26,15 @@ import { toast } from 'sonner';
 export default function EmailVerification() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [isVerified, setIsVerified] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
-  const [verificationAttempted, setVerificationAttempted] = useState(false);
+  const verificationAttemptedRef = useRef(false);
 
   const email = searchParams.get('email') || '';
   const token = searchParams.get('token') || '';
+  const [inviteUserId] = useState(() => searchParams.get('invite') || '');
 
   const resendSchema = useMemo(() => z.object({
     email: z.string().email(t('validation.invalidEmail'))
@@ -59,15 +61,16 @@ export default function EmailVerification() {
     }
   }, [countdown]);
 
-  // Auto-verify wenn Token vorhanden ist
+  // Auto-verify wenn Token vorhanden ist (nur einmal)
   useEffect(() => {
-    if (token && !verificationAttempted) {
+    if (token && !verificationAttemptedRef.current && !isVerified) {
+      verificationAttemptedRef.current = true;
       verifyEmail(token);
     }
-  }, [token, verificationAttempted]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   const verifyEmail = async (verificationToken: string) => {
-    setVerificationAttempted(true);
     setIsLoading(true);
 
     try {
@@ -86,6 +89,14 @@ export default function EmailVerification() {
         toast.success(t('authPages.emailVerification.emailVerified'), {
           description: t('authPages.emailVerification.accountActivated')
         });
+        // Speichere Invite-Parameter im localStorage, falls vorhanden
+        if (inviteUserId) {
+          localStorage.setItem('pendingInvite', inviteUserId);
+        }
+        // Auto-redirect to login
+        setTimeout(() => {
+          navigate('/auth/login');
+        }, 1500);
       } else {
         toast.error(t('common.error'), {
           description: data.error || t('authPages.emailVerification.invalidLink')
@@ -227,7 +238,7 @@ export default function EmailVerification() {
 
               <div className="space-y-4">
                 <Button size="lg" className="w-full" asChild>
-                  <Link to="/auth/login">
+                  <Link to={inviteUserId ? `/auth/login?redirect=/invite/${inviteUserId}` : '/auth/login'}>
                     {t('authPages.emailVerification.loginNow')}
                   </Link>
                 </Button>
@@ -342,7 +353,7 @@ export default function EmailVerification() {
                 </Card>
               )}
 
-              {token && verificationAttempted && !isVerified && !isLoading && (
+              {token && verificationAttemptedRef.current && !isVerified && !isLoading && (
                 <Card className="mt-6">
                   <CardContent className="pt-6">
                     <Alert variant="destructive">

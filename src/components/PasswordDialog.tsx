@@ -37,6 +37,19 @@ export function PasswordDialog({
   const [localError, setLocalError] = useState<string | undefined>(error);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Ensure title and description are never empty - do this early to avoid rendering issues
+  const safeTitle = React.useMemo(() => {
+    if (!title || typeof title !== 'string') return "Passwort erforderlich";
+    const trimmed = title.trim();
+    return trimmed || "Passwort erforderlich";
+  }, [title]);
+
+  const safeDescription = React.useMemo(() => {
+    if (!description || typeof description !== 'string') return "Bitte gib dein Passwort ein.";
+    const trimmed = description.trim();
+    return trimmed || "Bitte gib dein Passwort ein.";
+  }, [description]);
+
   // Reset state when dialog opens/closes
   useEffect(() => {
     if (open) {
@@ -97,9 +110,9 @@ export function PasswordDialog({
         aria-describedby="password-dialog-description"
       >
         <DialogHeader>
-          <DialogTitle id="password-dialog-title">{title}</DialogTitle>
+          <DialogTitle id="password-dialog-title">{safeTitle}</DialogTitle>
           <DialogDescription id="password-dialog-description">
-            {description}
+            {safeDescription}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>

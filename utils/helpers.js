@@ -482,6 +482,8 @@ export const sendPasswordResetEmail = async (pool, recipientEmail, resetToken, u
     const frontendUrl = req ? getFrontendUrl(req) : (process.env.FRONTEND_URL || 'http://localhost:4000');
     const resetUrl = `${frontendUrl}/auth/reset-password?token=${encodeURIComponent(resetToken)}`;
     const greeting = userName ? `Hallo ${userName},` : 'Hallo,';
+
+    // Plain-Text-Version für Fallback
     const emailBody = `${greeting}
 
 Du hast eine Passwort-Zurücksetzung für dein Sportify-Konto angefordert.
@@ -498,40 +500,20 @@ Wenn du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren.
 
 Dein Sportify-Team`;
 
-    const emailHtml = `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .button { display: inline-block; padding: 12px 24px; background-color: #dc2626; color: #fff; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-        .button:hover { background-color: #b91c1c; }
-        .token { background-color: #f4f4f4; padding: 15px; border-radius: 5px; font-size: 14px; font-family: monospace; margin: 20px 0; word-break: break-all; }
-        .footer { margin-top: 30px; font-size: 12px; color: #666; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <p>${greeting}</p>
-        <p>Du hast eine Passwort-Zurücksetzung für dein Sportify-Konto angefordert.</p>
-        <p>Klicke auf folgenden Button, um dein Passwort zurückzusetzen:</p>
-        <div style="text-align: center;">
-            <a href="${resetUrl}" class="button">Passwort zurücksetzen</a>
-        </div>
-        <p style="margin-top: 30px;">Falls der Button nicht funktioniert, kopiere folgenden Link in deinen Browser:</p>
-        <div class="token">${resetUrl}</div>
-        <p>Alternativ kannst du diesen Code manuell eingeben:</p>
-        <div class="token">${resetToken}</div>
-        <p style="margin-top: 20px;">Dieser Link ist eine Stunde lang gültig.</p>
-        <p>Wenn du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren.</p>
-        <div class="footer">
-            <p>Dein Sportify-Team</p>
-        </div>
-    </div>
-</body>
-</html>`;
+    // Verwende das neue E-Mail-Template
+    const { createActionEmail } = await import('./emailTemplates.js');
+    const emailHtml = createActionEmail({
+        greeting,
+        title: 'Passwort zurücksetzen',
+        message: 'Du hast eine Passwort-Zurücksetzung für dein Sportify-Konto angefordert.',
+        buttonText: 'Passwort zurücksetzen',
+        buttonUrl: resetUrl,
+        token: resetToken,
+        tokenLabel: 'Alternativ kannst du diesen Code manuell eingeben:',
+        additionalText: 'Dieser Link ist eine Stunde lang gültig. Wenn du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren.',
+        frontendUrl,
+        preheader: 'Passwort zurücksetzen'
+    });
 
     console.info(`[Password Reset] Sende E-Mail an: ${recipientEmail}`);
     const { queueEmail } = await import('../services/emailService.js');

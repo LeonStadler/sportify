@@ -3,7 +3,7 @@ import authMiddleware from '../authMiddleware.js';
 import { createAdminMiddleware } from '../middleware/adminMiddleware.js';
 import { queueEmail } from '../services/emailService.js';
 import { InvitationError, createInvitation } from '../services/invitationService.js';
-import { toCamelCase } from '../utils/helpers.js';
+import { toCamelCase, getFrontendUrl } from '../utils/helpers.js';
 
 export const createAdminRouter = (pool) => {
     const router = express.Router();
@@ -210,11 +210,43 @@ export const createAdminRouter = (pool) => {
                 invitedBy: req.user.id,
             });
 
+            const frontendUrl = getFrontendUrl(req);
+            const inviteLink = `${frontendUrl}/invite/${req.user.id}`;
+            const expiresDate = new Date(invitation.expires_at).toLocaleDateString('de-DE');
+
+            // Plain-Text-Version für Fallback
+            const emailBody = `Hallo ${firstName},
+
+Du wurdest zu Sportify eingeladen.
+
+Klicke auf folgenden Link, um dich zu registrieren:
+${inviteLink}
+
+Oder verwende diesen Code bei der Registrierung: ${token}
+
+Die Einladung läuft am ${expiresDate} ab.`;
+
+            // Verwende das neue E-Mail-Template
+            const { createActionEmail } = await import('../utils/emailTemplates.js');
+            const emailHtml = createActionEmail({
+                greeting: `Hallo ${firstName},`,
+                title: 'Du wurdest zu Sportify eingeladen',
+                message: 'Du wurdest eingeladen, Teil der Sportify-Community zu werden. Registriere dich jetzt und starte dein Training!',
+                buttonText: 'Jetzt registrieren',
+                buttonUrl: inviteLink,
+                token: token,
+                tokenLabel: 'Oder verwende diesen Code bei der Registrierung:',
+                additionalText: `Die Einladung läuft am ${expiresDate} ab.`,
+                frontendUrl,
+                preheader: 'Du wurdest zu Sportify eingeladen'
+            });
+
             try {
                 await queueEmail(pool, {
                     recipient: email,
                     subject: 'Sportify – Einladung',
-                    body: `Hallo ${firstName},\n\nDu wurdest zu Sportify eingeladen.\nVerwende diesen Code, um dich zu registrieren: ${token}\n\nDie Einladung läuft am ${new Date(invitation.expires_at).toISOString()} ab.`,
+                    body: emailBody,
+                    html: emailHtml,
                 });
                 console.log(`✅ Admin-Einladungs-E-Mail erfolgreich versendet an: ${email}`);
             } catch (emailError) {

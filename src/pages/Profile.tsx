@@ -1,19 +1,11 @@
 import { AvatarEditor } from "@/components/AvatarEditor";
+import { DeleteAccountConfirmationDialog } from "@/components/DeleteAccountConfirmationDialog";
+import { DeleteAccountPasswordDialog } from "@/components/DeleteAccountPasswordDialog";
 import { InviteFriendForm } from "@/components/InviteFriendForm";
 import { PageTemplate } from "@/components/PageTemplate";
 import { PasswordDialog } from "@/components/PasswordDialog";
 import { TwoFactorSetupDialog } from "@/components/TwoFactorSetupDialog";
 import { WeeklyGoals } from "@/components/WeeklyGoalsDialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -114,7 +106,7 @@ export function Profile() {
     onConfirm: (password: string) => Promise<void>;
     confirmLabel?: string;
   } | null>(null);
-  const [deleteAccountDialogOpen, setDeleteAccountDialogOpen] = useState(false);
+  const [deleteAccountConfirmationDialogOpen, setDeleteAccountConfirmationDialogOpen] = useState(false);
   const [deleteAccountPasswordDialogOpen, setDeleteAccountPasswordDialogOpen] = useState(false);
   const [twoFactorSetupDialogOpen, setTwoFactorSetupDialogOpen] = useState(false);
   const [goals, setGoals] = useState<WeeklyGoals>({
@@ -477,11 +469,11 @@ export function Profile() {
   };
 
   const handleDeleteAccount = () => {
-    setDeleteAccountDialogOpen(true);
+    setDeleteAccountConfirmationDialogOpen(true);
   };
 
-  const handleDeleteAccountConfirm = () => {
-    setDeleteAccountDialogOpen(false);
+  const handleDeleteAccountConfirmation = () => {
+    setDeleteAccountConfirmationDialogOpen(false);
     setDeleteAccountPasswordDialogOpen(true);
   };
 
@@ -1251,36 +1243,18 @@ export function Profile() {
       )}
 
       {/* Delete Account Confirmation Dialog */}
-      <AlertDialog open={deleteAccountDialogOpen} onOpenChange={setDeleteAccountDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Konto löschen</AlertDialogTitle>
-            <AlertDialogDescription>
-              Möchtest du dein Konto wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
-              Alle deine Daten werden unwiderruflich gelöscht.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteAccountConfirm}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Weiter
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteAccountConfirmationDialog
+        open={deleteAccountConfirmationDialogOpen}
+        onOpenChange={setDeleteAccountConfirmationDialogOpen}
+        onConfirm={handleDeleteAccountConfirmation}
+      />
 
-      {/* Password Dialog for Account Deletion */}
-      <PasswordDialog
+      {/* Delete Account Password Dialog */}
+      <DeleteAccountPasswordDialog
         open={deleteAccountPasswordDialogOpen}
         onOpenChange={setDeleteAccountPasswordDialogOpen}
-        title="Konto löschen"
-        description="Bitte gib dein Passwort ein, um das Löschen deines Kontos zu bestätigen."
         onConfirm={handleDeleteAccountPasswordConfirm}
-        confirmLabel="Konto endgültig löschen"
-        cancelLabel="Abbrechen"
+        isLoading={isLoading}
       />
 
       {/* 2FA Setup Dialog */}

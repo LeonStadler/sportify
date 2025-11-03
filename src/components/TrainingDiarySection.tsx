@@ -991,22 +991,24 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
                 return (
                   <div key={entry.id} className="rounded-lg border bg-card p-4 shadow-sm">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
+                      <div className="space-y-2 flex-1">
+                        <div className="flex items-center justify-between gap-2">
                           <Badge variant="secondary" className="text-xs">
                             {currentMood?.emoji ?? ""} {currentMood?.label ?? entry.mood}
                           </Badge>
-                          <span className="text-sm font-semibold text-foreground">{formatDate(entry.entryDate)}</span>
-                          {entry.workoutId && (
-                            <Badge variant="outline" className="text-xs flex flex-col items-start gap-0.5 px-2 py-1">
-                              <span className="font-medium">{entryWorkout ? entryWorkout.title : `Workout #${entry.workoutId.slice(0, 8)}`}</span>
-                              {entryWorkout?.workoutDate && (
-                                <span className="text-[10px] text-muted-foreground">
-                                  {formatDate(entryWorkout.workoutDate)}
-                                </span>
-                              )}
-                            </Badge>
-                          )}
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-foreground">{formatDate(entry.entryDate)}</span>
+                            {entry.workoutId && (
+                              <Badge variant="outline" className="text-xs flex flex-col items-start gap-0.5 px-2 py-1">
+                                <span className="font-medium">{entryWorkout ? entryWorkout.title : `Workout #${entry.workoutId.slice(0, 8)}`}</span>
+                                {entryWorkout?.workoutDate && (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {formatDate(entryWorkout.workoutDate)}
+                                  </span>
+                                )}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                           <span>{t('recoveryDiary.metrics.energy')}: {formatScaleValue(entry.energyLevel)}</span>

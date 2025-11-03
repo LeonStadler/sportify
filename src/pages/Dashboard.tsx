@@ -178,7 +178,6 @@ export function Dashboard() {
         const data = await response.json();
         return data;
       } else {
-        console.log(`Stats API failed for period ${period}`);
         return null;
       }
     } catch (error) {

@@ -43,7 +43,7 @@ export interface AuthState {
 }
 
 export interface AuthContextType extends AuthState {
-  login: (email: string, password: string, twoFactorCode?: string) => Promise<void>;
+  login: (email: string, password: string, twoFactorToken?: string, backupCode?: string) => Promise<{ requires2FA?: boolean }>;
   register: (data: RegisterData) => Promise<{ needsVerification: boolean; email: string }>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -131,13 +131,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     initializeAuth();
   }, []);
 
-  const login = async (email: string, password: string, twoFactorCode?: string): Promise<void> => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
+  const login = async (email: string, password: string, twoFactorToken?: string, backupCode?: string): Promise<{ requires2FA?: boolean }> => {
+    // Don't set isLoading to true - use local loading state in component instead
+    // This prevents the global spinner from showing during login attempts
+    setState(prev => ({ ...prev, error: null }));
 
     try {
-      const body: { email: string; password: string; twoFactorCode?: string } = { email, password };
-      if (twoFactorCode) {
-        body.twoFactorCode = twoFactorCode;
+      const body: { email: string; password: string; twoFactorToken?: string; backupCode?: string } = { email, password };
+      if (twoFactorToken) {
+        body.twoFactorToken = twoFactorToken;
+      }
+      if (backupCode) {
+        body.backupCode = backupCode;
       }
 
       const response = await fetch(`${API_URL}/auth/login`, {
@@ -146,12 +151,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         body: JSON.stringify(body)
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Login fehlgeschlagen');
+      // Parse response body
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        // If response is not JSON, treat as real error
+        const errorMessage = 'Ungültige Antwort vom Server';
+        setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));
+        throw new Error(errorMessage);
       }
 
+      // Check if 2FA is required (now returned as 200 with requires2FA flag)
+      if (data.requires2FA === true) {
+        // 2FA is required - this is expected behavior, not an error
+        setState(prev => ({ ...prev, isLoading: false, error: null }));
+        return { requires2FA: true };
+      }
+
+      // Handle other error responses
+      if (!response.ok) {
+        const errorMessage = data.error || 'Login fehlgeschlagen';
+        setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));
+        throw new Error(errorMessage);
+      }
+
+      // Success - extract user and token
       const { user, token } = data;
 
       localStorage.setItem('token', token);
@@ -163,6 +188,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         error: null
       });
 
+      return {};
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.';
       setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));

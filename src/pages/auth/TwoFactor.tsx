@@ -64,8 +64,6 @@ export default function TwoFactor() {
       // Mock API call - hier würde normalerweise der 2FA-Code verifiziert werden
       await new Promise(resolve => setTimeout(resolve, 1500));
       
-      console.log('2FA code submitted:', data.code);
-      
       // Simulate success/failure - hier würde normalerweise der Code gegen die Authenticator-App verifiziert werden
       // Placeholder: Im echten System würde hier die API-Anfrage zur Verifizierung erfolgen
       toast.error(t('common.error'), {

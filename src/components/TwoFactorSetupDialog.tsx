@@ -63,21 +63,15 @@ export function TwoFactorSetupDialog({
         setIsLoading(true);
         setError(null);
         try {
-            console.log("Initializing 2FA...");
             const result = await enable2FA();
-            console.log("2FA initialized, result:", result);
             if (!result || !result.secret) {
                 throw new Error("Ungültige Antwort vom Server");
             }
-            console.log("Setting QR code:", result.secret.otpauthUrl);
-            console.log("Setting secret:", result.secret.base32);
             setQrCode(result.secret.otpauthUrl);
             setSecret(result.secret.base32);
             setBackupCodes(result.backupCodes);
             setStep("qr");
-            console.log("2FA setup ready, QR code should be visible");
         } catch (err) {
-            console.error("Error initializing 2FA:", err);
             const errorMessage =
                 err instanceof Error ? err.message : "Fehler beim Initialisieren der 2FA";
             setError(errorMessage);
@@ -86,8 +80,6 @@ export function TwoFactorSetupDialog({
                 description: errorMessage,
                 variant: "destructive",
             });
-            // Don't close dialog on error - let user see the error
-            // onOpenChange(false);
         } finally {
             setIsLoading(false);
         }
@@ -103,16 +95,13 @@ export function TwoFactorSetupDialog({
         setError(null);
 
         try {
-            console.log("Verifying 2FA code:", verificationCode);
             await verify2FA(verificationCode);
-            console.log("2FA verified successfully");
             toast({
                 title: "2FA aktiviert",
                 description: "Zwei-Faktor-Authentifizierung wurde erfolgreich aktiviert.",
             });
             setStep("backup");
         } catch (err) {
-            console.error("Error verifying 2FA:", err);
             const errorMessage =
                 err instanceof Error ? err.message : "Ungültiger Code. Bitte versuche es erneut.";
             setError(errorMessage);

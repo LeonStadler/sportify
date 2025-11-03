@@ -7,61 +7,90 @@ export const getFrontendUrl = (req) => {
         return process.env.FRONTEND_URL;
     }
 
-    // 2. Versuche aus Request-Header zu ermitteln (Referer oder Origin)
-    const referer = req?.headers?.referer;
+    // 2. Versuche aus Request-Header zu ermitteln (Origin hat höchste Priorität bei Headers)
     const origin = req?.headers?.origin;
-
     if (origin) {
         try {
             const url = new URL(origin);
-            // Entferne /api Pfad falls vorhanden
             return `${url.protocol}//${url.host}`;
         } catch (e) {
-            // Invalid URL
+            // Invalid URL, continue
         }
     }
 
+    // 3. Prüfe Referer Header (enthält oft die Frontend-URL)
+    const referer = req?.headers?.referer || req?.headers?.referrer;
     if (referer) {
         try {
             const url = new URL(referer);
-            // Entferne /api Pfad und andere Pfade
+            // Entferne Pfad, behalte nur Protokoll und Host (inkl. Port)
             return `${url.protocol}//${url.host}`;
         } catch (e) {
-            // Invalid URL
+            // Invalid URL, continue
         }
     }
 
-    // 3. Prüfe Host-Header - wenn localhost, versuche Port aus Referer/Origin zu extrahieren
+    // 4. Prüfe X-Forwarded-Host (wichtig für Production mit Reverse Proxy)
+    const forwardedHost = req?.headers?.['x-forwarded-host'];
+    const forwardedProto = req?.headers?.['x-forwarded-proto'] || (req?.secure ? 'https' : 'http') || 'http';
+    if (forwardedHost) {
+        // X-Forwarded-Host kann mehrere Hosts enthalten (erster ist der ursprüngliche)
+        const host = forwardedHost.split(',')[0].trim();
+        return `${forwardedProto}://${host}`;
+    }
+
+    // 5. Prüfe Host-Header und Protokoll
+    // Aber ACHTUNG: Host-Header zeigt oft auf Backend, nicht Frontend!
+    // Deshalb versuchen wir zuerst, aus Referer/Origin den Port zu extrahieren
     const host = req?.headers?.host;
+    if (host) {
+        // Wenn hinter einem Proxy, nutze X-Forwarded-Proto, sonst prüfe req.protocol
+        const protocol = req?.headers?.['x-forwarded-proto'] ||
+            (req?.secure ? 'https' : 'http') ||
+            'http';
 
-    // Versuche Port aus Referer zu extrahieren
-    if (referer) {
-        try {
-            const url = new URL(referer);
-            if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
-                const port = url.port || (url.protocol === 'https:' ? '443' : '80');
-                if (port !== '443' && port !== '80') {
-                    return `${url.protocol}//${url.hostname}:${port}`;
+        // Wenn localhost, versuche Port aus Referer/Origin zu extrahieren
+        if (host.includes('localhost') || host.includes('127.0.0.1')) {
+            // Versuche Port aus Referer zu extrahieren (falls vorhanden)
+            if (referer) {
+                try {
+                    const refererUrl = new URL(referer);
+                    if (refererUrl.hostname === 'localhost' || refererUrl.hostname === '127.0.0.1') {
+                        // Verwende Host und Port aus Referer
+                        return `${refererUrl.protocol}//${refererUrl.host}`;
+                    }
+                } catch (e) {
+                    // Continue with host header
                 }
-                return `${url.protocol}//${url.hostname}:${port === '443' ? '' : ''}`;
             }
-        } catch (e) {
-            // Continue
+
+            // Wenn Port im Host-Header vorhanden, verwende diesen
+            if (host.includes(':')) {
+                return `${protocol}://${host}`;
+            }
+            // Standard-Port für localhost (kann falsch sein, aber ist besser als nichts)
+            // Versuche Port aus Referer zu bekommen, sonst Standard
+            if (referer) {
+                try {
+                    const refererUrl = new URL(referer);
+                    if (refererUrl.port) {
+                        return `${protocol}://${host.split(':')[0]}:${refererUrl.port}`;
+                    }
+                } catch (e) {
+                    // Continue
+                }
+            }
+            // Standard-Port für localhost
+            const defaultPort = protocol === 'https' ? '443' : '4000';
+            return `${protocol}://${host}:${defaultPort}`;
         }
+
+        // Für Production: nutze Host mit korrektem Protokoll
+        return `${protocol}://${host}`;
     }
 
-    // 4. Fallback: Wenn Host-Header vorhanden und localhost, nutze diesen
-    if (host && (host.includes('localhost') || host.includes('127.0.0.1'))) {
-        // Host-Header Format: localhost:8080
-        if (host.includes(':')) {
-            return `http://${host}`;
-        }
-        // Wenn kein Port im Host, versuche Standard-Port
-        return `http://${host}`;
-    }
-
-    // 5. Finaler Fallback
-    return 'http://localhost:4000';
+    // 6. Finaler Fallback - nur wenn nichts anderes verfügbar
+    return process.env.FRONTEND_URL || 'http://localhost:4000';
 };
 
 // Helper function to convert snake_case to camelCase

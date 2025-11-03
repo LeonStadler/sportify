@@ -331,14 +331,6 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
         };
       });
 
-      console.log('Sending workout data:', {
-        title: title.trim(),
-        description: description.trim() || null,
-        activities: backendActivities,
-        workoutDate: workoutDateTime.toISOString(),
-        duration: duration ? parseInt(duration) : null,
-      });
-
       const url = workout ? `${API_URL}/workouts/${workout.id}` : `${API_URL}/workouts`;
       const method = workout ? 'PUT' : 'POST';
 
@@ -379,7 +371,6 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
       }
 
       const savedWorkout = await response.json();
-      console.log('Workout saved successfully:', savedWorkout);
 
       toast({
         title: workout ? t('training.form.workoutUpdated') : t('training.form.workoutCreated'),

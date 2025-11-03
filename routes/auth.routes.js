@@ -91,19 +91,21 @@ export const createAuthRouter = (pool) => {
             const password_hash = await bcrypt.hash(password, salt);
 
             const newUserQuery = `
-                INSERT INTO users (email, password_hash, first_name, last_name, nickname, display_preference)
-                VALUES ($1, $2, $3, $4, $5, $6)
+                INSERT INTO users (email, password_hash, first_name, last_name, nickname, display_preference, weekly_goals)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
                 RETURNING id, email, first_name, last_name, nickname, display_preference, is_admin;
             `;
-            const values = [email, password_hash, firstName, lastName, nickname, displayPreference || 'firstName'];
+            const values = [email, password_hash, firstName, lastName, nickname, displayPreference || 'firstName', '{}'];
 
             const { rows } = await pool.query(newUserQuery, values);
             const rawUser = rows[0];
 
             // Versuche Verifizierungs-E-Mail zu senden
             let verificationEmailSent = false;
+            let verificationToken = null;
             try {
-                const { token: verificationToken } = await createEmailVerificationToken(pool, rawUser.id);
+                const tokenResult = await createEmailVerificationToken(pool, rawUser.id);
+                verificationToken = tokenResult.token;
 
                 const frontendUrl = getFrontendUrl(req);
                 const verificationUrl = `${frontendUrl}/auth/email-verification?token=${encodeURIComponent(verificationToken)}&email=${encodeURIComponent(email)}`;
@@ -161,17 +163,10 @@ Dein Sportify-Team`;
                     html: emailHtml,
                 });
                 verificationEmailSent = true;
-                console.log('✅ Verifizierungs-E-Mail erfolgreich versendet an:', email);
             } catch (mailError) {
-                console.error('❌ Fehler beim Versenden der Verifizierungs-E-Mail:', mailError);
-                console.error('   Fehler-Details:', {
-                    message: mailError.message,
-                    code: mailError.code,
-                    response: mailError.response
-                });
+                console.error('Fehler beim Versenden der Verifizierungs-E-Mail:', mailError.message);
                 // User wurde erstellt, aber E-Mail konnte nicht versendet werden
                 // Das ist nicht kritisch - User kann später erneut anfordern
-                console.warn('⚠️ User wurde erstellt, aber Verifizierungs-E-Mail konnte nicht versendet werden');
             }
 
             // Convert snake_case to camelCase
@@ -181,11 +176,14 @@ Dein Sportify-Team`;
 
             res.status(201).json({ user, token });
         } catch (error) {
-            console.error('Registration error:', error);
+            console.error('Registration error:', error.message);
             if (error.code === '23505') { // Unique violation
                 return res.status(409).json({ error: 'Ein Benutzer mit dieser E-Mail-Adresse existiert bereits.' });
             }
-            res.status(500).json({ error: 'Serverfehler bei der Registrierung.' });
+            const errorMessage = process.env.NODE_ENV === 'development'
+                ? (error.message || error.detail || 'Serverfehler bei der Registrierung.')
+                : 'Serverfehler bei der Registrierung.';
+            res.status(500).json({ error: errorMessage });
         }
     });
 
@@ -214,7 +212,9 @@ Dein Sportify-Team`;
 
             if (rawUser.has_2fa) {
                 if (!twoFactorToken && !backupCode) {
-                    return res.status(400).json({ error: 'Zwei-Faktor-Authentifizierungscode erforderlich.' });
+                    // Return 200 with requires2FA flag instead of 400 to avoid browser console error
+                    // This is expected behavior, not an error
+                    return res.status(200).json({ requires2FA: true, message: 'Zwei-Faktor-Authentifizierungscode erforderlich.' });
                 }
 
                 const secret = rawUser.totp_secret;

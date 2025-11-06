@@ -1,14 +1,17 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
+# Sportify - Spaßprojekt - Nicht für Indexierung
+# Alle Seiten sollen nicht indexiert werden
 
 User-agent: *
-Allow: /
+Disallow: /auth/
+Disallow: /dashboard
+Disallow: /scoreboard
+Disallow: /training
+Disallow: /stats
+Disallow: /profile
+Disallow: /friends
+Disallow: /admin
+Disallow: /privacy
+Disallow: /terms
+Disallow: /imprint
+Disallow: /invite/
+Disallow: /

@@ -54,7 +54,27 @@
       content="black-translucent"
     />
     <meta name="apple-mobile-web-app-title" content="Sportify" />
+
+    <!-- Windows Meta Tags -->
+    <meta name="msapplication-TileColor" content="#F97316" />
+    <meta name="msapplication-TileImage" content="/favicon.svg" />
+    <meta name="msapplication-config" content="/browserconfig.xml" />
+    <meta name="msapplication-navbutton-color" content="#F97316" />
+    <meta name="msapplication-starturl" content="/" />
+    <meta
+      name="msapplication-tooltip"
+      content="Sportify - Sports Analytics Platform"
+    />
+    <meta name="msapplication-window" content="width=1024;height=768" />
+
+    <!-- Android Meta Tags -->
+    <meta name="application-name" content="Sportify" />
     <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- SEO & Indexierung -->
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="googlebot" content="noindex, nofollow" />
+    <meta name="bingbot" content="noindex, nofollow" />
 
     <meta
       name="description"
@@ -66,6 +86,11 @@
       content="sport, analytics, fitness, tracking, dashboard"
     />
     <title>Sportify - Sports Analytics Platform</title>
+
+    <!-- Canonical URL -->
+    <link rel="canonical" href="%FRONTEND_URL%/" />
+
+    <!-- Open Graph -->
     <meta property="og:title" content="Sportify - Sports Analytics Platform" />
     <meta
       property="og:description"
@@ -73,6 +98,12 @@
     />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="/placeholder.svg" />
+    <meta property="og:url" content="%FRONTEND_URL%/" />
+
+    <!-- Performance-Optimierungen -->
+    <link rel="preload" href="/favicon.svg" as="image" type="image/svg+xml" />
+    <link rel="dns-prefetch" href="//fonts.googleapis.com" />
+    <link rel="dns-prefetch" href="//fonts.gstatic.com" />
   </head>
 
   <body>

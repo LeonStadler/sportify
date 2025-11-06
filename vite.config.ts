@@ -1,5 +1,6 @@
 import react from "@vitejs/plugin-react-swc";
 import dotenv from "dotenv";
+import fs from "fs";
 import path from "path";
 import { defineConfig } from "vitest/config";
 
@@ -24,6 +25,9 @@ const getFrontendPort = (): number => {
   return 8080;
 };
 
+// Frontend URL für HTML-Injection
+const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+
 // https://vitejs.dev/config/
 export default defineConfig({
   server: {
@@ -32,6 +36,43 @@ export default defineConfig({
   },
   plugins: [
     react(),
+    // HTML-Plugin für dynamische URL-Injection
+    {
+      name: 'html-transform',
+      transformIndexHtml(html) {
+        return html.replace(
+          /%FRONTEND_URL%/g,
+          frontendUrl
+        );
+      },
+    },
+    // Sitemap-Plugin für dynamische URL-Injection
+    {
+      name: 'sitemap-transform',
+      // Transformiere Sitemap nach dem Build
+      writeBundle() {
+        const sitemapPath = path.resolve(__dirname, 'dist/sitemap.xml');
+        if (fs.existsSync(sitemapPath)) {
+          let sitemap = fs.readFileSync(sitemapPath, 'utf-8');
+          sitemap = sitemap.replace(/%FRONTEND_URL%/g, frontendUrl);
+          fs.writeFileSync(sitemapPath, sitemap);
+        }
+      },
+      // Transformiere Sitemap auch im Dev-Modus
+      configureServer(server) {
+        server.middlewares.use('/sitemap.xml', (req, res, next) => {
+          const sitemapPath = path.resolve(__dirname, 'public/sitemap.xml');
+          if (fs.existsSync(sitemapPath)) {
+            let sitemap = fs.readFileSync(sitemapPath, 'utf-8');
+            sitemap = sitemap.replace(/%FRONTEND_URL%/g, frontendUrl);
+            res.setHeader('Content-Type', 'application/xml');
+            res.end(sitemap);
+          } else {
+            next();
+          }
+        });
+      },
+    },
   ],
   resolve: {
     alias: {

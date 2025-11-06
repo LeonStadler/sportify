@@ -1,17 +1,17 @@
 <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <style>
-      .trophy-icon { fill: none; stroke: #FFFFFF; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+      .trophy-icon { fill: none; stroke: #FFFFFF; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
     </style>
   </defs>
   <!-- Orange Background -->
   <rect width="32" height="32" rx="6" fill="#F97316"/>
   
-  <!-- Trophy Icon (perfekt zentriert in 32x32 Box) -->
+  <!-- Trophy Icon (kleiner als vorher, ähnlich wie logo.svg) -->
   <!-- Icon viewBox ist 0 0 24 24, also Mitte ist bei (12, 12) -->
   <!-- Box-Mitte ist bei (16, 16), also verschiebe Icon-Mitte dorthin -->
   <g transform="translate(16, 16)">
-    <g transform="scale(1.2)">
+    <g transform="scale(0.9)">
       <g transform="translate(-12, -12)">
         <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" class="trophy-icon"/>
         <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" class="trophy-icon"/>

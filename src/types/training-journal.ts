@@ -1,4 +1,4 @@
-export type TrainingJournalMood = 'energized' | 'balanced' | 'tired' | 'sore' | 'stressed';
+export type TrainingJournalMood = 'energized' | 'balanced' | 'tired' | 'sore' | 'stressed' | 'motivated' | 'relaxed' | 'excited' | 'focused' | 'frustrated';
 
 export interface TrainingJournalEntry {
   id: string;

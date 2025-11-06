@@ -5,7 +5,28 @@ ALTER TABLE users
     ADD COLUMN IF NOT EXISTS language_preference VARCHAR(5) DEFAULT 'de',
     ADD COLUMN IF NOT EXISTS totp_secret TEXT,
     ADD COLUMN IF NOT EXISTS totp_confirmed BOOLEAN DEFAULT false,
-    ADD COLUMN IF NOT EXISTS weekly_goals JSONB DEFAULT '{}'::jsonb;
+    ADD COLUMN IF NOT EXISTS weekly_goals JSONB DEFAULT '{}'::jsonb,
+    ADD COLUMN IF NOT EXISTS birth_date DATE,
+    ADD COLUMN IF NOT EXISTS country VARCHAR(100),
+    ADD COLUMN IF NOT EXISTS city VARCHAR(100),
+    ADD COLUMN IF NOT EXISTS gender VARCHAR(20);
+
+-- Entferne bestehenden gender Check-Constraint falls vorhanden und füge neuen hinzu
+DO $$
+BEGIN
+    -- Entferne bestehenden Constraint falls vorhanden
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'users_gender_check' 
+        AND conrelid = 'users'::regclass
+    ) THEN
+        ALTER TABLE users DROP CONSTRAINT users_gender_check;
+    END IF;
+    
+    -- Füge neuen Constraint hinzu, der male, female, diverse oder NULL erlaubt
+    ALTER TABLE users ADD CONSTRAINT users_gender_check 
+        CHECK (gender IS NULL OR gender IN ('male', 'female', 'diverse'));
+END $$;
 
 -- Backfill existing NULL values in weekly_goals
 UPDATE users
@@ -493,5 +514,160 @@ BEGIN
         END IF;
     ELSE
         RAISE NOTICE '[Migration] Tabelle "invitations" existiert nicht, Migration wird übersprungen';
+    END IF;
+END $$;
+
+-- Migration: Bereinige workouts Tabelle und ändere start_time zu TIMESTAMPTZ
+-- Diese Migration:
+-- 1. Ändert start_time direkt zu TIMESTAMPTZ (ohne workout_date, da es nicht mehr existiert)
+-- 2. Setzt start_time auf NOT NULL mit DEFAULT NOW()
+-- 3. Entfernt ungenutzte Spalten: preferences, end_time, status, verified_by, verified_at
+
+DO $$
+DECLARE
+    start_time_type text;
+    has_workout_date boolean;
+BEGIN
+    -- Prüfe ob die workouts Tabelle existiert
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'workouts'
+    ) THEN
+        -- Prüfe ob workout_date existiert
+        SELECT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_schema = 'public'
+            AND table_name = 'workouts' 
+            AND column_name = 'workout_date'
+        ) INTO has_workout_date;
+        
+        -- Hole den aktuellen Datentyp von start_time
+        SELECT data_type INTO start_time_type
+        FROM information_schema.columns 
+        WHERE table_schema = 'public'
+        AND table_name = 'workouts' 
+        AND column_name = 'start_time';
+        
+        -- Schritt 1: Ändere start_time zu TIMESTAMPTZ, falls nötig
+        IF start_time_type IS NOT NULL AND start_time_type != 'timestamp with time zone' THEN
+            -- Ändere den Typ zu TIMESTAMPTZ
+            IF start_time_type = 'time without time zone' THEN
+                -- start_time ist TIME (ohne Datum)
+                IF has_workout_date THEN
+                    -- workout_date existiert, kombiniere es mit start_time
+                    ALTER TABLE workouts 
+                    ALTER COLUMN start_time TYPE TIMESTAMPTZ 
+                    USING CASE
+                        WHEN start_time IS NOT NULL AND workout_date IS NOT NULL 
+                            THEN (workout_date::date + start_time::interval)::timestamptz
+                        WHEN workout_date IS NOT NULL 
+                            THEN workout_date::timestamptz
+                        WHEN created_at IS NOT NULL 
+                            THEN created_at
+                        ELSE NOW()
+                    END;
+                ELSE
+                    -- workout_date existiert nicht, kombiniere start_time mit created_at
+                    ALTER TABLE workouts 
+                    ALTER COLUMN start_time TYPE TIMESTAMPTZ 
+                    USING CASE
+                        WHEN start_time IS NOT NULL AND created_at IS NOT NULL 
+                            THEN (created_at::date + start_time::interval)::timestamptz
+                        WHEN created_at IS NOT NULL 
+                            THEN created_at
+                        ELSE NOW()
+                    END;
+                END IF;
+            ELSE
+                -- Versuche direkte Konvertierung zu TIMESTAMPTZ
+                ALTER TABLE workouts 
+                ALTER COLUMN start_time TYPE TIMESTAMPTZ 
+                USING COALESCE(start_time::timestamptz, created_at, NOW());
+            END IF;
+            
+            RAISE NOTICE 'start_time zu TIMESTAMPTZ geändert';
+        ELSIF start_time_type IS NULL THEN
+            -- start_time existiert nicht, erstelle es
+            ALTER TABLE workouts ADD COLUMN start_time TIMESTAMPTZ NOT NULL DEFAULT NOW();
+            RAISE NOTICE 'start_time Spalte erstellt';
+        END IF;
+        
+        -- Schritt 2: Setze start_time auf NOT NULL mit DEFAULT, falls noch nicht gesetzt
+        IF start_time_type IS NOT NULL THEN
+            -- Setze NULL-Werte auf NOW()
+            UPDATE workouts SET start_time = COALESCE(start_time, created_at, NOW()) WHERE start_time IS NULL;
+            
+            -- Setze DEFAULT
+            ALTER TABLE workouts ALTER COLUMN start_time SET DEFAULT NOW();
+            
+            -- Setze NOT NULL
+            BEGIN
+                ALTER TABLE workouts ALTER COLUMN start_time SET NOT NULL;
+                RAISE NOTICE 'start_time auf NOT NULL gesetzt';
+            EXCEPTION WHEN others THEN
+                RAISE NOTICE 'Konnte start_time nicht auf NOT NULL setzen: %', SQLERRM;
+            END;
+        END IF;
+        
+        -- Schritt 3: Entferne workout_date Spalte, falls vorhanden
+        IF has_workout_date THEN
+            ALTER TABLE workouts DROP COLUMN IF EXISTS workout_date;
+            RAISE NOTICE 'workout_date Spalte entfernt';
+        END IF;
+        
+        -- Schritt 4: Entferne ungenutzte Spalten
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_schema = 'public'
+            AND table_name = 'workouts' 
+            AND column_name = 'preferences'
+        ) THEN
+            ALTER TABLE workouts DROP COLUMN preferences;
+            RAISE NOTICE 'preferences Spalte entfernt';
+        END IF;
+        
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_schema = 'public'
+            AND table_name = 'workouts' 
+            AND column_name = 'end_time'
+        ) THEN
+            ALTER TABLE workouts DROP COLUMN end_time;
+            RAISE NOTICE 'end_time Spalte entfernt';
+        END IF;
+        
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_schema = 'public'
+            AND table_name = 'workouts' 
+            AND column_name = 'status'
+        ) THEN
+            ALTER TABLE workouts DROP COLUMN status;
+            RAISE NOTICE 'status Spalte entfernt';
+        END IF;
+        
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_schema = 'public'
+            AND table_name = 'workouts' 
+            AND column_name = 'verified_by'
+        ) THEN
+            ALTER TABLE workouts DROP COLUMN verified_by;
+            RAISE NOTICE 'verified_by Spalte entfernt';
+        END IF;
+        
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_schema = 'public'
+            AND table_name = 'workouts' 
+            AND column_name = 'verified_at'
+        ) THEN
+            ALTER TABLE workouts DROP COLUMN verified_at;
+            RAISE NOTICE 'verified_at Spalte entfernt';
+        END IF;
+        
+    ELSE
+        RAISE NOTICE 'Tabelle "workouts" existiert nicht, Migration wird übersprungen';
     END IF;
 END $$;

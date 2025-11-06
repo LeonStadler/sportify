@@ -105,7 +105,7 @@ export function Stats() {
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList>
           <TabsTrigger value="overview">{t('stats.overview', 'Overview')}</TabsTrigger>
           <TabsTrigger value="trends">{t('stats.trends', 'Trends')}</TabsTrigger>
           <TabsTrigger value="records">{t('stats.records', 'Records')}</TabsTrigger>

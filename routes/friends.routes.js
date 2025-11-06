@@ -87,6 +87,23 @@ export const createFriendsRouter = (pool, ensureFriendInfrastructure) => {
             // Wenn bereits eine Anfrage existiert, akzeptiere diese
             if (existingRequests.length > 0) {
                 const request = existingRequests[0];
+                
+                // Prüfe ob es eine ausstehende Invitation gibt und markiere sie als verwendet
+                const { rows: currentUserRows } = await pool.query('SELECT email FROM users WHERE id = $1', [currentUserId]);
+                if (currentUserRows.length > 0) {
+                    const currentUserEmail = currentUserRows[0].email;
+                    const { rows: invitationRows } = await pool.query(
+                        'SELECT id FROM invitations WHERE email = $1 AND status = $2 AND used = false AND invited_by = $3',
+                        [currentUserEmail, 'pending', inviterId]
+                    );
+                    if (invitationRows.length > 0) {
+                        const invitationId = invitationRows[0].id;
+                        const { markInvitationUsed } = await import('../services/invitationService.js');
+                        await markInvitationUsed(pool, invitationId);
+                        console.log(`✅ Invitation ${invitationId} wurde als verwendet markiert (Freundschaftsanfrage akzeptiert per Link)`);
+                    }
+                }
+                
                 // Der eingeladene User ist der requester, der Einlader ist der target
                 // Wir müssen prüfen, ob die Anfrage vom Einlader kommt oder vom eingeladenen User
                 if (request.requester_id === inviterId && request.target_id === currentUserId) {
@@ -119,6 +136,24 @@ export const createFriendsRouter = (pool, ensureFriendInfrastructure) => {
                         message: 'Freundschaft wurde akzeptiert.',
                         type: 'accepted'
                     });
+                }
+            }
+
+            // Prüfe ob es eine ausstehende Invitation für diese E-Mail gibt und markiere sie als verwendet
+            // Hole E-Mail des aktuellen Users
+            const { rows: currentUserRows } = await pool.query('SELECT email FROM users WHERE id = $1', [currentUserId]);
+            if (currentUserRows.length > 0) {
+                const currentUserEmail = currentUserRows[0].email;
+                // Suche nach ausstehenden Invitations für diese E-Mail
+                const { rows: invitationRows } = await pool.query(
+                    'SELECT id FROM invitations WHERE email = $1 AND status = $2 AND used = false AND invited_by = $3',
+                    [currentUserEmail, 'pending', inviterId]
+                );
+                if (invitationRows.length > 0) {
+                    const invitationId = invitationRows[0].id;
+                    const { markInvitationUsed } = await import('../services/invitationService.js');
+                    await markInvitationUsed(pool, invitationId);
+                    console.log(`✅ Invitation ${invitationId} wurde als verwendet markiert (Freundschaft akzeptiert per Link)`);
                 }
             }
 

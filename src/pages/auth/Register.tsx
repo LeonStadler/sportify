@@ -1,6 +1,7 @@
-import { ArrowLeft, Globe, Palette, Settings, Trophy } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, Globe, Palette, Settings } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { RegisterForm } from '@/components/auth/RegisterForm';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
@@ -18,77 +19,30 @@ import {
 export default function Register() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
-  const inviteUserId = searchParams.get('invite');
+  // Lade inviteUserId: Primär aus URL, Fallback aus localStorage
+  const [inviteUserId, setInviteUserId] = useState(() => {
+    const inviteFromUrl = searchParams.get('invite');
+    // Speichere in localStorage nur wenn aus URL (als Fallback)
+    if (inviteFromUrl) {
+      localStorage.setItem('pendingInvite', inviteFromUrl);
+      return inviteFromUrl;
+    }
+    // Fallback: aus localStorage (z.B. wenn von Invite-Seite kommt)
+    return localStorage.getItem('pendingInvite') || '';
+  });
+
+  // Update localStorage wenn invite in URL geändert wird
+  useEffect(() => {
+    const inviteUserIdFromUrl = searchParams.get('invite');
+    if (inviteUserIdFromUrl && inviteUserIdFromUrl !== inviteUserId) {
+      localStorage.setItem('pendingInvite', inviteUserIdFromUrl);
+      setInviteUserId(inviteUserIdFromUrl);
+    }
+  }, [searchParams, inviteUserId]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex flex-col">
-      {/* Header */}
-      <header className="border-b border-border/40 bg-background/95 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              {t('authPages.backToHome')}
-            </Link>
-          </Button>
-          
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Trophy className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-foreground">Sportify</h1>
-              <p className="text-xs text-muted-foreground">by Leon Stadler</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {/* Desktop: Language & Theme Switchers */}
-            <div className="hidden sm:flex items-center gap-2">
-              <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
-                <LanguageSwitcher />
-              </div>
-              <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
-                <ThemeSwitcher />
-              </div>
-            </div>
-            
-            {/* Mobile: Settings Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="sm:hidden">
-                  <Settings className="h-5 w-5" />
-                  <span className="sr-only">{t('landing.openSettings')}</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>{t('landing.settings')}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Globe className="h-4 w-4" />
-                    <span>{t('landing.language')}</span>
-                  </div>
-                  <LanguageSwitcher />
-                </DropdownMenuItem>
-                <DropdownMenuItem className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Palette className="h-4 w-4" />
-                    <span>{t('landing.theme')}</span>
-                  </div>
-                  <ThemeSwitcher />
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <div className="flex gap-2">
-              <Button variant="outline" asChild>
-                <Link to="/auth/login">{t('auth.login')}</Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <AuthHeader showAuthButtons={true} authButtonType="login" />
 
       {/* Main Content */}
       <div className="flex-1 flex items-center justify-center p-4 py-8">

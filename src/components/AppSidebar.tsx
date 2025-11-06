@@ -1,9 +1,21 @@
-import { BarChart, Dumbbell, Globe, Home, LogOut, Palette, Settings, Shield, Trophy, User, Users } from "lucide-react";
+import {
+  BarChart,
+  Dumbbell,
+  Globe,
+  Home,
+  LogOut,
+  Palette,
+  Settings,
+  Shield,
+  Trophy,
+  User,
+  Users,
+} from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import LanguageSwitcher from './LanguageSwitcher';
-import ThemeSwitcher from './ThemeSwitcher';
+import LanguageSwitcher from "./LanguageSwitcher";
+import ThemeSwitcher from "./ThemeSwitcher";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -12,7 +24,7 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   Sidebar,
@@ -31,7 +43,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { getUserInitials, parseAvatarConfig } from "@/lib/avatar";
 import NiceAvatar from "react-nice-avatar";
-import { Notifications } from './Notifications';
+import { Notifications } from "./Notifications";
 
 export function AppSidebar() {
   const { t } = useTranslation();
@@ -40,8 +52,8 @@ export function AppSidebar() {
   const { user, logout, getDisplayName, isAuthenticated } = useAuth();
   const { setOpenMobile, isMobile } = useSidebar();
 
-  // Verwende isAdmin vom User-Objekt
-  const isAdmin = user?.isAdmin || false;
+  // Verwende role vom User-Objekt
+  const isAdmin = user?.role === "admin";
 
   // Schließe das Sidebar auf Mobile, wenn sich die Route ändert
   useEffect(() => {
@@ -52,22 +64,22 @@ export function AppSidebar() {
 
   const menuItems = [
     {
-      title: t('navigation.dashboard'),
+      title: t("navigation.dashboard"),
       url: "/",
       icon: Home,
     },
     {
-      title: t('navigation.scoreboard'),
+      title: t("navigation.scoreboard"),
       url: "/scoreboard",
       icon: Trophy,
     },
     {
-      title: t('navigation.training'),
+      title: t("navigation.training"),
       url: "/training",
       icon: Dumbbell,
     },
     {
-      title: t('navigation.stats'),
+      title: t("navigation.stats"),
       url: "/stats",
       icon: BarChart,
     },
@@ -77,7 +89,7 @@ export function AppSidebar() {
       icon: Users,
     },
     {
-      title: t('navigation.profile'),
+      title: t("navigation.profile"),
       url: "/profile",
       icon: User,
     },
@@ -85,7 +97,7 @@ export function AppSidebar() {
 
   const adminItems = [
     {
-      title: t('navigation.admin'),
+      title: t("navigation.admin"),
       url: "/admin",
       icon: Shield,
     },
@@ -94,25 +106,21 @@ export function AppSidebar() {
   const handleLogout = async () => {
     try {
       await logout();
-      navigate('/auth/login');
+      navigate("/auth/login");
     } catch (error) {
-      console.error('Logout failed:', error);
+      console.error("Logout failed:", error);
     }
   };
-
-
 
   if (!isAuthenticated) {
     return null; // Don't render sidebar if not authenticated
   }
 
-
   return (
     <Sidebar className="border-r border-border bg-background">
       <SidebarHeader className="border-b border-border bg-background">
         <div className="p-6">
-          <h2 className="text-xl font-bold text-primary">Sportify</h2>
-          <p className="text-sm text-muted-foreground">Sports Analytics Platform</p>
+          <img src="/logo-full.svg" alt="Sportify" className="h-12" />
         </div>
       </SidebarHeader>
 
@@ -130,11 +138,14 @@ export function AppSidebar() {
                       asChild
                       className={`
                         hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200
-                        ${location.pathname === item.url ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''}
+                        ${location.pathname === item.url ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""}
                       `}
                     >
-                      <Link to={item.url} className="flex items-center gap-3 px-3 py-2">
-                        <item.icon size={20} />
+                      <Link
+                        to={item.url}
+                        className="flex items-center gap-3 px-3 py-2"
+                      >
+                        <item.icon size={32} />
                         <span>{item.title}</span>
                       </Link>
                     </SidebarMenuButton>
@@ -149,7 +160,7 @@ export function AppSidebar() {
               <SidebarSeparator className="mx-6 my-2" />
               <SidebarGroup>
                 <SidebarGroupLabel className="text-muted-foreground text-xs uppercase tracking-wider px-6 py-3">
-                  <Shield size={14} className="inline mr-2" />
+                  <Shield size={20} className="inline mr-2" />
                   Administration
                 </SidebarGroupLabel>
                 <SidebarGroupContent className="px-3">
@@ -160,10 +171,13 @@ export function AppSidebar() {
                           asChild
                           className={`
                             hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200
-                            ${location.pathname === item.url ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''}
+                            ${location.pathname === item.url ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""}
                           `}
                         >
-                          <Link to={item.url} className="flex items-center gap-3 px-3 py-2">
+                          <Link
+                            to={item.url}
+                            className="flex items-center gap-3 px-3 py-2"
+                          >
                             <item.icon size={20} />
                             <span>{item.title}</span>
                           </Link>
@@ -189,7 +203,7 @@ export function AppSidebar() {
                 <div className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200">
                   <div className="flex items-center gap-3">
                     <Globe size={20} />
-                    <span>{t('settings.language')}</span>
+                    <span>{t("settings.language")}</span>
                   </div>
                   <LanguageSwitcher />
                 </div>
@@ -200,7 +214,7 @@ export function AppSidebar() {
                 <div className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200">
                   <div className="flex items-center gap-3">
                     <Palette size={20} />
-                    <span>{t('settings.theme')}</span>
+                    <span>{t("settings.theme")}</span>
                   </div>
                   <ThemeSwitcher />
                 </div>
@@ -218,7 +232,7 @@ export function AppSidebar() {
                 <Avatar className="h-9 w-9">
                   {user?.avatar && parseAvatarConfig(user.avatar) ? (
                     <NiceAvatar
-                      style={{ width: '36px', height: '36px' }}
+                      style={{ width: "36px", height: "36px" }}
                       {...parseAvatarConfig(user.avatar)!}
                     />
                   ) : (
@@ -226,26 +240,34 @@ export function AppSidebar() {
                   )}
                 </Avatar>
                 <div className="flex-1">
-                  <p className="text-sm font-semibold truncate">{getDisplayName()}</p>
-                  <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                  <p className="text-sm font-semibold truncate">
+                    {getDisplayName()}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {user?.email}
+                  </p>
                 </div>
               </div>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56 mb-2" side="top" align="start">
-              <DropdownMenuLabel>{t('navigation.profile', 'Mein Account')}</DropdownMenuLabel>
+              <DropdownMenuLabel>
+                {t("navigation.profile", "Mein Account")}
+              </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigate('/profile')}>
+              <DropdownMenuItem onClick={() => navigate("/profile")}>
                 <User className="w-4 h-4 mr-2" />
-                <span>{t('navigation.profile', 'Profil')}</span>
+                <span>{t("navigation.profile", "Profil")}</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate('/profile?tab=preferences')}>
+              <DropdownMenuItem
+                onClick={() => navigate("/profile?tab=preferences")}
+              >
                 <Settings className="w-4 h-4 mr-2" />
-                <span>{t('navigation.settings', 'Einstellungen')}</span>
+                <span>{t("navigation.settings", "Einstellungen")}</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="w-4 h-4 mr-2" />
-                <span>{t('navigation.logout', 'Abmelden')}</span>
+                <span>{t("navigation.logout", "Abmelden")}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

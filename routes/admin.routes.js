@@ -3,7 +3,7 @@ import authMiddleware from '../authMiddleware.js';
 import { createAdminMiddleware } from '../middleware/adminMiddleware.js';
 import { queueEmail } from '../services/emailService.js';
 import { InvitationError, createInvitation } from '../services/invitationService.js';
-import { toCamelCase, getFrontendUrl } from '../utils/helpers.js';
+import { getFrontendUrl, toCamelCase } from '../utils/helpers.js';
 
 export const createAdminRouter = (pool) => {
     const router = express.Router();
@@ -20,15 +20,22 @@ export const createAdminRouter = (pool) => {
                     nickname,
                     is_email_verified,
                     has_2fa,
-                    is_admin,
-                    COALESCE(is_active, true) AS is_active,
+                    role,
                     created_at,
                     last_login_at
                 FROM users
                 ORDER BY created_at DESC
             `);
 
-            const users = rows.map(row => toCamelCase(row));
+            const users = rows.map(row => {
+                const user = toCamelCase(row);
+                // Fix has_2fa -> has2FA conversion (toCamelCase doesn't handle numbers)
+                if (user.has_2fa !== undefined) {
+                    user.has2FA = user.has_2fa;
+                    delete user.has_2fa;
+                }
+                return user;
+            });
             res.json(users);
         } catch (error) {
             console.error('Admin users error:', error);
@@ -234,8 +241,6 @@ Die Einladung läuft am ${expiresDate} ab.`;
                 message: 'Du wurdest eingeladen, Teil der Sportify-Community zu werden. Registriere dich jetzt und starte dein Training!',
                 buttonText: 'Jetzt registrieren',
                 buttonUrl: inviteLink,
-                token: token,
-                tokenLabel: 'Oder verwende diesen Code bei der Registrierung:',
                 additionalText: `Die Einladung läuft am ${expiresDate} ab.`,
                 frontendUrl,
                 preheader: 'Du wurdest zu Sportify eingeladen'

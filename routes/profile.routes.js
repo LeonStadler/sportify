@@ -29,7 +29,7 @@ export const createProfileRouter = (pool) => {
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = $8
                 RETURNING id, email, first_name, last_name, nickname, display_preference, avatar_url,
-                         is_email_verified, has_2fa, is_admin, language_preference, preferences, 
+                         is_email_verified, has_2fa, language_preference, preferences, 
                          created_at, last_login_at, role
             `;
 
@@ -58,6 +58,12 @@ export const createProfileRouter = (pool) => {
             if (user.avatarUrl !== undefined) {
                 user.avatar = user.avatarUrl;
                 delete user.avatarUrl;
+            }
+
+            // Fix has_2fa -> has2FA conversion (toCamelCase doesn't handle numbers)
+            if (user.has_2fa !== undefined) {
+                user.has2FA = user.has_2fa;
+                delete user.has_2fa;
             }
 
             res.json(user);
@@ -192,8 +198,6 @@ Die Einladung läuft am ${expiresDate} ab.`;
                 message: 'Jemand hat dich eingeladen, Teil der Sportify-Community zu werden. Registriere dich jetzt und starte dein Training!',
                 buttonText: 'Jetzt registrieren',
                 buttonUrl: inviteLink,
-                token: token,
-                tokenLabel: 'Oder verwende diesen Code bei der Registrierung:',
                 additionalText: `Die Einladung läuft am ${expiresDate} ab.`,
                 frontendUrl,
                 preheader: 'Du wurdest zu Sportify eingeladen'

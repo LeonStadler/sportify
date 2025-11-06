@@ -266,10 +266,15 @@ const resources = {
                 "units": "Einheiten",
                 "inWorkout": "in \"{{title}}\"",
                 "timeAgoShort": {
+                    "justNow": "gerade eben",
                     "minutes": "vor {{count}} Min",
                     "hours": "vor {{count}}h",
+                    "hoursMinutes": "vor {{hours}}h {{minutes}}min",
                     "yesterday": "gestern",
-                    "days": "vor {{count}}d"
+                    "days": "vor {{count}}d",
+                    "weeks": "vor {{count}} W",
+                    "months": "vor {{count}} M",
+                    "years": "vor {{count}} J"
                 },
                 "activityTypes": {
                     "pullups": "Klimmzüge",
@@ -416,6 +421,9 @@ const resources = {
                     "selectDate": "Wähle ein Datum",
                     "time": "Uhrzeit",
                     "timeRequired": "Uhrzeit *",
+                    "startTime": "Startzeit",
+                    "endTime": "Endzeit",
+                    "toggleDurationEndTime": "Zeit statt Dauer verwenden",
                     "description": "Beschreibung (optional)",
                     "descriptionPlaceholder": "Zusätzliche Notizen zu deinem Workout...",
                     "activities": "Aktivitäten",
@@ -492,9 +500,16 @@ const resources = {
                 "filterSearch": "Suche",
                 "filterSearchPlaceholder": "Tags oder Notizen durchsuchen",
                 "resetFilters": "Filter zurücksetzen",
+                "statistics": "Statistiken",
                 "trends": "Trends",
                 "moodDistribution": "Stimmungsverteilung",
                 "popularTags": "Beliebte Tags",
+                "period": {
+                    "week": "Woche",
+                    "month": "Monat",
+                    "quarter": "Quartal",
+                    "year": "Jahr"
+                },
                 "noEntries": "Noch keine Einträge im Erholungstagebuch vorhanden.",
                 "edit": "Bearbeiten",
                 "delete": "Löschen",
@@ -516,6 +531,16 @@ const resources = {
                     "soreHelper": "Erholung notwendig",
                     "stressed": "Gestresst",
                     "stressedHelper": "Achte auf Regeneration",
+                    "motivated": "Motiviert",
+                    "motivatedHelper": "Voll motiviert und bereit",
+                    "relaxed": "Entspannt",
+                    "relaxedHelper": "Gelassen und ruhig",
+                    "excited": "Aufgeregt",
+                    "excitedHelper": "Begeistert und voller Vorfreude",
+                    "focused": "Fokussiert",
+                    "focusedHelper": "Konzentriert und zielorientiert",
+                    "frustrated": "Frustriert",
+                    "frustratedHelper": "Enttäuscht oder blockiert",
                     "all": "Alle Stimmungen"
                 },
                 "metrics": {
@@ -1299,10 +1324,15 @@ const resources = {
                 "units": "units",
                 "inWorkout": "in \"{{title}}\"",
                 "timeAgoShort": {
+                    "justNow": "just now",
                     "minutes": "{{count}} min ago",
                     "hours": "{{count}}h ago",
+                    "hoursMinutes": "{{hours}}h {{minutes}}min ago",
                     "yesterday": "yesterday",
-                    "days": "{{count}}d ago"
+                    "days": "{{count}}d ago",
+                    "weeks": "{{count}}w ago",
+                    "months": "{{count}}m ago",
+                    "years": "{{count}}y ago"
                 },
                 "activityTypes": {
                     "pullups": "Pull-ups",
@@ -1449,6 +1479,9 @@ const resources = {
                     "selectDate": "Select a date",
                     "time": "Time",
                     "timeRequired": "Time *",
+                    "startTime": "Start Time",
+                    "endTime": "End Time",
+                    "toggleDurationEndTime": "Time instead of duration",
                     "description": "Description (optional)",
                     "descriptionPlaceholder": "Additional notes about your workout...",
                     "activities": "Activities",
@@ -1525,9 +1558,16 @@ const resources = {
                 "filterSearch": "Search",
                 "filterSearchPlaceholder": "Search tags or notes",
                 "resetFilters": "Reset Filters",
+                "statistics": "Statistics",
                 "trends": "Trends",
                 "moodDistribution": "Mood Distribution",
                 "popularTags": "Popular Tags",
+                "period": {
+                    "week": "Week",
+                    "month": "Month",
+                    "quarter": "Quarter",
+                    "year": "Year"
+                },
                 "noEntries": "No entries in recovery diary yet.",
                 "edit": "Edit",
                 "delete": "Delete",
@@ -1549,6 +1589,16 @@ const resources = {
                     "soreHelper": "Recovery necessary",
                     "stressed": "Stressed",
                     "stressedHelper": "Watch out for regeneration",
+                    "motivated": "Motivated",
+                    "motivatedHelper": "Fully motivated and ready",
+                    "relaxed": "Relaxed",
+                    "relaxedHelper": "Calm and peaceful",
+                    "excited": "Excited",
+                    "excitedHelper": "Enthusiastic and full of anticipation",
+                    "focused": "Focused",
+                    "focusedHelper": "Concentrated and goal-oriented",
+                    "frustrated": "Frustrated",
+                    "frustratedHelper": "Disappointed or blocked",
                     "all": "All Moods"
                 },
                 "metrics": {

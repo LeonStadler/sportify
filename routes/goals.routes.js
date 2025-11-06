@@ -34,8 +34,8 @@ export const createGoalsRouter = (pool) => {
                 FROM workouts w
                 LEFT JOIN workout_activities wa ON w.id = wa.workout_id
                 WHERE w.user_id = $1 
-                    AND w.workout_date >= DATE_TRUNC('week', CURRENT_DATE)
-                    AND w.workout_date < DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '1 week'
+                    AND w.start_time::date >= DATE_TRUNC('week', CURRENT_DATE)
+                    AND w.start_time::date < DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '1 week'
             `;
 
             const { rows } = await pool.query(query, [req.user.id]);
@@ -92,8 +92,8 @@ export const createGoalsRouter = (pool) => {
                 FROM workouts w
                 LEFT JOIN workout_activities wa ON w.id = wa.workout_id
                 WHERE w.user_id = $1 
-                    AND w.workout_date >= DATE_TRUNC('week', CURRENT_DATE)
-                    AND w.workout_date < DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '1 week'
+                    AND w.start_time::date >= DATE_TRUNC('week', CURRENT_DATE)
+                    AND w.start_time::date < DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '1 week'
             `;
 
             const { rows } = await pool.query(getQuery, [req.user.id]);

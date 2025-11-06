@@ -17,13 +17,13 @@ export const createStatsRouter = (pool) => {
                     periodCondition = WEEK_WINDOW_CONDITION;
                     break;
                 case 'month':
-                    periodCondition = `COALESCE(w.workout_date, w.created_at::date) >= date_trunc('month', CURRENT_DATE)`;
+                    periodCondition = `w.start_time::date >= date_trunc('month', CURRENT_DATE)`;
                     break;
                 case 'quarter':
-                    periodCondition = `COALESCE(w.workout_date, w.created_at::date) >= date_trunc('quarter', CURRENT_DATE)`;
+                    periodCondition = `w.start_time::date >= date_trunc('quarter', CURRENT_DATE)`;
                     break;
                 case 'year':
-                    periodCondition = `COALESCE(w.workout_date, w.created_at::date) >= date_trunc('year', CURRENT_DATE)`;
+                    periodCondition = `w.start_time::date >= date_trunc('year', CURRENT_DATE)`;
                     break;
                 default:
                     periodCondition = WEEK_WINDOW_CONDITION;

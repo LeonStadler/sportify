@@ -1,16 +1,16 @@
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { parseAvatarConfig } from '@/lib/avatar';
-import NiceAvatar from 'react-nice-avatar';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { API_URL } from '@/lib/api';
-import { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { API_URL } from "@/lib/api";
+import { parseAvatarConfig } from "@/lib/avatar";
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import NiceAvatar from "react-nice-avatar";
+import { useNavigate } from "react-router-dom";
 
 interface ActivityFeedItem {
   id: string;
@@ -22,40 +22,37 @@ interface ActivityFeedItem {
   amount: number;
   points: number;
   workoutTitle: string;
-  createdAt: string;
+  startTimeTimestamp: string | null;
 }
 
-
-const getInitials = (displayName: string) => {
-  const names = displayName.split(' ');
-  return names.map(name => name.charAt(0)).join('').toUpperCase().slice(0, 2);
-};
-
-const formatActivity = (activity: ActivityFeedItem, t: (key: string, params?: any) => string) => {
+const formatActivity = (
+  activity: ActivityFeedItem,
+  t: (key: string, params?: any) => string
+) => {
   const { activityType, amount, workoutTitle } = activity;
 
   let formatted = `${amount}`;
 
   // Add unit based on activity type
   switch (activityType) {
-    case 'pushups':
-    case 'pullups':
-    case 'situps':
-      formatted += ` ${t('activityFeed.repetitions')}`;
+    case "pushups":
+    case "pullups":
+    case "situps":
+      formatted += ` ${t("activityFeed.repetitions")}`;
       break;
-    case 'running':
-    case 'cycling':
-      formatted += ' km';
+    case "running":
+    case "cycling":
+      formatted += " km";
       break;
-    case 'other':
-      formatted += ` ${t('activityFeed.units')}`;
+    case "other":
+      formatted += ` ${t("activityFeed.units")}`;
       break;
     default:
-      formatted += ` ${t('activityFeed.units')}`;
+      formatted += ` ${t("activityFeed.units")}`;
   }
 
   if (workoutTitle) {
-    formatted += ` ${t('activityFeed.inWorkout', { title: workoutTitle })}`;
+    formatted += ` ${t("activityFeed.inWorkout", { title: workoutTitle })}`;
   }
 
   return formatted;
@@ -63,20 +60,20 @@ const formatActivity = (activity: ActivityFeedItem, t: (key: string, params?: an
 
 const getActivityIcon = (activityType: string) => {
   switch (activityType) {
-    case 'pullups':
-      return '💪';
-    case 'pushups':
-      return '🔥';
-    case 'situps':
-      return '🚀';
-    case 'running':
-      return '🏃';
-    case 'cycling':
-      return '🚴';
-    case 'other':
-      return '🔗';
+    case "pullups":
+      return "💪";
+    case "pushups":
+      return "🔥";
+    case "situps":
+      return "🚀";
+    case "running":
+      return "🏃";
+    case "cycling":
+      return "🚴";
+    case "other":
+      return "🔗";
     default:
-      return '💪';
+      return "💪";
   }
 };
 
@@ -84,43 +81,112 @@ const getActivityName = (activityType: string, t: (key: string) => string) => {
   const translationKey = `activityFeed.activityTypes.${activityType.toLowerCase()}`;
   const translation = t(translationKey);
   // Fallback to original if translation key doesn't exist
-  return translation !== translationKey ? translation : t('activityFeed.activityTypes.unknown');
+  return translation !== translationKey
+    ? translation
+    : t("activityFeed.activityTypes.unknown");
 };
 
 const getActivityColor = (activityType: string) => {
   switch (activityType) {
-    case 'pullups': return 'bg-blue-100 text-blue-800';
-    case 'pushups': return 'bg-red-100 text-red-800';
-    case 'situps': return 'bg-orange-100 text-orange-800';
-    case 'running': return 'bg-green-100 text-green-800';
-    case 'cycling': return 'bg-purple-100 text-purple-800';
-    case 'other': return 'bg-gray-100 text-gray-800';
-    default: return 'bg-gray-100 text-gray-800';
+    case "pullups":
+      return "bg-blue-100 text-blue-800";
+    case "pushups":
+      return "bg-red-100 text-red-800";
+    case "situps":
+      return "bg-orange-100 text-orange-800";
+    case "running":
+      return "bg-green-100 text-green-800";
+    case "cycling":
+      return "bg-purple-100 text-purple-800";
+    case "other":
+      return "bg-gray-100 text-gray-800";
+    default:
+      return "bg-gray-100 text-gray-800";
   }
 };
 
-const formatTimeAgo = (dateString: string, t: (key: string, params?: any) => string) => {
+const formatTimeAgo = (
+  dateString: string | null | undefined,
+  t: (key: string, params?: any) => string
+) => {
+  // Kein Fallback - wenn kein Datum vorhanden, zeige "Unbekannt"
+  if (!dateString) {
+    return t("activityFeed.timeAgoShort.unknown", "Unbekannt");
+  }
+
   const date = new Date(dateString);
   const now = new Date();
+
+  // Prüfe ob das Datum gültig ist
+  if (isNaN(date.getTime())) {
+    console.warn("Invalid date in formatTimeAgo:", dateString);
+    return t("activityFeed.timeAgoShort.unknown", "Unbekannt");
+  }
+
   const diffMs = now.getTime() - date.getTime();
+
+  // Wenn die Differenz negativ ist (Zukunft), zeige das Datum formatiert
+  if (diffMs < 0) {
+    // Zeige formatiertes Datum für zukünftige Daten
+    const locale = "de-DE";
+    return date.toLocaleDateString(locale, {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
   const diffMins = Math.floor(diffMs / (1000 * 60));
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffWeeks = Math.floor(diffDays / 7);
+  const diffMonths = Math.floor(diffDays / 30);
+  const diffYears = Math.floor(diffDays / 365);
 
+  // Unter 1 Stunde: Minuten
   if (diffMins < 60) {
-    return t('activityFeed.timeAgoShort.minutes', { count: diffMins });
-  } else if (diffHours < 24) {
-    return t('activityFeed.timeAgoShort.hours', { count: diffHours });
-  } else if (diffDays === 1) {
-    return t('activityFeed.timeAgoShort.yesterday');
-  } else {
-    return t('activityFeed.timeAgoShort.days', { count: diffDays });
+    if (diffMins < 1) {
+      return t("activityFeed.timeAgoShort.justNow");
+    }
+    return t("activityFeed.timeAgoShort.minutes", { count: diffMins });
+  }
+  // Unter 24 Stunden: Stunden:Minuten
+  else if (diffHours < 24) {
+    const remainingMinutes = diffMins % 60;
+    if (remainingMinutes === 0) {
+      return t("activityFeed.timeAgoShort.hours", { count: diffHours });
+    }
+    return t("activityFeed.timeAgoShort.hoursMinutes", {
+      hours: diffHours,
+      minutes: remainingMinutes,
+    });
+  }
+  // Unter 7 Tagen: Tage
+  else if (diffDays < 7) {
+    if (diffDays === 1) {
+      return t("activityFeed.timeAgoShort.yesterday");
+    }
+    return t("activityFeed.timeAgoShort.days", { count: diffDays });
+  }
+  // Unter 30 Tagen: Wochen
+  else if (diffDays < 30) {
+    return t("activityFeed.timeAgoShort.weeks", { count: diffWeeks });
+  }
+  // Unter 1 Jahr: Monate
+  else if (diffDays < 365) {
+    return t("activityFeed.timeAgoShort.months", { count: diffMonths });
+  }
+  // Darüber: Jahre
+  else {
+    return t("activityFeed.timeAgoShort.years", { count: diffYears });
   }
 };
 
 const getUserInitials = (firstName: string, lastName: string) => {
-  const first = firstName && firstName.length > 0 ? firstName.charAt(0) : '?';
-  const last = lastName && lastName.length > 0 ? lastName.charAt(0) : '?';
+  const first = firstName && firstName.length > 0 ? firstName.charAt(0) : "?";
+  const last = lastName && lastName.length > 0 ? lastName.charAt(0) : "?";
   return `${first}${last}`.toUpperCase();
 };
 
@@ -148,15 +214,15 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
     setIsLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) {
         setActivities([]);
-        setError(t('activityFeed.pleaseLogin'));
+        setError(t("activityFeed.pleaseLogin"));
         return;
       }
 
       const response = await fetch(`${API_URL}/feed?page=1&limit=10`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (response.ok) {
@@ -169,30 +235,30 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
           // Wenn payload leer ist, aber hasFriends true ist, bedeutet das, dass Freunde existieren, aber noch keine Aktivitäten
           setHasFriends(data?.hasFriends ?? (payload.length > 0 ? true : null));
         } else {
-          console.warn('ActivityFeed: Unexpected data format', data);
+          console.warn("ActivityFeed: Unexpected data format", data);
           setActivities([]);
           setHasFriends(data?.hasFriends ?? false);
-          setError(t('activityFeed.unexpectedFormat'));
+          setError(t("activityFeed.unexpectedFormat"));
         }
       } else {
         setActivities([]);
         setHasFriends(false);
-        setError(t('activityFeed.couldNotLoad'));
+        setError(t("activityFeed.couldNotLoad"));
         toast({
-          title: t('dashboard.error'),
-          description: t('activityFeed.errorLoading'),
-          variant: 'destructive'
+          title: t("dashboard.error"),
+          description: t("activityFeed.errorLoading"),
+          variant: "destructive",
         });
       }
     } catch (error) {
-      console.error('Error loading activity feed:', error);
+      console.error("Error loading activity feed:", error);
       setActivities([]);
       setHasFriends(false);
-      setError(t('activityFeed.couldNotLoad'));
+      setError(t("activityFeed.couldNotLoad"));
       toast({
-        title: t('dashboard.error'),
-        description: t('activityFeed.errorLoading'),
-        variant: 'destructive',
+        title: t("dashboard.error"),
+        description: t("activityFeed.errorLoading"),
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
@@ -203,7 +269,9 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
     return (
       <Card className={className}>
         <CardHeader className="pb-4">
-          <CardTitle className="text-lg md:text-xl">{t('activityFeed.title')}</CardTitle>
+          <CardTitle className="text-lg md:text-xl">
+            {t("activityFeed.title")}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -225,7 +293,9 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
   return (
     <Card className={className}>
       <CardHeader className="pb-4">
-        <CardTitle className="text-lg md:text-xl">{t('activityFeed.title')}</CardTitle>
+        <CardTitle className="text-lg md:text-xl">
+          {t("activityFeed.title")}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         {error ? (
@@ -236,17 +306,24 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
           <div className="space-y-3">
             {activities.length > 0 ? (
               activities.map((activity) => (
-                <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30">
+                <div
+                  key={activity.id}
+                  className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30"
+                >
                   <Avatar className="w-10 h-10 md:w-12 md:h-12">
-                    {activity.userAvatar && parseAvatarConfig(activity.userAvatar) ? (
-                      <NiceAvatar 
-                        style={{ width: '48px', height: '48px' }} 
-                        {...parseAvatarConfig(activity.userAvatar)!} 
+                    {activity.userAvatar &&
+                    parseAvatarConfig(activity.userAvatar) ? (
+                      <NiceAvatar
+                        style={{ width: "48px", height: "48px" }}
+                        {...parseAvatarConfig(activity.userAvatar)!}
                       />
                     ) : (
-                    <AvatarFallback className="text-xs md:text-sm">
-                      {getUserInitials(activity.userFirstName, activity.userLastName)}
-                    </AvatarFallback>
+                      <AvatarFallback className="text-xs md:text-sm">
+                        {getUserInitials(
+                          activity.userFirstName,
+                          activity.userLastName
+                        )}
+                      </AvatarFallback>
                     )}
                   </Avatar>
 
@@ -259,20 +336,23 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
                         variant="secondary"
                         className={`text-xs ${getActivityColor(activity.activityType)}`}
                       >
-                        {getActivityIcon(activity.activityType)} {getActivityName(activity.activityType, t)}
+                        {getActivityIcon(activity.activityType)}{" "}
+                        {getActivityName(activity.activityType, t)}
                       </Badge>
                     </div>
 
                     <p className="text-xs md:text-sm text-muted-foreground mb-1">
-                      <span className="font-medium">{formatActivity(activity, t)}</span>
+                      <span className="font-medium">
+                        {formatActivity(activity, t)}
+                      </span>
                     </p>
 
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">
-                        {formatTimeAgo(activity.createdAt, t)}
+                        {formatTimeAgo(activity.startTimeTimestamp, t)}
                       </span>
                       <span className="text-xs font-medium text-primary">
-                        {activity.points} {t('activityFeed.points')}
+                        {activity.points} {t("activityFeed.points")}
                       </span>
                     </div>
                   </div>
@@ -284,23 +364,31 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
                 {hasFriends === false ? (
                   <>
                     <p className="text-muted-foreground mb-2 font-medium">
-                      {t('activityFeed.noFriends', 'Du hast noch keine Freunde')}
+                      {t(
+                        "activityFeed.noFriends",
+                        "Du hast noch keine Freunde"
+                      )}
                     </p>
                     <p className="text-xs md:text-sm text-muted-foreground mb-4">
-                      {t('activityFeed.addFriendsToSeeActivities', 'Füge Freunde hinzu, um deren Aktivitäten hier zu sehen.')}
+                      {t(
+                        "activityFeed.addFriendsToSeeActivities",
+                        "Füge Freunde hinzu, um deren Aktivitäten hier zu sehen."
+                      )}
                     </p>
                     <Button
-                      onClick={() => navigate('/friends')}
+                      onClick={() => navigate("/friends")}
                       className="mt-2"
                     >
-                      {t('activityFeed.goToFriends', 'Zu Freunden')}
+                      {t("activityFeed.goToFriends", "Zu Freunden")}
                     </Button>
                   </>
                 ) : (
                   <>
-                    <p className="text-muted-foreground mb-2">{t('activityFeed.noActivities')}</p>
+                    <p className="text-muted-foreground mb-2">
+                      {t("activityFeed.noActivities")}
+                    </p>
                     <p className="text-xs md:text-sm text-muted-foreground">
-                      {t('activityFeed.addFriends')}
+                      {t("activityFeed.addFriends")}
                     </p>
                   </>
                 )}

@@ -101,13 +101,6 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, redirectT
       if (onSuccess) {
         onSuccess();
       } else if (result.needsVerification) {
-        // Speichere Invite-Parameter im localStorage, falls vorhanden
-        if (redirectTo && redirectTo.startsWith('/invite/')) {
-          const userId = redirectTo.replace('/invite/', '');
-          if (userId) {
-            localStorage.setItem('pendingInvite', userId);
-          }
-        }
         // Umleitung zur E-Mail-Verifizierung mit invite-Parameter, falls vorhanden
         const emailVerificationUrl = `/auth/email-verification?email=${encodeURIComponent(result.email)}`;
         let finalUrl = emailVerificationUrl;

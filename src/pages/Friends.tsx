@@ -74,10 +74,10 @@ export function Friends() {
       subtitle={t('friends.subtitle', 'Vernetze dich mit anderen Sportlern und vergleiche eure Leistungen.')}
     >
       <Tabs defaultValue="friends" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="friends" className="text-xs md:text-sm">Meine Freunde</TabsTrigger>
-          <TabsTrigger value="requests" className="text-xs md:text-sm">Anfragen</TabsTrigger>
-          <TabsTrigger value="search" className="text-xs md:text-sm">Finden</TabsTrigger>
+        <TabsList>
+          <TabsTrigger value="friends">Meine Freunde</TabsTrigger>
+          <TabsTrigger value="requests">Anfragen</TabsTrigger>
+          <TabsTrigger value="search">Finden</TabsTrigger>
         </TabsList>
         <TabsContent value="friends" className="mt-4 md:mt-6">
           <FriendsList key={`friends-${refreshKey}`} />

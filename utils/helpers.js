@@ -449,13 +449,14 @@ export const getColumnSqlType = async (pool, tableName, columnName) => {
     }
 };
 
-export const ALLOWED_JOURNAL_MOODS = ['energized', 'balanced', 'tired', 'sore', 'stressed'];
+export const ALLOWED_JOURNAL_MOODS = ['energized', 'balanced', 'tired', 'sore', 'stressed', 'motivated', 'relaxed', 'excited', 'focused', 'frustrated'];
 
 // Woche von Montag (Start) bis Sonntag (Ende)
 // PostgreSQL's date_trunc('week', ...) startet standardmäßig am Montag gemäß ISO 8601
+// Verwendet nur start_time (TIMESTAMPTZ) - KEIN Fallback
 export const WEEK_WINDOW_CONDITION = `
-    COALESCE(w.workout_date, w.created_at::date) >= date_trunc('week', CURRENT_DATE)
-    AND COALESCE(w.workout_date, w.created_at::date) < date_trunc('week', CURRENT_DATE) + INTERVAL '7 days'
+    w.start_time::date >= date_trunc('week', CURRENT_DATE)
+    AND w.start_time::date < date_trunc('week', CURRENT_DATE) + INTERVAL '7 days'
 `;
 
 export const weeklyChallengeTargets = {
@@ -508,8 +509,6 @@ Dein Sportify-Team`;
         message: 'Du hast eine Passwort-Zurücksetzung für dein Sportify-Konto angefordert.',
         buttonText: 'Passwort zurücksetzen',
         buttonUrl: resetUrl,
-        token: resetToken,
-        tokenLabel: 'Alternativ kannst du diesen Code manuell eingeben:',
         additionalText: 'Dieser Link ist eine Stunde lang gültig. Wenn du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren.',
         frontendUrl,
         preheader: 'Passwort zurücksetzen'

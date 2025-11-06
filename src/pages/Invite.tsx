@@ -23,23 +23,37 @@ export function Invite() {
     const [inviter, setInviter] = useState<InviterInfo | null>(null);
     const [processing, setProcessing] = useState(false);
 
+    // Prüfe localStorage für pendingInvite, falls userId aus URL fehlt
     useEffect(() => {
-        // Entferne pendingInvite aus localStorage, wenn wir auf der Invite-Seite sind
-        // (entweder direkt oder nach Login)
         const pendingInvite = localStorage.getItem('pendingInvite');
-        if (pendingInvite && pendingInvite === userId) {
-            localStorage.removeItem('pendingInvite');
+        // Wenn kein userId in URL, aber pendingInvite vorhanden, navigiere zur Invite-Seite
+        if (!userId && pendingInvite) {
+            navigate(`/invite/${pendingInvite}`, { replace: true });
+            return;
         }
-        
+        // Wenn userId vorhanden, speichere es in localStorage
+        if (userId) {
+            localStorage.setItem('pendingInvite', userId);
+        }
+    }, [userId, navigate]);
+
+    useEffect(() => {
         const fetchInviterInfo = async () => {
-            if (!userId) {
+            // Verwende userId aus URL oder aus localStorage
+            const inviteUserId = userId || localStorage.getItem('pendingInvite');
+            
+            if (!inviteUserId) {
                 toast.error('Ungültiger Einladungslink.');
                 navigate('/');
                 return;
             }
 
+            // Speichere invite userId in localStorage für den Fall, dass User sich registriert/verifiziert
+            localStorage.setItem('pendingInvite', inviteUserId);
+
+            setLoading(true);
             try {
-                const response = await fetch(`${API_URL}/friends/invite/${userId}`);
+                const response = await fetch(`${API_URL}/friends/invite/${inviteUserId}`);
 
                 if (!response.ok) {
                     throw new Error('Einladungslink ungültig.');
@@ -51,8 +65,9 @@ export function Invite() {
                 // Wenn eingeloggt, prüfe ob bereits eine Anfrage existiert
                 if (isAuthenticated && user) {
                     // Prüfe ob User sich selbst einlädt
-                    if (user.id === userId) {
+                    if (user.id === inviteUserId) {
                         toast.error('Du kannst dir selbst keine Freundschaftsanfrage senden.');
+                        localStorage.removeItem('pendingInvite');
                         navigate('/friends');
                         return;
                     }
@@ -60,25 +75,31 @@ export function Invite() {
             } catch (error) {
                 console.error('Error fetching inviter info:', error);
                 toast.error('Einladungslink ungültig oder abgelaufen.');
+                localStorage.removeItem('pendingInvite');
                 navigate('/');
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchInviterInfo();
+        // Lade Daten nur wenn userId vorhanden ist
+        if (userId || localStorage.getItem('pendingInvite')) {
+            fetchInviterInfo();
+        }
     }, [userId, navigate, isAuthenticated, user]);
 
     const handleAcceptInvitation = async () => {
-        if (!userId || !isAuthenticated) {
-            navigate(`/auth/login?redirect=/invite/${userId}`);
+        const inviteUserId = userId || localStorage.getItem('pendingInvite');
+        
+        if (!inviteUserId || !isAuthenticated) {
+            navigate(`/auth/login?redirect=/invite/${inviteUserId}`);
             return;
         }
 
         setProcessing(true);
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/friends/invite/${userId}`, {
+            const response = await fetch(`${API_URL}/friends/invite/${inviteUserId}`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -103,6 +124,9 @@ export function Invite() {
                 });
             }
 
+            // Entferne pendingInvite aus localStorage nach erfolgreicher Annahme
+            localStorage.removeItem('pendingInvite');
+
             // Navigate to friends page after 1.5 seconds
             setTimeout(() => {
                 navigate('/friends');
@@ -117,11 +141,13 @@ export function Invite() {
     };
 
     const handleLogin = () => {
-        navigate(`/auth/login?redirect=/invite/${userId}`);
+        const inviteUserId = userId || localStorage.getItem('pendingInvite');
+        navigate(`/auth/login?redirect=/invite/${inviteUserId}`);
     };
 
     const handleRegister = () => {
-        navigate(`/auth/register?invite=${userId}`);
+        const inviteUserId = userId || localStorage.getItem('pendingInvite');
+        navigate(`/auth/register?invite=${inviteUserId}`);
     };
 
     if (loading) {

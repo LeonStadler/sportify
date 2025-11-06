@@ -21,8 +21,7 @@ interface AdminUser {
   nickname?: string;
   isEmailVerified: boolean;
   has2FA: boolean;
-  isAdmin: boolean;
-  isActive: boolean;
+  role: 'user' | 'admin';
   createdAt: string;
   lastLoginAt?: string;
 }
@@ -64,13 +63,13 @@ export function Admin() {
 
   // Lade Daten beim Komponenten-Mount
   useEffect(() => {
-    if (user?.isAdmin) {
+    if (user?.role === 'admin') {
       loadAdminData();
     }
-  }, [user?.isAdmin]);
+  }, [user?.role]);
 
   // Prüfe Admin-Rechte
-  if (!user?.isAdmin) {
+  if (user?.role !== 'admin') {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-center min-h-[400px]">
@@ -335,7 +334,7 @@ export function Admin() {
                 </div>
                 <div className="p-4 border rounded-lg">
                   <p className="text-2xl font-bold text-blue-600">
-                    {users.filter(u => u.isAdmin).length}
+                    {users.filter(u => u.role === 'admin').length}
                   </p>
                   <p className="text-sm text-muted-foreground">Administratoren</p>
                 </div>
@@ -407,7 +406,7 @@ export function Admin() {
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-col gap-1">
-                              {adminUser.isAdmin && (
+                              {adminUser.role === 'admin' && (
                                 <Badge variant="secondary">
                                   <Shield className="w-3 h-3 mr-1" />
                                   Admin

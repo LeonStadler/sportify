@@ -60,20 +60,17 @@ export function Scoreboard() {
     >
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="w-full overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
-          <TabsList className="flex h-auto flex-wrap items-center justify-start rounded-lg bg-muted/50 dark:bg-muted/30 p-1.5 gap-1.5 sm:grid sm:w-full sm:grid-cols-4 md:grid-cols-7 sm:gap-2 sm:h-10">
-            {activityTypes.map((activity) => (
-              <TabsTrigger
-                key={activity.id}
-                value={activity.id}
-                className="text-xs sm:text-sm whitespace-nowrap px-3 py-2 sm:py-1.5 flex-shrink-0 rounded-md transition-all bg-transparent hover:bg-muted data-[state=active]:bg-background dark:data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=active]:font-semibold"
-              >
-                <span className="mr-1.5 text-sm sm:text-base">{activity.icon}</span>
-                <span>{activity.name}</span>
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </div>
+        <TabsList>
+          {activityTypes.map((activity) => (
+            <TabsTrigger
+              key={activity.id}
+              value={activity.id}
+            >
+              <span className="mr-1.5">{activity.icon}</span>
+              <span>{activity.name}</span>
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
         {activityTypes.map((activity) => (
           <TabsContent key={activity.id} value={activity.id} className="mt-6">

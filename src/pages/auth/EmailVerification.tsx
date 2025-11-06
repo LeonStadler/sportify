@@ -1,27 +1,24 @@
-import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowLeft, CheckCircle, Globe, Mail, Palette, RotateCcw, Settings, Trophy } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { z } from 'zod';
+import { zodResolver } from "@hookform/resolvers/zod";
+import { CheckCircle, Mail, RotateCcw } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { z } from "zod";
 
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { AuthHeader } from "@/components/auth/AuthHeader";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import LanguageSwitcher from '@/components/LanguageSwitcher';
-import ThemeSwitcher from '@/components/ThemeSwitcher';
-import { toast } from 'sonner';
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 
 export default function EmailVerification() {
   const { t } = useTranslation();
@@ -32,25 +29,48 @@ export default function EmailVerification() {
   const [countdown, setCountdown] = useState(0);
   const verificationAttemptedRef = useRef(false);
 
-  const email = searchParams.get('email') || '';
-  const token = searchParams.get('token') || '';
-  const [inviteUserId] = useState(() => searchParams.get('invite') || '');
+  const email = searchParams.get("email") || "";
+  const token = searchParams.get("token") || "";
+  // Lade inviteUserId: Primär aus URL, Fallback aus localStorage
+  const [inviteUserId, setInviteUserId] = useState(() => {
+    const inviteFromUrl = searchParams.get("invite");
+    // Speichere in localStorage nur wenn aus URL (als Fallback für Login)
+    if (inviteFromUrl) {
+      localStorage.setItem("pendingInvite", inviteFromUrl);
+      return inviteFromUrl;
+    }
+    // Fallback: aus localStorage
+    return localStorage.getItem("pendingInvite") || "";
+  });
 
-  const resendSchema = useMemo(() => z.object({
-    email: z.string().email(t('validation.invalidEmail'))
-  }), [t]);
+  // Update localStorage wenn invite in URL geändert wird
+  useEffect(() => {
+    const inviteFromUrl = searchParams.get("invite");
+    if (inviteFromUrl && inviteFromUrl !== inviteUserId) {
+      localStorage.setItem("pendingInvite", inviteFromUrl);
+      setInviteUserId(inviteFromUrl);
+    }
+  }, [searchParams, inviteUserId]);
+
+  const resendSchema = useMemo(
+    () =>
+      z.object({
+        email: z.string().email(t("validation.invalidEmail")),
+      }),
+    [t]
+  );
 
   type ResendData = z.infer<typeof resendSchema>;
 
   const {
     register,
     handleSubmit,
-    formState: { errors }
+    formState: { errors },
   } = useForm<ResendData>({
     resolver: zodResolver(resendSchema),
     defaultValues: {
-      email: email
-    }
+      email: email,
+    },
   });
 
   // Countdown für erneut senden
@@ -74,38 +94,42 @@ export default function EmailVerification() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/auth/verify-email`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token: verificationToken }),
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || "http://localhost:3001/api"}/auth/verify-email`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ token: verificationToken }),
+        }
+      );
 
       const data = await response.json();
 
       if (response.ok) {
         setIsVerified(true);
-        toast.success(t('authPages.emailVerification.emailVerified'), {
-          description: t('authPages.emailVerification.accountActivated')
+        toast.success(t("authPages.emailVerification.emailVerified"), {
+          description: t("authPages.emailVerification.accountActivated"),
         });
-        // Speichere Invite-Parameter im localStorage, falls vorhanden
-        if (inviteUserId) {
-          localStorage.setItem('pendingInvite', inviteUserId);
+        // Auto-redirect to login with invite parameter if present
+        const pendingInvite =
+          inviteUserId || localStorage.getItem("pendingInvite");
+        if (pendingInvite) {
+          setTimeout(() => {
+            navigate(`/auth/login?redirect=/invite/${pendingInvite}`);
+          }, 1500);
         }
-        // Auto-redirect to login
-        setTimeout(() => {
-          navigate('/auth/login');
-        }, 1500);
       } else {
-        toast.error(t('common.error'), {
-          description: data.error || t('authPages.emailVerification.invalidLink')
+        toast.error(t("common.error"), {
+          description:
+            data.error || t("authPages.emailVerification.invalidLink"),
         });
       }
     } catch (error) {
-      console.error('Email verification error:', error);
-      toast.error(t('common.error'), {
-        description: t('common.error')
+      console.error("Email verification error:", error);
+      toast.error(t("common.error"), {
+        description: t("common.error"),
       });
     } finally {
       setIsLoading(false);
@@ -120,30 +144,33 @@ export default function EmailVerification() {
     try {
       // Verwende E-Mail aus URL-Parameter, falls vorhanden, sonst aus Form
       const emailToUse = email || data.email;
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/auth/resend-verification`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email: emailToUse }),
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || "http://localhost:3001/api"}/auth/resend-verification`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email: emailToUse }),
+        }
+      );
 
       const result = await response.json();
 
       if (response.ok) {
-        toast.success(t('authPages.emailVerification.resendButton'), {
-          description: t('authPages.emailVerification.checkSpam')
+        toast.success(t("authPages.emailVerification.resendButton"), {
+          description: t("authPages.emailVerification.checkSpam"),
         });
         setCountdown(60); // 60 Sekunden Countdown
       } else {
-        toast.error(t('common.error'), {
-          description: result.error || t('common.error')
+        toast.error(t("common.error"), {
+          description: result.error || t("common.error"),
         });
       }
     } catch (error) {
-      console.error('Resend verification error:', error);
-      toast.error(t('common.error'), {
-        description: t('common.error')
+      console.error("Resend verification error:", error);
+      toast.error(t("common.error"), {
+        description: t("common.error"),
       });
     } finally {
       setIsLoading(false);
@@ -152,73 +179,10 @@ export default function EmailVerification() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex flex-col">
-      {/* Header */}
-      <header className="border-b border-border/40 bg-background/95 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/auth/login">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              {t('authPages.emailVerification.backToLogin')}
-            </Link>
-          </Button>
-
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Trophy className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-foreground">Sportify</h1>
-              <p className="text-xs text-muted-foreground">by Leon Stadler</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {/* Desktop: Language & Theme Switchers */}
-            <div className="hidden sm:flex items-center gap-2">
-              <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
-                <LanguageSwitcher />
-              </div>
-              <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
-                <ThemeSwitcher />
-              </div>
-            </div>
-            
-            {/* Mobile: Settings Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="sm:hidden">
-                  <Settings className="h-5 w-5" />
-                  <span className="sr-only">{t('landing.openSettings')}</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>{t('landing.settings')}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Globe className="h-4 w-4" />
-                    <span>{t('landing.language')}</span>
-                  </div>
-                  <LanguageSwitcher />
-                </DropdownMenuItem>
-                <DropdownMenuItem className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Palette className="h-4 w-4" />
-                    <span>{t('landing.theme')}</span>
-                  </div>
-                  <ThemeSwitcher />
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <div className="flex gap-2">
-              <Button variant="outline" asChild>
-                <Link to="/auth/register">{t('auth.register')}</Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <AuthHeader
+        backTo="/auth/login"
+        backText={t("authPages.emailVerification.backToLogin")}
+      />
 
       {/* Main Content */}
       <div className="flex-1 flex items-center justify-center p-4">
@@ -230,22 +194,31 @@ export default function EmailVerification() {
                 <CheckCircle className="w-12 h-12 text-green-600" />
               </div>
               <h1 className="text-3xl font-bold text-foreground mb-4">
-                {t('authPages.emailVerification.emailVerified')}
+                {t("authPages.emailVerification.emailVerified")}
               </h1>
               <p className="text-muted-foreground mb-8">
-                {t('authPages.emailVerification.accountActivated')}
+                {t("authPages.emailVerification.accountActivated")}
               </p>
 
               <div className="space-y-4">
-                <Button size="lg" className="w-full" asChild>
-                  <Link to={inviteUserId ? `/auth/login?redirect=/invite/${inviteUserId}` : '/auth/login'}>
-                    {t('authPages.emailVerification.loginNow')}
-                  </Link>
+                <Button
+                  size="lg"
+                  className="w-full"
+                  onClick={() => {
+                    const pendingInvite =
+                      inviteUserId || localStorage.getItem("pendingInvite");
+                    const loginUrl = pendingInvite
+                      ? `/auth/login?redirect=/invite/${pendingInvite}`
+                      : "/auth/login";
+                    navigate(loginUrl);
+                  }}
+                >
+                  {t("authPages.emailVerification.loginNow")}
                 </Button>
 
                 <Button variant="outline" size="lg" className="w-full" asChild>
                   <Link to="/">
-                    {t('authPages.emailVerification.backToHome')}
+                    {t("authPages.emailVerification.backToHome")}
                   </Link>
                 </Button>
               </div>
@@ -258,13 +231,12 @@ export default function EmailVerification() {
                   <Mail className="w-8 h-8 text-primary" />
                 </div>
                 <h1 className="text-3xl font-bold text-foreground mb-2">
-                  {t('authPages.emailVerification.verifyTitle')}
+                  {t("authPages.emailVerification.verifyTitle")}
                 </h1>
                 <p className="text-muted-foreground">
                   {token
-                    ? t('authPages.emailVerification.verifying')
-                    : t('authPages.emailVerification.checkInbox')
-                  }
+                    ? t("authPages.emailVerification.verifying")
+                    : t("authPages.emailVerification.checkInbox")}
                 </p>
               </div>
 
@@ -274,110 +246,139 @@ export default function EmailVerification() {
                     <div className="text-center space-y-4">
                       <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
                       <p className="text-muted-foreground">
-                        {t('authPages.emailVerification.verifying')}
+                        {t("authPages.emailVerification.verifying")}
                       </p>
                     </div>
                   </CardContent>
                 </Card>
-              ) : !token && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>{t('authPages.emailVerification.resendTitle')}</CardTitle>
-                    <CardDescription>
-                      {email
-                        ? t('authPages.emailVerification.resendDescription', { email })
-                        : t('authPages.emailVerification.resendDescriptionAlt')
-                      }
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <form onSubmit={handleSubmit(handleResendVerification)} className="space-y-4">
-                      {!email && (
-                        <div className="space-y-2">
-                          <Label htmlFor="email">{t('authPages.emailVerification.emailLabel')}</Label>
-                          <Input
-                            id="email"
-                            type="email"
-                            placeholder={t('authPages.emailVerification.emailPlaceholder')}
-                            {...register('email')}
-                            className={errors.email ? 'border-destructive' : ''}
-                          />
-                          {errors.email && (
-                            <p className="text-sm text-destructive">{errors.email.message}</p>
-                          )}
-                        </div>
-                      )}
-                      {email && (
-                        <div className="space-y-2">
-                          <Label htmlFor="email">{t('authPages.emailVerification.emailLabel')}</Label>
-                          <Input
-                            id="email"
-                            type="email"
-                            value={email}
-                            disabled
-                            className="bg-muted"
-                          />
-                        </div>
-                      )}
+              ) : (
+                !token && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>
+                        {t("authPages.emailVerification.resendTitle")}
+                      </CardTitle>
+                      <CardDescription>
+                        {email
+                          ? t("authPages.emailVerification.resendDescription", {
+                              email,
+                            })
+                          : t(
+                              "authPages.emailVerification.resendDescriptionAlt"
+                            )}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <form
+                        onSubmit={handleSubmit(handleResendVerification)}
+                        className="space-y-4"
+                      >
+                        {!email && (
+                          <div className="space-y-2">
+                            <Label htmlFor="email">
+                              {t("authPages.emailVerification.emailLabel")}
+                            </Label>
+                            <Input
+                              id="email"
+                              type="email"
+                              placeholder={t(
+                                "authPages.emailVerification.emailPlaceholder"
+                              )}
+                              {...register("email")}
+                              className={
+                                errors.email ? "border-destructive" : ""
+                              }
+                            />
+                            {errors.email && (
+                              <p className="text-sm text-destructive">
+                                {errors.email.message}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        {email && (
+                          <div className="space-y-2">
+                            <Label htmlFor="email">
+                              {t("authPages.emailVerification.emailLabel")}
+                            </Label>
+                            <Input
+                              id="email"
+                              type="email"
+                              value={email}
+                              disabled
+                              className="bg-muted"
+                            />
+                          </div>
+                        )}
 
-                      <Alert>
+                        <Alert>
+                          <AlertDescription>
+                            {t("authPages.emailVerification.checkSpam")}
+                          </AlertDescription>
+                        </Alert>
+
+                        <Button
+                          type="submit"
+                          className="w-full"
+                          disabled={isLoading || countdown > 0}
+                        >
+                          {isLoading ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-background border-t-transparent rounded-full animate-spin mr-2" />
+                              {t("authPages.emailVerification.sending")}
+                            </>
+                          ) : countdown > 0 ? (
+                            <>
+                              <RotateCcw className="w-4 h-4 mr-2" />
+                              {t(
+                                "authPages.emailVerification.resendCountdown",
+                                { count: countdown }
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <Mail className="w-4 h-4 mr-2" />
+                              {t("authPages.emailVerification.resendButton")}
+                            </>
+                          )}
+                        </Button>
+                      </form>
+                    </CardContent>
+                  </Card>
+                )
+              )}
+
+              {token &&
+                verificationAttemptedRef.current &&
+                !isVerified &&
+                !isLoading && (
+                  <Card className="mt-6">
+                    <CardContent className="pt-6">
+                      <Alert variant="destructive">
                         <AlertDescription>
-                          {t('authPages.emailVerification.checkSpam')}
+                          {t("authPages.emailVerification.invalidLink")}
                         </AlertDescription>
                       </Alert>
 
-                      <Button
-                        type="submit"
-                        className="w-full"
-                        disabled={isLoading || countdown > 0}
-                      >
-                        {isLoading ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-background border-t-transparent rounded-full animate-spin mr-2" />
-                            {t('authPages.emailVerification.sending')}
-                          </>
-                        ) : countdown > 0 ? (
-                          <>
-                            <RotateCcw className="w-4 h-4 mr-2" />
-                            {t('authPages.emailVerification.resendCountdown', { count: countdown })}
-                          </>
-                        ) : (
-                          <>
-                            <Mail className="w-4 h-4 mr-2" />
-                            {t('authPages.emailVerification.resendButton')}
-                          </>
-                        )}
-                      </Button>
-                    </form>
-                  </CardContent>
-                </Card>
-              )}
-
-              {token && verificationAttemptedRef.current && !isVerified && !isLoading && (
-                <Card className="mt-6">
-                  <CardContent className="pt-6">
-                    <Alert variant="destructive">
-                      <AlertDescription>
-                        {t('authPages.emailVerification.invalidLink')}
-                      </AlertDescription>
-                    </Alert>
-
-                    <div className="mt-4 text-center">
-                      <Button variant="outline" asChild>
-                        <Link to="/auth/email-verification">
-                          {t('authPages.emailVerification.requestNewLink')}
-                        </Link>
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+                      <div className="mt-4 text-center">
+                        <Button variant="outline" asChild>
+                          <Link to="/auth/email-verification">
+                            {t("authPages.emailVerification.requestNewLink")}
+                          </Link>
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
               <div className="mt-8 text-center">
                 <p className="text-sm text-muted-foreground">
-                  {t('authPages.emailVerification.alreadyVerified')}{' '}
-                  <Link to="/auth/login" className="text-primary hover:underline font-medium">
-                    {t('authPages.emailVerification.loginHere')}
+                  {t("authPages.emailVerification.alreadyVerified")}{" "}
+                  <Link
+                    to="/auth/login"
+                    className="text-primary hover:underline font-medium"
+                  >
+                    {t("authPages.emailVerification.loginHere")}
                   </Link>
                 </p>
               </div>
@@ -390,10 +391,10 @@ export default function EmailVerification() {
       <footer className="border-t border-border/40 py-6">
         <div className="container mx-auto px-4 text-center">
           <p className="text-sm text-muted-foreground">
-            {t('common.copyright')}
+            {t("common.copyright")}
           </p>
         </div>
       </footer>
     </div>
   );
-} 
+}

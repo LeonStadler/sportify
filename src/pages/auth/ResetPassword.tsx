@@ -1,24 +1,15 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowLeft, CheckCircle, Eye, EyeOff, Globe, Key, Lock, Mail, Palette, Send, Settings, Trophy } from 'lucide-react';
+import { CheckCircle, Eye, EyeOff, Key, Lock, Mail, Send } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 
-import LanguageSwitcher from '@/components/LanguageSwitcher';
-import ThemeSwitcher from '@/components/ThemeSwitcher';
+import { AuthHeader } from '@/components/auth/AuthHeader';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,7 +21,19 @@ export default function ResetPassword() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const token = searchParams.get('token') || '';
+  // Token aus URL extrahieren
+  // searchParams.get() dekodiert bereits automatisch, aber zur Sicherheit dekodieren wir erneut
+  const rawToken = searchParams.get('token') || '';
+  let token = rawToken;
+  // Nur dekodieren, wenn der Token noch URL-encoded ist (enthält %)
+  if (rawToken && rawToken.includes('%')) {
+    try {
+      token = decodeURIComponent(rawToken);
+    } catch (e) {
+      // Falls Dekodierung fehlschlägt, verwende den ursprünglichen Token
+      token = rawToken;
+    }
+  }
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isReset, setIsReset] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -135,72 +138,12 @@ export default function ResetPassword() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex flex-col">
         {/* Header */}
-        <header className="border-b border-border/40 bg-background/95 backdrop-blur-sm">
-          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/auth/login">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                {t('authPages.resetPassword.backToLogin')}
-              </Link>
-            </Button>
-
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <Trophy className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-foreground">Sportify</h1>
-                <p className="text-xs text-muted-foreground">by Leon Stadler</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              {/* Desktop: Language & Theme Switchers */}
-              <div className="hidden sm:flex items-center gap-2">
-                <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
-                  <LanguageSwitcher />
-                </div>
-                <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
-                  <ThemeSwitcher />
-                </div>
-              </div>
-
-              {/* Mobile: Settings Dropdown */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="sm:hidden">
-                    <Settings className="h-5 w-5" />
-                    <span className="sr-only">{t('landing.openSettings')}</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>{t('landing.settings')}</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Globe className="h-4 w-4" />
-                      <span>{t('landing.language')}</span>
-                    </div>
-                    <LanguageSwitcher />
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Palette className="h-4 w-4" />
-                      <span>{t('landing.theme')}</span>
-                    </div>
-                    <ThemeSwitcher />
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <div className="flex gap-2">
-                <Button variant="outline" asChild>
-                  <Link to="/auth/register">{t('auth.register')}</Link>
-                </Button>
-              </div>
-            </div>
-          </div>
-        </header>
+        <AuthHeader
+          backTo="/auth/login"
+          backText={t('authPages.resetPassword.backToLogin')}
+          showAuthButtons={true}
+          authButtonType="register"
+        />
 
         {/* Main Content */}
         <div className="flex-1 flex items-center justify-center p-4">
@@ -331,43 +274,12 @@ export default function ResetPassword() {
   if (isReset) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex flex-col">
-        <header className="border-b border-border/40 bg-background/95 backdrop-blur-sm">
-          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/auth/login">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                {t('authPages.resetPassword.backToLogin')}
-              </Link>
-            </Button>
-
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <Trophy className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-foreground">Sportify</h1>
-                <p className="text-xs text-muted-foreground">by Leon Stadler</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="hidden sm:flex items-center gap-2">
-                <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
-                  <LanguageSwitcher />
-                </div>
-                <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
-                  <ThemeSwitcher />
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <Button variant="outline" asChild>
-                  <Link to="/auth/register">{t('auth.register')}</Link>
-                </Button>
-              </div>
-            </div>
-          </div>
-        </header>
+        <AuthHeader
+          backTo="/auth/login"
+          backText={t('authPages.resetPassword.backToLogin')}
+          showAuthButtons={true}
+          authButtonType="register"
+        />
 
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="w-full max-w-md">
@@ -413,73 +325,12 @@ export default function ResetPassword() {
   // Modus 1: E-Mail anfordern (Standard)
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex flex-col">
-      {/* Header */}
-      <header className="border-b border-border/40 bg-background/95 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/auth/login">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              {t('authPages.resetPassword.backToLogin')}
-            </Link>
-          </Button>
-
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Trophy className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-foreground">Sportify</h1>
-              <p className="text-xs text-muted-foreground">by Leon Stadler</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {/* Desktop: Language & Theme Switchers */}
-            <div className="hidden sm:flex items-center gap-2">
-              <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
-                <LanguageSwitcher />
-              </div>
-              <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
-                <ThemeSwitcher />
-              </div>
-            </div>
-
-            {/* Mobile: Settings Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="sm:hidden">
-                  <Settings className="h-5 w-5" />
-                  <span className="sr-only">{t('landing.openSettings')}</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>{t('landing.settings')}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Globe className="h-4 w-4" />
-                    <span>{t('landing.language')}</span>
-                  </div>
-                  <LanguageSwitcher />
-                </DropdownMenuItem>
-                <DropdownMenuItem className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Palette className="h-4 w-4" />
-                    <span>{t('landing.theme')}</span>
-                  </div>
-                  <ThemeSwitcher />
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <div className="flex gap-2">
-              <Button variant="outline" asChild>
-                <Link to="/auth/register">{t('auth.register')}</Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <AuthHeader
+        backTo="/auth/login"
+        backText={t('authPages.resetPassword.backToLogin')}
+        showAuthButtons={true}
+        authButtonType="register"
+      />
 
       {/* Main Content */}
       <div className="flex-1 flex items-center justify-center p-4">

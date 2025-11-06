@@ -71,6 +71,11 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
     { value: "tired", label: t('recoveryDiary.moods.tired'), helper: t('recoveryDiary.moods.tiredHelper'), emoji: "😴" },
     { value: "sore", label: t('recoveryDiary.moods.sore'), helper: t('recoveryDiary.moods.soreHelper'), emoji: "💢" },
     { value: "stressed", label: t('recoveryDiary.moods.stressed'), helper: t('recoveryDiary.moods.stressedHelper'), emoji: "⚠️" },
+    { value: "motivated", label: t('recoveryDiary.moods.motivated'), helper: t('recoveryDiary.moods.motivatedHelper'), emoji: "🔥" },
+    { value: "relaxed", label: t('recoveryDiary.moods.relaxed'), helper: t('recoveryDiary.moods.relaxedHelper'), emoji: "😌" },
+    { value: "excited", label: t('recoveryDiary.moods.excited'), helper: t('recoveryDiary.moods.excitedHelper'), emoji: "🎉" },
+    { value: "focused", label: t('recoveryDiary.moods.focused'), helper: t('recoveryDiary.moods.focusedHelper'), emoji: "🎯" },
+    { value: "frustrated", label: t('recoveryDiary.moods.frustrated'), helper: t('recoveryDiary.moods.frustratedHelper'), emoji: "😤" },
   ], [t]);
 
   const filterMoodOptions = useMemo(() => [
@@ -105,6 +110,7 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
   const [filterEndDate, setFilterEndDate] = useState<string>("");
   const [searchInput, setSearchInput] = useState<string>("");
   const [searchFilter, setSearchFilter] = useState<string>("");
+  const [summaryPeriod, setSummaryPeriod] = useState<string>("week");
 
   // Finde das ausgewählte Workout für die Anzeige
   const selectedWorkout = useMemo(() => {
@@ -193,11 +199,11 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
     }
   }, [user, t]);
 
-  const loadSummary = useCallback(async () => {
+  const loadSummary = useCallback(async (period: string = 'week') => {
     if (!user) return;
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${API_URL}/training-journal/summary`, {
+      const response = await fetch(`${API_URL}/training-journal/summary?period=${period}`, {
         headers: {
           Authorization: `Bearer ${token ?? ""}`,
         },
@@ -208,23 +214,31 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
       }
 
       const data = await response.json();
+
+      // Konvertiere die Durchschnittswerte zu Zahlen, falls sie als Strings kommen
+      const parseNumber = (value: unknown): number | null => {
+        if (value === null || value === undefined) return null;
+        const num = typeof value === 'string' ? parseFloat(value) : Number(value);
+        return !Number.isNaN(num) ? num : null;
+      };
+
       setSummary({
         moodDistribution: Array.isArray(data.moodDistribution) ? data.moodDistribution : [],
         topTags: Array.isArray(data.topTags) ? data.topTags : [],
         latestEntry: data.latestEntry ?? null,
         totalEntries: data.totalEntries ?? 0,
-        avgEnergyLevel: data.avgEnergyLevel ?? null,
-        avgFocusLevel: data.avgFocusLevel ?? null,
-        avgSleepQuality: data.avgSleepQuality ?? null,
-        avgSorenessLevel: data.avgSorenessLevel ?? null,
-        avgPerceivedExertion: data.avgPerceivedExertion ?? null,
+        avgEnergyLevel: parseNumber(data.avgEnergyLevel),
+        avgFocusLevel: parseNumber(data.avgFocusLevel),
+        avgSleepQuality: parseNumber(data.avgSleepQuality),
+        avgSorenessLevel: parseNumber(data.avgSorenessLevel),
+        avgPerceivedExertion: parseNumber(data.avgPerceivedExertion),
         firstEntry: data.firstEntry ?? null,
         lastEntry: data.lastEntry ?? null,
       });
     } catch (error) {
       console.error("Training journal summary error:", error);
     }
-  }, [user]);
+  }, [user, t]);
 
   const loadEntries = useCallback(
     async (page = 1) => {
@@ -281,9 +295,14 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
   useEffect(() => {
     if (!user) return;
     loadEntries(1);
-    loadSummary();
+    loadSummary(summaryPeriod);
     fetchRecentWorkouts();
-  }, [user, loadEntries, loadSummary, fetchRecentWorkouts]);
+  }, [user, loadEntries, fetchRecentWorkouts]);
+
+  useEffect(() => {
+    if (!user) return;
+    loadSummary(summaryPeriod);
+  }, [summaryPeriod, loadSummary, user]);
 
   // Setze das vorgewählte Workout, wenn es übergeben wurde
   useEffect(() => {
@@ -465,7 +484,7 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
       }
 
       await loadEntries(editingEntry ? currentPage : 1);
-      await loadSummary();
+      await loadSummary(summaryPeriod);
       resetForm();
 
       toast({
@@ -601,7 +620,7 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
       });
 
       await loadEntries(currentPage);
-      await loadSummary();
+      await loadSummary(summaryPeriod);
       resetForm();
     } catch (error) {
       console.error("Delete training journal entry error:", error);
@@ -644,37 +663,54 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
           </Button>
         </div>
 
-        {summary && (
-          <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3 xl:grid-cols-6">
-            <div className="rounded-lg border bg-muted/50 p-3">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('recoveryDiary.entries')}</p>
-              <p className="text-lg font-semibold">{summary.totalEntries ?? 0}</p>
-            </div>
-            <div className="rounded-lg border bg-muted/50 p-3">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('recoveryDiary.avgEnergy')}</p>
-              <p className="text-lg font-semibold">{formatScaleValue(summary.avgEnergyLevel)}</p>
-            </div>
-            <div className="rounded-lg border bg-muted/50 p-3">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('recoveryDiary.avgFocus')}</p>
-              <p className="text-lg font-semibold">{formatScaleValue(summary.avgFocusLevel)}</p>
-            </div>
-            <div className="rounded-lg border bg-muted/50 p-3">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('recoveryDiary.avgSleep')}</p>
-              <p className="text-lg font-semibold">{formatScaleValue(summary.avgSleepQuality)}</p>
-            </div>
-            <div className="rounded-lg border bg-muted/50 p-3">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('recoveryDiary.avgSoreness')}</p>
-              <p className="text-lg font-semibold">{formatScaleValue(summary.avgSorenessLevel)}</p>
-            </div>
-            <div className="rounded-lg border bg-muted/50 p-3">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('recoveryDiary.avgExertion')}</p>
-              <p className="text-lg font-semibold">{formatScaleValue(summary.avgPerceivedExertion)}</p>
-            </div>
-          </div>
-        )}
       </CardHeader>
 
       <CardContent className="space-y-8 pt-4">
+        {/* Summary Statistics mit Zeitraum-Selector */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <h3 className="text-sm font-semibold text-foreground">{t('recoveryDiary.statistics')}</h3>
+            <Select value={summaryPeriod} onValueChange={(value) => setSummaryPeriod(value)}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="week">{t('recoveryDiary.period.week')}</SelectItem>
+                <SelectItem value="month">{t('recoveryDiary.period.month')}</SelectItem>
+                <SelectItem value="quarter">{t('recoveryDiary.period.quarter')}</SelectItem>
+                <SelectItem value="year">{t('recoveryDiary.period.year')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {summary && (
+            <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3 xl:grid-cols-6">
+              <div className="rounded-lg border bg-muted/50 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('recoveryDiary.entries')}</p>
+                <p className="text-lg font-semibold">{summary.totalEntries ?? 0}</p>
+              </div>
+              <div className="rounded-lg border bg-muted/50 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('recoveryDiary.avgEnergy')}</p>
+                <p className="text-lg font-semibold">{formatScaleValue(summary.avgEnergyLevel)}</p>
+              </div>
+              <div className="rounded-lg border bg-muted/50 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('recoveryDiary.avgFocus')}</p>
+                <p className="text-lg font-semibold">{formatScaleValue(summary.avgFocusLevel)}</p>
+              </div>
+              <div className="rounded-lg border bg-muted/50 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('recoveryDiary.avgSleep')}</p>
+                <p className="text-lg font-semibold">{formatScaleValue(summary.avgSleepQuality)}</p>
+              </div>
+              <div className="rounded-lg border bg-muted/50 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('recoveryDiary.avgSoreness')}</p>
+                <p className="text-lg font-semibold">{formatScaleValue(summary.avgSorenessLevel)}</p>
+              </div>
+              <div className="rounded-lg border bg-muted/50 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('recoveryDiary.avgExertion')}</p>
+                <p className="text-lg font-semibold">{formatScaleValue(summary.avgPerceivedExertion)}</p>
+              </div>
+            </div>
+          )}
+        </div>
         <form onSubmit={onSubmit} className="space-y-6">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
@@ -992,23 +1028,27 @@ export function TrainingDiarySection({ className, preselectedWorkoutId }: Traini
                   <div key={entry.id} className="rounded-lg border bg-card p-4 shadow-sm">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="space-y-2 flex-1">
-                        <div className="flex items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
                           <Badge variant="secondary" className="text-xs">
                             {currentMood?.emoji ?? ""} {currentMood?.label ?? entry.mood}
                           </Badge>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-foreground">{formatDate(entry.entryDate)}</span>
-                            {entry.workoutId && (
-                              <Badge variant="outline" className="text-xs flex flex-col items-start gap-0.5 px-2 py-1">
-                                <span className="font-medium">{entryWorkout ? entryWorkout.title : `Workout #${entry.workoutId.slice(0, 8)}`}</span>
-                                {entryWorkout?.workoutDate && (
-                                  <span className="text-[10px] text-muted-foreground">
-                                    {formatDate(entryWorkout.workoutDate)}
-                                  </span>
-                                )}
-                              </Badge>
-                            )}
-                          </div>
+                          <span className="text-sm font-semibold text-foreground">{formatDate(entry.entryDate)}</span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {entry.workoutId ? (
+                            <Badge variant="outline" className="text-xs flex flex-row items-center justify-between gap-2 px-2 py-1">
+                              <span className="font-medium">{entryWorkout ? entryWorkout.title : `Workout #${entry.workoutId.slice(0, 8)}`}</span>
+                              {entryWorkout?.workoutDate && (
+                                <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                  {formatDate(entryWorkout.workoutDate)}
+                                </span>
+                              )}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs text-muted-foreground">
+                              {t('recoveryDiary.noWorkout')}
+                            </Badge>
+                          )}
                         </div>
                         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                           <span>{t('recoveryDiary.metrics.energy')}: {formatScaleValue(entry.energyLevel)}</span>

@@ -218,4 +218,18 @@
   body.dark {
     @apply bg-background text-foreground;
   }
+
+  /* PWA Status-Bar Support für iOS */
+  @supports (padding: env(safe-area-inset-top)) {
+    body {
+      padding-top: env(safe-area-inset-top);
+    }
+  }
+
+  /* Für Standalone-Modus auf iOS */
+  @media all and (display-mode: standalone) {
+    body {
+      padding-top: env(safe-area-inset-top);
+    }
+  }
 }

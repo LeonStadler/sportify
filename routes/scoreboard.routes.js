@@ -1,25 +1,25 @@
-import express from 'express';
-import authMiddleware from '../authMiddleware.js';
-import { toCamelCase, USER_DISPLAY_NAME_SQL } from '../utils/helpers.js';
+import express from "express";
+import authMiddleware from "../authMiddleware.js";
+import { toCamelCase, USER_DISPLAY_NAME_SQL } from "../utils/helpers.js";
 
 export const createScoreboardRouter = (pool) => {
-    const router = express.Router();
+  const router = express.Router();
 
-    // GET /api/scoreboard/overall - Overall leaderboard
-    router.get('/overall', authMiddleware, async (req, res) => {
-        try {
-            const { period = 'all' } = req.query;
-            let dateFilter = '';
+  // GET /api/scoreboard/overall - Overall leaderboard
+  router.get("/overall", authMiddleware, async (req, res) => {
+    try {
+      const { period = "all" } = req.query;
+      let dateFilter = "";
 
-            if (period === 'week') {
-                dateFilter = `AND COALESCE(w.workout_date, w.created_at::date) >= NOW() - INTERVAL '7 days'`;
-            } else if (period === 'month') {
-                dateFilter = `AND COALESCE(w.workout_date, w.created_at::date) >= NOW() - INTERVAL '30 days'`;
-            } else if (period === 'year') {
-                dateFilter = `AND COALESCE(w.workout_date, w.created_at::date) >= NOW() - INTERVAL '365 days'`;
-            }
+      if (period === "week") {
+        dateFilter = `AND w.start_time >= NOW() - INTERVAL '7 days'`;
+      } else if (period === "month") {
+        dateFilter = `AND w.start_time >= NOW() - INTERVAL '30 days'`;
+      } else if (period === "year") {
+        dateFilter = `AND w.start_time >= NOW() - INTERVAL '365 days'`;
+      }
 
-            const query = `
+      const query = `
                 SELECT
                     u.id,
                     ${USER_DISPLAY_NAME_SQL} as display_name,
@@ -39,53 +39,62 @@ export const createScoreboardRouter = (pool) => {
                 LIMIT 50
             `;
 
-            const { rows } = await pool.query(query);
+      const { rows } = await pool.query(query);
 
-            const leaderboard = rows.map((row, index) => {
-                const converted = toCamelCase(row);
-                return {
-                    id: converted.id,
-                    displayName: converted.displayName || 'Athlet',
-                    avatarUrl: converted.avatarUrl || null,
-                    totalPoints: Number(converted.totalPoints) || 0,
-                    totalPullups: Number(converted.totalPullups) || 0,
-                    totalPushups: Number(converted.totalPushups) || 0,
-                    totalRunning: Number(converted.totalRunning) || 0,
-                    totalCycling: Number(converted.totalCycling) || 0,
-                    totalSitups: Number(converted.totalSitups) || 0,
-                    rank: index + 1,
-                    isCurrentUser: row.id === req.user.id
-                };
-            });
+      const leaderboard = rows.map((row, index) => {
+        const converted = toCamelCase(row);
+        return {
+          id: converted.id,
+          displayName: converted.displayName || "Athlet",
+          avatarUrl: converted.avatarUrl || null,
+          totalPoints: Number(converted.totalPoints) || 0,
+          totalPullups: Number(converted.totalPullups) || 0,
+          totalPushups: Number(converted.totalPushups) || 0,
+          totalRunning: Number(converted.totalRunning) || 0,
+          totalCycling: Number(converted.totalCycling) || 0,
+          totalSitups: Number(converted.totalSitups) || 0,
+          rank: index + 1,
+          isCurrentUser: row.id === req.user.id,
+        };
+      });
 
-            res.json({ leaderboard });
-        } catch (error) {
-            console.error('Scoreboard overall error:', error);
-            res.status(500).json({ error: 'Serverfehler beim Laden des Scoreboards.' });
-        }
-    });
+      res.json({ leaderboard });
+    } catch (error) {
+      console.error("Scoreboard overall error:", error);
+      res
+        .status(500)
+        .json({ error: "Serverfehler beim Laden des Scoreboards." });
+    }
+  });
 
-    // GET /api/scoreboard/activity/:activity - Activity-specific leaderboard
-    router.get('/activity/:activity', authMiddleware, async (req, res) => {
-        try {
-            const { activity } = req.params;
-            const { period = 'all' } = req.query;
+  // GET /api/scoreboard/activity/:activity - Activity-specific leaderboard
+  router.get("/activity/:activity", authMiddleware, async (req, res) => {
+    try {
+      const { activity } = req.params;
+      const { period = "all" } = req.query;
 
-            const validActivities = ['pullups', 'pushups', 'running', 'cycling', 'situps', 'other'];
-            if (!validActivities.includes(activity)) {
-                return res.status(400).json({ error: 'Ungültiger Aktivitätstyp' });
-            }
+      const validActivities = [
+        "pullups",
+        "pushups",
+        "running",
+        "cycling",
+        "situps",
+        "other",
+      ];
+      if (!validActivities.includes(activity)) {
+        return res.status(400).json({ error: "Ungültiger Aktivitätstyp" });
+      }
 
-            let dateFilter = '';
-            if (period === 'week') {
-                dateFilter = `AND COALESCE(w.workout_date, w.created_at::date) >= NOW() - INTERVAL '7 days'`;
-            } else if (period === 'month') {
-                dateFilter = `AND COALESCE(w.workout_date, w.created_at::date) >= NOW() - INTERVAL '30 days'`;
-            } else if (period === 'year') {
-                dateFilter = `AND COALESCE(w.workout_date, w.created_at::date) >= NOW() - INTERVAL '365 days'`;
-            }
+      let dateFilter = "";
+      if (period === "week") {
+        dateFilter = `AND w.start_time >= NOW() - INTERVAL '7 days'`;
+      } else if (period === "month") {
+        dateFilter = `AND w.start_time >= NOW() - INTERVAL '30 days'`;
+      } else if (period === "year") {
+        dateFilter = `AND w.start_time >= NOW() - INTERVAL '365 days'`;
+      }
 
-            const query = `
+      const query = `
                 SELECT
                     u.id,
                     ${USER_DISPLAY_NAME_SQL} as display_name,
@@ -101,28 +110,29 @@ export const createScoreboardRouter = (pool) => {
                 LIMIT 50
             `;
 
-            const { rows } = await pool.query(query, [activity]);
+      const { rows } = await pool.query(query, [activity]);
 
-            const leaderboard = rows.map((row, index) => {
-                const converted = toCamelCase(row);
-                return {
-                    id: converted.id,
-                    displayName: converted.displayName || 'Athlet',
-                    avatarUrl: converted.avatarUrl || null,
-                    totalAmount: Number(converted.totalAmount) || 0,
-                    totalPoints: Number(converted.totalPoints) || 0,
-                    rank: index + 1,
-                    isCurrentUser: row.id === req.user.id
-                };
-            });
+      const leaderboard = rows.map((row, index) => {
+        const converted = toCamelCase(row);
+        return {
+          id: converted.id,
+          displayName: converted.displayName || "Athlet",
+          avatarUrl: converted.avatarUrl || null,
+          totalAmount: Number(converted.totalAmount) || 0,
+          totalPoints: Number(converted.totalPoints) || 0,
+          rank: index + 1,
+          isCurrentUser: row.id === req.user.id,
+        };
+      });
 
-            res.json({ leaderboard });
-        } catch (error) {
-            console.error('Scoreboard activity error:', error);
-            res.status(500).json({ error: 'Serverfehler beim Laden des Scoreboards.' });
-        }
-    });
+      res.json({ leaderboard });
+    } catch (error) {
+      console.error("Scoreboard activity error:", error);
+      res
+        .status(500)
+        .json({ error: "Serverfehler beim Laden des Scoreboards." });
+    }
+  });
 
-    return router;
+  return router;
 };
-

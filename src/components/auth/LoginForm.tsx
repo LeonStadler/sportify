@@ -11,7 +11,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface LoginFormProps {
@@ -56,7 +55,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
   const onSubmit = async (data: LoginFormData) => {
     try {
       clearError();
-      
+
       // If 2FA step is shown, submit with 2FA code
       if (showTwoFactor && savedCredentials) {
         if (!twoFactorCode && !backupCode) {
@@ -74,18 +73,13 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
             twoFactorCode || undefined,
             backupCode || undefined
           );
-          
+
           if (!result.requires2FA) {
-            // Login successful
-            // Prüfe ob ein Invite-Parameter im localStorage gespeichert ist
+            // Login successful (after 2FA with backup code)
+            // Prüfe ob pendingInvite in localStorage vorhanden ist
             const pendingInvite = localStorage.getItem('pendingInvite');
             const finalRedirect = pendingInvite ? `/invite/${pendingInvite}` : redirectTo;
-            
-            // Entferne den Invite-Parameter aus localStorage nach erfolgreichem Login
-            if (pendingInvite) {
-              localStorage.removeItem('pendingInvite');
-            }
-            
+
             if (onSuccess) {
               onSuccess();
             } else {
@@ -108,7 +102,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
         setIsLoggingIn(true);
         try {
           const result = await login(data.email, data.password);
-          
+
           if (result && result.requires2FA) {
             // 2FA is required, show 2FA input
             // Don't clear logging state yet - it will be cleared by AuthContext
@@ -117,15 +111,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
             clearError();
           } else {
             // Login successful (no 2FA)
-            // Prüfe ob ein Invite-Parameter im localStorage gespeichert ist
+            // Prüfe ob pendingInvite in localStorage vorhanden ist
             const pendingInvite = localStorage.getItem('pendingInvite');
             const finalRedirect = pendingInvite ? `/invite/${pendingInvite}` : redirectTo;
-            
-            // Entferne den Invite-Parameter aus localStorage nach erfolgreichem Login
-            if (pendingInvite) {
-              localStorage.removeItem('pendingInvite');
-            }
-            
+
             if (onSuccess) {
               onSuccess();
             } else {
@@ -212,13 +201,17 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
             twoFactorCode,
             undefined
           );
-          
+
           if (!result.requires2FA) {
-            // Login successful
+            // Login successful (after 2FA with code)
+            // Prüfe ob pendingInvite in localStorage vorhanden ist
+            const pendingInvite = localStorage.getItem('pendingInvite');
+            const finalRedirect = pendingInvite ? `/invite/${pendingInvite}` : redirectTo;
+
             if (onSuccess) {
               onSuccess();
             } else {
-              navigate(redirectTo);
+              navigate(finalRedirect);
             }
           } else {
             // If still requires 2FA after submitting, reset to allow new code
@@ -260,7 +253,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
               <Shield className="h-5 w-5" />
               <h3 className="font-semibold">Zwei-Faktor-Authentifizierung</h3>
             </div>
-            
+
             <Alert>
               <AlertDescription>
                 Bitte gib den 6-stelligen Code aus deiner Authenticator-App ein, um die Anmeldung abzuschließen.

@@ -95,7 +95,6 @@ export function Profile() {
   });
 
   const [copiedLink, setCopiedLink] = useState(false);
-  const [twoFAEnabled, setTwoFAEnabled] = useState(user?.has2FA || false);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loadingInvitations, setLoadingInvitations] = useState(false);
   const [avatarEditorOpen, setAvatarEditorOpen] = useState(false);
@@ -213,8 +212,6 @@ export function Profile() {
         nickname: user.nickname || '',
         displayPreference: user.displayPreference || 'firstName'
       });
-      // Sync twoFAEnabled with user state - always reflect the actual backend state
-      setTwoFAEnabled(user.has2FA || false);
     }
   }, [user]);
 
@@ -396,13 +393,9 @@ export function Profile() {
 
   const handleToggle2FA = (checked: boolean) => {
     if (checked) {
-      // Temporarily set switch to checked for better UX
-      setTwoFAEnabled(true);
       // Open 2FA setup dialog when enabling
       setTwoFactorSetupDialogOpen(true);
     } else {
-      // Temporarily set switch to unchecked for better UX
-      setTwoFAEnabled(false);
       // Show password dialog for disabling 2FA
       setPasswordDialogConfig({
         title: "2FA deaktivieren",
@@ -411,14 +404,11 @@ export function Profile() {
         onConfirm: async (password: string) => {
           try {
             await disable2FA(password);
-            // Switch state already set to false
             toast({
               title: "2FA deaktiviert",
               description: "Zwei-Faktor-Authentifizierung wurde erfolgreich deaktiviert.",
             });
           } catch (error) {
-            // Reset switch state on error
-            setTwoFAEnabled(user?.has2FA || false);
             toast({
               title: "Fehler",
               description: error instanceof Error ? error.message : "Fehler beim Deaktivieren der 2FA",
@@ -525,7 +515,7 @@ export function Profile() {
         params.set('tab', value);
         setSearchParams(params);
       }} className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList>
           <TabsTrigger value="profile">Profil</TabsTrigger>
           <TabsTrigger value="preferences">Einstellungen</TabsTrigger>
           <TabsTrigger value="goals">Wochenziele</TabsTrigger>
@@ -581,7 +571,7 @@ export function Profile() {
                   <div>
                     <h3 className="text-xl font-semibold">{getDisplayName()}</h3>
                     <p className="text-muted-foreground">{user.email}</p>
-                    {user.isAdmin && (
+                    {user.role === 'admin' && (
                       <Badge variant="secondary" className="mt-1">
                         <Shield size={12} className="mr-1" />
                         Administrator
@@ -818,7 +808,7 @@ export function Profile() {
                     </p>
                   </div>
                   <Switch
-                    checked={twoFAEnabled}
+                    checked={user.has2FA || false}
                     onCheckedChange={handleToggle2FA}
                     disabled={isLoading}
                   />
@@ -829,9 +819,8 @@ export function Profile() {
                 <div className="space-y-2">
                   <p className="font-medium text-sm">Kontosicherheit</p>
                   <div className="space-y-1 text-sm text-muted-foreground">
-                    <p>• Erstellt: {new Date(user.createdAt).toLocaleDateString('de-DE')}</p>
-                    <p>• Letzter Login: {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString('de-DE') : 'Nie'}</p>
-                    <p>• E-Mail verifiziert: {user.isEmailVerified ? 'Ja' : 'Nein'}</p>
+                    <p>• Erstellt: {user.createdAt && !isNaN(new Date(user.createdAt).getTime()) ? new Date(user.createdAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Nicht verfügbar'}</p>
+                    <p>• Letzter Login: {user.lastLoginAt && !isNaN(new Date(user.lastLoginAt).getTime()) ? new Date(user.lastLoginAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Nie'}</p>
                   </div>
                 </div>
               </CardContent>
@@ -1261,25 +1250,11 @@ export function Profile() {
       <TwoFactorSetupDialog
         open={twoFactorSetupDialogOpen}
         onOpenChange={(open) => {
-          console.log("2FA Dialog onOpenChange:", open);
           setTwoFactorSetupDialogOpen(open);
-          // If dialog is closed without success, reset switch state
-          if (!open) {
-            // Wait a bit for user state to update, then sync
-            setTimeout(() => {
-              setTwoFAEnabled(user?.has2FA || false);
-            }, 300);
-          }
         }}
         onSuccess={() => {
-          console.log("2FA setup successful");
           // User state is automatically updated by verify2FA in the dialog
-          // Refresh user data to ensure state is synced
-          // The useEffect will sync twoFAEnabled when user changes
-          // Force a small delay to ensure backend state is loaded
-          setTimeout(() => {
-            setTwoFAEnabled(true);
-          }, 500);
+          // The Toggle will automatically reflect the updated user.has2FA state
         }}
       />
 

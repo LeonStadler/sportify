@@ -35,21 +35,24 @@ const resolveNow = (options) => {
 export const createInvitation = async (pool, payload, options = {}) => {
   const now = resolveNow(options);
   
+  // Vor- und Nachnamen sind nicht erforderlich für Invitations
+  // Sie werden bei der Registrierung eingegeben
+  const firstName = payload.firstName || '';
+  const lastName = payload.lastName || '';
+  
   try {
-    // Lösche alte ausstehende Einladungen für diese E-Mail, um UNIQUE Constraint (email, status) zu erfüllen
+    // Lösche ALLE alten ausstehenden Einladungen für diese E-Mail (unabhängig von used),
+    // um UNIQUE Constraint (email, status) zu erfüllen
     // und um sicherzustellen, dass nur eine aktive Einladung pro E-Mail existiert
+    // Wir löschen auch abgelaufene Einladungen, um Platz zu schaffen
     await pool.query(
-      'DELETE FROM invitations WHERE email = $1 AND status = $2 AND used = false',
+      'DELETE FROM invitations WHERE email = $1 AND status = $2',
       [payload.email, 'pending']
     );
 
     const rawToken = options.generateToken ? options.generateToken() : generateRawToken();
     const tokenHash = await (options.hashToken ? options.hashToken(rawToken) : defaultHash(rawToken));
     const expiresAt = new Date(now.getTime() + INVITATION_TOKEN_TTL);
-
-    // Stelle sicher, dass first_name und last_name nicht null sind (leerer String ist erlaubt)
-    const firstName = payload.firstName || '';
-    const lastName = payload.lastName || '';
 
     // Erstelle einen kurzen Einladungscode (max 50 Zeichen) für die Anzeige
     // Verwende nur die ersten 45 Zeichen des rawTokens als Code
@@ -76,7 +79,39 @@ export const createInvitation = async (pool, payload, options = {}) => {
     if (error instanceof InvitationError) {
       throw error;
     }
-    // Wrappe Datenbankfehler in InvitationError
+    // Prüfe auf UNIQUE Constraint Verletzung (PostgreSQL Error Code 23505)
+    if (error.code === '23505' || (error.constraint && error.constraint.includes('invitations'))) {
+      // Versuche nochmal zu löschen und neu einzufügen (falls Race Condition)
+      try {
+        await pool.query(
+          'DELETE FROM invitations WHERE email = $1 AND status = $2',
+          [payload.email, 'pending']
+        );
+        // Erstelle neue Token-Daten für Retry
+        const rawToken = options.generateToken ? options.generateToken() : generateRawToken();
+        const tokenHash = await (options.hashToken ? options.hashToken(rawToken) : defaultHash(rawToken));
+        const expiresAt = new Date(now.getTime() + INVITATION_TOKEN_TTL);
+        const shortCode = rawToken.substring(0, 45);
+        
+        // Retry einmal
+        const retryRows = await pool.query(
+          'INSERT INTO invitations (email, first_name, last_name, invited_by, token_hash, expires_at, status, used, invitation_code) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, email, first_name, last_name, status, expires_at, created_at, invited_by, used, used_at',
+          [payload.email, firstName, lastName, payload.invitedBy ?? null, tokenHash, expiresAt, 'pending', false, shortCode]
+        );
+        if (retryRows.rows && retryRows.rows.length > 0) {
+          const invitation = retryRows.rows[0];
+          const finalToken = createCompositeToken(invitation.id, rawToken);
+          return {
+            invitation: { ...invitation, invitation_code: shortCode },
+            token: finalToken,
+          };
+        }
+      } catch (retryError) {
+        // Retry fehlgeschlagen - werfe benutzerfreundliche Fehlermeldung
+      }
+      throw new InvitationError('DUPLICATE_INVITATION', `Es existiert bereits eine ausstehende Einladung für diese E-Mail-Adresse. Bitte warte, bis die vorherige Einladung abgelaufen ist, oder kontaktiere den Support.`);
+    }
+    // Wrappe andere Datenbankfehler in InvitationError
     throw new InvitationError('DATABASE_ERROR', `Datenbankfehler: ${error.message}`);
   }
 };

@@ -4,12 +4,12 @@ export const createAdminMiddleware = (pool) => async (req, res, next) => {
       return res.status(401).json({ error: 'Authentifizierung erforderlich.' });
     }
 
-    const { rows } = await pool.query('SELECT is_admin FROM users WHERE id = $1', [req.user.id]);
+    const { rows } = await pool.query('SELECT role FROM users WHERE id = $1', [req.user.id]);
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
     }
 
-    if (!rows[0].is_admin) {
+    if (rows[0].role !== 'admin') {
       return res.status(403).json({ error: 'Adminrechte erforderlich.' });
     }
 

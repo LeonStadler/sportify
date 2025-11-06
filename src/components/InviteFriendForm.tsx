@@ -62,6 +62,15 @@ export function InviteFriendForm({ onSuccess, className }: InviteFriendFormProps
                 return;
             }
             
+            // Wenn bereits eine Einladung existiert, zeige Info-Nachricht
+            if (result?.type === 'invitation_exists') {
+                toast.info('Einladung bereits gesendet', {
+                    description: result.message || `Es wurde bereits eine Einladung an ${email} gesendet.`,
+                });
+                setEmail('');
+                return;
+            }
+            
             // Zeige unterschiedliche Nachrichten basierend auf Ergebnis
             if (result?.type === 'friend_request') {
                 toast.success('Freundschaftsanfrage gesendet', {
@@ -85,87 +94,87 @@ export function InviteFriendForm({ onSuccess, className }: InviteFriendFormProps
 
     return (
         <>
-            <form onSubmit={handleSubmit} className={className}>
-                <div className="space-y-3">
-                    <div>
-                        <Label htmlFor="invite-email">E-Mail-Adresse</Label>
-                        <div className="relative">
-                            <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                            <Input
-                                id="invite-email"
-                                type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                placeholder="freund@example.com"
-                                className="pl-10"
-                                disabled={isLoading}
-                            />
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Die Person kann sich bei der Registrierung selbst ihren Namen angeben.
-                        </p>
+        <form onSubmit={handleSubmit} className={className}>
+            <div className="space-y-3">
+                <div>
+                    <Label htmlFor="invite-email">E-Mail-Adresse</Label>
+                    <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                        <Input
+                            id="invite-email"
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="freund@example.com"
+                            className="pl-10"
+                            disabled={isLoading}
+                        />
                     </div>
-
-                    <Button type="submit" className="w-full" disabled={isLoading || !email.trim()}>
-                        {isLoading ? 'Wird gesendet...' : 'Einladung senden'}
-                    </Button>
+                    <p className="text-xs text-muted-foreground mt-1">
+                        Die Person kann sich bei der Registrierung selbst ihren Namen angeben.
+                    </p>
                 </div>
-            </form>
 
-            <AlertDialog open={showUserExistsDialog} onOpenChange={setShowUserExistsDialog}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Benutzer bereits registriert</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Die E-Mail-Adresse <strong>{existingUserInfo?.email}</strong> ist bereits bei Sportify registriert.
-                            {existingUserInfo?.displayName && (
-                                <>
-                                    {' '}Der Benutzer heißt <strong>{existingUserInfo.displayName}</strong>.
-                                </>
-                            )}
-                            <br /><br />
-                            Möchtest du stattdessen eine Freundschaftsanfrage an diese Person senden?
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => {
-                            setShowUserExistsDialog(false);
-                            setExistingUserInfo(null);
-                            setEmail('');
-                        }}>
-                            Abbrechen
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={async () => {
-                                if (!existingUserInfo) return;
-                                
-                                setIsSendingRequest(true);
-                                try {
-                                    await sendFriendRequest(existingUserInfo.userId);
-                                    toast.success('Freundschaftsanfrage gesendet', {
-                                        description: `Eine Freundschaftsanfrage wurde an ${existingUserInfo.displayName} gesendet.`,
-                                    });
-                                    setShowUserExistsDialog(false);
-                                    setExistingUserInfo(null);
-                                    setEmail('');
-                                    if (onSuccess) {
-                                        onSuccess();
-                                    }
-                                } catch (error) {
-                                    toast.error('Fehler beim Senden der Freundschaftsanfrage', {
-                                        description: error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.',
-                                    });
-                                } finally {
-                                    setIsSendingRequest(false);
+                <Button type="submit" className="w-full" disabled={isLoading || !email.trim()}>
+                    {isLoading ? 'Wird gesendet...' : 'Einladung senden'}
+                </Button>
+            </div>
+        </form>
+
+        <AlertDialog open={showUserExistsDialog} onOpenChange={setShowUserExistsDialog}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Benutzer bereits registriert</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Die E-Mail-Adresse <strong>{existingUserInfo?.email}</strong> ist bereits bei Sportify registriert.
+                        {existingUserInfo?.displayName && (
+                            <>
+                                {' '}Der Benutzer heißt <strong>{existingUserInfo.displayName}</strong>.
+                            </>
+                        )}
+                        <br /><br />
+                        Möchtest du stattdessen eine Freundschaftsanfrage an diese Person senden?
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => {
+                        setShowUserExistsDialog(false);
+                        setExistingUserInfo(null);
+                        setEmail('');
+                    }}>
+                        Abbrechen
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                        onClick={async () => {
+                            if (!existingUserInfo) return;
+                            
+                            setIsSendingRequest(true);
+                            try {
+                                await sendFriendRequest(existingUserInfo.userId);
+                                toast.success('Freundschaftsanfrage gesendet', {
+                                    description: `Eine Freundschaftsanfrage wurde an ${existingUserInfo.displayName} gesendet.`,
+                                });
+                                setShowUserExistsDialog(false);
+                                setExistingUserInfo(null);
+                                setEmail('');
+                                if (onSuccess) {
+                                    onSuccess();
                                 }
-                            }}
-                            disabled={isSendingRequest}
-                        >
-                            {isSendingRequest ? 'Wird gesendet...' : 'Freundschaftsanfrage senden'}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                            } catch (error) {
+                                toast.error('Fehler beim Senden der Freundschaftsanfrage', {
+                                    description: error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.',
+                                });
+                            } finally {
+                                setIsSendingRequest(false);
+                            }
+                        }}
+                        disabled={isSendingRequest}
+                    >
+                        {isSendingRequest ? 'Wird gesendet...' : 'Freundschaftsanfrage senden'}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
         </>
     );
 }

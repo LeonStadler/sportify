@@ -10,7 +10,6 @@ export interface User {
   displayPreference: 'firstName' | 'fullName' | 'nickname';
   isEmailVerified: boolean;
   has2FA: boolean;
-  isAdmin: boolean;
   avatar?: string;
   themePreference?: string;
   languagePreference: 'de' | 'en';
@@ -132,7 +131,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     initializeAuth();
   }, []);
 
-  const login = async (email: string, password: string, twoFactorToken?: string, backupCode?: string): Promise<{ requires2FA?: boolean }> => {
+  const login = async (email: string, password: string, twoFactorToken?: string, backupCode?: string): Promise<{ requires2FA?: boolean; invitedBy?: string }> => {
     // Don't set isLoading to true - use local loading state in component instead
     // This prevents the global spinner from showing during login attempts
     setState(prev => ({ ...prev, error: null }));
@@ -455,10 +454,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         throw new Error(data.error || 'Fehler beim Deaktivieren der 2FA');
       }
 
-      // Update user state
-      if (state.user) {
-        const updatedUser = { ...state.user, has2FA: false };
-        setState(prev => ({ ...prev, user: updatedUser }));
+      // Reload user data to get updated has2FA status
+      try {
+        const userResponse = await fetch(`${API_URL}/auth/me`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          setState(prev => ({ ...prev, user: userData }));
+        }
+      } catch (refreshError) {
+        console.error('Error refreshing user data:', refreshError);
+        // Fallback: Update has2FA locally if refresh fails
+        if (state.user) {
+          const updatedUser = { ...state.user, has2FA: false };
+          setState(prev => ({ ...prev, user: updatedUser }));
+        }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.';

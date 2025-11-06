@@ -130,10 +130,10 @@ export const createEmailVerificationToken = async (pool, userId, options = {}) =
   
   // Markiere alte Tokens als verwendet (mit used_at falls vorhanden)
   try {
-    await pool.query(
-      'UPDATE email_verification_tokens SET used = true, used_at = $2 WHERE user_id = $1 AND used = false',
-      [userId, now]
-    );
+  await pool.query(
+    'UPDATE email_verification_tokens SET used = true, used_at = $2 WHERE user_id = $1 AND used = false',
+    [userId, now]
+  );
   } catch (error) {
     // Falls used_at nicht existiert, nur used setzen
     if (error.code === '42703') { // undefined_column
@@ -154,21 +154,21 @@ export const createEmailVerificationToken = async (pool, userId, options = {}) =
   const expiresAt = new Date(now.getTime() + EMAIL_VERIFICATION_TOKEN_TTL);
 
   try {
-    const { rows } = await pool.query(
-      'INSERT INTO email_verification_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3) RETURNING id, expires_at',
-      [userId, tokenHash, expiresAt]
-    );
+  const { rows } = await pool.query(
+    'INSERT INTO email_verification_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3) RETURNING id, expires_at',
+    [userId, tokenHash, expiresAt]
+  );
 
     if (rows.length === 0) {
       throw new Error('Token konnte nicht erstellt werden - keine Zeile zurückgegeben');
     }
 
-    const record = rows[0];
+  const record = rows[0];
     const token = createCompositeToken(record.id, rawToken);
-    return {
+  return {
       token,
-      expiresAt: record.expires_at ?? expiresAt,
-    };
+    expiresAt: record.expires_at ?? expiresAt,
+  };
   } catch (error) {
     // Wenn die Tabelle nicht existiert, wirf einen aussagekräftigen Fehler
     if (error.code === '42P01') {
@@ -219,7 +219,7 @@ export const markEmailVerificationTokenUsed = async (pool, tokenId, options = {}
   const now = resolveNow(options);
   // Prüfe ob used_at Spalte existiert
   try {
-    await pool.query('UPDATE email_verification_tokens SET used = true, used_at = $2 WHERE id = $1', [tokenId, now]);
+  await pool.query('UPDATE email_verification_tokens SET used = true, used_at = $2 WHERE id = $1', [tokenId, now]);
   } catch (error) {
     // Falls used_at nicht existiert, nur used setzen
     if (error.code === '42703') { // undefined_column

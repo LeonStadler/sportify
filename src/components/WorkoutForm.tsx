@@ -127,6 +127,8 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
   const [workoutDate, setWorkoutDate] = useState<Date>(new Date());
   const [workoutTime, setWorkoutTime] = useState(format(new Date(), "HH:mm"));
   const [duration, setDuration] = useState<string>(""); // in Minuten, optional
+  const [endTime, setEndTime] = useState<string>(""); // Format: "HH:mm"
+  const [useEndTime, setUseEndTime] = useState<boolean>(false); // Toggle zwischen Dauer und Endzeit
   const getDefaultUnit = () => t('training.form.units.repetitions');
   
   const [activities, setActivities] = useState<WorkoutActivity[]>([{
@@ -140,6 +142,39 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isTitleInitialized = useRef(false);
 
+  // Berechne Endzeit aus Startzeit und Dauer
+  const calculateEndTime = (start: string, dur: number): string => {
+    if (!start || !dur || dur <= 0) return "";
+    try {
+      const [hours, minutes] = start.split(':').map(Number);
+      const totalMinutes = hours * 60 + minutes + dur;
+      const endHours = Math.floor(totalMinutes / 60) % 24;
+      const endMinutes = totalMinutes % 60;
+      return `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
+    } catch {
+      return "";
+    }
+  };
+
+  // Berechne Dauer aus Startzeit und Endzeit
+  const calculateDuration = (start: string, end: string): number => {
+    if (!start || !end) return 0;
+    try {
+      const [startHours, startMins] = start.split(':').map(Number);
+      const [endHours, endMins] = end.split(':').map(Number);
+      const startMinutes = startHours * 60 + startMins;
+      const endMinutes = endHours * 60 + endMins;
+      let duration = endMinutes - startMinutes;
+      if (duration < 0) {
+        // Wenn Endzeit am nächsten Tag ist
+        duration = (24 * 60) + duration;
+      }
+      return duration;
+    } catch {
+      return 0;
+    }
+  };
+
   // Initialwerte setzen oder aktualisieren wenn ein Workout editiert wird
   useEffect(() => {
     if (workout) {
@@ -147,8 +182,29 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
       setDescription(workout.description || "");
       const date = new Date(workout.workoutDate);
       setWorkoutDate(date);
-      setWorkoutTime(format(date, "HH:mm"));
-      setDuration(workout.duration ? String(workout.duration) : "");
+      
+      // Startzeit setzen (aus workout.startTime oder workout.workoutDate extrahieren)
+      if (workout.startTime) {
+        setWorkoutTime(workout.startTime);
+      } else {
+          setWorkoutTime(format(date, "HH:mm"));
+      }
+      
+      // useEndTime aus Workout lesen
+      const workoutUseEndTime = workout.useEndTime === true;
+      setUseEndTime(workoutUseEndTime);
+
+      if (workoutUseEndTime && workout.duration && workout.startTime) {
+        // Wenn Endzeit-Modus: Endzeit aus Startzeit und Dauer berechnen
+        const calculatedEndTime = calculateEndTime(workout.startTime, workout.duration);
+        setEndTime(calculatedEndTime);
+        setDuration(""); // Duration-Feld leeren
+      } else {
+        // Dauer-Modus: Dauer direkt setzen
+        setDuration(workout.duration ? String(workout.duration) : "");
+        setEndTime(""); // Endzeit-Feld leeren
+      }
+      
       setActivities(
         workout.activities.map((a) => ({
           activityType: a.activityType,
@@ -240,6 +296,32 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
     }
   };
 
+  // Toggle-Handler für Dauer/Endzeit
+  const handleToggleEndTime = (checked: boolean) => {
+    setUseEndTime(checked);
+    
+    if (checked) {
+      // Umschalten zu Endzeit-Modus: Wenn Dauer vorhanden, berechne Endzeit
+      if (duration && workoutTime) {
+        const parsedDuration = parseInt(duration);
+        if (parsedDuration > 0) {
+          const calculatedEndTime = calculateEndTime(workoutTime, parsedDuration);
+          setEndTime(calculatedEndTime);
+        }
+      }
+      setDuration(""); // Duration-Feld leeren
+    } else {
+      // Umschalten zu Dauer-Modus: Wenn Endzeit vorhanden, berechne Dauer
+      if (endTime && workoutTime) {
+        const calculatedDuration = calculateDuration(workoutTime, endTime);
+        if (calculatedDuration > 0) {
+          setDuration(String(calculatedDuration));
+        }
+      }
+      setEndTime(""); // Endzeit-Feld leeren
+    }
+  };
+
   const updateSet = (activityIndex: number, setIndex: number, field: keyof WorkoutSet, value: number) => {
     const newActivities = [...activities];
     newActivities[activityIndex].sets[setIndex] = {
@@ -310,6 +392,25 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
       const workoutDateTime = new Date(workoutDate);
       workoutDateTime.setHours(hours, minutes, 0, 0);
 
+      // Berechne duration oder endTime basierend auf useEndTime
+      let finalDuration: number | null = null;
+      let finalEndTime: string | null = null;
+
+      if (useEndTime && endTime) {
+        // Endzeit-Modus: Berechne duration aus startTime und endTime
+        const calculatedDuration = calculateDuration(workoutTime, endTime);
+        if (calculatedDuration > 0) {
+          finalDuration = calculatedDuration;
+        }
+        finalEndTime = endTime;
+      } else if (duration) {
+        // Dauer-Modus: Verwende direkt duration
+        const parsedDuration = parseInt(duration);
+        if (parsedDuration > 0) {
+          finalDuration = parsedDuration;
+        }
+      }
+
       // Backend-Format: activities mit quantity statt amount
       const backendActivities = validActivities.map(activity => {
         // Filtere ungültige Sets heraus (reps <= 0)
@@ -345,7 +446,10 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
           description: description.trim() || null,
           activities: backendActivities,
           workoutDate: workoutDateTime.toISOString(),
-          duration: duration ? parseInt(duration) : null,
+          startTime: workoutTime,
+          duration: finalDuration,
+          endTime: finalEndTime,
+          useEndTime: useEndTime,
         }),
       });
 
@@ -384,6 +488,8 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
       setWorkoutDate(new Date());
       setWorkoutTime(format(new Date(), "HH:mm"));
       setDuration("");
+      setEndTime("");
+      setUseEndTime(false);
       setActivities([
         {
           activityType: "",
@@ -422,7 +528,7 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Workout-Grunddaten */}
+          {/* Zeile 1: Titel und Datum */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="title" className="text-sm font-medium">{t('training.form.workoutTitle')}</Label>
@@ -434,22 +540,6 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
                 className="mt-1"
               />
             </div>
-            <div>
-              <Label htmlFor="duration" className="text-sm font-medium">{t('training.form.duration')}</Label>
-              <Input
-                id="duration"
-                type="number"
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
-                placeholder={t('training.form.durationPlaceholder')}
-                min="1"
-                className="mt-1"
-              />
-            </div>
-          </div>
-
-          {/* Datum und Uhrzeit */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="date" className="text-sm font-medium">{t('training.form.dateRequired')}</Label>
               <Popover>
@@ -476,8 +566,14 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
                 </PopoverContent>
               </Popover>
             </div>
+          </div>
+
+          {/* Zeile 2: Uhrzeit und Dauer/Endzeit */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="time" className="text-sm font-medium">{t('training.form.timeRequired')}</Label>
+              <Label htmlFor="time" className="text-sm font-medium">
+                {useEndTime ? t('training.form.startTime') : t('training.form.timeRequired')}
+              </Label>
               <div className="relative mt-1">
                 <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -489,6 +585,48 @@ export function WorkoutForm({ workout, onWorkoutCreated, onWorkoutUpdated, onCan
                 />
               </div>
             </div>
+            <div>
+              {useEndTime ? (
+                <>
+                  <Label htmlFor="endTime" className="text-sm font-medium">{t('training.form.endTime')}</Label>
+                  <div className="relative mt-1">
+                    <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="endTime"
+                      type="time"
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Label htmlFor="duration" className="text-sm font-medium">{t('training.form.duration')}</Label>
+                <Input
+                  id="duration"
+                  type="number"
+                  value={duration}
+                  onChange={(e) => setDuration(e.target.value)}
+                  placeholder={t('training.form.durationPlaceholder')}
+                  min="1"
+                  className="mt-1"
+                />
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Zeile 3: Toggle Switch */}
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="toggleEndTime"
+              checked={useEndTime}
+              onCheckedChange={handleToggleEndTime}
+            />
+            <Label htmlFor="toggleEndTime" className="text-sm cursor-pointer">
+              {t('training.form.toggleDurationEndTime')}
+            </Label>
           </div>
 
           <div>

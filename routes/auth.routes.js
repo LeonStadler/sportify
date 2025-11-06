@@ -17,6 +17,7 @@ import {
     generateBackupCodes,
     generateTotpSecret,
     getFrontendUrl,
+    sendPasswordResetEmail,
     toCamelCase,
     verifyTotpToken,
 } from '../utils/helpers.js';
@@ -29,7 +30,7 @@ export const createAuthRouter = (pool) => {
         try {
             const userQuery = `
                 SELECT id, email, first_name, last_name, nickname, display_preference, avatar_url,
-                       is_email_verified, has_2fa, is_admin, theme_preference, language_preference,
+                       is_email_verified, has_2fa, theme_preference, language_preference,
                        preferences, created_at, last_login_at, role
                 FROM users
                 WHERE id = $1
@@ -58,6 +59,12 @@ export const createAuthRouter = (pool) => {
             if (user.avatarUrl !== undefined) {
                 user.avatar = user.avatarUrl;
                 delete user.avatarUrl;
+            }
+
+            // Fix has_2fa -> has2FA conversion (toCamelCase doesn't handle numbers)
+            if (user.has_2fa !== undefined) {
+                user.has2FA = user.has_2fa;
+                delete user.has_2fa;
             }
 
             res.json(user);
@@ -91,9 +98,9 @@ export const createAuthRouter = (pool) => {
             const password_hash = await bcrypt.hash(password, salt);
 
             const newUserQuery = `
-                INSERT INTO users (email, password_hash, first_name, last_name, nickname, display_preference, weekly_goals)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
-                RETURNING id, email, first_name, last_name, nickname, display_preference, is_admin;
+                INSERT INTO users (email, password_hash, first_name, last_name, nickname, display_preference, weekly_goals, role)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, 'user')
+                RETURNING id, email, first_name, last_name, nickname, display_preference, role;
             `;
             const values = [email, password_hash, firstName, lastName, nickname, displayPreference || 'firstName', '{}'];
 
@@ -157,7 +164,8 @@ Dein Sportify-Team`;
 
             const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '1d' });
 
-            res.status(201).json({ user, token });
+            // Gib invitedBy zurück, falls eine Invitation verwendet wurde
+            res.status(201).json({ user, token, invitedBy: invitedBy || undefined });
         } catch (error) {
             console.error('Registration error:', error.message);
             if (error.code === '23505') { // Unique violation
@@ -243,6 +251,12 @@ Dein Sportify-Team`;
 
             // Convert snake_case to camelCase
             const user = toCamelCase(rawUser);
+
+            // Fix has_2fa -> has2FA conversion (toCamelCase doesn't handle numbers)
+            if (user.has_2fa !== undefined) {
+                user.has2FA = user.has_2fa;
+                delete user.has_2fa;
+            }
 
             // Update last_login_at
             await pool.query('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = $1', [rawUser.id]);
@@ -405,51 +419,29 @@ Dein Sportify-Team`;
             const frontendUrl = getFrontendUrl(req);
             const verificationUrl = `${frontendUrl}/auth/email-verification?token=${encodeURIComponent(verificationToken)}&email=${encodeURIComponent(user.email)}`;
 
+            // Plain-Text-Version für Fallback
             const emailBody = `Hallo ${user.first_name},
 
 bitte bestätige deine E-Mail-Adresse, indem du auf folgenden Link klickst:
 
 ${verificationUrl}
 
-Alternativ kannst du diesen Code manuell eingeben:
-${verificationToken}
-
 Dieser Link ist 24 Stunden lang gültig.
 
 Dein Sportify-Team`;
 
-            const emailHtml = `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .button { display: inline-block; padding: 12px 24px; background-color: #007bff; color: #fff; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-        .button:hover { background-color: #0056b3; }
-        .code { background-color: #f4f4f4; padding: 15px; border-radius: 5px; font-size: 14px; font-family: monospace; margin: 20px 0; word-break: break-all; }
-        .footer { margin-top: 30px; font-size: 12px; color: #666; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <p>Hallo ${user.first_name},</p>
-        <p>bitte bestätige deine E-Mail-Adresse, indem du auf folgenden Button klickst:</p>
-        <div style="text-align: center;">
-            <a href="${verificationUrl}" class="button">E-Mail-Adresse bestätigen</a>
-        </div>
-        <p style="margin-top: 30px;">Falls der Button nicht funktioniert, kopiere folgenden Link in deinen Browser:</p>
-        <div class="code">${verificationUrl}</div>
-        <p>Alternativ kannst du diesen Code manuell eingeben:</p>
-        <div class="code">${verificationToken}</div>
-        <p style="margin-top: 20px;">Dieser Link ist 24 Stunden lang gültig.</p>
-        <div class="footer">
-            <p>Dein Sportify-Team</p>
-        </div>
-    </div>
-</body>
-</html>`;
+            // Verwende das neue E-Mail-Template
+            const { createActionEmail } = await import('../utils/emailTemplates.js');
+            const emailHtml = createActionEmail({
+                greeting: `Hallo ${user.first_name},`,
+                title: 'E-Mail-Adresse bestätigen',
+                message: 'Bitte bestätige deine E-Mail-Adresse, um dein Sportify-Konto zu aktivieren.',
+                buttonText: 'E-Mail-Adresse bestätigen',
+                buttonUrl: verificationUrl,
+                additionalText: 'Dieser Link ist 24 Stunden lang gültig.',
+                frontendUrl,
+                preheader: 'E-Mail-Adresse bestätigen'
+            });
 
             try {
                 await queueEmail(pool, {
@@ -759,69 +751,9 @@ Dein Sportify-Team`;
                 });
             }
 
-            // Erstelle E-Mail-Inhalt
-            const frontendUrl = getFrontendUrl(req);
-            const resetUrl = `${frontendUrl}/auth/reset-password?token=${encodeURIComponent(resetToken)}`;
-            const greeting = `Hallo ${userName},`;
-
-            const emailBody = `${greeting}
-
-Du hast eine Passwort-Zurücksetzung für dein Sportify-Konto angefordert.
-
-Klicke auf folgenden Link, um dein Passwort zurückzusetzen:
-${resetUrl}
-
-Alternativ kannst du diesen Code manuell eingeben:
-${resetToken}
-
-Dieser Link ist eine Stunde lang gültig.
-
-Wenn du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren.
-
-Dein Sportify-Team`;
-
-            const emailHtml = `<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .button { display: inline-block; padding: 12px 24px; background-color: #dc2626; color: #fff; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-        .button:hover { background-color: #b91c1c; }
-        .token { background-color: #f4f4f4; padding: 15px; border-radius: 5px; font-size: 14px; font-family: monospace; margin: 20px 0; word-break: break-all; }
-        .footer { margin-top: 30px; font-size: 12px; color: #666; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <p>${greeting}</p>
-        <p>Du hast eine Passwort-Zurücksetzung für dein Sportify-Konto angefordert.</p>
-        <p>Klicke auf folgenden Button, um dein Passwort zurückzusetzen:</p>
-        <div style="text-align: center;">
-            <a href="${resetUrl}" class="button">Passwort zurücksetzen</a>
-        </div>
-        <p style="margin-top: 30px;">Falls der Button nicht funktioniert, kopiere folgenden Link in deinen Browser:</p>
-        <div class="token">${resetUrl}</div>
-        <p>Alternativ kannst du diesen Code manuell eingeben:</p>
-        <div class="token">${resetToken}</div>
-        <p style="margin-top: 20px;">Dieser Link ist eine Stunde lang gültig.</p>
-        <p>Wenn du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren.</p>
-        <div class="footer">
-            <p>Dein Sportify-Team</p>
-        </div>
-    </div>
-</body>
-</html>`;
-
-            // Versende E-Mail
+            // Versende E-Mail mit dem neuen Template
             try {
-                await queueEmail(pool, {
-                    recipient: userEmail,
-                    subject: 'Sportify – Passwort zurücksetzen',
-                    body: emailBody,
-                    html: emailHtml,
-                });
+                await sendPasswordResetEmail(pool, userEmail, resetToken, userName, req);
             } catch (emailError) {
                 console.error('Fehler beim Versenden der Passwort-Reset-E-Mail:', emailError);
                 // E-Mail-Versand fehlgeschlagen - aber Token wurde bereits erstellt

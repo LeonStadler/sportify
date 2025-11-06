@@ -19,6 +19,7 @@ import { createStatsRouter } from './routes/stats.routes.js';
 import { createTrainingJournalRouter } from './routes/training-journal.routes.js';
 import { createUsersRouter } from './routes/users.routes.js';
 import { createWorkoutsRouter } from './routes/workouts.routes.js';
+import { createContactRouter } from './routes/contact.routes.js';
 import { parseBoolean } from './utils/helpers.js';
 
 dotenv.config();
@@ -154,6 +155,7 @@ app.use('/api/recent-workouts', createRecentWorkoutsRouter(pool));
 app.use('/api/feed', createFeedRouter(pool, ensureFriendInfrastructure));
 app.use('/api/challenges', createChallengesRouter(pool));
 app.use('/api/notifications', createNotificationsRouter());
+app.use('/api/contact', createContactRouter(pool));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

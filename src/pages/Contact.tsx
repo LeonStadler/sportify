@@ -19,6 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { API_URL } from "@/lib/api";
 import { toast } from "sonner";
 
 export default function Contact() {
@@ -57,8 +58,23 @@ export default function Contact() {
     setIsSubmitting(true);
 
     try {
-      // Mock API call - hier würde normalerweise die E-Mail versendet werden
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const response = await fetch(`${API_URL}/contact`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: data.name.trim(),
+          email: data.email.trim().toLowerCase(),
+          subject: data.subject.trim(),
+          message: data.message.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || t("common.error"));
+      }
 
       toast.success(t("contact.messageSent"), {
         description: t("contact.thankYouMessage"),
@@ -66,8 +82,9 @@ export default function Contact() {
 
       reset();
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : t("common.error");
       toast.error(t("common.error"), {
-        description: t("common.error"),
+        description: errorMessage,
       });
     } finally {
       setIsSubmitting(false);

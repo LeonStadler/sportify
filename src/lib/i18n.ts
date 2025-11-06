@@ -2117,6 +2117,45 @@ const resources = {
                     "content": "The use of our website is usually possible without providing personal data. If personal data is collected on our pages, this is always done within the framework of the applicable data protection laws.",
                     "link": "For more information, please see our Privacy Policy."
                 }
+            },
+            // PWA Install Prompt
+            "pwa": {
+                "installTitle": "Sportify installieren",
+                "installDescription": "Installiere die App für schnelleren Zugriff und Offline-Nutzung",
+                "installDescriptionDesktop": "Installiere die App zum Dock/Desktop für schnelleren Zugriff",
+                "install": "Installieren",
+                "dismiss": "Schließen",
+                "close": "Schließen",
+                "instructionsDescription": "Folge diesen Schritten, um Sportify zu installieren:",
+                "iosInstallTitle": "Sportify auf iOS installieren",
+                "iosStep1": "Tippe auf das Teilen-Symbol in der Safari-Adressleiste",
+                "iosStep2": "Wähle 'Zum Home-Bildschirm'",
+                "iosStep3": "Tippe auf 'Hinzufügen'",
+                "safariDesktopInstallTitle": "Sportify zum Dock hinzufügen",
+                "safariDesktopStep1": "Klicke im Safari-Menü auf 'Datei'",
+                "safariDesktopStep2": "Wähle 'Zum Dock hinzufügen'",
+                "safariDesktopAlternative": "Alternativ: Klicke auf das Teilen-Symbol in der Adressleiste und wähle 'Zum Dock hinzufügen'",
+                "safariInstallTitle": "Sportify installieren",
+                "safariStep1": "Klicke auf das Teilen-Symbol in der Adressleiste",
+                "safariStep2": "Wähle 'Zum Startbildschirm hinzufügen' oder 'Zum Desktop hinzufügen'",
+                "androidChromeInstallTitle": "Sportify auf Android installieren",
+                "androidChromeStep1": "Tippe auf das Menü-Symbol (drei Punkte) oben rechts",
+                "androidChromeStep2": "Wähle 'Zum Startbildschirm hinzufügen' oder 'App installieren'",
+                "androidChromeStep3": "Bestätige die Installation",
+                "chromeDesktopInstallTitle": "Sportify in Chrome installieren",
+                "chromeDesktopStep1": "Klicke auf das Install-Symbol in der Adressleiste (oder im Menü)",
+                "chromeDesktopStep2": "Bestätige die Installation im Dialog",
+                "firefoxMobileInstallTitle": "Sportify in Firefox installieren",
+                "firefoxMobileStep1": "Tippe auf das Menü-Symbol (drei Punkte) oben rechts",
+                "firefoxMobileStep2": "Wähle 'Seite' → 'Zum Startbildschirm hinzufügen'",
+                "firefoxDesktopInstallTitle": "Sportify in Firefox installieren",
+                "firefoxDesktopStep1": "Klicke auf das Menü-Symbol (drei Striche) oben rechts",
+                "firefoxDesktopStep2": "Wähle 'Mehr' → 'Diese Seite als App installieren'",
+                "edgeInstallTitle": "Sportify in Edge installieren",
+                "edgeStep1": "Klicke auf das Menü-Symbol (drei Punkte) oben rechts",
+                "edgeStep2": "Wähle 'Apps' → 'Diese Seite als App installieren'",
+                "genericInstallTitle": "Sportify installieren",
+                "genericStep1": "Verwende die Install-Option in deinem Browser-Menü"
             }
         }
     }

@@ -1,16 +1,16 @@
 <!doctype html>
 <html lang="de">
-  <head>
-    <meta charset="UTF-8" />
-    <!-- Favicons -->
+<head>
+  <meta charset="UTF-8" />
+    <!-- Favicons - Safari bevorzugt ICO/PNG, SVG für moderne Browser -->
+    <link rel="icon" type="image/x-icon" href="/favico.ico" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg" />
-    <link rel="icon" type="image/svg+xml" sizes="32x32" href="/favicon.svg" />
-    <link rel="icon" type="image/svg+xml" sizes="16x16" href="/favicon.svg" />
+    <link rel="alternate icon" type="image/png" href="/favico.ico" />
+    <link rel="shortcut icon" href="/favico.ico" />
 
     <!-- Apple Touch Icons für iOS Home Screen -->
     <link rel="apple-touch-icon" href="/favicon.svg" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/favicon.svg" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/favicon.svg" />
     <link rel="apple-touch-icon" sizes="152x152" href="/favicon.svg" />
     <link rel="apple-touch-icon" sizes="144x144" href="/favicon.svg" />
     <link rel="apple-touch-icon" sizes="120x120" href="/favicon.svg" />
@@ -19,7 +19,7 @@
     <link rel="apple-touch-icon" sizes="72x72" href="/favicon.svg" />
     <link rel="apple-touch-icon" sizes="60x60" href="/favicon.svg" />
     <link rel="apple-touch-icon" sizes="57x57" href="/favicon.svg" />
-    <link rel="manifest" href="/site.webmanifest" />
+  <link rel="manifest" href="/site.webmanifest" />
     <meta
       name="theme-color"
       content="#F97316"
@@ -80,34 +80,33 @@
       name="description"
       content="Moderne Sports Analytics Plattform von Leon Stadler"
     />
-    <meta name="author" content="Leon Stadler" />
+  <meta name="author" content="Leon Stadler" />
     <meta
       name="keywords"
       content="sport, analytics, fitness, tracking, dashboard"
     />
-    <title>Sportify - Sports Analytics Platform</title>
+  <title>Sportify - Sports Analytics Platform</title>
 
     <!-- Canonical URL -->
     <link rel="canonical" href="%FRONTEND_URL%/" />
 
     <!-- Open Graph -->
-    <meta property="og:title" content="Sportify - Sports Analytics Platform" />
+  <meta property="og:title" content="Sportify - Sports Analytics Platform" />
     <meta
       property="og:description"
       content="Moderne Sports Analytics Plattform von Leon Stadler"
     />
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content="/placeholder.svg" />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="/placeholder.svg" />
     <meta property="og:url" content="%FRONTEND_URL%/" />
 
     <!-- Performance-Optimierungen -->
-    <link rel="preload" href="/favicon.svg" as="image" type="image/svg+xml" />
     <link rel="dns-prefetch" href="//fonts.googleapis.com" />
     <link rel="dns-prefetch" href="//fonts.gstatic.com" />
-  </head>
+</head>
 
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
 </html>

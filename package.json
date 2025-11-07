@@ -22,7 +22,8 @@
     "vercel:deploy": "vercel",
     "vercel:prod": "vercel --prod",
     "type-check": "tsc --noEmit",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "generate-icons": "node scripts/generate-icons.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -108,6 +109,7 @@
     "nodemon": "^3.1.10",
     "postcss": "^8.4.47",
     "prettier": "^3.1.0",
+    "sharp": "^0.34.5",
     "tailwindcss": "^3.4.11",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",

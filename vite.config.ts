@@ -39,11 +39,14 @@ export default defineConfig({
     // HTML-Plugin für dynamische URL-Injection
     {
       name: 'html-transform',
-      transformIndexHtml(html) {
-        return html.replace(
-          /%FRONTEND_URL%/g,
-          frontendUrl
-        );
+      transformIndexHtml: {
+        order: 'pre' as const,
+        handler(html) {
+          return html.replace(
+            /http:\/\/localhost:8080/g,
+            frontendUrl
+          );
+        },
       },
     },
     // Sitemap-Plugin für dynamische URL-Injection

@@ -1,5 +1,8 @@
 import express from 'express';
 import { queueEmail } from '../services/emailService.js';
+import { createSimpleEmail } from '../utils/emailTemplates.js';
+import { getFrontendUrl } from '../utils/helpers.js';
+import { contactInfo } from '../config/contactInfo.js';
 
 export const createContactRouter = (pool) => {
     const router = express.Router();
@@ -33,8 +36,27 @@ export const createContactRouter = (pool) => {
                 });
             }
 
-            // E-Mail-Inhalt erstellen
+            // Frontend URL ermitteln
+            const frontendUrl = getFrontendUrl(req);
+
+            // E-Mail-Inhalt erstellen mit dem einheitlichen Template-System
             const emailSubject = `Kontaktformular: ${subject}`;
+            
+            // HTML-Nachricht für das Template
+            const messageHtml = `
+                <div style="margin-bottom: 20px;">
+                    <h2 style="font-size: 18px; font-weight: 600; margin-bottom: 16px; color: inherit;">Kontaktdaten:</h2>
+                    <div style="background-color: #f9f9f9; border: 1px solid #e5e5e5; border-radius: 6px; padding: 16px; margin-bottom: 20px;">
+                        <p style="margin: 8px 0;"><strong>Name:</strong> ${name}</p>
+                        <p style="margin: 8px 0;"><strong>E-Mail:</strong> <a href="mailto:${email}" style="color: #F97316; text-decoration: underline;">${email}</a></p>
+                        <p style="margin: 8px 0;"><strong>Betreff:</strong> ${subject}</p>
+                    </div>
+                    <h2 style="font-size: 18px; font-weight: 600; margin-bottom: 16px; color: inherit;">Nachricht:</h2>
+                    <div style="background-color: #f9f9f9; border: 1px solid #e5e5e5; border-radius: 6px; padding: 16px; white-space: pre-wrap; line-height: 1.6;">${message.replace(/\n/g, '<br>')}</div>
+                </div>
+            `;
+
+            // Plain-Text-Version für Fallback
             const emailBody = `Neue Kontaktanfrage von ${name}
 
 E-Mail: ${email}
@@ -46,81 +68,15 @@ ${message}
 ---
 Diese E-Mail wurde über das Kontaktformular auf der Sportify-Website gesendet.`;
 
-            const emailHtml = `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .header {
-            background-color: #4CAF50;
-            color: white;
-            padding: 20px;
-            border-radius: 5px 5px 0 0;
-        }
-        .content {
-            background-color: #f9f9f9;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-top: none;
-        }
-        .field {
-            margin-bottom: 15px;
-        }
-        .label {
-            font-weight: bold;
-            color: #555;
-        }
-        .value {
-            margin-top: 5px;
-            padding: 10px;
-            background-color: white;
-            border-radius: 3px;
-        }
-        .footer {
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid #ddd;
-            font-size: 12px;
-            color: #777;
-        }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>Neue Kontaktanfrage</h1>
-    </div>
-    <div class="content">
-        <div class="field">
-            <div class="label">Name:</div>
-            <div class="value">${name}</div>
-        </div>
-        <div class="field">
-            <div class="label">E-Mail:</div>
-            <div class="value">${email}</div>
-        </div>
-        <div class="field">
-            <div class="label">Betreff:</div>
-            <div class="value">${subject}</div>
-        </div>
-        <div class="field">
-            <div class="label">Nachricht:</div>
-            <div class="value">${message.replace(/\n/g, '<br>')}</div>
-        </div>
-    </div>
-    <div class="footer">
-        <p>Diese E-Mail wurde über das Kontaktformular auf der Sportify-Website gesendet.</p>
-    </div>
-</body>
-</html>`;
+            // Verwende das einheitliche E-Mail-Template-System
+            const emailHtml = createSimpleEmail({
+                greeting: '',
+                title: 'Neue Kontaktanfrage',
+                message: messageHtml,
+                frontendUrl,
+                preheader: `Kontaktanfrage von ${name}`,
+                language: 'de',
+            });
 
             console.info(`[Contact] 📧 Versende Kontaktformular-E-Mail von ${email} an ${smtpUser}`);
 

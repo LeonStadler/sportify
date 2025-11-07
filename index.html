@@ -1,25 +1,64 @@
 <!doctype html>
 <html lang="de">
-<head>
-  <meta charset="UTF-8" />
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Android: Stelle sicher dass Manifest sofort geladen wird -->
+    <link rel="manifest" href="/site.webmanifest" />
     <!-- Favicons - Safari bevorzugt ICO/PNG, SVG für moderne Browser -->
     <link rel="icon" type="image/x-icon" href="/favico.ico" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="alternate icon" type="image/png" href="/favico.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="alternate icon" type="image/png" href="/favicon-32x32.png" />
     <link rel="shortcut icon" href="/favico.ico" />
 
     <!-- Apple Touch Icons für iOS Home Screen -->
-    <link rel="apple-touch-icon" href="/favicon.svg" />
-  <link rel="apple-touch-icon" sizes="180x180" href="/favicon.svg" />
-    <link rel="apple-touch-icon" sizes="152x152" href="/favicon.svg" />
-    <link rel="apple-touch-icon" sizes="144x144" href="/favicon.svg" />
-    <link rel="apple-touch-icon" sizes="120x120" href="/favicon.svg" />
-    <link rel="apple-touch-icon" sizes="114x114" href="/favicon.svg" />
-    <link rel="apple-touch-icon" sizes="76x76" href="/favicon.svg" />
-    <link rel="apple-touch-icon" sizes="72x72" href="/favicon.svg" />
-    <link rel="apple-touch-icon" sizes="60x60" href="/favicon.svg" />
-    <link rel="apple-touch-icon" sizes="57x57" href="/favicon.svg" />
-  <link rel="manifest" href="/site.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="/apple-touch-icon-180x180.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="152x152"
+      href="/apple-touch-icon-152x152.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="144x144"
+      href="/apple-touch-icon-144x144.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="120x120"
+      href="/apple-touch-icon-120x120.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="114x114"
+      href="/apple-touch-icon-114x114.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="76x76"
+      href="/apple-touch-icon-76x76.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="72x72"
+      href="/apple-touch-icon-72x72.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="60x60"
+      href="/apple-touch-icon-60x60.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="57x57"
+      href="/apple-touch-icon-57x57.png"
+    />
     <meta
       name="theme-color"
       content="#F97316"
@@ -31,18 +70,9 @@
       media="(prefers-color-scheme: dark)"
     />
 
-    <!-- iOS Splash Screens -->
+    <!-- iOS PWA Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <link
-      rel="apple-touch-startup-image"
-      media="(prefers-color-scheme: light)"
-      href="/favicon.svg"
-    />
-    <link
-      rel="apple-touch-startup-image"
-      media="(prefers-color-scheme: dark)"
-      href="/favicon.svg"
-    />
+    <!-- iOS nutzt automatisch theme-color und apple-touch-icon als Splash Screen -->
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
@@ -80,33 +110,31 @@
       name="description"
       content="Moderne Sports Analytics Plattform von Leon Stadler"
     />
-  <meta name="author" content="Leon Stadler" />
+    <meta name="author" content="Leon Stadler" />
     <meta
       name="keywords"
       content="sport, analytics, fitness, tracking, dashboard"
     />
-  <title>Sportify - Sports Analytics Platform</title>
+    <title>Sportify - Sports Analytics Platform</title>
 
     <!-- Canonical URL -->
-    <link rel="canonical" href="%FRONTEND_URL%/" />
+    <link rel="canonical" href="http://localhost:8080/" />
 
     <!-- Open Graph -->
-  <meta property="og:title" content="Sportify - Sports Analytics Platform" />
+    <meta property="og:title" content="Sportify - Sports Analytics Platform" />
     <meta
       property="og:description"
       content="Moderne Sports Analytics Plattform von Leon Stadler"
     />
-  <meta property="og:type" content="website" />
-  <meta property="og:image" content="/placeholder.svg" />
-    <meta property="og:url" content="%FRONTEND_URL%/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/placeholder.svg" />
+    <meta property="og:url" content="http://localhost:8080/" />
 
     <!-- Performance-Optimierungen -->
-    <link rel="dns-prefetch" href="//fonts.googleapis.com" />
-    <link rel="dns-prefetch" href="//fonts.gstatic.com" />
-</head>
+  </head>
 
-<body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
-</body>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>

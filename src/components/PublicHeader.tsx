@@ -2,6 +2,7 @@ import { ArrowLeft, ArrowRight, Globe, Palette, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
+import { LogoFull } from "@/components/LogoFull";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/use-auth";
 
 interface PublicHeaderProps {
   showBackButton?: boolean;
@@ -53,12 +54,12 @@ export function PublicHeader({
           )}
           {!showBackButton && (
             <Link to="/" className="hover:opacity-80 transition-opacity">
-              <img src="/logo-full.svg" alt="Sportify" className="h-12" />
+              <LogoFull className="h-12" />
             </Link>
           )}
           {showBackButton && (
             <div className="flex items-center gap-4">
-              <img src="/logo-full.svg" alt="Sportify" className="h-12" />
+              <LogoFull className="h-12" />
               {title && (
                 <h1 className="text-xl font-bold text-foreground">{title}</h1>
               )}

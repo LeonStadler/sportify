@@ -13,6 +13,7 @@ import { de } from 'date-fns/locale';
 import { Bell, CheckCircle, UserPlus } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { API_URL } from '@/lib/api';
+import { setAppBadge, clearAppBadge } from '@/utils/badge';
 import { toast } from 'sonner';
 
 interface Notification {
@@ -78,6 +79,15 @@ export function Notifications() {
   }, [fetchNotifications]);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+  // Update Badge wenn sich unreadCount ändert
+  useEffect(() => {
+    if (unreadCount > 0) {
+      setAppBadge(unreadCount);
+    } else {
+      clearAppBadge();
+    }
+  }, [unreadCount]);
 
   const markAllAsRead = async () => {
     if (unreadCount === 0) return;

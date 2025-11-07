@@ -1,21 +1,36 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { parseAvatarConfig } from "@/lib/avatar";
-import NiceAvatar from "react-nice-avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
+import { parseAvatarConfig } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
-import type { WeeklyChallengeLeaderboardEntry, WeeklyChallengeResponse } from "@/types/challenges";
+import type {
+  WeeklyChallengeLeaderboardEntry,
+  WeeklyChallengeResponse,
+} from "@/types/challenges";
 import { format } from "date-fns";
 import { de, enUS } from "date-fns/locale";
 import { Flame, ShieldCheck, Target } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import NiceAvatar from "react-nice-avatar";
 
 import { Skeleton } from "./ui/skeleton";
+
+interface BackendFriend {
+  id: string;
+  displayName?: string;
+  display_name?: string;
+  firstName?: string;
+  first_name?: string;
+  lastName?: string;
+  last_name?: string;
+  avatarUrl?: string;
+  avatar_url?: string;
+}
 
 interface Friend {
   id: string;
@@ -47,7 +62,10 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [friends, setFriends] = useState<Friend[]>([]);
 
-  const locale = useMemo(() => (i18n.language === "en" ? enUS : de), [i18n.language]);
+  const locale = useMemo(
+    () => (i18n.language === "en" ? enUS : de),
+    [i18n.language]
+  );
   const numberLocale = i18n.language === "en" ? "en-US" : "de-DE";
 
   const WEEKLY_POINTS_TARGET = 1500;
@@ -58,11 +76,11 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
     }
 
     // Erstelle Set von Freunde-IDs inklusive eigener ID
-    const friendIds = new Set([user.id, ...friends.map(f => f.id)]);
+    const friendIds = new Set([user.id, ...friends.map((f) => f.id)]);
 
     // Filtere Leaderboard nach Freunden (sich selbst + Freunde)
     const friendsLeaderboard = data.leaderboard
-      .filter(entry => friendIds.has(entry.id))
+      .filter((entry) => friendIds.has(entry.id))
       .sort((a, b) => {
         // Sortiere nach Punkten (absteigend), dann nach Rank
         if (b.totalPoints !== a.totalPoints) {
@@ -94,11 +112,16 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
         if (response.ok) {
           const data = await response.json();
           if (Array.isArray(data)) {
-            setFriends(data.map((friend: any) => ({
-              id: friend.id,
-              displayName: friend.displayName || friend.display_name || `${friend.firstName || friend.first_name} ${friend.lastName || friend.last_name}`,
-              avatarUrl: friend.avatarUrl || friend.avatar_url,
-            })));
+            setFriends(
+              data.map((friend: BackendFriend) => ({
+                id: friend.id,
+                displayName:
+                  friend.displayName ||
+                  friend.display_name ||
+                  `${friend.firstName || friend.first_name || ""} ${friend.lastName || friend.last_name || ""}`,
+                avatarUrl: friend.avatarUrl || friend.avatar_url,
+              }))
+            );
           }
         }
       } catch (error) {
@@ -130,7 +153,7 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
         });
 
         if (!response.ok) {
-          throw new Error(t('weeklyChallenge.errorLoading'));
+          throw new Error(t("weeklyChallenge.errorLoading"));
         }
 
         const payload: WeeklyChallengeResponse = await response.json();
@@ -141,8 +164,8 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
         }
         console.error("Weekly challenge load error", error);
         toast({
-          title: t('dashboard.error'),
-          description: t('weeklyChallenge.couldNotLoad'),
+          title: t("dashboard.error"),
+          description: t("weeklyChallenge.couldNotLoad"),
           variant: "destructive",
         });
         setData(null);
@@ -156,7 +179,7 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
     return () => {
       controller.abort();
     };
-  }, [user, toast]);
+  }, [user, toast, t]);
 
   if (!user) {
     return (
@@ -164,12 +187,12 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Flame className="h-5 w-5 text-orange-500" />
-            {t('weeklyChallenge.title')}
+            {t("weeklyChallenge.title")}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            {t('weeklyChallenge.pleaseLogin')}
+            {t("weeklyChallenge.pleaseLogin")}
           </p>
         </CardContent>
       </Card>
@@ -182,7 +205,7 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Flame className="h-5 w-5 text-orange-500" />
-            {t('weeklyChallenge.title')}
+            {t("weeklyChallenge.title")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -219,12 +242,12 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Flame className="h-5 w-5 text-orange-500" />
-            {t('weeklyChallenge.title')}
+            {t("weeklyChallenge.title")}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            {t('weeklyChallenge.noData')}
+            {t("weeklyChallenge.noData")}
           </p>
         </CardContent>
       </Card>
@@ -240,57 +263,85 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
             <Flame className="h-5 w-5 text-orange-500" />
-            {t('weeklyChallenge.title')}
+            {t("weeklyChallenge.title")}
           </CardTitle>
-          <Badge variant={challengeCompleted ? "default" : "secondary"} className="flex items-center gap-1">
+          <Badge
+            variant={challengeCompleted ? "default" : "secondary"}
+            className="flex items-center gap-1"
+          >
             {challengeCompleted ? (
               <>
                 <ShieldCheck className="h-4 w-4" />
-                {t('weeklyChallenge.completed')}
+                {t("weeklyChallenge.completed")}
               </>
             ) : (
               <>
                 <Target className="h-4 w-4" />
-                {data.week.daysRemaining} {data.week.daysRemaining === 1 ? t('weeklyChallenge.day') : t('weeklyChallenge.days')}
+                {data.week.daysRemaining}{" "}
+                {data.week.daysRemaining === 1
+                  ? t("weeklyChallenge.day")
+                  : t("weeklyChallenge.days")}
               </>
             )}
           </Badge>
         </div>
         <p className="text-sm text-muted-foreground">{formattedRange}</p>
         <div className="flex flex-wrap items-center gap-4 text-sm">
-          <span className="font-medium">{data.progress.totalPoints.toLocaleString()} {t('weeklyChallenge.points')}</span>
-          <span className="text-muted-foreground">
-            {t('weeklyChallenge.workoutsThisWeek', { count: data.progress.workoutsCompleted })}
+          <span className="font-medium">
+            {data.progress.totalPoints.toLocaleString()}{" "}
+            {t("weeklyChallenge.points")}
           </span>
           <span className="text-muted-foreground">
-            {t('weeklyChallenge.progress')}: {Math.round((data.progress.totalPoints / WEEKLY_POINTS_TARGET) * 100)}%
+            {t("weeklyChallenge.workoutsThisWeek", {
+              count: data.progress.workoutsCompleted,
+            })}
+          </span>
+          <span className="text-muted-foreground">
+            {t("weeklyChallenge.progress")}:{" "}
+            {Math.round(
+              (data.progress.totalPoints / WEEKLY_POINTS_TARGET) * 100
+            )}
+            %
           </span>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="font-medium">{t('weeklyChallenge.pointsTarget', 'Punkte-Ziel')}</span>
+            <span className="font-medium">
+              {t("weeklyChallenge.pointsTarget", "Punkte-Ziel")}
+            </span>
             <span className="text-muted-foreground">
-              {data.progress.totalPoints.toLocaleString()} / {WEEKLY_POINTS_TARGET.toLocaleString()} {t('weeklyChallenge.points')}
+              {data.progress.totalPoints.toLocaleString()} /{" "}
+              {WEEKLY_POINTS_TARGET.toLocaleString()}{" "}
+              {t("weeklyChallenge.points")}
             </span>
           </div>
-          <Progress value={Math.min((data.progress.totalPoints / WEEKLY_POINTS_TARGET) * 100, 100)} className="h-2" />
+          <Progress
+            value={Math.min(
+              (data.progress.totalPoints / WEEKLY_POINTS_TARGET) * 100,
+              100
+            )}
+            className="h-2"
+          />
         </div>
 
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">
-              {t('weeklyChallenge.leaderboard')}
+              {t("weeklyChallenge.leaderboard")}
             </h3>
             {challengeCompleted ? (
-              <Badge variant="outline" className="bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800">
+              <Badge
+                variant="outline"
+                className="bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
+              >
                 <ShieldCheck className="mr-1 h-4 w-4" />
-                {t('weeklyChallenge.bonusPointsSecured')}
+                {t("weeklyChallenge.bonusPointsSecured")}
               </Badge>
             ) : (
               <span className="text-xs text-muted-foreground">
-                {t('weeklyChallenge.collectPoints')}
+                {t("weeklyChallenge.collectPoints")}
               </span>
             )}
           </div>
@@ -298,61 +349,73 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
           <div className="space-y-2">
             {visibleLeaderboard.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">
-                {friends.length === 0 
-                  ? t('weeklyChallenge.noFriendsYet', 'Du hast noch keine Freunde. Füge Freunde hinzu, um sie hier zu sehen.')
-                  : t('weeklyChallenge.noActivitiesYet', 'Noch keine Aktivitäten in dieser Woche.')}
+                {friends.length === 0
+                  ? t(
+                      "weeklyChallenge.noFriendsYet",
+                      "Du hast noch keine Freunde. Füge Freunde hinzu, um sie hier zu sehen."
+                    )
+                  : t(
+                      "weeklyChallenge.noActivitiesYet",
+                      "Noch keine Aktivitäten in dieser Woche."
+                    )}
               </p>
             ) : (
-              visibleLeaderboard.map((entry: WeeklyChallengeLeaderboardEntry) => (
-                <div
-                  key={entry.id}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg border p-3 transition-colors",
-                    entry.isCurrentUser
-                      ? "bg-primary/10 dark:bg-primary/20 border-primary/30 dark:border-primary/40"
-                      : "bg-card border-border/50 hover:bg-accent/50"
-                  )}
-                >
-                  <Badge
-                    variant="secondary"
+              visibleLeaderboard.map(
+                (entry: WeeklyChallengeLeaderboardEntry) => (
+                  <div
+                    key={entry.id}
                     className={cn(
-                      "w-10 justify-center font-semibold shrink-0",
-                      entry.isCurrentUser && "bg-primary/20 dark:bg-primary/30 text-primary"
+                      "flex items-center gap-3 rounded-lg border p-3 transition-colors",
+                      entry.isCurrentUser
+                        ? "bg-primary/10 dark:bg-primary/20 border-primary/30 dark:border-primary/40"
+                        : "bg-card border-border/50 hover:bg-accent/50"
                     )}
                   >
-                    #{entry.rank}
-                  </Badge>
-                  <Avatar className="h-10 w-10 shrink-0">
-                    {entry.avatarUrl && parseAvatarConfig(entry.avatarUrl) ? (
-                      <NiceAvatar 
-                        style={{ width: '40px', height: '40px' }} 
-                        {...parseAvatarConfig(entry.avatarUrl)!} 
-                      />
-                    ) : (
-                    <AvatarFallback className={cn(
-                      entry.isCurrentUser
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground"
-                    )}>
-                      {getAvatarFallback(entry.displayName)}
-                    </AvatarFallback>
-                    )}
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium leading-tight truncate">
-                      {entry.displayName}
-                      {entry.isCurrentUser && (
-                        <span className="ml-1 text-primary font-semibold">
-                          ({t('weeklyChallenge.you')})
-                        </span>
+                    <Badge
+                      variant="secondary"
+                      className={cn(
+                        "w-10 justify-center font-semibold shrink-0",
+                        entry.isCurrentUser &&
+                          "bg-primary/20 dark:bg-primary/30 text-primary"
                       )}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {entry.totalPoints.toLocaleString()} {t('weeklyChallenge.points')}
-                    </p>
+                    >
+                      #{entry.rank}
+                    </Badge>
+                    <Avatar className="h-10 w-10 shrink-0">
+                      {entry.avatarUrl && parseAvatarConfig(entry.avatarUrl) ? (
+                        <NiceAvatar
+                          style={{ width: "40px", height: "40px" }}
+                          {...parseAvatarConfig(entry.avatarUrl)!}
+                        />
+                      ) : (
+                        <AvatarFallback
+                          className={cn(
+                            entry.isCurrentUser
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted text-muted-foreground"
+                          )}
+                        >
+                          {getAvatarFallback(entry.displayName)}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium leading-tight truncate">
+                        {entry.displayName}
+                        {entry.isCurrentUser && (
+                          <span className="ml-1 text-primary font-semibold">
+                            ({t("weeklyChallenge.you")})
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {entry.totalPoints.toLocaleString()}{" "}
+                        {t("weeklyChallenge.points")}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))
+                )
+              )
             )}
           </div>
         </div>

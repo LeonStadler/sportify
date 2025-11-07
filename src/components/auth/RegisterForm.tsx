@@ -12,7 +12,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { RegisterData, useAuth } from '@/contexts/AuthContext';
+import { RegisterData } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/use-auth';
 
 interface RegisterFormProps {
   onSuccess?: () => void;

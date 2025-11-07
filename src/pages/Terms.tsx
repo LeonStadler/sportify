@@ -2,6 +2,7 @@ import { Scale } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { LegalPageTemplate } from '@/components/LegalPageTemplate';
+import { contactInfo } from '@/config/contactInfo';
 
 export default function Terms() {
   const { t } = useTranslation();
@@ -21,12 +22,16 @@ export default function Terms() {
             <h2 className="text-2xl font-bold mb-4">{t('terms.service.title')}</h2>
             <p className="mb-4">{t('terms.service.description')}</p>
             <h3 className="text-xl font-semibold mb-3 mt-4">{t('terms.service.features.title')}</h3>
-            <ul className="list-disc pl-6 space-y-2">
+            <ul className="list-disc pl-6 space-y-2 mb-4">
               <li>{t('terms.service.features.tracking')}</li>
               <li>{t('terms.service.features.statistics')}</li>
               <li>{t('terms.service.features.community')}</li>
               <li>{t('terms.service.features.scoreboard')}</li>
             </ul>
+            <h3 className="text-xl font-semibold mb-3 mt-6">{t('terms.service.freeService')}</h3>
+            <p className="mb-4">{t('terms.service.freeServiceContent')}</p>
+            <h3 className="text-xl font-semibold mb-3 mt-6">{t('terms.service.noMonetization')}</h3>
+            <p className="mb-4">{t('terms.service.noMonetizationContent')}</p>
           </section>
 
           <section>
@@ -36,9 +41,12 @@ export default function Terms() {
               <li>{t('terms.account.registration.age')}</li>
               <li>{t('terms.account.registration.accuracy')}</li>
               <li>{t('terms.account.registration.responsibility')}</li>
+              <li>{t('terms.account.registration.singleAccount')}</li>
             </ul>
             <h3 className="text-xl font-semibold mb-3 mt-6">{t('terms.account.security.title')}</h3>
             <p className="mb-4">{t('terms.account.security.content')}</p>
+            <h3 className="text-xl font-semibold mb-3 mt-6">{t('terms.account.deletion.title')}</h3>
+            <p className="mb-4">{t('terms.account.deletion.content')}</p>
           </section>
 
           <section>
@@ -50,13 +58,17 @@ export default function Terms() {
               <li>{t('terms.usage.allowed.respectful')}</li>
             </ul>
             <h3 className="text-xl font-semibold mb-3 mt-6">{t('terms.usage.prohibited.title')}</h3>
-            <ul className="list-disc pl-6 space-y-2">
+            <ul className="list-disc pl-6 space-y-2 mb-4">
               <li>{t('terms.usage.prohibited.illegal')}</li>
               <li>{t('terms.usage.prohibited.harm')}</li>
               <li>{t('terms.usage.prohibited.unauthorized')}</li>
               <li>{t('terms.usage.prohibited.spam')}</li>
               <li>{t('terms.usage.prohibited.reverse')}</li>
+              <li>{t('terms.usage.prohibited.misleading')}</li>
+              <li>{t('terms.usage.prohibited.userContent')}</li>
             </ul>
+            <h3 className="text-xl font-semibold mb-3 mt-6">{t('terms.usage.userContent.title')}</h3>
+            <p className="mb-4">{t('terms.usage.userContent.content')}</p>
           </section>
 
           <section>
@@ -70,11 +82,16 @@ export default function Terms() {
             <h2 className="text-2xl font-bold mb-4">{t('terms.liability.title')}</h2>
             <p className="mb-4">{t('terms.liability.content')}</p>
             <h3 className="text-xl font-semibold mb-3 mt-4">{t('terms.liability.limitations.title')}</h3>
-            <ul className="list-disc pl-6 space-y-2">
+            <ul className="list-disc pl-6 space-y-2 mb-4">
               <li>{t('terms.liability.limitations.availability')}</li>
               <li>{t('terms.liability.limitations.accuracy')}</li>
               <li>{t('terms.liability.limitations.damages')}</li>
+              <li>{t('terms.liability.limitations.userContent')}</li>
+              <li>{t('terms.liability.limitations.health')}</li>
+              <li>{t('terms.liability.limitations.training')}</li>
             </ul>
+            <h3 className="text-xl font-semibold mb-3 mt-6">{t('terms.liability.noHealthData.title')}</h3>
+            <p className="mb-4">{t('terms.liability.noHealthData.content')}</p>
           </section>
 
           <section>
@@ -87,7 +104,8 @@ export default function Terms() {
           <section>
             <h2 className="text-2xl font-bold mb-4">{t('terms.changes.title')}</h2>
             <p className="mb-4">{t('terms.changes.content')}</p>
-            <p>{t('terms.changes.notification')}</p>
+            <p className="mb-4">{t('terms.changes.notification')}</p>
+            <p>{t('terms.changes.serviceChanges')}</p>
           </section>
 
           <section>
@@ -100,7 +118,7 @@ export default function Terms() {
             <h2 className="text-2xl font-bold mb-4">{t('terms.contact.title')}</h2>
             <p className="mb-4">{t('terms.contact.content')}</p>
             <p>
-              <strong>{t('terms.contact.email')}</strong>: contact@sportify.com
+              <strong>{t('terms.contact.email')}</strong>: <a href={`mailto:${contactInfo.email}`} className="text-primary hover:underline">{contactInfo.email}</a>
             </p>
           </section>
 

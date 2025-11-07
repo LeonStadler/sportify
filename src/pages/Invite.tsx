@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/use-auth';
 import { API_URL } from '@/lib/api';
 import { parseAvatarConfig } from '@/lib/avatar';
 import { Check, UserPlus, X } from 'lucide-react';

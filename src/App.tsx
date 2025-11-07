@@ -2,9 +2,11 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { InviteLinkHandler } from "@/components/InviteLinkHandler";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
+import { OfflineBanner } from "@/components/OfflineBanner";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/use-auth";
+import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { lazy, Suspense } from "react";
 import { Route, Routes } from "react-router-dom";
 
@@ -16,7 +18,6 @@ const EmailVerification = lazy(() => import("@/pages/auth/EmailVerification"));
 const Login = lazy(() => import("@/pages/auth/Login"));
 const Register = lazy(() => import("@/pages/auth/Register"));
 const ResetPassword = lazy(() => import("@/pages/auth/ResetPassword"));
-const TwoFactor = lazy(() => import("@/pages/auth/TwoFactor"));
 const Contact = lazy(() => import("@/pages/Contact"));
 const Dashboard = lazy(() =>
   import("@/pages/Dashboard").then((m) => ({ default: m.Dashboard }))
@@ -43,6 +44,7 @@ const Terms = lazy(() => import("@/pages/Terms"));
 const Training = lazy(() =>
   import("@/pages/Training").then((m) => ({ default: m.Training }))
 );
+const Share = lazy(() => import("@/pages/Share"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Loading component
@@ -57,6 +59,9 @@ const PageLoader = () => (
 
 const App = () => {
   const { isAuthenticated, isLoading } = useAuth();
+
+  // Offline-Synchronisation aktivieren
+  useOfflineSync();
 
   // Zeige einen Loader während der Auth-Initialisierung
   if (isLoading) {
@@ -83,7 +88,6 @@ const App = () => {
             <Route path="/auth/login" element={<Login />} />
             <Route path="/auth/register" element={<Register />} />
             <Route path="/auth/reset-password" element={<ResetPassword />} />
-            <Route path="/auth/two-factor" element={<TwoFactor />} />
             <Route
               path="/auth/email-verification"
               element={<EmailVerification />}
@@ -98,11 +102,20 @@ const App = () => {
   return (
     <TooltipProvider>
       <SidebarProvider>
+        <OfflineBanner />
         <InviteLinkHandler />
         <InstallPrompt />
-        <div className="min-h-screen flex w-full">
+        <div
+          className="min-h-screen flex w-full"
+          role="application"
+          aria-label="Sportify App"
+        >
           <AppSidebar />
-          <main className="flex-1 p-3 md:p-6 bg-background pb-20 md:pb-6">
+          <main
+            className="flex-1 p-3 md:p-6 bg-background pb-20 md:pb-6"
+            role="main"
+            aria-label="Hauptinhalt"
+          >
             <div className="mb-4">
               <SidebarTrigger className="lg:hidden" />
             </div>
@@ -121,6 +134,7 @@ const App = () => {
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/imprint" element={<Imprint />} />
+                <Route path="/share" element={<Share />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 
 import { PublicHeader } from "@/components/PublicHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/use-auth";
 
 interface LegalPageTemplateProps {
   title: string;

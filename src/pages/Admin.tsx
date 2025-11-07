@@ -5,13 +5,30 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
-import { API_URL } from '@/lib/api';
-import { Edit, Eye, EyeOff, Plus, Settings, Shield, Trophy, Users, X } from "lucide-react";
-import { useEffect, useState } from 'react';
+import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
+import { API_URL } from "@/lib/api";
+import {
+  Edit,
+  Eye,
+  EyeOff,
+  Plus,
+  Settings,
+  Shield,
+  Trophy,
+  Users,
+  X,
+} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
 interface AdminUser {
   id: string;
@@ -21,7 +38,7 @@ interface AdminUser {
   nickname?: string;
   isEmailVerified: boolean;
   has2FA: boolean;
-  role: 'user' | 'admin';
+  role: "user" | "admin";
   createdAt: string;
   lastLoginAt?: string;
 }
@@ -39,8 +56,6 @@ interface Exercise {
   updatedAt: string;
 }
 
-
-
 export function Admin() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -52,24 +67,75 @@ export function Admin() {
   const [isExerciseFormOpen, setIsExerciseFormOpen] = useState(false);
   const [editingExercise, setEditingExercise] = useState<Exercise | null>(null);
   const [exerciseForm, setExerciseForm] = useState({
-    id: '',
-    name: '',
+    id: "",
+    name: "",
     pointsPerUnit: 1,
-    unit: 'Wiederholungen',
+    unit: "Wiederholungen",
     hasWeight: false,
     hasSetMode: true,
     isActive: true,
   });
 
+  const loadUsers = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/admin/users`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const usersData = await response.json();
+        setUsers(usersData);
+      }
+    } catch (error) {
+      console.error("Error loading users:", error);
+    }
+  };
+
+  const loadExercises = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/admin/exercises`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const exercisesData = await response.json();
+        setExercises(exercisesData);
+      }
+    } catch (error) {
+      console.error("Error loading exercises:", error);
+    }
+  };
+
+  const loadAdminData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      await Promise.all([loadUsers(), loadExercises()]);
+    } catch (error) {
+      toast({
+        title: "Fehler",
+        description: "Fehler beim Laden der Admin-Daten",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
   // Lade Daten beim Komponenten-Mount
   useEffect(() => {
-    if (user?.role === 'admin') {
+    if (user?.role === "admin") {
       loadAdminData();
     }
-  }, [user?.role]);
+  }, [user?.role, loadAdminData]);
 
   // Prüfe Admin-Rechte
-  if (user?.role !== 'admin') {
+  if (user?.role !== "admin") {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-center min-h-[400px]">
@@ -87,61 +153,14 @@ export function Admin() {
     );
   }
 
-  const loadAdminData = async () => {
-    setIsLoading(true);
-    try {
-      await Promise.all([loadUsers(), loadExercises()]);
-    } catch (error) {
-      toast({
-        title: "Fehler",
-        description: "Fehler beim Laden der Admin-Daten",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loadUsers = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/admin/users`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        const usersData = await response.json();
-        setUsers(usersData);
-      }
-    } catch (error) {
-      console.error('Error loading users:', error);
-    }
-  };
-
-  const loadExercises = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/admin/exercises`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        const exercisesData = await response.json();
-        setExercises(exercisesData);
-      }
-    } catch (error) {
-      console.error('Error loading exercises:', error);
-    }
-  };
-
   const handleCreateExercise = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!exerciseForm.id || !exerciseForm.name || exerciseForm.pointsPerUnit <= 0) {
+    if (
+      !exerciseForm.id ||
+      !exerciseForm.name ||
+      exerciseForm.pointsPerUnit <= 0
+    ) {
       toast({
         title: "Fehler",
         description: "Bitte füllen Sie alle erforderlichen Felder aus.",
@@ -151,25 +170,31 @@ export function Admin() {
     }
 
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       const response = await fetch(`${API_URL}/admin/exercises`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          id: exerciseForm.id.toLowerCase().replace(/\s+/g, '-'),
+          id: exerciseForm.id.toLowerCase().replace(/\s+/g, "-"),
           name: exerciseForm.name,
           pointsPerUnit: exerciseForm.pointsPerUnit,
           unit: exerciseForm.unit,
           hasWeight: exerciseForm.hasWeight,
           hasSetMode: exerciseForm.hasSetMode,
           unitOptions: exerciseForm.hasSetMode
-            ? [{ value: exerciseForm.unit, label: exerciseForm.unit, multiplier: 1 }]
+            ? [
+                {
+                  value: exerciseForm.unit,
+                  label: exerciseForm.unit,
+                  multiplier: 1,
+                },
+              ]
             : [],
           isActive: exerciseForm.isActive,
-        })
+        }),
       });
 
       if (response.ok) {
@@ -196,19 +221,26 @@ export function Admin() {
     }
   };
 
-  const handleUpdateExercise = async (exercise: Exercise, field: keyof Exercise, value: any) => {
+  const handleUpdateExercise = async (
+    exercise: Exercise,
+    field: keyof Exercise,
+    value: unknown
+  ) => {
     try {
-      const token = localStorage.getItem('token');
-      const updateData: any = { [field]: value };
+      const token = localStorage.getItem("token");
+      const updateData: Partial<Exercise> = { [field]: value };
 
-      const response = await fetch(`${API_URL}/admin/exercises/${exercise.id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(updateData)
-      });
+      const response = await fetch(
+        `${API_URL}/admin/exercises/${exercise.id}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updateData),
+        }
+      );
 
       if (response.ok) {
         toast({
@@ -235,10 +267,10 @@ export function Admin() {
 
   const resetExerciseForm = () => {
     setExerciseForm({
-      id: '',
-      name: '',
+      id: "",
+      name: "",
       pointsPerUnit: 1,
-      unit: 'Wiederholungen',
+      unit: "Wiederholungen",
       hasWeight: false,
       hasSetMode: true,
       isActive: true,
@@ -269,22 +301,22 @@ export function Admin() {
       if (isNaN(date.getTime())) {
         return "Ungültiges Datum";
       }
-      return date.toLocaleString('de-DE', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
+      return date.toLocaleString("de-DE", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
       });
     } catch (error) {
-      console.error('Date formatting error:', error, 'Input:', dateString);
+      console.error("Date formatting error:", error, "Input:", dateString);
       return "Ungültiges Datum";
     }
   };
 
   const maskEmail = (email: string) => {
     if (showEmails) return email;
-    const [name, domain] = email.split('@');
+    const [name, domain] = email.split("@");
     return `${name.substring(0, 2)}***@${domain}`;
   };
 
@@ -300,7 +332,8 @@ export function Admin() {
       <Alert>
         <Shield className="h-4 w-4" />
         <AlertDescription>
-          Sie sind als Administrator angemeldet und haben vollständigen Zugriff auf alle Einstellungen.
+          Sie sind als Administrator angemeldet und haben vollständigen Zugriff
+          auf alle Einstellungen.
         </AlertDescription>
       </Alert>
 
@@ -323,20 +356,28 @@ export function Admin() {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-4 border rounded-lg">
-                  <p className="text-2xl font-bold text-primary">{users.length}</p>
-                  <p className="text-sm text-muted-foreground">Registrierte Benutzer</p>
+                  <p className="text-2xl font-bold text-primary">
+                    {users.length}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Registrierte Benutzer
+                  </p>
                 </div>
                 <div className="p-4 border rounded-lg">
                   <p className="text-2xl font-bold text-green-600">
-                    {users.filter(u => u.isEmailVerified).length}
+                    {users.filter((u) => u.isEmailVerified).length}
                   </p>
-                  <p className="text-sm text-muted-foreground">Verifizierte E-Mails</p>
+                  <p className="text-sm text-muted-foreground">
+                    Verifizierte E-Mails
+                  </p>
                 </div>
                 <div className="p-4 border rounded-lg">
                   <p className="text-2xl font-bold text-blue-600">
-                    {users.filter(u => u.role === 'admin').length}
+                    {users.filter((u) => u.role === "admin").length}
                   </p>
-                  <p className="text-sm text-muted-foreground">Administratoren</p>
+                  <p className="text-sm text-muted-foreground">
+                    Administratoren
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -366,7 +407,11 @@ export function Admin() {
                   size="sm"
                   onClick={() => setShowEmails(!showEmails)}
                 >
-                  {showEmails ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showEmails ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
                   {showEmails ? "E-Mails verbergen" : "E-Mails anzeigen"}
                 </Button>
               </CardTitle>
@@ -406,19 +451,25 @@ export function Admin() {
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-col gap-1">
-                              {adminUser.role === 'admin' && (
+                              {adminUser.role === "admin" && (
                                 <Badge variant="secondary">
                                   <Shield className="w-3 h-3 mr-1" />
                                   Admin
                                 </Badge>
                               )}
                               {adminUser.isEmailVerified && (
-                                <Badge variant="outline" className="text-green-600">
+                                <Badge
+                                  variant="outline"
+                                  className="text-green-600"
+                                >
                                   ✓ Verifiziert
                                 </Badge>
                               )}
                               {adminUser.has2FA && (
-                                <Badge variant="outline" className="text-blue-600">
+                                <Badge
+                                  variant="outline"
+                                  className="text-blue-600"
+                                >
                                   🔒 2FA
                                 </Badge>
                               )}
@@ -438,7 +489,9 @@ export function Admin() {
 
                 {users.length === 0 && (
                   <div className="text-center py-8">
-                    <p className="text-muted-foreground">Keine Benutzer gefunden</p>
+                    <p className="text-muted-foreground">
+                      Keine Benutzer gefunden
+                    </p>
                   </div>
                 )}
               </div>
@@ -483,7 +536,11 @@ export function Admin() {
                   <Card className="border-2">
                     <CardHeader>
                       <CardTitle className="flex items-center justify-between">
-                        <span>{editingExercise ? 'Übung bearbeiten' : 'Neue Übung erstellen'}</span>
+                        <span>
+                          {editingExercise
+                            ? "Übung bearbeiten"
+                            : "Neue Übung erstellen"}
+                        </span>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -494,23 +551,61 @@ export function Admin() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <form onSubmit={editingExercise ? async (e) => {
-                        e.preventDefault();
-                        await handleUpdateExercise(editingExercise, 'name', exerciseForm.name);
-                        await handleUpdateExercise(editingExercise, 'pointsPerUnit', exerciseForm.pointsPerUnit);
-                        await handleUpdateExercise(editingExercise, 'unit', exerciseForm.unit);
-                        await handleUpdateExercise(editingExercise, 'hasWeight', exerciseForm.hasWeight);
-                        await handleUpdateExercise(editingExercise, 'hasSetMode', exerciseForm.hasSetMode);
-                        await handleUpdateExercise(editingExercise, 'isActive', exerciseForm.isActive);
-                        resetExerciseForm();
-                      } : handleCreateExercise} className="space-y-4">
+                      <form
+                        onSubmit={
+                          editingExercise
+                            ? async (e) => {
+                                e.preventDefault();
+                                await handleUpdateExercise(
+                                  editingExercise,
+                                  "name",
+                                  exerciseForm.name
+                                );
+                                await handleUpdateExercise(
+                                  editingExercise,
+                                  "pointsPerUnit",
+                                  exerciseForm.pointsPerUnit
+                                );
+                                await handleUpdateExercise(
+                                  editingExercise,
+                                  "unit",
+                                  exerciseForm.unit
+                                );
+                                await handleUpdateExercise(
+                                  editingExercise,
+                                  "hasWeight",
+                                  exerciseForm.hasWeight
+                                );
+                                await handleUpdateExercise(
+                                  editingExercise,
+                                  "hasSetMode",
+                                  exerciseForm.hasSetMode
+                                );
+                                await handleUpdateExercise(
+                                  editingExercise,
+                                  "isActive",
+                                  exerciseForm.isActive
+                                );
+                                resetExerciseForm();
+                              }
+                            : handleCreateExercise
+                        }
+                        className="space-y-4"
+                      >
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <Label htmlFor="exercise-id">ID (eindeutig, z.B. "burpees")</Label>
+                            <Label htmlFor="exercise-id">
+                              ID (eindeutig, z.B. "burpees")
+                            </Label>
                             <Input
                               id="exercise-id"
                               value={exerciseForm.id}
-                              onChange={(e) => setExerciseForm(prev => ({ ...prev, id: e.target.value }))}
+                              onChange={(e) =>
+                                setExerciseForm((prev) => ({
+                                  ...prev,
+                                  id: e.target.value,
+                                }))
+                              }
                               placeholder="burpees"
                               disabled={!!editingExercise}
                               required
@@ -521,7 +616,12 @@ export function Admin() {
                             <Input
                               id="exercise-name"
                               value={exerciseForm.name}
-                              onChange={(e) => setExerciseForm(prev => ({ ...prev, name: e.target.value }))}
+                              onChange={(e) =>
+                                setExerciseForm((prev) => ({
+                                  ...prev,
+                                  name: e.target.value,
+                                }))
+                              }
                               placeholder="Burpees"
                               required
                             />
@@ -530,14 +630,22 @@ export function Admin() {
 
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <Label htmlFor="exercise-points">Punkte pro Einheit</Label>
+                            <Label htmlFor="exercise-points">
+                              Punkte pro Einheit
+                            </Label>
                             <Input
                               id="exercise-points"
                               type="number"
                               step="0.1"
                               min="0"
                               value={exerciseForm.pointsPerUnit}
-                              onChange={(e) => setExerciseForm(prev => ({ ...prev, pointsPerUnit: parseFloat(e.target.value) || 0 }))}
+                              onChange={(e) =>
+                                setExerciseForm((prev) => ({
+                                  ...prev,
+                                  pointsPerUnit:
+                                    parseFloat(e.target.value) || 0,
+                                }))
+                              }
                               required
                             />
                           </div>
@@ -546,7 +654,12 @@ export function Admin() {
                             <Input
                               id="exercise-unit"
                               value={exerciseForm.unit}
-                              onChange={(e) => setExerciseForm(prev => ({ ...prev, unit: e.target.value }))}
+                              onChange={(e) =>
+                                setExerciseForm((prev) => ({
+                                  ...prev,
+                                  unit: e.target.value,
+                                }))
+                              }
                               placeholder="Wiederholungen"
                               required
                             />
@@ -558,7 +671,12 @@ export function Admin() {
                             <Switch
                               id="has-set-mode"
                               checked={exerciseForm.hasSetMode}
-                              onCheckedChange={(checked) => setExerciseForm(prev => ({ ...prev, hasSetMode: checked }))}
+                              onCheckedChange={(checked) =>
+                                setExerciseForm((prev) => ({
+                                  ...prev,
+                                  hasSetMode: checked,
+                                }))
+                              }
                             />
                             <Label htmlFor="has-set-mode">Set-Modus</Label>
                           </div>
@@ -566,7 +684,12 @@ export function Admin() {
                             <Switch
                               id="has-weight"
                               checked={exerciseForm.hasWeight}
-                              onCheckedChange={(checked) => setExerciseForm(prev => ({ ...prev, hasWeight: checked }))}
+                              onCheckedChange={(checked) =>
+                                setExerciseForm((prev) => ({
+                                  ...prev,
+                                  hasWeight: checked,
+                                }))
+                              }
                             />
                             <Label htmlFor="has-weight">Mit Gewicht</Label>
                           </div>
@@ -574,7 +697,12 @@ export function Admin() {
                             <Switch
                               id="is-active"
                               checked={exerciseForm.isActive}
-                              onCheckedChange={(checked) => setExerciseForm(prev => ({ ...prev, isActive: checked }))}
+                              onCheckedChange={(checked) =>
+                                setExerciseForm((prev) => ({
+                                  ...prev,
+                                  isActive: checked,
+                                }))
+                              }
                             />
                             <Label htmlFor="is-active">Aktiv</Label>
                           </div>
@@ -582,9 +710,13 @@ export function Admin() {
 
                         <div className="flex gap-2">
                           <Button type="submit" className="flex-1">
-                            {editingExercise ? 'Speichern' : 'Erstellen'}
+                            {editingExercise ? "Speichern" : "Erstellen"}
                           </Button>
-                          <Button type="button" variant="outline" onClick={resetExerciseForm}>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={resetExerciseForm}
+                          >
                             Abbrechen
                           </Button>
                         </div>
@@ -609,15 +741,25 @@ export function Admin() {
                     <TableBody>
                       {exercises.map((exercise) => (
                         <TableRow key={exercise.id}>
-                          <TableCell className="font-medium">{exercise.name}</TableCell>
-                          <TableCell className="font-mono text-sm">{exercise.id}</TableCell>
+                          <TableCell className="font-medium">
+                            {exercise.name}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">
+                            {exercise.id}
+                          </TableCell>
                           <TableCell>
                             <Input
                               type="number"
                               step="0.1"
                               min="0"
                               value={exercise.pointsPerUnit}
-                              onChange={(e) => handleUpdateExercise(exercise, 'pointsPerUnit', parseFloat(e.target.value) || 0)}
+                              onChange={(e) =>
+                                handleUpdateExercise(
+                                  exercise,
+                                  "pointsPerUnit",
+                                  parseFloat(e.target.value) || 0
+                                )
+                              }
                               className="w-24"
                             />
                           </TableCell>
@@ -625,15 +767,29 @@ export function Admin() {
                           <TableCell>
                             <div className="flex flex-col gap-1">
                               {exercise.hasSetMode && (
-                                <Badge variant="outline" className="text-xs w-fit">Set-Modus</Badge>
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs w-fit"
+                                >
+                                  Set-Modus
+                                </Badge>
                               )}
                               {exercise.hasWeight && (
-                                <Badge variant="outline" className="text-xs w-fit">Mit Gewicht</Badge>
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs w-fit"
+                                >
+                                  Mit Gewicht
+                                </Badge>
                               )}
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant={exercise.isActive ? "default" : "secondary"}>
+                            <Badge
+                              variant={
+                                exercise.isActive ? "default" : "secondary"
+                              }
+                            >
                               {exercise.isActive ? "Aktiv" : "Inaktiv"}
                             </Badge>
                           </TableCell>
@@ -654,7 +810,9 @@ export function Admin() {
 
                 {exercises.length === 0 && (
                   <div className="text-center py-8">
-                    <p className="text-muted-foreground">Keine Übungen gefunden</p>
+                    <p className="text-muted-foreground">
+                      Keine Übungen gefunden
+                    </p>
                   </div>
                 )}
               </div>

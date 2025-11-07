@@ -31,8 +31,8 @@ export function Logo({
         <style>
           {`
             .trophy-icon { fill: none; stroke: #FFFFFF; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-            .logo-text { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; font-weight: bold; fill: hsl(var(--foreground)); }
-            .logo-subtext { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; fill: hsl(var(--foreground)); opacity: 0.7; }
+            .logo-text { font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; font-weight: 700; fill: hsl(var(--foreground)); }
+            .logo-subtext { font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; fill: hsl(var(--foreground)); opacity: 0.7; }
           `}
         </style>
       </defs>

@@ -3,11 +3,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
 import { parseAvatarConfig } from "@/lib/avatar";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import NiceAvatar from "react-nice-avatar";
 import { useNavigate } from "react-router-dom";
@@ -27,7 +27,7 @@ interface ActivityFeedItem {
 
 const formatActivity = (
   activity: ActivityFeedItem,
-  t: (key: string, params?: any) => string
+  t: (key: string, params?: Record<string, unknown>) => string
 ) => {
   const { activityType, amount, workoutTitle } = activity;
 
@@ -107,11 +107,11 @@ const getActivityColor = (activityType: string) => {
 
 const formatTimeAgo = (
   dateString: string | null | undefined,
-  t: (key: string, params?: any) => string
+  t: (key: string, params?: Record<string, unknown>) => string
 ) => {
   // Kein Fallback - wenn kein Datum vorhanden, zeige "Unbekannt"
   if (!dateString) {
-    return t("activityFeed.timeAgoShort.unknown", "Unbekannt");
+    return t("activityFeed.timeAgoShort.unknown");
   }
 
   const date = new Date(dateString);
@@ -120,7 +120,7 @@ const formatTimeAgo = (
   // Prüfe ob das Datum gültig ist
   if (isNaN(date.getTime())) {
     console.warn("Invalid date in formatTimeAgo:", dateString);
-    return t("activityFeed.timeAgoShort.unknown", "Unbekannt");
+    return t("activityFeed.timeAgoShort.unknown");
   }
 
   const diffMs = now.getTime() - date.getTime();
@@ -204,13 +204,7 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
   const [error, setError] = useState<string | null>(null);
   const [hasFriends, setHasFriends] = useState<boolean | null>(null);
 
-  useEffect(() => {
-    if (user) {
-      loadActivityFeed();
-    }
-  }, [user]);
-
-  const loadActivityFeed = async () => {
+  const loadActivityFeed = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -263,7 +257,13 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [t, toast]);
+
+  useEffect(() => {
+    if (user) {
+      loadActivityFeed();
+    }
+  }, [user, loadActivityFeed]);
 
   if (isLoading) {
     return (

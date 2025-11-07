@@ -7,6 +7,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { initSvgThemeListener } from '@/utils/updateSvgTheme';
+import { registerServiceWorker } from '@/utils/serviceWorker';
 import App from './App.tsx';
 import './index.css';
 import './lib/i18n';
@@ -22,6 +23,9 @@ const queryClient = new QueryClient({
 
 // Initialisiere SVG-Theme-Listener
 initSvgThemeListener();
+
+// Registriere Service Worker
+registerServiceWorker();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

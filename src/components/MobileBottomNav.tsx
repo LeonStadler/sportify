@@ -18,6 +18,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import LanguageSwitcher from "./LanguageSwitcher";
 import ThemeSwitcher from "./ThemeSwitcher";
 
+import { LogoFull } from "@/components/LogoFull";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -30,7 +31,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/use-auth";
 import { getUserInitials, parseAvatarConfig } from "@/lib/avatar";
 import NiceAvatar from "react-nice-avatar";
 
@@ -41,8 +42,8 @@ export function MobileBottomNav() {
   const { user, logout, getDisplayName, isAuthenticated } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  // Mock admin check
-  const isAdmin = user?.email === "admin@sportify.com";
+  // Verwende role vom User-Objekt
+  const isAdmin = user?.role === "admin";
 
   const navItems = [
     {
@@ -154,11 +155,7 @@ export function MobileBottomNav() {
                     </SheetDescription>
                   </div>
                 </div>
-                <img
-                  src="/logo-full.svg"
-                  alt="Sportify"
-                  className="h-12 scale-75"
-                />
+                <LogoFull className="h-12 scale-75" />
               </SheetHeader>
 
               <div className="px-6 space-y-6">

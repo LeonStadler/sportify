@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { LegalPageTemplate } from '@/components/LegalPageTemplate';
+import { contactInfo } from '@/config/contactInfo';
 
 export default function Imprint() {
   const { t } = useTranslation();
@@ -17,15 +18,16 @@ export default function Imprint() {
             <h2 className="text-2xl font-bold mb-4">{t('imprint.responsibility.title')}</h2>
             <div className="space-y-2">
               <p>
-                <strong>{t('imprint.responsibility.name')}</strong>: Leon Stadler
+                <strong>{t('imprint.responsibility.name')}</strong>: {contactInfo.responsiblePerson}
               </p>
               <p>
                 <strong>{t('imprint.responsibility.address')}</strong>
               </p>
-              <p className="pl-4">
-                Musterstraße 123<br />
-                12345 Musterstadt<br />
-                Deutschland
+              <p className="pl-4 whitespace-pre-line">
+                {contactInfo.address.full}
+              </p>
+              <p className="mt-2 text-muted-foreground">
+                {t('imprint.responsibility.content')}
               </p>
             </div>
           </section>
@@ -33,13 +35,24 @@ export default function Imprint() {
           <section>
             <h2 className="text-2xl font-bold mb-4">{t('imprint.contact.title')}</h2>
             <div className="space-y-2">
+              <p className="mb-2">{t('imprint.contact.content')}</p>
               <p>
-                <strong>{t('imprint.contact.email')}</strong>: contact@sportify.com
+                <strong>{t('imprint.contact.email')}</strong>: <a href={`mailto:${contactInfo.email}`} className="text-primary hover:underline">{contactInfo.email}</a>
               </p>
               <p>
-                <strong>{t('imprint.contact.phone')}</strong>: +49 (0) 123 456 789
+                <strong>{t('imprint.contact.phone')}</strong>: <a href={`tel:${contactInfo.phone.replace(/\s/g, '')}`} className="text-primary hover:underline">{contactInfo.phone}</a>
               </p>
             </div>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-bold mb-4">{t('imprint.hosting.title')}</h2>
+            <p className="mb-4">{t('imprint.hosting.content')}</p>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>{t('imprint.hosting.domainProvider')}</li>
+              <li>{t('imprint.hosting.hostingProvider')}</li>
+              <li>{t('imprint.hosting.serverLocation')}</li>
+            </ul>
           </section>
 
           <section>
@@ -47,21 +60,28 @@ export default function Imprint() {
             <h3 className="text-xl font-semibold mb-3 mt-4">{t('imprint.disclaimer.content.title')}</h3>
             <p className="mb-4">{t('imprint.disclaimer.content.intro')}</p>
             <p className="mb-4">{t('imprint.disclaimer.content.responsibility')}</p>
+            <p className="mb-4">{t('imprint.disclaimer.content.liability')}</p>
             <h3 className="text-xl font-semibold mb-3 mt-6">{t('imprint.disclaimer.links.title')}</h3>
             <p className="mb-4">{t('imprint.disclaimer.links.intro')}</p>
             <p className="mb-4">{t('imprint.disclaimer.links.responsibility')}</p>
-            <p>{t('imprint.disclaimer.links.investigation')}</p>
+            <p className="mb-4">{t('imprint.disclaimer.links.investigation')}</p>
+            <h3 className="text-xl font-semibold mb-3 mt-6">{t('imprint.disclaimer.userContent.title')}</h3>
+            <p className="mb-4">{t('imprint.disclaimer.userContent.content')}</p>
+            <h3 className="text-xl font-semibold mb-3 mt-6">{t('imprint.disclaimer.health.title')}</h3>
+            <p className="mb-4">{t('imprint.disclaimer.health.content')}</p>
           </section>
 
           <section>
             <h2 className="text-2xl font-bold mb-4">{t('imprint.copyright.title')}</h2>
             <p className="mb-4">{t('imprint.copyright.content')}</p>
-            <p>{t('imprint.copyright.prohibition')}</p>
+            <p className="mb-4">{t('imprint.copyright.prohibition')}</p>
+            <p>{t('imprint.copyright.violation')}</p>
           </section>
 
           <section>
             <h2 className="text-2xl font-bold mb-4">{t('imprint.dataProtection.title')}</h2>
             <p className="mb-4">{t('imprint.dataProtection.content')}</p>
+            <p className="mb-4">{t('imprint.dataProtection.noTracking')}</p>
             <p>
               <Link to="/privacy" className="text-primary hover:underline">
                 {t('imprint.dataProtection.link')}

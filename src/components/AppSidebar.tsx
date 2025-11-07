@@ -17,6 +17,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import LanguageSwitcher from "./LanguageSwitcher";
 import ThemeSwitcher from "./ThemeSwitcher";
 
+import { LogoFull } from "@/components/LogoFull";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -38,9 +39,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarSeparator,
-  useSidebar,
 } from "@/components/ui/sidebar";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/use-auth";
+import { useSidebar } from "@/hooks/use-sidebar";
 import { getUserInitials, parseAvatarConfig } from "@/lib/avatar";
 import NiceAvatar from "react-nice-avatar";
 import { Notifications } from "./Notifications";
@@ -120,7 +121,7 @@ export function AppSidebar() {
     <Sidebar className="border-r border-border bg-background">
       <SidebarHeader className="border-b border-border bg-background">
         <div className="p-6">
-          <img src="/logo-full.svg" alt="Sportify" className="h-12" />
+          <LogoFull className="h-12" />
         </div>
       </SidebarHeader>
 

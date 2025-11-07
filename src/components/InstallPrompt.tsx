@@ -18,6 +18,10 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
+interface NavigatorStandalone extends Navigator {
+  standalone?: boolean;
+}
+
 export function InstallPrompt() {
   const { t } = useTranslation();
   const [deferredPrompt, setDeferredPrompt] =
@@ -36,7 +40,8 @@ export function InstallPrompt() {
 
       // Prüfe ob auf iOS (Safari) im Standalone-Modus
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      const isInStandaloneMode = (window.navigator as any).standalone === true;
+      const isInStandaloneMode =
+        (window.navigator as NavigatorStandalone).standalone === true;
 
       if (isIOS && isInStandaloneMode) {
         return true;

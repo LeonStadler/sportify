@@ -3,32 +3,37 @@
     <style>
       .trophy-icon { fill: none; stroke: #FFFFFF; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
       
-      /* Light Mode (Default) - entspricht hsl(222.2 84% 4.9%) = #1a1a1a */
+      /* Verwende CSS-Variablen aus dem Design-System für automatische Theme-Unterstützung */
+      /* Fallback-Farben für den Fall, dass CSS-Variablen nicht verfügbar sind */
       .logo-text { 
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; 
-        font-weight: bold; 
-        fill: #1a1a1a; 
+        font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; 
+        font-weight: 700; 
+        fill: hsl(var(--foreground, 222.2 84% 4.9%)); 
       }
       .logo-subtext { 
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; 
-        fill: #1a1a1a; 
+        font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; 
+        fill: hsl(var(--foreground, 222.2 84% 4.9%)); 
         opacity: 0.7; 
       }
       
-      /* Dark Mode - entspricht hsl(210 20% 98%) = #f8fafc */
+      /* Dark Mode via prefers-color-scheme (für externe Verwendung) */
       @media (prefers-color-scheme: dark) {
         .logo-text { 
-          fill: #f8fafc; 
+          fill: hsl(var(--foreground, 210 20% 98%)); 
         }
         .logo-subtext { 
-          fill: #f8fafc; 
+          fill: hsl(var(--foreground, 210 20% 98%)); 
         }
       }
       
-      /* Alternative: Reagiere auf CSS-Variable (wird per JavaScript gesetzt) */
-      .logo-text[data-theme="dark"],
-      .logo-subtext[data-theme="dark"] {
-        fill: #f8fafc;
+      /* Dark Mode via .dark Klasse (funktioniert nur wenn SVG inline eingebettet ist) */
+      :root.dark .logo-text,
+      .dark .logo-text { 
+        fill: hsl(var(--foreground, 210 20% 98%)); 
+      }
+      :root.dark .logo-subtext,
+      .dark .logo-subtext { 
+        fill: hsl(var(--foreground, 210 20% 98%)); 
       }
     </style>
   </defs>

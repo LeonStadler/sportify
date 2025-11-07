@@ -1,3 +1,36 @@
+/* Lokale Schriftarten - Inter */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/inter-400.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/inter-500.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/inter-600.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/inter-700.ttf') format('truetype');
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -230,6 +263,38 @@
   @media all and (display-mode: standalone) {
     body {
       padding-top: env(safe-area-inset-top);
+    }
+  }
+
+  /* PWA Splash Screen - CSS-basierte Lösung für iOS & Android */
+  /* 
+   * iOS: Nutzt automatisch theme-color Meta Tag und apple-touch-icon
+   * Android: Nutzt background_color und icons aus dem Web App Manifest
+   * Beide zeigen beim App-Start einen Splash Screen mit Hintergrundfarbe und Icon
+   */
+  @media all and (display-mode: standalone) {
+    body {
+      /* Smooth transition beim App-Start für beide Plattformen */
+      animation: fadeIn 0.3s ease-in;
+    }
+    
+    /* Stelle sicher dass Hintergrundfarbe korrekt ist (für Android) */
+    background-color: hsl(var(--background));
+  }
+  
+  /* Android: Stelle sicher dass HTML-Element auch die richtige Hintergrundfarbe hat */
+  @media all and (display-mode: standalone) {
+    html {
+      background-color: hsl(var(--background));
+    }
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
     }
   }
 }

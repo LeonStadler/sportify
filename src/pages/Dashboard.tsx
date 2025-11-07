@@ -11,11 +11,11 @@ import { WeeklyGoals, WeeklyGoalsDialog } from "@/components/WeeklyGoalsDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
 import { BarChart, Dumbbell, Settings, TrendingUp, Trophy } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 interface DashboardStats {
@@ -127,42 +127,28 @@ export function Dashboard() {
   );
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    if (user) {
-      loadDashboardData();
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (user && cardConfigs.length > 0) {
-      loadStatsForCards();
-    }
-  }, [user, cardConfigs]);
-
-  const loadDashboardData = async () => {
-    setIsLoading(true);
+  const loadStats = async (
+    token: string,
+    period: string = "week"
+  ): Promise<DashboardStats | null> => {
     try {
-      const token = localStorage.getItem("token");
-      if (!token) return;
-
-      await Promise.all([
-        loadStatsForCards(),
-        loadGoals(token),
-        loadRecentWorkouts(token),
-      ]);
-    } catch (error) {
-      console.error("Error loading dashboard data:", error);
-      toast({
-        title: t("dashboard.error"),
-        description: t("dashboard.errorLoadingData"),
-        variant: "destructive",
+      const response = await fetch(`${API_URL}/stats?period=${period}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-    } finally {
-      setIsLoading(false);
+
+      if (response.ok) {
+        const data = await response.json();
+        return data;
+      } else {
+        return null;
+      }
+    } catch (error) {
+      console.error(`Error loading stats for period ${period}:`, error);
+      return null;
     }
   };
 
-  const loadStatsForCards = async () => {
+  const loadStatsForCards = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
 
@@ -188,28 +174,7 @@ export function Dashboard() {
     } catch (error) {
       console.error("Error loading stats for cards:", error);
     }
-  };
-
-  const loadStats = async (
-    token: string,
-    period: string = "week"
-  ): Promise<DashboardStats | null> => {
-    try {
-      const response = await fetch(`${API_URL}/stats?period=${period}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        return data;
-      } else {
-        return null;
-      }
-    } catch (error) {
-      console.error(`Error loading stats for period ${period}:`, error);
-      return null;
-    }
-  };
+  }, [cardConfigs]);
 
   const loadGoals = async (token: string) => {
     try {
@@ -226,7 +191,8 @@ export function Dashboard() {
     }
   };
 
-  const loadRecentWorkouts = async (token: string) => {
+  const loadRecentWorkouts = useCallback(
+    async (token: string) => {
     try {
       setRecentWorkoutsError(null);
 
@@ -280,7 +246,44 @@ export function Dashboard() {
         variant: "destructive",
       });
     }
-  };
+    },
+    [t, toast]
+  );
+
+  const loadDashboardData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      await Promise.all([
+        loadStatsForCards(),
+        loadGoals(token),
+        loadRecentWorkouts(token),
+      ]);
+    } catch (error) {
+      console.error("Error loading dashboard data:", error);
+      toast({
+        title: t("dashboard.error"),
+        description: t("dashboard.errorLoadingData"),
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [loadStatsForCards, toast, t, loadRecentWorkouts]);
+
+  useEffect(() => {
+    if (user) {
+      loadDashboardData();
+    }
+  }, [user, loadDashboardData]);
+
+  useEffect(() => {
+    if (user && cardConfigs.length > 0) {
+      loadStatsForCards();
+    }
+  }, [user, cardConfigs, loadStatsForCards]);
 
   const formatActivityName = (activityType: string) => {
     const activityKey = activityType.toLowerCase();
@@ -464,7 +467,7 @@ export function Dashboard() {
         trend = `+${periodStats.periodPoints} ${getPeriodLabel(config.period)}`;
         Icon = Trophy;
         break;
-      case "activity":
+      case "activity": {
         if (!config.activityType) return null;
         const activity = periodStats.activities[config.activityType];
         title = t(`dashboard.${config.activityType}`, config.activityType);
@@ -480,6 +483,7 @@ export function Dashboard() {
         }
         Icon = Dumbbell;
         break;
+      }
       case "rank":
         title = t("dashboard.rank", "Rang");
         value = `#${periodStats.userRank}`;

@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { API_URL } from "@/lib/api";
 import { toast } from "sonner";
+import { contactInfo, formattedContactInfo } from "@/config/contactInfo";
 
 export default function Contact() {
   const { t } = useTranslation();
@@ -127,9 +128,12 @@ export default function Contact() {
                     <p className="font-medium text-foreground">
                       {t("contact.email")}
                     </p>
-                    <p className="text-sm text-muted-foreground">
-                      contact@sportify.com
-                    </p>
+                    <a 
+                      href={formattedContactInfo.emailLink}
+                      className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      {contactInfo.email}
+                    </a>
                   </div>
                 </div>
 
@@ -141,9 +145,12 @@ export default function Contact() {
                     <p className="font-medium text-foreground">
                       {t("contact.phone")}
                     </p>
-                    <p className="text-sm text-muted-foreground">
-                      +49 (0) 123 456 789
-                    </p>
+                    <a 
+                      href={formattedContactInfo.phoneLink}
+                      className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      {contactInfo.phone}
+                    </a>
                   </div>
                 </div>
 
@@ -155,12 +162,8 @@ export default function Contact() {
                     <p className="font-medium text-foreground">
                       {t("contact.address")}
                     </p>
-                    <p className="text-sm text-muted-foreground">
-                      Musterstraße 123
-                      <br />
-                      12345 Musterstadt
-                      <br />
-                      Deutschland
+                    <p className="text-sm text-muted-foreground whitespace-pre-line">
+                      {contactInfo.address.full}
                     </p>
                   </div>
                 </div>

@@ -2,6 +2,7 @@ import { ArrowLeft, Globe, Palette, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
+import { LogoFull } from "@/components/LogoFull";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 import { Button } from "@/components/ui/button";
@@ -41,7 +42,7 @@ export function AuthHeader({
           </Link>
         </Button>
 
-        <img src="/logo-full.svg" alt="Sportify" className="h-12" />
+        <LogoFull className="h-12" />
 
         <div className="flex items-center gap-3">
           {/* Desktop: Language & Theme Switchers */}

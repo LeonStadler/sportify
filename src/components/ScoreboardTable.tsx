@@ -2,7 +2,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { parseAvatarConfig } from "@/lib/avatar";
 import NiceAvatar from "react-nice-avatar";
 import { Badge } from "@/components/ui/badge";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/use-auth";
 import { API_URL } from '@/lib/api';
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from 'react-i18next';

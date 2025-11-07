@@ -122,10 +122,10 @@ export const createEmailTemplate = ({
                             <td style="padding-left: 12px; vertical-align: middle;">
                                 <table border="0" cellpadding="0" cellspacing="0">
                                     <tr>
-                                        <td style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; font-size: 20px; font-weight: bold; color: #FFFFFF; line-height: 1.2;">Sportify</td>
+                                        <td style="font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; font-size: 20px; font-weight: 700; color: #FFFFFF; line-height: 1.2;">Sportify</td>
                                     </tr>
                                     <tr>
-                                        <td style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; font-size: 10px; color: #FFFFFF; opacity: 0.9; line-height: 1.4; padding-top: 2px;">by Leon Stadler</td>
+                                        <td style="font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; font-size: 10px; color: #FFFFFF; opacity: 0.9; line-height: 1.4; padding-top: 2px;">by Leon Stadler</td>
                                     </tr>
                                 </table>
                             </td>
@@ -177,7 +177,7 @@ export const createEmailTemplate = ({
             padding: 0;
             width: 100% !important;
             height: 100% !important;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
             font-size: 16px;
             line-height: 1.6;
             color: #1a1a1a;

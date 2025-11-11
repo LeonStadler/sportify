@@ -29,11 +29,12 @@ export const createAuthRouter = (pool) => {
     router.get('/me', authMiddleware, async (req, res) => {
         try {
             const userQuery = `
-                SELECT id, email, first_name, last_name, nickname, display_preference, avatar_url,
-                       is_email_verified, has_2fa, theme_preference, language_preference,
-                       preferences, created_at, last_login_at, role
-                FROM users
-                WHERE id = $1
+                SELECT u.id, u.email, u.first_name, u.last_name, u.nickname, u.display_preference, u.avatar_url,
+                       u.is_email_verified, u.has_2fa, u.theme_preference, u.language_preference,
+                       u.preferences, u.created_at, u.last_login_at, u.role, u.two_factor_enabled_at, u.password_changed_at,
+                       (SELECT MIN(created_at) FROM user_backup_codes WHERE user_id = u.id) as backup_codes_created_at
+                FROM users u
+                WHERE u.id = $1
             `;
             const { rows } = await pool.query(userQuery, [req.user.id]);
 
@@ -43,6 +44,29 @@ export const createAuthRouter = (pool) => {
 
             // Convert snake_case to camelCase
             const user = toCamelCase(rows[0]);
+
+            // IMPORTANT: Date objects from PostgreSQL need to be preserved
+            // toCamelCase converts them to empty objects, so we need to restore them
+            if (rows[0].last_login_at) {
+                user.lastLoginAt = rows[0].last_login_at instanceof Date 
+                    ? rows[0].last_login_at.toISOString() 
+                    : rows[0].last_login_at;
+            }
+            if (rows[0].password_changed_at) {
+                user.passwordChangedAt = rows[0].password_changed_at instanceof Date 
+                    ? rows[0].password_changed_at.toISOString() 
+                    : rows[0].password_changed_at;
+            }
+            if (rows[0].two_factor_enabled_at) {
+                user.twoFactorEnabledAt = rows[0].two_factor_enabled_at instanceof Date 
+                    ? rows[0].two_factor_enabled_at.toISOString() 
+                    : rows[0].two_factor_enabled_at;
+            }
+            if (rows[0].backup_codes_created_at) {
+                user.backupCodesCreatedAt = rows[0].backup_codes_created_at instanceof Date 
+                    ? rows[0].backup_codes_created_at.toISOString() 
+                    : rows[0].backup_codes_created_at;
+            }
 
             // Parse preferences if it's a string
             if (user.preferences && typeof user.preferences === 'string') {
@@ -98,8 +122,8 @@ export const createAuthRouter = (pool) => {
             const password_hash = await bcrypt.hash(password, salt);
 
             const newUserQuery = `
-                INSERT INTO users (email, password_hash, first_name, last_name, nickname, display_preference, weekly_goals, role)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, 'user')
+                INSERT INTO users (email, password_hash, first_name, last_name, nickname, display_preference, weekly_goals, role, password_changed_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, 'user', CURRENT_TIMESTAMP)
                 RETURNING id, email, first_name, last_name, nickname, display_preference, role;
             `;
             const values = [email, password_hash, firstName, lastName, nickname, displayPreference || 'firstName', '{}'];
@@ -247,13 +271,50 @@ Dein Sportify-Team`;
             const tokenExpiration = rememberMe ? '30d' : '1d';
             const token = jwt.sign({ userId: rawUser.id }, process.env.JWT_SECRET, { expiresIn: tokenExpiration });
 
+            // Update last_login_at BEFORE converting to camelCase so the updated value is included
+            await pool.query('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = $1', [rawUser.id]);
+
+            // Reload user to get updated last_login_at and all other fields
+            const { rows: updatedRows } = await pool.query(`
+                SELECT u.id, u.email, u.first_name, u.last_name, u.nickname, u.display_preference, u.avatar_url,
+                       u.is_email_verified, u.has_2fa, u.theme_preference, u.language_preference,
+                       u.preferences, u.created_at, u.last_login_at, u.role, u.two_factor_enabled_at, u.password_changed_at,
+                       (SELECT MIN(created_at) FROM user_backup_codes WHERE user_id = u.id) as backup_codes_created_at
+                FROM users u
+                WHERE u.id = $1
+            `, [rawUser.id]);
+            const updatedUser = updatedRows[0] || rawUser;
+
             // Don't send password hash to client
-            delete rawUser.password_hash;
-            delete rawUser.totp_secret;
-            delete rawUser.totp_confirmed;
+            delete updatedUser.password_hash;
+            delete updatedUser.totp_secret;
+            delete updatedUser.totp_confirmed;
 
             // Convert snake_case to camelCase
-            const user = toCamelCase(rawUser);
+            const user = toCamelCase(updatedUser);
+
+            // IMPORTANT: Date objects from PostgreSQL need to be preserved
+            // toCamelCase converts them to empty objects, so we need to restore them
+            if (updatedUser.last_login_at) {
+                user.lastLoginAt = updatedUser.last_login_at instanceof Date 
+                    ? updatedUser.last_login_at.toISOString() 
+                    : updatedUser.last_login_at;
+            }
+            if (updatedUser.password_changed_at) {
+                user.passwordChangedAt = updatedUser.password_changed_at instanceof Date 
+                    ? updatedUser.password_changed_at.toISOString() 
+                    : updatedUser.password_changed_at;
+            }
+            if (updatedUser.two_factor_enabled_at) {
+                user.twoFactorEnabledAt = updatedUser.two_factor_enabled_at instanceof Date 
+                    ? updatedUser.two_factor_enabled_at.toISOString() 
+                    : updatedUser.two_factor_enabled_at;
+            }
+            if (updatedUser.backup_codes_created_at) {
+                user.backupCodesCreatedAt = updatedUser.backup_codes_created_at instanceof Date 
+                    ? updatedUser.backup_codes_created_at.toISOString() 
+                    : updatedUser.backup_codes_created_at;
+            }
 
             // Fix has_2fa -> has2FA conversion (toCamelCase doesn't handle numbers)
             if (user.has_2fa !== undefined) {
@@ -261,8 +322,6 @@ Dein Sportify-Team`;
                 delete user.has_2fa;
             }
 
-            // Update last_login_at
-            await pool.query('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = $1', [rawUser.id]);
 
             res.json({ user, token });
         } catch (error) {
@@ -287,9 +346,9 @@ Dein Sportify-Team`;
 
             const tokenData = await validatePasswordResetToken(pool, token);
             const salt = await bcrypt.genSalt(10);
-            const passwordHash = await bcrypt.hash(password, salt);
+            const password_hash = await bcrypt.hash(password, salt);
 
-            await pool.query('UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [passwordHash, tokenData.userId]);
+            await pool.query('UPDATE users SET password_hash = $1, password_changed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [password_hash, tokenData.userId]);
             await markPasswordResetTokenUsed(pool, tokenData.id);
 
             res.json({ message: 'Passwort wurde erfolgreich zurückgesetzt.' });
@@ -568,7 +627,7 @@ Dein Sportify-Team`;
             }
 
             await pool.query(
-                'UPDATE users SET has_2fa = true, totp_confirmed = true, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+                'UPDATE users SET has_2fa = true, totp_confirmed = true, two_factor_enabled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
                 [req.user.id]
             );
 

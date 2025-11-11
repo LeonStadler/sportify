@@ -4,6 +4,7 @@ import { DeleteAccountPasswordDialog } from "@/components/DeleteAccountPasswordD
 import { InviteFriendForm } from "@/components/InviteFriendForm";
 import { PageTemplate } from "@/components/PageTemplate";
 import { PasswordDialog } from "@/components/PasswordDialog";
+import { RecoveryCodesDialog } from "@/components/RecoveryCodesDialog";
 import { TwoFactorSetupDialog } from "@/components/TwoFactorSetupDialog";
 import type { WeeklyGoals } from "@/components/WeeklyGoalsDialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -32,6 +33,8 @@ import {
   Camera,
   Check,
   Copy,
+  Key,
+  Lock,
   Mail,
   Share2,
   Shield,
@@ -51,6 +54,8 @@ export function Profile() {
     updateProfile,
     deleteAccount,
     disable2FA,
+    rotateBackupCodes,
+    changePassword,
     isLoading,
     inviteFriend,
     getInvitations,
@@ -173,6 +178,8 @@ export function Profile() {
     useState(false);
   const [twoFactorSetupDialogOpen, setTwoFactorSetupDialogOpen] =
     useState(false);
+  const [recoveryCodesDialogOpen, setRecoveryCodesDialogOpen] = useState(false);
+  const [newRecoveryCodes, setNewRecoveryCodes] = useState<string[]>([]);
   const [goals, setGoals] = useState<WeeklyGoals>({
     pullups: { target: 100, current: 0 },
     pushups: { target: 400, current: 0 },
@@ -451,6 +458,12 @@ export function Profile() {
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+
+    // Prevent multiple submissions
+    if (isLoading) {
+      return;
+    }
 
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       toast({
@@ -461,20 +474,61 @@ export function Profile() {
       return;
     }
 
-    if (passwordForm.newPassword.length < 6) {
+    if (passwordForm.newPassword.length < 8) {
       toast({
         title: "Fehler",
-        description: "Das Passwort muss mindestens 6 Zeichen lang sein.",
+        description: "Das Passwort muss mindestens 8 Zeichen lang sein.",
         variant: "destructive",
       });
       return;
     }
 
-    // This would need a separate API endpoint for password change
-    toast({
-      title: "Funktion in Entwicklung",
-      description: "Passwort ändern wird bald verfügbar sein.",
-    });
+    if (!passwordForm.currentPassword) {
+      toast({
+        title: "Fehler",
+        description: "Bitte gib dein aktuelles Passwort ein.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!passwordForm.newPassword) {
+      toast({
+        title: "Fehler",
+        description: "Bitte gib ein neues Passwort ein.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await changePassword(
+        passwordForm.currentPassword,
+        passwordForm.newPassword
+      );
+      toast({
+        title: "Passwort geändert",
+        description: "Dein Passwort wurde erfolgreich geändert.",
+      });
+      // Reset form
+      setPasswordForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+    } catch (error) {
+      // Error is already handled in changePassword function and shown via toast
+      // But we can add additional logging if needed
+      console.error("Password change error:", error);
+      toast({
+        title: "Fehler",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Fehler beim Ändern des Passworts",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleToggle2FA = (checked: boolean) => {
@@ -907,7 +961,7 @@ export function Profile() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Shield className="w-5 h-5" />
+                  <Key className="w-5 h-5" />
                   Passwort ändern
                 </CardTitle>
               </CardHeader>
@@ -961,12 +1015,13 @@ export function Profile() {
                   </div>
 
                   <Button
-                    type="submit"
+                    type="button"
                     className="w-full"
                     variant="destructive"
                     disabled={isLoading}
+                    onClick={handlePasswordChange}
                   >
-                    Passwort ändern
+                    {isLoading ? "Wird geändert..." : "Passwort ändern"}
                   </Button>
                 </form>
               </CardContent>
@@ -975,7 +1030,10 @@ export function Profile() {
             {/* Two-Factor Authentication */}
             <Card>
               <CardHeader>
-                <CardTitle>Zwei-Faktor-Authentifizierung</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Lock className="w-5 h-5" />
+                  Zwei-Faktor-Authentifizierung
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -995,25 +1053,83 @@ export function Profile() {
                   />
                 </div>
 
-                <Separator />
+                {user.has2FA && (
+                  <>
+                    <Separator />
+                    <div className="space-y-3 text-sm">
+                      <div className="space-y-1">
+                        <p className="font-medium">2FA Details</p>
+                        <p className="text-muted-foreground">
+                          Aktiviert am:{" "}
+                          {user.twoFactorEnabledAt &&
+                          user.twoFactorEnabledAt !== null &&
+                          user.twoFactorEnabledAt !== undefined &&
+                          user.twoFactorEnabledAt !== "" &&
+                          !isNaN(new Date(user.twoFactorEnabledAt).getTime())
+                            ? new Date(
+                                user.twoFactorEnabledAt
+                              ).toLocaleDateString("de-DE", {
+                                day: "2-digit",
+                                month: "2-digit",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : "Nicht verfügbar"}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            const codes = await rotateBackupCodes();
+                            setNewRecoveryCodes(codes);
+                            setRecoveryCodesDialogOpen(true);
+                            toast({
+                              title: "Recovery-Keys zurückgesetzt",
+                              description:
+                                "Neue Recovery-Keys wurden erfolgreich generiert.",
+                            });
+                          } catch (error) {
+                            toast({
+                              title: "Fehler",
+                              description:
+                                error instanceof Error
+                                  ? error.message
+                                  : "Fehler beim Zurücksetzen der Recovery-Keys",
+                              variant: "destructive",
+                            });
+                          }
+                        }}
+                        className="w-full"
+                      >
+                        Recovery-Keys zurücksetzen
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
 
-                <div className="space-y-2">
-                  <p className="font-medium text-sm">Kontosicherheit</p>
-                  <div className="space-y-1 text-sm text-muted-foreground">
-                    <p>
-                      • Erstellt:{" "}
-                      {user.createdAt &&
-                      !isNaN(new Date(user.createdAt).getTime())
-                        ? new Date(user.createdAt).toLocaleDateString("de-DE", {
-                            day: "2-digit",
-                            month: "2-digit",
-                            year: "numeric",
-                          })
-                        : "Nicht verfügbar"}
-                    </p>
-                    <p>
-                      • Letzter Login:{" "}
+            {/* Account Security */}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="w-5 h-5" />
+                  Kontosicherheit
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Letzter Login</p>
+                    <p className="text-sm text-muted-foreground">
                       {user.lastLoginAt &&
+                      user.lastLoginAt !== null &&
+                      user.lastLoginAt !== undefined &&
+                      user.lastLoginAt !== "" &&
                       !isNaN(new Date(user.lastLoginAt).getTime())
                         ? new Date(user.lastLoginAt).toLocaleDateString(
                             "de-DE",
@@ -1021,9 +1137,48 @@ export function Profile() {
                               day: "2-digit",
                               month: "2-digit",
                               year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
                             }
                           )
                         : "Nie"}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">
+                      Letzte Passwortänderung
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {user.passwordChangedAt &&
+                      user.passwordChangedAt !== null &&
+                      user.passwordChangedAt !== undefined &&
+                      user.passwordChangedAt !== "" &&
+                      !isNaN(new Date(user.passwordChangedAt).getTime())
+                        ? new Date(user.passwordChangedAt).toLocaleDateString(
+                            "de-DE",
+                            {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            }
+                          )
+                        : "Nie geändert"}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">E-Mail-Verifizierung</p>
+                    <p className="text-sm text-muted-foreground">
+                      {user.isEmailVerified ? (
+                        <span className="text-green-600 dark:text-green-400">
+                          ✓ Verifiziert
+                        </span>
+                      ) : (
+                        <span className="text-yellow-600 dark:text-yellow-400">
+                          ⚠ Nicht verifiziert
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -1563,6 +1718,13 @@ export function Profile() {
           // User state is automatically updated by verify2FA in the dialog
           // The Toggle will automatically reflect the updated user.has2FA state
         }}
+      />
+
+      {/* Recovery Codes Dialog */}
+      <RecoveryCodesDialog
+        open={recoveryCodesDialogOpen}
+        onOpenChange={setRecoveryCodesDialogOpen}
+        backupCodes={newRecoveryCodes}
       />
     </PageTemplate>
   );

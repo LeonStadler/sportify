@@ -5,7 +5,6 @@ import {
   Home,
   LogOut,
   LucideIcon,
-  Palette,
   Settings,
   Shield,
   Trophy,
@@ -241,13 +240,7 @@ export function AppSidebar() {
 
               {/* Theme Switch */}
               <SidebarMenuItem>
-                <div className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200">
-                  <div className="flex items-center gap-3">
-                    <Palette size={20} />
-                    <span>{t("settings.theme")}</span>
-                  </div>
-                  <ThemeSwitcher />
-                </div>
+                <ThemeSwitcher variant="sidebar" />
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>

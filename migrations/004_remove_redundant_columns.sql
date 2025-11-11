@@ -7,9 +7,15 @@ DO $$
 BEGIN
     -- Setze role für alle User, die is_admin = true haben, auf 'admin'
     -- (falls role noch nicht gesetzt ist)
-    UPDATE users
-    SET role = 'admin'
-    WHERE is_admin = true AND (role IS NULL OR role = 'user');
+    -- Nur ausführen, wenn is_admin Spalte existiert
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'users' AND column_name = 'is_admin'
+    ) THEN
+        UPDATE users
+        SET role = 'admin'
+        WHERE is_admin = true AND (role IS NULL OR role = 'user');
+    END IF;
 
     -- Entferne is_admin Spalte
     IF EXISTS (

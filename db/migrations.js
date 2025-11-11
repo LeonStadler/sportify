@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const MIGRATION_FILE_PATH = path.join(__dirname, '../migrations/001_initial_schema.sql');
+const MIGRATIONS_DIR = path.join(__dirname, '../migrations');
 
 /**
  * Prüft ob eine Tabelle existiert
@@ -52,7 +52,7 @@ const columnExists = async (pool, tableName, columnName) => {
  */
 export const ensureAllTablesExist = async (pool) => {
     const requiredTables = {
-        'users': ['id', 'email', 'password_hash', 'first_name', 'last_name'],
+        'users': ['id', 'email', 'password_hash', 'first_name', 'last_name', 'two_factor_enabled_at', 'password_changed_at'],
         'email_verification_tokens': ['id', 'user_id', 'token_hash', 'expires_at', 'used', 'used_at'],
         'password_reset_tokens': ['id', 'user_id', 'token_hash', 'expires_at', 'used', 'used_at'],
         'outbound_emails': ['id', 'recipient', 'subject', 'body', 'sent_at'],
@@ -90,6 +90,9 @@ export const ensureAllTablesExist = async (pool) => {
     return true;
 };
 
+/**
+ * Liest alle Migration-Dateien und führt sie in numerischer Reihenfolge aus
+ */
 export const createMigrationRunner = (pool) => {
     let migrationPromise;
 
@@ -97,11 +100,26 @@ export const createMigrationRunner = (pool) => {
         if (!migrationPromise) {
             migrationPromise = (async () => {
                 try {
-                    const sql = await fs.readFile(MIGRATION_FILE_PATH, 'utf-8');
-                    await pool.query(sql);
+                    // Lese alle Migration-Dateien
+                    const files = await fs.readdir(MIGRATIONS_DIR);
+                    const migrationFiles = files
+                        .filter(file => file.endsWith('.sql'))
+                        .sort(); // Sortiere alphabetisch (001, 002, 003, ...)
+
+                    console.log(`[Migration] Gefundene Migrationen: ${migrationFiles.length}`);
+
+                    // Führe jede Migration aus
+                    for (const file of migrationFiles) {
+                        const migrationPath = path.join(MIGRATIONS_DIR, file);
+                        console.log(`[Migration] Führe aus: ${file}`);
+                        const sql = await fs.readFile(migrationPath, 'utf-8');
+                        await pool.query(sql);
+                        console.log(`[Migration] ✅ ${file} erfolgreich ausgeführt`);
+                    }
                     
                     // Prüfe ob alle Tabellen existieren
                     await ensureAllTablesExist(pool);
+                    console.log('[Migration] ✅ Alle Migrationen erfolgreich ausgeführt');
                 } catch (error) {
                     console.error('[Migration] ❌ Fehler beim Ausführen der Migrationen:', error);
                     throw error;

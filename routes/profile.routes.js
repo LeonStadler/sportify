@@ -73,6 +73,55 @@ export const createProfileRouter = (pool) => {
         }
     });
 
+    // POST /api/profile/change-password - Change user password
+    router.post('/change-password', authMiddleware, async (req, res) => {
+        try {
+            const { currentPassword, newPassword } = req.body;
+
+            if (!currentPassword || !newPassword) {
+                return res.status(400).json({ error: 'Aktuelles Passwort und neues Passwort sind erforderlich.' });
+            }
+
+            if (newPassword.length < 8) {
+                return res.status(400).json({ error: 'Das neue Passwort muss mindestens 8 Zeichen lang sein.' });
+            }
+
+            // Verify current password
+            const userQuery = 'SELECT password_hash FROM users WHERE id = $1';
+            const { rows } = await pool.query(userQuery, [req.user.id]);
+
+            if (rows.length === 0) {
+                return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
+            }
+
+            const isMatch = await bcrypt.compare(currentPassword, rows[0].password_hash);
+            if (!isMatch) {
+                return res.status(401).json({ error: 'Ungültiges aktuelles Passwort.' });
+            }
+
+            // Check if new password is different from current password
+            const isSamePassword = await bcrypt.compare(newPassword, rows[0].password_hash);
+            if (isSamePassword) {
+                return res.status(400).json({ error: 'Das neue Passwort muss sich vom aktuellen Passwort unterscheiden.' });
+            }
+
+            // Hash new password - using same method as registration
+            const salt = await bcrypt.genSalt(10);
+            const password_hash = await bcrypt.hash(newPassword, salt);
+
+            // Update password
+            await pool.query(
+                'UPDATE users SET password_hash = $1, password_changed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+                [password_hash, req.user.id]
+            );
+
+            res.json({ message: 'Passwort wurde erfolgreich geändert.' });
+        } catch (error) {
+            console.error('Change password error:', error);
+            res.status(500).json({ error: 'Serverfehler beim Ändern des Passworts.' });
+        }
+    });
+
     // DELETE /api/profile/account - Delete user account
     router.delete('/account', authMiddleware, async (req, res) => {
         try {

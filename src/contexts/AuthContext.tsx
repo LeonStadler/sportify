@@ -16,6 +16,9 @@ export interface User {
   languagePreference: "de" | "en";
   createdAt: string;
   lastLoginAt: string;
+  twoFactorEnabledAt?: string;
+  passwordChangedAt?: string;
+  backupCodesCreatedAt?: string;
   role: "user" | "admin";
   preferences: {
     timeFormat: "12h" | "24h";
@@ -66,6 +69,10 @@ export interface AuthContextType extends AuthState {
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   confirmResetPassword: (token: string, newPassword: string) => Promise<void>;
+  changePassword: (
+    currentPassword: string,
+    newPassword: string
+  ) => Promise<void>;
   verifyEmail: (token: string) => Promise<void>;
   resendVerification: () => Promise<void>;
   enable2FA: () => Promise<{
@@ -74,6 +81,7 @@ export interface AuthContextType extends AuthState {
   }>;
   verify2FA: (token: string) => Promise<void>;
   disable2FA: (password: string) => Promise<void>;
+  rotateBackupCodes: () => Promise<string[]>;
   updateProfile: (data: Partial<User>) => Promise<void>;
   deleteAccount: (password: string) => Promise<void>;
   inviteUser: (
@@ -342,6 +350,78 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
+  const changePassword = async (
+    currentPassword: string,
+    newPassword: string
+  ): Promise<void> => {
+    setState((prev) => ({ ...prev, isLoading: true, error: null }));
+
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("Nicht angemeldet");
+      }
+
+      const response = await fetch(`${API_URL}/profile/change-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          currentPassword,
+          newPassword,
+        }),
+      });
+
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        // If response is not JSON, treat as error
+        const errorMessage = "Ungültige Antwort vom Server";
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: errorMessage,
+        }));
+        throw new Error(errorMessage);
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || "Fehler beim Ändern des Passworts");
+      }
+
+      // Reload user data to get updated passwordChangedAt
+      try {
+        const userResponse = await fetch(`${API_URL}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          // Ensure passwordChangedAt is properly set
+          if (userData.passwordChangedAt === undefined && userData.password_changed_at !== undefined) {
+            userData.passwordChangedAt = userData.password_changed_at;
+            delete userData.password_changed_at;
+          }
+          setState((prev) => ({ ...prev, user: userData, isLoading: false }));
+        } else {
+          setState((prev) => ({ ...prev, isLoading: false }));
+        }
+      } catch (refreshError) {
+        console.error("Error refreshing user data:", refreshError);
+        setState((prev) => ({ ...prev, isLoading: false }));
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Ein unbekannter Fehler ist aufgetreten.";
+      setState((prev) => ({ ...prev, isLoading: false, error: errorMessage }));
+      throw error;
+    }
+  };
+
   const confirmResetPassword = async (
     token: string,
     newPassword: string
@@ -576,6 +656,55 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
           };
         });
       }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Ein unbekannter Fehler ist aufgetreten.";
+      setState((prev) => ({ ...prev, error: errorMessage }));
+      throw error;
+    }
+  };
+
+  const rotateBackupCodes = async (): Promise<string[]> => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        const error = new Error("Nicht angemeldet");
+        setState((prev) => ({ ...prev, error: error.message }));
+        throw error;
+      }
+
+      const response = await fetch(`${API_URL}/auth/backup-codes/rotate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Fehler beim Zurücksetzen der Recovery-Keys"
+        );
+      }
+
+      // Reload user data to get updated backupCodesCreatedAt
+      try {
+        const userResponse = await fetch(`${API_URL}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          setState((prev) => ({ ...prev, user: userData }));
+        }
+      } catch (refreshError) {
+        console.error("Error refreshing user data:", refreshError);
+      }
+
+      return data.backupCodes || [];
     } catch (error) {
       const errorMessage =
         error instanceof Error
@@ -978,11 +1107,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     logout,
     resetPassword,
     confirmResetPassword,
+    changePassword,
     verifyEmail,
     resendVerification,
     enable2FA,
     verify2FA,
     disable2FA,
+    rotateBackupCodes,
     updateProfile,
     deleteAccount,
     inviteUser,

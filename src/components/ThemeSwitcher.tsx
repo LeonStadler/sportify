@@ -1,4 +1,4 @@
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Monitor, Moon, Palette, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -20,7 +20,7 @@ import {
 
 interface ThemeSwitcherProps {
   className?: string;
-  variant?: "dropdown" | "button" | "toggle";
+  variant?: "dropdown" | "button" | "toggle" | "sidebar";
 }
 
 export default function ThemeSwitcher({
@@ -131,6 +131,56 @@ export default function ThemeSwitcher({
     );
   }
 
+  // Sidebar Variante (klickbarer Bereich mit Icon, Text und Button)
+  if (variant === "sidebar") {
+    const handleToggleTheme = () => {
+      const currentIndex = themes.findIndex((t) => t.value === currentTheme);
+      const nextIndex = (currentIndex + 1) % themes.length;
+      setTheme(themes[nextIndex].value);
+    };
+
+    return (
+      <div 
+        className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 cursor-pointer"
+        onClick={handleToggleTheme}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            handleToggleTheme();
+          }
+        }}
+        aria-label={`${t("settings.theme")}: ${currentThemeConfig.label}`}
+      >
+        <div className="flex items-center gap-3">
+          <Palette size={20} />
+          <span>{t("settings.theme")}</span>
+        </div>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 bg-muted/50 hover:bg-muted"
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+                aria-label={currentThemeConfig.label}
+              >
+                <CurrentIcon className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{currentThemeConfig.label}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+    );
+  }
+
   // Dropdown Variante (Standard)
   return (
     <TooltipProvider>
@@ -141,7 +191,7 @@ export default function ThemeSwitcher({
               <Button
                 variant="ghost"
                 size="icon"
-                className={`h-9 w-9 ${className || ""}`.trim()}
+                className={`h-9 w-9 bg-muted/50 hover:bg-muted ${className || ""}`.trim()}
                 aria-label={t("settings.theme")}
                 aria-haspopup="true"
                 aria-expanded="false"

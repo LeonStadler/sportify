@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import express from 'express';
 import jwt from 'jsonwebtoken';
-import authMiddleware from '../authMiddleware.js';
+import authMiddleware from '../middleware/authMiddleware.js';
 import { queueEmail } from '../services/emailService.js';
 import {
     TokenError,
@@ -180,7 +180,7 @@ Dein Sportify-Team`;
 
     // POST /api/auth/login
     router.post('/login', async (req, res) => {
-        const { email, password, twoFactorToken, backupCode } = req.body;
+        const { email, password, twoFactorToken, backupCode, rememberMe } = req.body;
 
         if (!email || !password) {
             return res.status(400).json({ error: 'E-Mail und Passwort sind erforderlich.' });
@@ -242,7 +242,10 @@ Dein Sportify-Team`;
                 }
             }
 
-            const token = jwt.sign({ userId: rawUser.id }, process.env.JWT_SECRET, { expiresIn: '1d' });
+            // Set token expiration based on rememberMe flag
+            // With rememberMe: 30 days, without: 1 day
+            const tokenExpiration = rememberMe ? '30d' : '1d';
+            const token = jwt.sign({ userId: rawUser.id }, process.env.JWT_SECRET, { expiresIn: tokenExpiration });
 
             // Don't send password hash to client
             delete rawUser.password_hash;

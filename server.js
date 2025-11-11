@@ -2,7 +2,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
 import pkg from 'pg';
-import authMiddleware from './authMiddleware.js';
+import authMiddleware from './middleware/authMiddleware.js';
 import { createMigrationRunner } from './db/migrations.js';
 import { createAdminMiddleware } from './middleware/adminMiddleware.js';
 import { createAdminRouter } from './routes/admin.routes.js';

@@ -1,5 +1,5 @@
 import express from 'express';
-import authMiddleware from '../authMiddleware.js';
+import authMiddleware from '../middleware/authMiddleware.js';
 import { USER_DISPLAY_NAME_SQL, WEEK_WINDOW_CONDITION, weeklyChallengeTargets } from '../utils/helpers.js';
 
 export const createChallengesRouter = (pool) => {

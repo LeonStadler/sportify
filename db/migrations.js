@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const MIGRATION_FILE_PATH = path.join(__dirname, '../migration.sql');
+const MIGRATION_FILE_PATH = path.join(__dirname, '../migrations/001_initial_schema.sql');
 
 /**
  * Prüft ob eine Tabelle existiert

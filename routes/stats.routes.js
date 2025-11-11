@@ -1,5 +1,5 @@
 import express from 'express';
-import authMiddleware from '../authMiddleware.js';
+import authMiddleware from '../middleware/authMiddleware.js';
 import { toCamelCase, WEEK_WINDOW_CONDITION } from '../utils/helpers.js';
 
 export const createStatsRouter = (pool) => {

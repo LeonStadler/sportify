@@ -23,14 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 
+# Environment variables (but keep .env.example)
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
-
-.env*
-.env.example
-.env
 
 sportify-score-battle-main.zip

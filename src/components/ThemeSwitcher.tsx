@@ -1,7 +1,7 @@
-import { Moon, Sun } from 'lucide-react';
-import { useTheme } from 'next-themes';
-import { useEffect, useState } from 'react';
-import { Switch } from '@/components/ui/switch';
+import { Switch } from "@/components/ui/switch";
+import { Moon, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 
 interface ThemeSwitcherProps {
   className?: string;
@@ -17,11 +17,11 @@ export default function ThemeSwitcher({ className }: ThemeSwitcherProps) {
   const current = resolvedTheme || theme;
 
   return (
-    <div className={`flex items-center gap-2 ${className || ''}`.trim()}>
+    <div className={`flex items-center gap-2 ${className || ""}`.trim()}>
       <Sun className="h-4 w-4" />
       <Switch
-        checked={current === 'dark'}
-        onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+        checked={current === "dark"}
+        onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
         aria-label="Toggle theme"
       />
       <Moon className="h-4 w-4" />

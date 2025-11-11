@@ -1,5 +1,5 @@
 import express from "express";
-import authMiddleware from "../authMiddleware.js";
+import authMiddleware from "../middleware/authMiddleware.js";
 import { toCamelCase, USER_DISPLAY_NAME_SQL } from "../utils/helpers.js";
 
 export const createScoreboardRouter = (pool) => {

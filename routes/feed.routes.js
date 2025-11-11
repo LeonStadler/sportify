@@ -1,5 +1,5 @@
 import express from "express";
-import authMiddleware from "../authMiddleware.js";
+import authMiddleware from "../middleware/authMiddleware.js";
 import { toCamelCase } from "../utils/helpers.js";
 
 export const createFeedRouter = (pool, ensureFriendInfrastructure) => {

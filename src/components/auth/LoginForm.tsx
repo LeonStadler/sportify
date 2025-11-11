@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/use-auth';
@@ -30,6 +31,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
   const [showBackupCodeField, setShowBackupCodeField] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [lastSubmittedCode, setLastSubmittedCode] = useState<string | null>(null);
+  const [rememberMe, setRememberMe] = useState(false);
   const navigate = useNavigate();
 
   const loginSchema = useMemo(() => z.object({
@@ -71,7 +73,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
             savedCredentials.email,
             savedCredentials.password,
             twoFactorCode || undefined,
-            backupCode || undefined
+            backupCode || undefined,
+            rememberMe
           );
 
           if (!result.requires2FA) {
@@ -101,7 +104,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
         // First step: submit email and password
         setIsLoggingIn(true);
         try {
-          const result = await login(data.email, data.password);
+          const result = await login(data.email, data.password, undefined, undefined, rememberMe);
 
           if (result && result.requires2FA) {
             // 2FA is required, show 2FA input
@@ -199,7 +202,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
             savedCredentials.email,
             savedCredentials.password,
             twoFactorCode,
-            undefined
+            undefined,
+            rememberMe
           );
 
           if (!result.requires2FA) {
@@ -396,6 +400,19 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
             </div>
 
             <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="rememberMe"
+                  checked={rememberMe}
+                  onCheckedChange={(checked) => setRememberMe(checked === true)}
+                />
+                <Label
+                  htmlFor="rememberMe"
+                  className="text-sm font-normal cursor-pointer"
+                >
+                  {t('auth.rememberMe')}
+                </Label>
+              </div>
               <Link
                 to="/auth/reset-password"
                 className="text-sm text-primary hover:underline"

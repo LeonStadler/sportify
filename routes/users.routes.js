@@ -1,5 +1,5 @@
 import express from 'express';
-import authMiddleware from '../authMiddleware.js';
+import authMiddleware from '../middleware/authMiddleware.js';
 import { applyDisplayName, extractSearchTerm, parsePaginationParams, toCamelCase } from '../utils/helpers.js';
 
 export const createUsersRouter = (pool) => {

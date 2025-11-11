@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import express from 'express';
-import authMiddleware from '../authMiddleware.js';
+import authMiddleware from '../middleware/authMiddleware.js';
 import { applyDisplayName, createRateLimiter, toCamelCase } from '../utils/helpers.js';
 
 const friendRequestRateLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10 });

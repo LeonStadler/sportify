@@ -671,3 +671,4 @@ BEGIN
         RAISE NOTICE 'Tabelle "workouts" existiert nicht, Migration wird übersprungen';
     END IF;
 END $$;
+

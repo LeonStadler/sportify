@@ -1,4 +1,4 @@
-import { AuthContext } from "@/contexts/AuthContextContext";
+import { AuthContext } from "@/contexts/AuthContextProvider";
 import { API_URL } from "@/lib/api";
 import React, {
   ReactNode,
@@ -61,7 +61,8 @@ export interface AuthContextType extends AuthState {
     email: string,
     password: string,
     twoFactorToken?: string,
-    backupCode?: string
+    backupCode?: string,
+    rememberMe?: boolean
   ) => Promise<{ requires2FA?: boolean }>;
   register: (
     data: RegisterData
@@ -180,7 +181,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     email: string,
     password: string,
     twoFactorToken?: string,
-    backupCode?: string
+    backupCode?: string,
+    rememberMe: boolean = false
   ): Promise<{ requires2FA?: boolean; invitedBy?: string }> => {
     // Don't set isLoading to true - use local loading state in component instead
     // This prevents the global spinner from showing during login attempts
@@ -192,12 +194,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         password: string;
         twoFactorToken?: string;
         backupCode?: string;
+        rememberMe?: boolean;
       } = { email, password };
       if (twoFactorToken) {
         body.twoFactorToken = twoFactorToken;
       }
       if (backupCode) {
         body.backupCode = backupCode;
+      }
+      if (rememberMe) {
+        body.rememberMe = rememberMe;
       }
 
       const response = await fetch(`${API_URL}/auth/login`, {

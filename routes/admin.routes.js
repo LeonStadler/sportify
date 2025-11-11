@@ -1,5 +1,5 @@
 import express from 'express';
-import authMiddleware from '../authMiddleware.js';
+import authMiddleware from '../middleware/authMiddleware.js';
 import { createAdminMiddleware } from '../middleware/adminMiddleware.js';
 import { queueEmail } from '../services/emailService.js';
 import { InvitationError, createInvitation } from '../services/invitationService.js';

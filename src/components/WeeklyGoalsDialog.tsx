@@ -9,15 +9,16 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 import { Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 export interface WeeklyGoals {
-  pullups: { target: number; current: number; };
-  pushups: { target: number; current: number; };
-  running: { target: number; current: number; };
-  cycling: { target: number; current: number; };
+  pullups: { target: number; current: number };
+  pushups: { target: number; current: number };
+  running: { target: number; current: number };
+  cycling: { target: number; current: number };
 }
 
 interface WeeklyGoalsDialogProps {
@@ -34,6 +35,7 @@ export function WeeklyGoalsDialog({
   onSave,
 }: WeeklyGoalsDialogProps) {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [localGoals, setLocalGoals] = useState<WeeklyGoals>(goals);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -42,9 +44,9 @@ export function WeeklyGoalsDialog({
   }, [goals, open]);
 
   const updateGoal = (activity: keyof WeeklyGoals, target: number) => {
-    setLocalGoals(prev => ({
+    setLocalGoals((prev) => ({
       ...prev,
-      [activity]: { ...prev[activity], target: Math.max(0, target) }
+      [activity]: { ...prev[activity], target: Math.max(0, target) },
     }));
   };
 
@@ -54,7 +56,18 @@ export function WeeklyGoalsDialog({
       await onSave(localGoals);
       onOpenChange(false);
     } catch (error) {
-      console.error('Error saving goals:', error);
+      console.error("Error saving goals:", error);
+      toast({
+        title: t("common.error", "Fehler"),
+        description:
+          error instanceof Error
+            ? error.message
+            : t(
+                "weeklyGoals.saveError",
+                "Fehler beim Speichern der Wochenziele"
+              ),
+        variant: "destructive",
+      });
     } finally {
       setIsSaving(false);
     }
@@ -62,28 +75,28 @@ export function WeeklyGoalsDialog({
 
   const activities = [
     {
-      key: 'pullups' as const,
-      label: t('dashboard.pullups', 'Klimmzüge'),
-      unit: '',
-      getPlaceholder: () => '100'
+      key: "pullups" as const,
+      label: t("dashboard.pullups", "Klimmzüge"),
+      unit: "",
+      getPlaceholder: () => "100",
     },
     {
-      key: 'pushups' as const,
-      label: t('dashboard.pushups', 'Liegestütze'),
-      unit: '',
-      getPlaceholder: () => '400'
+      key: "pushups" as const,
+      label: t("dashboard.pushups", "Liegestütze"),
+      unit: "",
+      getPlaceholder: () => "400",
     },
     {
-      key: 'running' as const,
-      label: t('dashboard.running', 'Laufen'),
-      unit: 'km',
-      getPlaceholder: () => '25'
+      key: "running" as const,
+      label: t("dashboard.running", "Laufen"),
+      unit: "km",
+      getPlaceholder: () => "25",
     },
     {
-      key: 'cycling' as const,
-      label: t('dashboard.cycling', 'Radfahren'),
-      unit: 'km',
-      getPlaceholder: () => '100'
+      key: "cycling" as const,
+      label: t("dashboard.cycling", "Radfahren"),
+      unit: "km",
+      getPlaceholder: () => "100",
     },
   ];
 
@@ -93,10 +106,13 @@ export function WeeklyGoalsDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
-            {t('weeklyGoals.dialog.title', 'Wochenziele einstellen')}
+            {t("weeklyGoals.dialog.title", "Wochenziele einstellen")}
           </DialogTitle>
           <DialogDescription>
-            {t('weeklyGoals.dialog.description', 'Passe deine wöchentlichen Ziele nach deinen Wünschen an.')}
+            {t(
+              "weeklyGoals.dialog.description",
+              "Passe deine wöchentlichen Ziele nach deinen Wünschen an."
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -106,7 +122,10 @@ export function WeeklyGoalsDialog({
               key={activity.key}
               className="p-4 border rounded-lg space-y-2 bg-muted/30"
             >
-              <Label htmlFor={`goal-${activity.key}`} className="text-base font-semibold">
+              <Label
+                htmlFor={`goal-${activity.key}`}
+                className="text-base font-semibold"
+              >
                 {activity.label}
                 {activity.unit && ` (${activity.unit})`}
               </Label>
@@ -115,8 +134,8 @@ export function WeeklyGoalsDialog({
                   id={`goal-${activity.key}`}
                   type="number"
                   min="0"
-                  step={activity.unit === 'km' ? '0.1' : '1'}
-                  value={localGoals[activity.key].target || ''}
+                  step={activity.unit === "km" ? "0.1" : "1"}
+                  value={localGoals[activity.key]?.target ?? ""}
                   onChange={(e) => {
                     const value = parseFloat(e.target.value);
                     updateGoal(activity.key, isNaN(value) ? 0 : value);
@@ -131,22 +150,29 @@ export function WeeklyGoalsDialog({
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                {t('weeklyGoals.dialog.current', 'Aktuell')}: {localGoals[activity.key].current} {activity.unit && activity.unit}
+                {t("weeklyGoals.dialog.current", "Aktuell")}:{" "}
+                {localGoals[activity.key].current}{" "}
+                {activity.unit && activity.unit}
               </p>
             </div>
           ))}
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
-            {t('common.cancel', 'Abbrechen')}
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isSaving}
+          >
+            {t("common.cancel", "Abbrechen")}
           </Button>
           <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? t('common.saving', 'Wird gespeichert...') : t('common.save', 'Speichern')}
+            {isSaving
+              ? t("common.saving", "Wird gespeichert...")
+              : t("common.save", "Speichern")}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-

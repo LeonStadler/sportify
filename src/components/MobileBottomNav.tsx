@@ -4,15 +4,19 @@ import {
   Globe,
   Home,
   LogOut,
+  Monitor,
+  Moon,
   Palette,
   Settings,
   Shield,
+  Sun,
   Trophy,
   User,
   UserCircle,
   UserPlus,
 } from "lucide-react";
-import { useState } from "react";
+import { useTheme } from "next-themes";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import LanguageSwitcher from "./LanguageSwitcher";
@@ -40,7 +44,18 @@ export function MobileBottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, getDisplayName, isAuthenticated } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  const currentTheme = theme || "system";
+  const themes = [
+    { value: "light", icon: Sun, label: t("settings.themeLight") },
+    { value: "dark", icon: Moon, label: t("settings.themeDark") },
+    { value: "system", icon: Monitor, label: t("settings.themeSystem") },
+  ];
 
   // Verwende role vom User-Objekt
   const isAdmin = user?.role === "admin";
@@ -208,12 +223,29 @@ export function MobileBottomNav() {
                   </div>
 
                   {/* Theme Setting */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 mb-2">
                       <Palette className="h-4 w-4" />
-                      <span className="text-sm">{t("settings.theme")}</span>
+                      <span className="text-sm font-medium">{t("settings.theme")}</span>
                     </div>
-                    <ThemeSwitcher />
+                    <div className="grid grid-cols-3 gap-2">
+                      {mounted && themes.map((themeOption) => {
+                        const Icon = themeOption.icon;
+                        const isSelected = currentTheme === themeOption.value;
+                        return (
+                          <Button
+                            key={themeOption.value}
+                            variant={isSelected ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setTheme(themeOption.value)}
+                            className="flex flex-col items-center gap-1 h-auto py-2"
+                          >
+                            <Icon className="h-4 w-4" />
+                            <span className="text-xs">{themeOption.label}</span>
+                          </Button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 

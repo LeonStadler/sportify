@@ -5,7 +5,7 @@ import { InviteFriendForm } from "@/components/InviteFriendForm";
 import { PageTemplate } from "@/components/PageTemplate";
 import { PasswordDialog } from "@/components/PasswordDialog";
 import { TwoFactorSetupDialog } from "@/components/TwoFactorSetupDialog";
-import { WeeklyGoals } from "@/components/WeeklyGoalsDialog";
+import type { WeeklyGoals } from "@/components/WeeklyGoalsDialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,7 @@ import {
   Shield,
   Trash2,
 } from "lucide-react";
+import { useTheme } from "next-themes";
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import NiceAvatar, { NiceAvatarProps } from "react-nice-avatar";
@@ -44,6 +45,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 export function Profile() {
   const { t } = useTranslation();
+  const { theme, setTheme } = useTheme();
   const {
     user,
     updateProfile,
@@ -108,7 +110,23 @@ export function Profile() {
   }>({});
 
   // User preferences state
-  const [preferencesForm, setPreferencesForm] = useState({
+  const [preferencesForm, setPreferencesForm] = useState<{
+    languagePreference: "de" | "en";
+    timeFormat: "12h" | "24h";
+    units: {
+      distance: "km" | "m" | "miles" | "yards";
+      weight: "kg" | "lbs" | "stone";
+      temperature: "celsius" | "fahrenheit";
+    };
+    notifications: {
+      push: boolean;
+      email: boolean;
+    };
+    privacy: {
+      publicProfile: boolean;
+    };
+    theme: "light" | "dark" | "system";
+  }>({
     languagePreference: user?.languagePreference || "de",
     timeFormat: user?.preferences?.timeFormat || "24h",
     units: {
@@ -123,7 +141,10 @@ export function Profile() {
     privacy: {
       publicProfile: user?.preferences?.privacy?.publicProfile ?? true,
     },
-    theme: user?.preferences?.theme || "system",
+    theme:
+      (theme && (theme === "light" || theme === "dark" || theme === "system")
+        ? theme
+        : "system") || "system",
   });
 
   // Password change state
@@ -209,23 +230,11 @@ export function Profile() {
     }
   };
 
-  const handleGoalsSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSavingGoals(true);
-    try {
-      await handleSaveGoals(goalsForm);
-    } catch (error) {
-      // Error handling is done in handleSaveGoals
-    } finally {
-      setSavingGoals(false);
-    }
-  };
-
   const handleSaveGoals = async (newGoals: WeeklyGoals) => {
     try {
       const token = localStorage.getItem("token");
       if (!token) {
-        throw new Error("Nicht authentifiziert");
+        throw new Error(t("errors.notAuthenticated", "Nicht authentifiziert"));
       }
 
       const response = await fetch(`${API_URL}/goals`, {
@@ -241,27 +250,38 @@ export function Profile() {
         const errorData = await response
           .json()
           .catch(() => ({ error: "Fehler beim Speichern" }));
-        throw new Error(errorData.error || "Fehler beim Speichern der Ziele");
+        throw new Error(
+          errorData.error ||
+            t("goals.saveError", "Fehler beim Speichern der Ziele")
+        );
       }
 
       const updatedGoals = await response.json();
       setGoals(updatedGoals);
       setGoalsForm(updatedGoals);
       toast({
-        title: "Wochenziele gespeichert",
-        description: "Deine Wochenziele wurden erfolgreich aktualisiert.",
+        title: t("goals.saved", "Wochenziele gespeichert"),
+        description: t(
+          "goals.savedDescription",
+          "Deine Wochenziele wurden erfolgreich aktualisiert."
+        ),
       });
     } catch (error) {
       toast({
-        title: "Fehler",
+        title: t("common.error", "Fehler"),
         description:
           error instanceof Error
             ? error.message
-            : "Fehler beim Speichern der Wochenziele",
+            : t("goals.saveError", "Fehler beim Speichern der Wochenziele"),
         variant: "destructive",
       });
       throw error;
     }
+  };
+
+  const handleGoalsSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await handleSaveGoals(goalsForm);
   };
 
   // Update form when user changes
@@ -544,7 +564,7 @@ export function Profile() {
       // Redirect to login after successful account deletion
       setTimeout(() => {
         navigate("/auth/login");
-      }, 1000);
+      }, 1500);
     } catch (error) {
       toast({
         title: "Fehler",
@@ -1074,23 +1094,32 @@ export function Profile() {
 
                   {/* Theme */}
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">Design</Label>
+                    <Label className="text-sm font-medium">
+                      {t("settings.theme")}
+                    </Label>
                     <Select
-                      value={preferencesForm.theme}
-                      onValueChange={(value) =>
+                      value={theme || "system"}
+                      onValueChange={(value) => {
+                        setTheme(value as "light" | "dark" | "system");
                         setPreferencesForm((prev) => ({
                           ...prev,
                           theme: value as "light" | "dark" | "system",
-                        }))
-                      }
+                        }));
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="system">System</SelectItem>
-                        <SelectItem value="light">Hell</SelectItem>
-                        <SelectItem value="dark">Dunkel</SelectItem>
+                        <SelectItem value="system">
+                          {t("settings.themeSystem")}
+                        </SelectItem>
+                        <SelectItem value="light">
+                          {t("settings.themeLight")}
+                        </SelectItem>
+                        <SelectItem value="dark">
+                          {t("settings.themeDark")}
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

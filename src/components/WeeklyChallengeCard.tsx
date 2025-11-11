@@ -61,6 +61,7 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
   const [data, setData] = useState<WeeklyChallengeResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [friends, setFriends] = useState<Friend[]>([]);
+  const [friendsError, setFriendsError] = useState<string | null>(null);
 
   const locale = useMemo(
     () => (i18n.language === "en" ? enUS : de),
@@ -95,11 +96,13 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
   useEffect(() => {
     if (!user) {
       setFriends([]);
+      setFriendsError(null);
       return;
     }
 
     const loadFriends = async () => {
       try {
+        setFriendsError(null);
         const token = localStorage.getItem("token");
         if (!token) return;
 
@@ -109,28 +112,48 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
           },
         });
 
-        if (response.ok) {
-          const data = await response.json();
-          if (Array.isArray(data)) {
-            setFriends(
-              data.map((friend: BackendFriend) => ({
-                id: friend.id,
-                displayName:
-                  friend.displayName ||
-                  friend.display_name ||
-                  `${friend.firstName || friend.first_name || ""} ${friend.lastName || friend.last_name || ""}`,
-                avatarUrl: friend.avatarUrl || friend.avatar_url,
-              }))
-            );
-          }
+        if (!response.ok) {
+          const errorMessage = t("weeklyChallenge.errorLoadingFriends");
+          setFriendsError(errorMessage);
+          setFriends([]);
+          toast({
+            title: t("common.error"),
+            description: errorMessage,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const data = await response.json();
+        if (Array.isArray(data)) {
+          setFriends(
+            data.map((friend: BackendFriend) => ({
+              id: friend.id,
+              displayName:
+                friend.displayName ||
+                friend.display_name ||
+                `${friend.firstName || friend.first_name || ""} ${friend.lastName || friend.last_name || ""}`,
+              avatarUrl: friend.avatarUrl || friend.avatar_url,
+            }))
+          );
+        } else {
+          setFriends([]);
         }
       } catch (error) {
         console.error("Error loading friends:", error);
+        const errorMessage = t("weeklyChallenge.errorLoadingFriends");
+        setFriendsError(errorMessage);
+        setFriends([]);
+        toast({
+          title: t("common.error"),
+          description: errorMessage,
+          variant: "destructive",
+        });
       }
     };
 
     loadFriends();
-  }, [user]);
+  }, [user, toast, t]);
 
   useEffect(() => {
     if (!user) {
@@ -309,7 +332,7 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium">
-              {t("weeklyChallenge.pointsTarget", "Punkte-Ziel")}
+              {t("weeklyChallenge.pointsTarget")}
             </span>
             <span className="text-muted-foreground">
               {data.progress.totalPoints.toLocaleString()} /{" "}
@@ -346,18 +369,18 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
             )}
           </div>
 
+          {friendsError && (
+            <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive dark:bg-destructive/20">
+              {friendsError}
+            </div>
+          )}
+
           <div className="space-y-2">
             {visibleLeaderboard.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">
                 {friends.length === 0
-                  ? t(
-                      "weeklyChallenge.noFriendsYet",
-                      "Du hast noch keine Freunde. Füge Freunde hinzu, um sie hier zu sehen."
-                    )
-                  : t(
-                      "weeklyChallenge.noActivitiesYet",
-                      "Noch keine Aktivitäten in dieser Woche."
-                    )}
+                  ? t("weeklyChallenge.noFriendsYet")
+                  : t("weeklyChallenge.noActivitiesYet")}
               </p>
             ) : (
               visibleLeaderboard.map(

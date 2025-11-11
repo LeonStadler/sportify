@@ -193,41 +193,51 @@ export function Dashboard() {
 
   const loadRecentWorkouts = useCallback(
     async (token: string) => {
-    try {
-      setRecentWorkoutsError(null);
+      try {
+        setRecentWorkoutsError(null);
 
-      if (!token) {
-        setRecentWorkouts([]);
-        setRecentWorkoutsError(t("dashboard.pleaseLoginWorkouts"));
-        return;
-      }
+        if (!token) {
+          setRecentWorkouts([]);
+          setRecentWorkoutsError(t("dashboard.pleaseLoginWorkouts"));
+          return;
+        }
 
-      const response = await fetch(`${API_URL}/recent-workouts?limit=5`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+        const response = await fetch(`${API_URL}/recent-workouts?limit=5`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
-      if (response.ok) {
-        const data = await response.json();
-        const workouts = Array.isArray(data) ? data : data?.workouts;
+        if (response.ok) {
+          const data = await response.json();
+          const workouts = Array.isArray(data) ? data : data?.workouts;
 
-        if (Array.isArray(workouts)) {
-          setRecentWorkouts(
-            workouts.map((workout) => ({
-              ...workout,
-              activities: Array.isArray(workout.activities)
-                ? workout.activities.map((activity) => ({
-                    activityType: activity.activityType,
-                    amount: activity.amount ?? activity.quantity ?? 0,
-                    points: activity.points ?? 0,
-                  }))
-                : [],
-            }))
-          );
+          if (Array.isArray(workouts)) {
+            setRecentWorkouts(
+              workouts.map((workout) => ({
+                ...workout,
+                activities: Array.isArray(workout.activities)
+                  ? workout.activities.map((activity) => ({
+                      activityType: activity.activityType,
+                      amount: activity.amount ?? activity.quantity ?? 0,
+                      points: activity.points ?? 0,
+                    }))
+                  : [],
+              }))
+            );
+          } else {
+            setRecentWorkouts([]);
+            setRecentWorkoutsError(t("dashboard.unexpectedFormat"));
+          }
         } else {
           setRecentWorkouts([]);
-          setRecentWorkoutsError(t("dashboard.unexpectedFormat"));
+          setRecentWorkoutsError(t("dashboard.workoutsNotLoaded"));
+          toast({
+            title: t("dashboard.error"),
+            description: t("dashboard.errorLoadingWorkouts"),
+            variant: "destructive",
+          });
         }
-      } else {
+      } catch (error) {
+        console.error("Error loading recent workouts:", error);
         setRecentWorkouts([]);
         setRecentWorkoutsError(t("dashboard.workoutsNotLoaded"));
         toast({
@@ -236,16 +246,6 @@ export function Dashboard() {
           variant: "destructive",
         });
       }
-    } catch (error) {
-      console.error("Error loading recent workouts:", error);
-      setRecentWorkouts([]);
-      setRecentWorkoutsError(t("dashboard.workoutsNotLoaded"));
-      toast({
-        title: t("dashboard.error"),
-        description: t("dashboard.errorLoadingWorkouts"),
-        variant: "destructive",
-      });
-    }
     },
     [t, toast]
   );
@@ -394,7 +394,7 @@ export function Dashboard() {
     try {
       const token = localStorage.getItem("token");
       if (!token) {
-        throw new Error("Nicht authentifiziert");
+        throw new Error(t("dashboard.notAuthenticated"));
       }
 
       const response = await fetch(`${API_URL}/goals`, {
@@ -409,8 +409,8 @@ export function Dashboard() {
       if (!response.ok) {
         const errorData = await response
           .json()
-          .catch(() => ({ error: "Fehler beim Speichern" }));
-        throw new Error(errorData.error || "Fehler beim Speichern der Ziele");
+          .catch(() => ({ error: t("dashboard.saveError") }));
+        throw new Error(errorData.error || t("dashboard.saveGoalsError"));
       }
 
       const updatedGoals = await response.json();

@@ -20,7 +20,6 @@ export function Scoreboard() {
     { id: "running", name: t('scoreboard.activityTypes.running'), icon: "🏃" },
     { id: "cycling", name: t('scoreboard.activityTypes.cycling'), icon: "🚴" },
     { id: "situps", name: t('scoreboard.activityTypes.situps'), icon: "🚀" },
-    { id: "other", name: t('scoreboard.activityTypes.other'), icon: "🔗" },
   ], [t]);
 
   const periods = useMemo(() => [

@@ -21,7 +21,10 @@ const MONTHLY_POINTS_TARGET = 6000;
 export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
   const { user } = useAuth();
   const { t } = useTranslation();
-  const [stats, setStats] = useState<MonthlyStats>({ totalPoints: 0, periodPoints: 0 });
+  const [stats, setStats] = useState<MonthlyStats>({
+    totalPoints: 0,
+    periodPoints: 0,
+  });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -33,7 +36,10 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
     const loadMonthlyStats = async () => {
       try {
         const token = localStorage.getItem("token");
-        if (!token) return;
+        if (!token) {
+          setIsLoading(false);
+          return;
+        }
 
         const response = await fetch(`${API_URL}/stats?period=month`, {
           headers: {
@@ -58,7 +64,10 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
     loadMonthlyStats();
   }, [user]);
 
-  const progressPercentage = Math.min((stats.totalPoints / MONTHLY_POINTS_TARGET) * 100, 100);
+  const progressPercentage = Math.min(
+    ((stats.periodPoints ?? 0) / MONTHLY_POINTS_TARGET) * 100,
+    100
+  );
 
   if (isLoading) {
     return (
@@ -66,7 +75,7 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
         <CardHeader className="pb-4">
           <CardTitle className="text-lg md:text-xl flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            {t('dashboard.monthlyGoal', 'Monatsziel')}
+            {t("dashboard.monthlyGoal", "Monatsziel")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -84,22 +93,28 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
       <CardHeader className="pb-4">
         <CardTitle className="text-lg md:text-xl flex items-center gap-2">
           <Calendar className="h-5 w-5" />
-          {t('dashboard.monthlyGoal', 'Monatsziel')}
+          {t("dashboard.monthlyGoal", "Monatsziel")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
           <div className="flex justify-between text-sm mb-2">
-            <span>{t('dashboard.points', 'Punkte')} ({t('dashboard.goal', 'Ziel')}: {MONTHLY_POINTS_TARGET.toLocaleString()})</span>
-            <span className="font-medium">{stats.totalPoints.toLocaleString()}/{MONTHLY_POINTS_TARGET.toLocaleString()}</span>
+            <span>
+              {t("dashboard.points", "Punkte")} ({t("dashboard.goal", "Ziel")}:{" "}
+              {MONTHLY_POINTS_TARGET.toLocaleString()})
+            </span>
+            <span className="font-medium">
+              {(stats.periodPoints ?? 0).toLocaleString()}/
+              {MONTHLY_POINTS_TARGET.toLocaleString()}
+            </span>
           </div>
           <Progress value={progressPercentage} className="h-2" />
           <p className="text-xs text-muted-foreground mt-2">
-            +{stats.periodPoints.toLocaleString()} {t('dashboard.thisMonth', 'diesen Monat')}
+            +{(stats.periodPoints ?? 0).toLocaleString()}{" "}
+            {t("dashboard.thisMonth", "diesen Monat")}
           </p>
         </div>
       </CardContent>
     </Card>
   );
 }
-

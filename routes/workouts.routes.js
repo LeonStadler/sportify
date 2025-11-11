@@ -233,7 +233,6 @@ export const createWorkoutsRouter = (pool) => {
         "running",
         "cycling",
         "situps",
-        "other",
       ];
       legacyTypes.forEach((type) => {
         if (!validActivityTypes.includes(type)) {
@@ -419,8 +418,6 @@ export const createWorkoutsRouter = (pool) => {
               return amount * 10;
             case "cycling":
               return amount * 5;
-            case "other":
-              return amount * 1;
             default:
               return 0;
           }
@@ -840,7 +837,6 @@ export const createWorkoutsRouter = (pool) => {
         "running",
         "cycling",
         "situps",
-        "other",
       ];
       legacyTypes.forEach((type) => {
         if (!validActivityTypes.includes(type)) {
@@ -1000,8 +996,6 @@ export const createWorkoutsRouter = (pool) => {
               return amount * 10;
             case "cycling":
               return amount * 5;
-            case "other":
-              return amount * 1;
             default:
               return 0;
           }

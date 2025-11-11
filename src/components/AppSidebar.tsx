@@ -4,6 +4,7 @@ import {
   Globe,
   Home,
   LogOut,
+  LucideIcon,
   Palette,
   Settings,
   Shield,
@@ -13,7 +14,7 @@ import {
 } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, type Location } from "react-router-dom";
 import LanguageSwitcher from "./LanguageSwitcher";
 import ThemeSwitcher from "./ThemeSwitcher";
 
@@ -63,7 +64,13 @@ export function AppSidebar() {
     }
   }, [location.pathname, isMobile, setOpenMobile]);
 
-  const menuItems = [
+  const menuItems: Array<{
+    title: string;
+    url: string;
+    icon: LucideIcon;
+    isActive?: (loc: Location) => boolean;
+    onClick?: () => void;
+  }> = [
     {
       title: t("navigation.dashboard"),
       url: "/",
@@ -93,6 +100,16 @@ export function AppSidebar() {
       title: t("navigation.profile"),
       url: "/profile",
       icon: User,
+      isActive: (loc) =>
+        loc.pathname === "/profile" && !loc.search.includes("tab=preferences"),
+      onClick: () => navigate("/profile?tab=profile"),
+    },
+    {
+      title: t("navigation.settings"),
+      url: "/profile?tab=preferences",
+      icon: Settings,
+      isActive: (loc) =>
+        loc.pathname === "/profile" && loc.search.includes("tab=preferences"),
     },
   ];
 
@@ -133,25 +150,37 @@ export function AppSidebar() {
             </SidebarGroupLabel>
             <SidebarGroupContent className="px-3">
               <SidebarMenu>
-                {menuItems.map((item) => (
+                {menuItems.map((item) => {
+                  const active = item.isActive
+                    ? item.isActive(location)
+                    : location.pathname === item.url;
+                  return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
                       asChild
                       className={`
                         hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200
-                        ${location.pathname === item.url ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""}
+                        ${active ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""}
                       `}
                     >
-                      <Link
-                        to={item.url}
-                        className="flex items-center gap-3 px-3 py-2"
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (item.onClick) {
+                            item.onClick();
+                          } else {
+                            navigate(item.url);
+                          }
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-base font-medium text-left"
                       >
-                        <item.icon size={32} />
-                        <span>{item.title}</span>
-                      </Link>
+                        <item.icon size={36} />
+                        <span className="tracking-tight">{item.title}</span>
+                      </button>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-                ))}
+                  );
+                })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -175,13 +204,13 @@ export function AppSidebar() {
                             ${location.pathname === item.url ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""}
                           `}
                         >
-                          <Link
-                            to={item.url}
-                            className="flex items-center gap-3 px-3 py-2"
-                          >
-                            <item.icon size={20} />
-                            <span>{item.title}</span>
-                          </Link>
+                      <Link
+                        to={item.url}
+                        className="flex items-center gap-3 px-3 py-2 text-sm font-medium"
+                      >
+                        <item.icon size={28} />
+                        <span className="tracking-tight">{item.title}</span>
+                      </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     ))}

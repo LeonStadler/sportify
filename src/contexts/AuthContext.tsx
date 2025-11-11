@@ -1,10 +1,6 @@
 import { AuthContext } from "@/contexts/AuthContextProvider";
 import { API_URL } from "@/lib/api";
-import React, {
-  ReactNode,
-  useEffect,
-  useState,
-} from "react";
+import React, { ReactNode, useEffect, useState } from "react";
 
 export interface User {
   id: string;
@@ -490,6 +486,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
   const verify2FA = async (token: string): Promise<void> => {
     // Don't set global isLoading - use local loading state in component instead
+
+    // Input validation: Check that token is a valid 2FA token
+    if (!token || typeof token !== "string" || token.trim() === "") {
+      const errorMessage =
+        "Ungültiger 2FA-Code. Bitte gib einen 6-stelligen Code ein.";
+      setState((prev) => ({ ...prev, error: errorMessage }));
+      throw new Error(errorMessage);
+    }
+
+    // Validate token format: 6-digit numeric code
+    const tokenRegex = /^\d{6}$/;
+    if (!tokenRegex.test(token.trim())) {
+      const errorMessage =
+        "Ungültiger 2FA-Code. Der Code muss genau 6 Ziffern enthalten.";
+      setState((prev) => ({ ...prev, error: errorMessage }));
+      throw new Error(errorMessage);
+    }
+
     try {
       const authToken = localStorage.getItem("token");
       if (!authToken) {
@@ -504,7 +518,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
           "Content-Type": "application/json",
           Authorization: `Bearer ${authToken}`,
         },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ token: token.trim() }),
       });
 
       const data = await response.json();
@@ -521,9 +535,46 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         if (userResponse.ok) {
           const userData = await userResponse.json();
           setState((prev) => ({ ...prev, user: userData }));
+        } else {
+          // If refresh fails, update has2FA locally as fallback
+          const refreshError = new Error(
+            "Fehler beim Aktualisieren der Benutzerdaten"
+          );
+          console.error("Error refreshing user data:", refreshError);
+          setState((prev) => {
+            if (prev.user) {
+              return {
+                ...prev,
+                user: { ...prev.user, has2FA: true },
+                error:
+                  "2FA wurde aktiviert, aber die Benutzerdaten konnten nicht aktualisiert werden. Bitte lade die Seite neu.",
+              };
+            }
+            return {
+              ...prev,
+              error:
+                "2FA wurde aktiviert, aber die Benutzerdaten konnten nicht geladen werden. Bitte lade die Seite neu.",
+            };
+          });
         }
       } catch (refreshError) {
+        // If refresh fails, update has2FA locally as fallback
         console.error("Error refreshing user data:", refreshError);
+        setState((prev) => {
+          if (prev.user) {
+            return {
+              ...prev,
+              user: { ...prev.user, has2FA: true },
+              error:
+                "2FA wurde aktiviert, aber die Benutzerdaten konnten nicht aktualisiert werden. Bitte lade die Seite neu.",
+            };
+          }
+          return {
+            ...prev,
+            error:
+              "2FA wurde aktiviert, aber die Benutzerdaten konnten nicht geladen werden. Bitte lade die Seite neu.",
+          };
+        });
       }
     } catch (error) {
       const errorMessage =
@@ -945,4 +996,3 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-

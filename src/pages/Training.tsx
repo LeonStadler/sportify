@@ -69,7 +69,6 @@ export function Training() {
     { id: "running", name: t("training.running") },
     { id: "cycling", name: t("training.cycling") },
     { id: "situps", name: t("training.situps") },
-    { id: "other", name: t("training.other") },
   ];
 
   const loadWorkouts = useCallback(
@@ -220,8 +219,6 @@ export function Training() {
         return "🏃";
       case "cycling":
         return "🚴";
-      case "other":
-        return "🔗";
       default:
         return "💪";
     }
@@ -239,8 +236,6 @@ export function Training() {
         return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
       case "cycling":
         return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300";
-      case "other":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
     }

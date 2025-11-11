@@ -79,7 +79,6 @@ export const createScoreboardRouter = (pool) => {
         "running",
         "cycling",
         "situps",
-        "other",
       ];
       if (!validActivities.includes(activity)) {
         return res.status(400).json({ error: "Ungültiger Aktivitätstyp" });

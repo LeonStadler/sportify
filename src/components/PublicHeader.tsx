@@ -1,6 +1,8 @@
-import { ArrowLeft, ArrowRight, Globe, Palette, Settings } from "lucide-react";
+import { ArrowLeft, ArrowRight, Globe, Monitor, Moon, Palette, Settings, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 
 import { LogoFull } from "@/components/LogoFull";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -19,6 +21,7 @@ import { useAuth } from "@/hooks/use-auth";
 interface PublicHeaderProps {
   showBackButton?: boolean;
   backText?: string;
+  shortBackText?: string;
   title?: string;
   sticky?: boolean;
   showContactButton?: boolean;
@@ -27,14 +30,30 @@ interface PublicHeaderProps {
 export function PublicHeader({
   showBackButton = false,
   backText,
+  shortBackText,
   title,
   sticky = false,
   showContactButton = false,
 }: PublicHeaderProps) {
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  const currentTheme = theme || "system";
+  const themes = [
+    { value: "light", icon: Sun, label: t("settings.themeLight") },
+    { value: "dark", icon: Moon, label: t("settings.themeDark") },
+    { value: "system", icon: Monitor, label: t("settings.themeSystem") },
+  ];
 
   const defaultBackText = backText || t("legal.backToHome");
+  const defaultShortBackText =
+    shortBackText ||
+    defaultBackText.split(" ").filter(Boolean).pop() ||
+    defaultBackText;
 
   return (
     <header
@@ -48,7 +67,8 @@ export function PublicHeader({
             <Button variant="ghost" size="sm" asChild>
               <Link to="/">
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                {defaultBackText}
+                <span className="hidden sm:inline">{defaultBackText}</span>
+                <span className="sm:hidden">{defaultShortBackText}</span>
               </Link>
             </Button>
           )}
@@ -74,7 +94,7 @@ export function PublicHeader({
                 <LanguageSwitcher />
               </div>
               <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
-                <ThemeSwitcher />
+                <ThemeSwitcher variant="toggle" />
               </div>
             </div>
 
@@ -89,20 +109,38 @@ export function PublicHeader({
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>{t("landing.settings")}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="flex items-center justify-between">
+                <DropdownMenuItem className="flex items-center justify-between cursor-default">
                   <div className="flex items-center gap-2">
                     <Globe className="h-4 w-4" />
                     <span>{t("landing.language")}</span>
                   </div>
                   <LanguageSwitcher />
                 </DropdownMenuItem>
-                <DropdownMenuItem className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                <DropdownMenuSeparator />
+                <div className="px-2 py-1.5">
+                  <div className="flex items-center gap-2 mb-2">
                     <Palette className="h-4 w-4" />
-                    <span>{t("landing.theme")}</span>
+                    <span className="text-sm font-medium">{t("landing.theme")}</span>
                   </div>
-                  <ThemeSwitcher />
-                </DropdownMenuItem>
+                  <div className="grid grid-cols-3 gap-1">
+                    {mounted && themes.map((themeOption) => {
+                      const Icon = themeOption.icon;
+                      const isSelected = currentTheme === themeOption.value;
+                      return (
+                        <Button
+                          key={themeOption.value}
+                          variant={isSelected ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setTheme(themeOption.value)}
+                          className="flex flex-col items-center gap-1 h-auto py-2 px-1"
+                        >
+                          <Icon className="h-4 w-4" />
+                          <span className="text-xs">{themeOption.label}</span>
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
               </DropdownMenuContent>
             </DropdownMenu>
 

@@ -44,9 +44,6 @@ const formatActivity = (
     case "cycling":
       formatted += " km";
       break;
-    case "other":
-      formatted += ` ${t("activityFeed.units")}`;
-      break;
     default:
       formatted += ` ${t("activityFeed.units")}`;
   }
@@ -70,8 +67,6 @@ const getActivityIcon = (activityType: string) => {
       return "🏃";
     case "cycling":
       return "🚴";
-    case "other":
-      return "🔗";
     default:
       return "💪";
   }
@@ -98,8 +93,6 @@ const getActivityColor = (activityType: string) => {
       return "bg-green-100 text-green-800";
     case "cycling":
       return "bg-purple-100 text-purple-800";
-    case "other":
-      return "bg-gray-100 text-gray-800";
     default:
       return "bg-gray-100 text-gray-800";
   }

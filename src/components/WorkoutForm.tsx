@@ -152,19 +152,6 @@ export function WorkoutForm({
           },
         ],
     },
-    { 
-      id: "other", 
-        name: t("training.other"),
-      hasWeight: false, 
-      hasSetMode: true,
-      unitOptions: [
-          {
-            value: "Einheiten",
-            label: t("training.form.units.units"),
-            multiplier: 1,
-          },
-        ],
-      },
     ],
     [t]
   );

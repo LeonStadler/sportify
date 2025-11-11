@@ -42,8 +42,6 @@ export function ScoreboardTable({ activity, period }: ScoreboardTableProps) {
       case "running":
       case "cycling":
         return t('scoreboard.units.kilometers');
-      case "other":
-        return t('scoreboard.units.units');
       default:
         return t('scoreboard.units.points');
     }

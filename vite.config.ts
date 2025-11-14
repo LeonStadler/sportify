@@ -2,7 +2,7 @@ import react from "@vitejs/plugin-react-swc";
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
-import { defineConfig } from "vitest/config";
+import { defaultExclude, defineConfig } from "vitest/config";
 
 // Lade .env Datei
 dotenv.config();
@@ -109,5 +109,6 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: "./src/setupTests.ts",
     css: true,
+    exclude: [...defaultExclude, "tests/**"],
   },
 });

@@ -43,6 +43,18 @@ class FakePool {
       return { rowCount: count, rows: [] };
     }
 
+    if (normalized.startsWith('update password_reset_tokens set used = true where user_id = $1 and used = false')) {
+      const [userId] = params;
+      let count = 0;
+      this.passwordResetTokens.forEach((token) => {
+        if (token.user_id === userId && !token.used) {
+          token.used = true;
+          count += 1;
+        }
+      });
+      return { rowCount: count, rows: [] };
+    }
+
     if (normalized.startsWith('insert into password_reset_tokens')) {
       const [userId, tokenHash, expiresAt] = params;
       const record = {
@@ -168,6 +180,15 @@ class FakePool {
       return { rowCount: record ? 1 : 0, rows: record ? [record] : [] };
     }
 
+    if (normalized.startsWith('delete from invitations where email = $1 and status = $2')) {
+      const [email, status] = params;
+      const before = this.invitations.length;
+      this.invitations = this.invitations.filter(
+        (invitation) => !(invitation.email === email && invitation.status === status)
+      );
+      return { rowCount: before - this.invitations.length, rows: [] };
+    }
+
     if (normalized.startsWith('update invitations set used = true, used_at = $2, status = $3 where id = $1')) {
       const [id, usedAt, status] = params;
       const record = this.invitations.find((invitation) => invitation.id === id);
@@ -187,6 +208,15 @@ class FakePool {
         return { rowCount: 0, rows: [] };
       }
       return { rowCount: 1, rows: [{ is_admin: user.is_admin }] };
+    }
+
+    if (normalized.startsWith('select role from users where id = $1')) {
+      const [id] = params;
+      const user = this.users.get(id);
+      if (!user) {
+        return { rowCount: 0, rows: [] };
+      }
+      return { rowCount: 1, rows: [{ role: user.role ?? (user.is_admin ? 'admin' : 'user') }] };
     }
 
     if (normalized.startsWith('insert into outbound_emails')) {

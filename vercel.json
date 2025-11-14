@@ -64,5 +64,19 @@
         }
       ]
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/events/weekly",
+      "schedule": "0 0 * * 1"
+    },
+    {
+      "path": "/api/events/monthly",
+      "schedule": "0 0 1 * *"
+    },
+    {
+      "path": "/api/events/emails/dispatch",
+      "schedule": "*/5 * * * *"
+    }
   ]
 }

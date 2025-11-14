@@ -25,6 +25,9 @@ const Dashboard = lazy(() =>
 const Friends = lazy(() =>
   import("@/pages/Friends").then((m) => ({ default: m.Friends }))
 );
+const FriendProfile = lazy(() =>
+  import("@/pages/FriendProfile").then((m) => ({ default: m.FriendProfile }))
+);
 const Imprint = lazy(() => import("@/pages/Imprint"));
 const Invite = lazy(() =>
   import("@/pages/Invite").then((m) => ({ default: m.Invite }))
@@ -128,6 +131,7 @@ const App = () => {
                 <Route path="/stats" element={<Stats />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/friends" element={<Friends />} />
+                <Route path="/friends/:friendId" element={<FriendProfile />} />
                 <Route path="/invite/:userId" element={<Invite />} />
                 <Route path="/admin" element={<Admin />} />
                 <Route path="/contact" element={<Contact />} />

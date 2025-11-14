@@ -8,7 +8,7 @@ const STATIC_ASSETS = [
   '/',
   '/offline.html',
   '/favicon.svg',
-  '/favico.ico',
+  '/favicon.ico',
   '/site.webmanifest',
   '/browserconfig.xml',
   // Wichtigste Icons für schnellen Start
@@ -136,6 +136,49 @@ async function cacheFirstStrategy(request) {
     throw error;
   }
 }
+
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (error) {
+    console.error('[Service Worker] Failed to parse push payload', error);
+  }
+
+  const title = data.title || 'Sportify';
+  const options = {
+    body: data.body || '',
+    data: data.data || {},
+    badge: data.badge || '/icon-192x192.png',
+    icon: data.icon || '/icon-192x192.png',
+    vibrate: [200, 100, 200],
+    requireInteraction: data.requireInteraction ?? true,
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const notificationData = event.notification.data || {};
+
+  event.waitUntil(
+    (async () => {
+      const allClients = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+
+      for (const client of allClients) {
+        if ('focus' in client) {
+          client.postMessage({ type: 'notification-clicked', payload: notificationData });
+          return client.focus();
+        }
+      }
+
+      if (clients.openWindow) {
+        await clients.openWindow('/');
+      }
+    })()
+  );
+});
 
 // Network First Strategy - Für API Requests
 async function networkFirstStrategy(request) {

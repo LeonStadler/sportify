@@ -3,7 +3,7 @@ import express from 'express';
 import authMiddleware from '../middleware/authMiddleware.js';
 import { queueEmail } from '../services/emailService.js';
 import { InvitationError, createInvitation } from '../services/invitationService.js';
-import { getFrontendUrl, toCamelCase } from '../utils/helpers.js';
+import { applyDisplayName, getFrontendUrl, toCamelCase } from '../utils/helpers.js';
 
 export const createProfileRouter = (pool) => {
     const router = express.Router();
@@ -119,6 +119,114 @@ export const createProfileRouter = (pool) => {
         } catch (error) {
             console.error('Change password error:', error);
             res.status(500).json({ error: 'Serverfehler beim Ändern des Passworts.' });
+        }
+    });
+
+    router.get('/friends/:friendId', authMiddleware, async (req, res) => {
+        try {
+            const { friendId } = req.params;
+
+            if (!friendId) {
+                return res.status(400).json({ error: 'Freundes-ID ist erforderlich.' });
+            }
+
+            if (friendId === req.user.id) {
+                return res.status(400).json({ error: 'Nutze dein eigenes Profil im Profilbereich.' });
+            }
+
+            const { rows: friendColumns } = await pool.query(
+                `SELECT column_name FROM information_schema.columns WHERE table_name = 'friendships'`
+            );
+            const columnNames = friendColumns.map((row) => row.column_name);
+
+            if (columnNames.length === 0) {
+                return res.status(400).json({ error: 'Freundesfunktionen sind nicht aktiviert.' });
+            }
+
+            let friendshipQuery = '';
+            if (columnNames.includes('requester_id') && columnNames.includes('addressee_id')) {
+                friendshipQuery = `SELECT 1 FROM friendships WHERE status = 'accepted' AND ((requester_id = $1 AND addressee_id = $2) OR (requester_id = $2 AND addressee_id = $1)) LIMIT 1`;
+            } else {
+                friendshipQuery = `SELECT 1 FROM friendships WHERE (user_one_id = $1 AND user_two_id = $2) OR (user_one_id = $2 AND user_two_id = $1) LIMIT 1`;
+            }
+
+            const { rowCount: friendshipExists } = await pool.query(friendshipQuery, [req.user.id, friendId]);
+            if (friendshipExists === 0) {
+                return res.status(403).json({ error: 'Ihr seid nicht befreundet.' });
+            }
+
+            const { rows: friendRows } = await pool.query(
+                `SELECT id, first_name, last_name, nickname, display_preference, avatar_url, created_at
+                 FROM users WHERE id = $1`,
+                [friendId]
+            );
+
+            if (friendRows.length === 0) {
+                return res.status(404).json({ error: 'Freund wurde nicht gefunden.' });
+            }
+
+            const friend = friendRows[0];
+            const displayData = applyDisplayName({
+                firstName: friend.first_name,
+                lastName: friend.last_name,
+                nickname: friend.nickname,
+                displayPreference: friend.display_preference,
+            });
+
+            const { rows: badgeRows } = await pool.query(
+                `SELECT ub.id, b.slug, b.label, b.icon, b.category, b.level, ub.earned_at
+                 FROM user_badges ub
+                 JOIN badges b ON b.id = ub.badge_id
+                 WHERE ub.user_id = $1
+                 ORDER BY ub.earned_at DESC`,
+                [friendId]
+            );
+
+            const badges = badgeRows.map((row) => {
+                const badge = toCamelCase(row);
+                badge.earnedAt = row.earned_at;
+                return badge;
+            });
+
+            const { rows: awardRows } = await pool.query(
+                `SELECT id, type, label, period_start, period_end, metadata, created_at
+                 FROM awards
+                 WHERE user_id = $1
+                 ORDER BY created_at DESC`,
+                [friendId]
+            );
+
+            const awards = awardRows.map((row) => {
+                let metadata = row.metadata;
+                if (typeof metadata === 'string') {
+                    try {
+                        metadata = JSON.parse(metadata);
+                    } catch (error) {
+                        metadata = {};
+                    }
+                }
+                return {
+                    id: row.id,
+                    type: row.type,
+                    label: row.label,
+                    periodStart: row.period_start,
+                    periodEnd: row.period_end,
+                    metadata,
+                    createdAt: row.created_at,
+                };
+            });
+
+            res.json({
+                id: friend.id,
+                displayName: displayData.displayName,
+                avatarUrl: friend.avatar_url,
+                joinedAt: friend.created_at,
+                badges,
+                awards,
+            });
+        } catch (error) {
+            console.error('Friend profile error:', error);
+            res.status(500).json({ error: 'Serverfehler beim Laden des Freundesprofils.' });
         }
     });
 

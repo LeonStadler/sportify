@@ -1,5 +1,6 @@
 import express from "express";
 import authMiddleware from "../middleware/authMiddleware.js";
+import { badgeService } from "../services/badgeService.js";
 import { toCamelCase } from "../utils/helpers.js";
 
 export const createWorkoutsRouter = (pool) => {
@@ -567,6 +568,24 @@ export const createWorkoutsRouter = (pool) => {
           }
         }
 
+        const { rows: lifetimeTotals } = await client.query(
+          `SELECT wa.activity_type, COALESCE(SUM(wa.quantity), 0) AS total_quantity
+           FROM workouts w
+           JOIN workout_activities wa ON w.id = wa.workout_id
+           WHERE w.user_id = $1
+           GROUP BY wa.activity_type`,
+          [req.user.id]
+        );
+
+        for (const total of lifetimeTotals) {
+          await badgeService.handleLifetimeMilestones(
+            client,
+            req.user.id,
+            total.activity_type,
+            Number(total.total_quantity) || 0
+          );
+        }
+
         await client.query("COMMIT");
 
         const workout = toCamelCase(workoutRows[0]);
@@ -1061,7 +1080,7 @@ export const createWorkoutsRouter = (pool) => {
             }
           }
 
-          const { rows: activityRows } = await client.query(activityQuery, [
+        const { rows: activityRows } = await client.query(activityQuery, [
             workoutId,
             activity.activityType,
             activityAmount,
@@ -1092,6 +1111,24 @@ export const createWorkoutsRouter = (pool) => {
           delete row.pointsEarned;
           delete row.setsData;
           activitiesData.push(row);
+        }
+
+        const { rows: lifetimeTotals } = await client.query(
+          `SELECT wa.activity_type, COALESCE(SUM(wa.quantity), 0) AS total_quantity
+           FROM workouts w
+           JOIN workout_activities wa ON w.id = wa.workout_id
+           WHERE w.user_id = $1
+           GROUP BY wa.activity_type`,
+          [req.user.id]
+        );
+
+        for (const total of lifetimeTotals) {
+          await badgeService.handleLifetimeMilestones(
+            client,
+            req.user.id,
+            total.activity_type,
+            Number(total.total_quantity) || 0
+          );
         }
 
         await client.query("COMMIT");

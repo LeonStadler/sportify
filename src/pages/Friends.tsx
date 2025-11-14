@@ -13,6 +13,7 @@ import { parseAvatarConfig } from "@/lib/avatar";
 import { Check, Search, UserPlus, Users, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 import NiceAvatar from "react-nice-avatar";
 import { toast } from "sonner";
 
@@ -283,17 +284,22 @@ function FriendsList() {
                     {friend.displayName}
                   </p>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    handleRemoveFriend(friend.friendshipId, friend.displayName)
-                  }
-                  className="text-destructive hover:text-destructive-foreground hover:bg-destructive flex-shrink-0 text-xs md:text-sm"
-                >
-                  <span className="hidden sm:inline">Entfernen</span>
-                  <span className="sm:hidden">×</span>
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button asChild size="sm" variant="ghost" className="text-xs md:text-sm">
+                    <Link to={`/friends/${friend.id}`}>Profil</Link>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      handleRemoveFriend(friend.friendshipId, friend.displayName)
+                    }
+                    className="text-destructive hover:text-destructive-foreground hover:bg-destructive flex-shrink-0 text-xs md:text-sm"
+                  >
+                    <span className="hidden sm:inline">Entfernen</span>
+                    <span className="sm:hidden">×</span>
+                  </Button>
+                </div>
               </div>
             ))}
           </div>

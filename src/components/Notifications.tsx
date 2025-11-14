@@ -10,42 +10,36 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { Bell, CheckCircle, UserPlus } from 'lucide-react';
+import { Award, Bell, CheckCircle, Trophy, UserPlus } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { API_URL } from '@/lib/api';
 import { setAppBadge, clearAppBadge } from '@/utils/badge';
 import { toast } from 'sonner';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 interface Notification {
   id: string;
-  type: 'FRIEND_REQUEST_RECEIVED' | 'FRIEND_REQUEST_ACCEPTED';
+  type: string;
+  title: string;
+  message: string;
+  payload?: Record<string, unknown> | null;
   isRead: boolean;
   createdAt: string;
-  firstName?: string;
-  lastName?: string;
-  nickname?: string;
-  avatarUrl?: string;
 }
 
-const getInitials = (firstName?: string, lastName?: string) => {
-    return `${firstName?.charAt(0) ?? ''}${lastName?.charAt(0) ?? ''}`.toUpperCase();
-};
 
-const notificationContent = {
-  FRIEND_REQUEST_RECEIVED: {
-    icon: <UserPlus className="w-5 h-5 text-blue-500" />,
-    message: (name: string) => `Du hast eine Freundschaftsanfrage von ${name}.`,
-  },
-  FRIEND_REQUEST_ACCEPTED: {
-    icon: <CheckCircle className="w-5 h-5 text-green-500" />,
-    message: (name: string) => `${name} hat deine Freundschaftsanfrage angenommen.`,
-  },
+const notificationIcons: Record<string, JSX.Element> = {
+  FRIEND_REQUEST_RECEIVED: <UserPlus className="w-5 h-5 text-blue-500" />,
+  FRIEND_REQUEST_ACCEPTED: <CheckCircle className="w-5 h-5 text-green-500" />,
+  'badge-earned': <Award className="w-5 h-5 text-yellow-500" />,
+  'award-earned': <Trophy className="w-5 h-5 text-amber-500" />,
 };
 
 export function Notifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
+  const { isSupported, permission, isRegistering, requestPermission } = usePushNotifications();
 
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
@@ -62,7 +56,21 @@ export function Notifications() {
         throw new Error('Benachrichtigungen konnten nicht geladen werden.');
       }
       const data = await response.json();
-      setNotifications(Array.isArray(data) ? data : []);
+      if (!Array.isArray(data)) {
+        setNotifications([]);
+        return;
+      }
+
+      const mapped: Notification[] = data.map((item) => ({
+        id: item.id,
+        type: item.type ?? 'info',
+        title: item.title ?? 'Benachrichtigung',
+        message: item.message ?? '',
+        payload: item.payload ?? null,
+        isRead: Boolean(item.isRead ?? item.is_read ?? item.readAt),
+        createdAt: item.createdAt ?? item.created_at ?? new Date().toISOString(),
+      }));
+      setNotifications(mapped);
     } catch (error) {
       // No toast here to avoid spamming on background fetch
       console.error('Notifications fetch error:', error);
@@ -100,7 +108,7 @@ export function Notifications() {
 
       if (!response.ok) throw new Error('Fehler beim Markieren als gelesen.');
       
-      setNotifications(notifications.map(n => ({ ...n, isRead: true })));
+      setNotifications((prev) => prev.map((notification) => ({ ...notification, isRead: true })));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unbekannter Fehler');
     }
@@ -126,6 +134,36 @@ export function Notifications() {
       <DropdownMenuContent className="w-80 md:w-96" align="end">
         <DropdownMenuLabel>Benachrichtigungen</DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {isSupported && permission !== 'granted' && (
+          <div className="px-3 pb-2">
+            <div className="rounded-md border bg-muted/40 p-3 text-sm">
+              <p className="font-medium">Push-Benachrichtigungen aktivieren</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {permission === 'denied'
+                  ? 'Benachrichtigungen sind aktuell im Browser blockiert. Erlaube Mitteilungen in den Einstellungen deines Geräts, um Updates zu erhalten.'
+                  : 'Erhalte Auszeichnungen und Freundes-Updates direkt als Mitteilung auf deinem Gerät.'}
+              </p>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mt-2"
+                disabled={isRegistering || permission === 'denied'}
+                onClick={() => {
+                  requestPermission().catch((error) => {
+                    console.error('Push permission error:', error);
+                    toast.error('Push-Benachrichtigungen konnten nicht aktiviert werden.');
+                  });
+                }}
+              >
+                {permission === 'denied'
+                  ? 'In Einstellungen aktivieren'
+                  : isRegistering
+                    ? 'Aktiviere...'
+                    : 'Jetzt aktivieren'}
+              </Button>
+            </div>
+          </div>
+        )}
         {loading ? (
           <div className="p-2 space-y-2">
             <Skeleton className="h-12 w-full" />
@@ -137,17 +175,24 @@ export function Notifications() {
         ) : (
           <div className="max-h-96 overflow-y-auto">
             {notifications.map((notification) => {
-              const content = notificationContent[notification.type];
-              if (!content) return null;
-              
-              const displayName = notification.nickname || `${notification.firstName} ${notification.lastName}`;
+              const icon = notificationIcons[notification.type] ?? (
+                <Bell className="w-5 h-5 text-muted-foreground" />
+              );
 
               return (
-                <DropdownMenuItem key={notification.id} className={`flex items-start gap-3 p-2.5 ${!notification.isRead ? 'bg-muted/50' : ''}`}>
-                  {content.icon}
+                <DropdownMenuItem
+                  key={notification.id}
+                  className={`flex items-start gap-3 p-2.5 ${!notification.isRead ? 'bg-muted/50' : ''}`}
+                >
+                  {icon}
                   <div className="flex-1">
-                    <p className="text-sm">{content.message(displayName)}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-sm font-medium leading-tight">{notification.title}</p>
+                    {notification.message && (
+                      <p className="text-xs text-muted-foreground leading-snug">
+                        {notification.message}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-1">
                       {(() => {
                         try {
                           const date = new Date(notification.createdAt);
@@ -161,7 +206,9 @@ export function Notifications() {
                       })()}
                     </p>
                   </div>
-                   {!notification.isRead && <div className="w-2 h-2 rounded-full bg-blue-500 self-center" />}
+                  {!notification.isRead && (
+                    <div className="w-2 h-2 rounded-full bg-blue-500 self-center" />
+                  )}
                 </DropdownMenuItem>
               );
             })}

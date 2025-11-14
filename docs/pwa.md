@@ -100,6 +100,32 @@ Ermöglicht es, dass Sportify als Ziel für Share-Aktionen von anderen Apps verw
 - Vendor Chunks für besseres Caching
 - Route-based Code Splitting
 
+### 7. Push-Benachrichtigungen
+
+**Backend**:
+
+- Endpunkte `POST /api/notifications/subscriptions` und `DELETE /api/notifications/subscriptions` speichern bzw. löschen Browser-Subscriptions.
+- `GET /api/notifications/public-key` liefert den VAPID Public Key (falls konfiguriert).
+- Jede neue Notification (`services/notificationService.createNotification`) stößt einen Push-Versand an. Fehlerhafte oder abgemeldete Endpoints werden automatisch bereinigt.
+- Web-Push ist optional (`optionalDependencies`). Falls `web-push` nicht installiert oder keine VAPID-Keys gesetzt sind, werden Pushes übersprungen.
+
+**Frontend**:
+
+- Hook `usePushNotifications` (siehe `src/hooks/usePushNotifications.ts`) übernimmt Permission-Handling, Subscription-Registrierung und Sync.
+- `src/components/Notifications.tsx` blendet einen CTA ein, um Push-Benachrichtigungen zu aktivieren. Auf mobilen PWA-Installationen erscheinen Mitteilungen in der System-Mitteilungszentrale.
+- Service Worker (`public/sw.js`) verarbeitet `push` und `notificationclick`, zeigt das Badge/Icon `icon-192x192.png` an und fokussiert vorhandene Clients.
+
+**Konfiguration** (Environment Variablen):
+
+```
+WEB_PUSH_PUBLIC_KEY=...
+WEB_PUSH_PRIVATE_KEY=...
+WEB_PUSH_SUBJECT=mailto:support@sportify.app
+WEB_PUSH_TTL_SECONDS=60
+```
+
+VAPID-Keys können z. B. mit `npx web-push generate-vapid-keys` erzeugt werden. Werden keine Keys gesetzt, bleibt das Feature inaktiv.
+
 ## Browser-Support Matrix
 
 | Feature         | Chrome | Edge | Firefox | Safari (iOS) | Safari (macOS) |

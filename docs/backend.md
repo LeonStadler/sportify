@@ -118,6 +118,17 @@ const invitation = await createInvitation(pool, {
 });
 ```
 
+### eventService
+
+Zeitgesteuerte Auswertungen für Wochen- und Monatsziele:
+
+- `processWeeklyEvents` aggregiert Workouts, vergibt Badges/Awards und schreibt Leaderboard-Ränge.
+- `processMonthlyEvents` prüft Monats-Challenges und vergibt Monatsabzeichen.
+- Cron-Trigger (`routes/events.routes.js`) sichern sich über einen optionalen Bearer-Token (`EVENTS_CRON_SECRET`).
+- Zeitzone: per `EVENTS_UTC_OFFSET_MINUTES` (Default `0`) lässt sich der Auswertungszeitpunkt vom UTC-Cron entkoppeln.
+
+Zusätzliche Tabellen: `weekly_results`, `monthly_results`, `leaderboard_results`, `awards`, `user_badges`, `notifications`, `email_queue`, `push_subscriptions`.
+
 ## Datenbank
 
 ### Connection Pool

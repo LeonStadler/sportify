@@ -293,6 +293,8 @@ const resources = {
           title: "Wochenziele einstellen",
           description: "Passe deine wöchentlichen Ziele nach deinen Wünschen an.",
           current: "Aktuell",
+          pointsLabel: "Punkte-Ziel",
+          pointsUnit: "Punkte",
         },
       },
       // Activity Feed
@@ -1746,6 +1748,8 @@ const resources = {
           title: "Set weekly goals",
           description: "Adjust your weekly goals according to your preferences.",
           current: "Current",
+          pointsLabel: "Points goal",
+          pointsUnit: "Points",
         },
       },
       // Activity Feed

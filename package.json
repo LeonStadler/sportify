@@ -16,6 +16,7 @@
     "lint:check": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:api": "node --test tests/*.test.js",
     "preview": "vite preview",
     "vercel": "vercel dev",
     "vercel:dev": "vercel dev",
@@ -88,6 +89,7 @@
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.3",
+    "web-push": "^3.6.6",
     "zod": "^3.23.8"
   },
   "devDependencies": {

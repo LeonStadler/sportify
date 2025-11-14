@@ -7,6 +7,7 @@ import { PasswordDialog } from "@/components/PasswordDialog";
 import { RecoveryCodesDialog } from "@/components/RecoveryCodesDialog";
 import { TwoFactorSetupDialog } from "@/components/TwoFactorSetupDialog";
 import type { WeeklyGoals } from "@/components/WeeklyGoalsDialog";
+import { DEFAULT_WEEKLY_POINTS_GOAL } from "@/config/events";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -185,12 +186,14 @@ export function Profile() {
     pushups: { target: 400, current: 0 },
     running: { target: 25, current: 0 },
     cycling: { target: 100, current: 0 },
+    points: { target: DEFAULT_WEEKLY_POINTS_GOAL, current: 0 },
   });
   const [goalsForm, setGoalsForm] = useState<WeeklyGoals>({
     pullups: { target: 100, current: 0 },
     pushups: { target: 400, current: 0 },
     running: { target: 25, current: 0 },
     cycling: { target: 100, current: 0 },
+    points: { target: DEFAULT_WEEKLY_POINTS_GOAL, current: 0 },
   });
   const [loadingGoals, setLoadingGoals] = useState(false);
   const [savingGoals, setSavingGoals] = useState(false);
@@ -227,8 +230,18 @@ export function Profile() {
 
       if (response.ok) {
         const data = await response.json();
-        setGoals(data);
-        setGoalsForm(data);
+        const mergedGoals: WeeklyGoals = {
+          pullups: { target: data.pullups?.target ?? 100, current: data.pullups?.current ?? 0 },
+          pushups: { target: data.pushups?.target ?? 400, current: data.pushups?.current ?? 0 },
+          running: { target: data.running?.target ?? 25, current: data.running?.current ?? 0 },
+          cycling: { target: data.cycling?.target ?? 100, current: data.cycling?.current ?? 0 },
+          points: {
+            target: data.points?.target ?? DEFAULT_WEEKLY_POINTS_GOAL,
+            current: data.points?.current ?? 0,
+          },
+        };
+        setGoals(mergedGoals);
+        setGoalsForm(mergedGoals);
       }
     } catch (error) {
       console.error("Error loading goals:", error);
@@ -1594,6 +1607,34 @@ export function Profile() {
                       <p className="text-xs text-muted-foreground">
                         Aktuell: {goals.cycling.current} km / Ziel:{" "}
                         {goals.cycling.target} km
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="goal-points">Punkte</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="goal-points"
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={goalsForm.points.target || ""}
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value);
+                            setGoalsForm((prev) => ({
+                              ...prev,
+                              points: {
+                                ...prev.points,
+                                target: isNaN(value) ? 0 : Math.max(0, value),
+                              },
+                            }));
+                          }}
+                          placeholder={DEFAULT_WEEKLY_POINTS_GOAL.toString()}
+                          className="flex-1"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Aktuell: {goals.points.current} / Ziel:{" "}
+                        {goals.points.target}
                       </p>
                     </div>
                   </div>

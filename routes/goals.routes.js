@@ -1,5 +1,6 @@
 import express from 'express';
 import authMiddleware from '../middleware/authMiddleware.js';
+import { DEFAULT_WEEKLY_POINTS_GOAL } from '../config/badges.js';
 
 export const createGoalsRouter = (pool) => {
     const router = express.Router();
@@ -19,7 +20,8 @@ export const createGoalsRouter = (pool) => {
                 pullups: { target: 100, current: 0 },
                 pushups: { target: 400, current: 0 },
                 running: { target: 25, current: 0 },
-                cycling: { target: 100, current: 0 }
+                cycling: { target: 100, current: 0 },
+                points: { target: DEFAULT_WEEKLY_POINTS_GOAL, current: 0 }
             };
 
             const goals = userWeeklyGoals ? { ...defaultGoals, ...userWeeklyGoals } : defaultGoals;
@@ -30,7 +32,8 @@ export const createGoalsRouter = (pool) => {
                     COALESCE(SUM(CASE WHEN wa.activity_type = 'pullups' THEN wa.quantity ELSE 0 END), 0) as current_pullups,
                     COALESCE(SUM(CASE WHEN wa.activity_type = 'pushups' THEN wa.quantity ELSE 0 END), 0) as current_pushups,
                     COALESCE(SUM(CASE WHEN wa.activity_type = 'running' THEN wa.quantity ELSE 0 END), 0) as current_running,
-                    COALESCE(SUM(CASE WHEN wa.activity_type = 'cycling' THEN wa.quantity ELSE 0 END), 0) as current_cycling
+                    COALESCE(SUM(CASE WHEN wa.activity_type = 'cycling' THEN wa.quantity ELSE 0 END), 0) as current_cycling,
+                    COALESCE(SUM(wa.points_earned), 0) as current_points
                 FROM workouts w
                 LEFT JOIN workout_activities wa ON w.id = wa.workout_id
                 WHERE w.user_id = $1 
@@ -45,6 +48,7 @@ export const createGoalsRouter = (pool) => {
             goals.pushups.current = parseInt(progress.current_pushups) || 0;
             goals.running.current = parseInt(progress.current_running) || 0;
             goals.cycling.current = parseInt(progress.current_cycling) || 0;
+            goals.points.current = parseInt(progress.current_points) || 0;
 
             res.json(goals);
         } catch (error) {
@@ -56,13 +60,14 @@ export const createGoalsRouter = (pool) => {
     // PUT /api/goals - Update user goals
     router.put('/', authMiddleware, async (req, res) => {
         try {
-            const { pullups, pushups, running, cycling } = req.body;
+            const { pullups, pushups, running, cycling, points } = req.body;
 
             // Validate input
             if (typeof pullups?.target !== 'number' || pullups.target < 0 ||
                 typeof pushups?.target !== 'number' || pushups.target < 0 ||
                 typeof running?.target !== 'number' || running.target < 0 ||
-                typeof cycling?.target !== 'number' || cycling.target < 0) {
+                typeof cycling?.target !== 'number' || cycling.target < 0 ||
+                typeof points?.target !== 'number' || points.target < 0) {
                 return res.status(400).json({ error: 'Ungültige Zielwerte. Alle Ziele müssen nicht-negative Zahlen sein.' });
             }
 
@@ -70,7 +75,8 @@ export const createGoalsRouter = (pool) => {
                 pullups: { target: pullups.target },
                 pushups: { target: pushups.target },
                 running: { target: running.target },
-                cycling: { target: cycling.target }
+                cycling: { target: cycling.target },
+                points: { target: points.target }
             };
 
             // Update user's weekly_goals in database
@@ -88,7 +94,8 @@ export const createGoalsRouter = (pool) => {
                     COALESCE(SUM(CASE WHEN wa.activity_type = 'pullups' THEN wa.quantity ELSE 0 END), 0) as current_pullups,
                     COALESCE(SUM(CASE WHEN wa.activity_type = 'pushups' THEN wa.quantity ELSE 0 END), 0) as current_pushups,
                     COALESCE(SUM(CASE WHEN wa.activity_type = 'running' THEN wa.quantity ELSE 0 END), 0) as current_running,
-                    COALESCE(SUM(CASE WHEN wa.activity_type = 'cycling' THEN wa.quantity ELSE 0 END), 0) as current_cycling
+                    COALESCE(SUM(CASE WHEN wa.activity_type = 'cycling' THEN wa.quantity ELSE 0 END), 0) as current_cycling,
+                    COALESCE(SUM(wa.points_earned), 0) as current_points
                 FROM workouts w
                 LEFT JOIN workout_activities wa ON w.id = wa.workout_id
                 WHERE w.user_id = $1 
@@ -103,7 +110,8 @@ export const createGoalsRouter = (pool) => {
                 pullups: { target: pullups.target, current: parseInt(progress.current_pullups) || 0 },
                 pushups: { target: pushups.target, current: parseInt(progress.current_pushups) || 0 },
                 running: { target: running.target, current: parseInt(progress.current_running) || 0 },
-                cycling: { target: cycling.target, current: parseInt(progress.current_cycling) || 0 }
+                cycling: { target: cycling.target, current: parseInt(progress.current_cycling) || 0 },
+                points: { target: points.target, current: parseInt(progress.current_points) || 0 }
             };
 
             res.json(response);

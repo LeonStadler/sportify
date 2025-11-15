@@ -451,6 +451,68 @@ export const getColumnSqlType = async (pool, tableName, columnName) => {
 
 export const ALLOWED_JOURNAL_MOODS = ['energized', 'balanced', 'tired', 'sore', 'stressed', 'motivated', 'relaxed', 'excited', 'focused', 'frustrated'];
 
+export const STATS_PERIODS = ['week', 'month', 'quarter', 'year'];
+
+export const normalizeStatsPeriod = (value) => {
+    if (typeof value !== 'string') {
+        return 'week';
+    }
+
+    const normalized = value.toLowerCase();
+    return STATS_PERIODS.includes(normalized) ? normalized : 'week';
+};
+
+const PERIOD_WINDOWS = {
+    week: {
+        start: "date_trunc('week', CURRENT_DATE)",
+        end: "date_trunc('week', CURRENT_DATE) + INTERVAL '7 days'",
+        interval: "INTERVAL '7 days'"
+    },
+    month: {
+        start: "date_trunc('month', CURRENT_DATE)",
+        end: "date_trunc('month', CURRENT_DATE) + INTERVAL '1 month'",
+        interval: "INTERVAL '1 month'"
+    },
+    quarter: {
+        start: "date_trunc('quarter', CURRENT_DATE)",
+        end: "date_trunc('quarter', CURRENT_DATE) + INTERVAL '3 months'",
+        interval: "INTERVAL '3 months'"
+    },
+    year: {
+        start: "date_trunc('year', CURRENT_DATE)",
+        end: "date_trunc('year', CURRENT_DATE) + INTERVAL '1 year'",
+        interval: "INTERVAL '1 year'"
+    }
+};
+
+export const getPeriodWindowExpressions = (value = 'week') => {
+    const period = normalizeStatsPeriod(value);
+    const config = PERIOD_WINDOWS[period] || PERIOD_WINDOWS.week;
+
+    return {
+        period,
+        start: config.start,
+        end: config.end,
+        interval: config.interval,
+        previousStart: `(${config.start}) - ${config.interval}`,
+        previousEnd: config.start
+    };
+};
+
+export const buildPeriodCondition = (columnExpression, period = 'week', { isTimestamp = true } = {}) => {
+    if (!columnExpression || typeof columnExpression !== 'string') {
+        throw new Error('Column expression is required to build period condition.');
+    }
+
+    const window = getPeriodWindowExpressions(period);
+    const cast = isTimestamp ? '::timestamptz' : '::date';
+
+    return {
+        condition: `${columnExpression} >= (${window.start})${cast} AND ${columnExpression} < (${window.end})${cast}`,
+        window
+    };
+};
+
 // Woche von Montag (Start) bis Sonntag (Ende)
 // PostgreSQL's date_trunc('week', ...) startet standardmäßig am Montag gemäß ISO 8601
 // Verwendet nur start_time (TIMESTAMPTZ) - KEIN Fallback

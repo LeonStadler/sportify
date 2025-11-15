@@ -11,11 +11,14 @@ import type { AnalyticsMoodDistributionEntry, AnalyticsResponse } from "@/types/
 
 import type { AnalyticsFormatters } from "../utils/formatters";
 import { ensureAtLeastOne } from "../utils/metrics";
-import type { MetricOption } from "../types";
+import type { ActivityMetricOption, RecoveryMetricOption } from "../types";
 import { AnalyticsOverviewTab } from "./AnalyticsOverviewTab";
 import { AnalyticsTrainingTab } from "./AnalyticsTrainingTab";
 import { AnalyticsRecoveryTab } from "./AnalyticsRecoveryTab";
 import { AnalyticsBalanceTab } from "./AnalyticsBalanceTab";
+
+type ActivityMetricKey = ActivityMetricOption["key"];
+type RecoveryMetricKey = RecoveryMetricOption["key"];
 
 interface AnalyticsDashboardProps {
   data: AnalyticsResponse | null;
@@ -23,12 +26,16 @@ interface AnalyticsDashboardProps {
   error: string | null;
   onRetry: () => void;
   formatters: AnalyticsFormatters;
-  activityMetrics: MetricOption[];
-  recoveryMetrics: MetricOption[];
+  activityMetrics: ActivityMetricOption[];
+  recoveryMetrics: RecoveryMetricOption[];
   t: TFunction;
 }
 
-const DEFAULT_RECOVERY_KEYS = ["avgEnergy", "avgSleep", "avgSoreness"];
+const DEFAULT_RECOVERY_KEYS: RecoveryMetricKey[] = [
+  "avgEnergy",
+  "avgSleep",
+  "avgSoreness",
+];
 
 export function AnalyticsDashboard({
   data,
@@ -46,59 +53,66 @@ export function AnalyticsDashboard({
   const balance = safeAnalyticsData?.balance;
   const range = safeAnalyticsData?.range;
 
-  const [selectedActivityKeys, setSelectedActivityKeys] = useState<string[]>(() =>
+  const [selectedActivityKeys, setSelectedActivityKeys] = useState<ActivityMetricKey[]>(() =>
     activityMetrics.map((metric) => metric.key),
   );
-  const [selectedRecoveryKeys, setSelectedRecoveryKeys] = useState<string[]>(() =>
-    ensureAtLeastOne(DEFAULT_RECOVERY_KEYS.filter((key) =>
-      recoveryMetrics.some((metric) => metric.key === key),
-    ), recoveryMetrics[0]?.key ?? DEFAULT_RECOVERY_KEYS[0]),
+  const [selectedRecoveryKeys, setSelectedRecoveryKeys] = useState<RecoveryMetricKey[]>(() =>
+    ensureAtLeastOne(
+      DEFAULT_RECOVERY_KEYS.filter((key) =>
+        recoveryMetrics.some((metric) => metric.key === key),
+      ),
+      recoveryMetrics[0]?.key ?? DEFAULT_RECOVERY_KEYS[0],
+    ),
   );
 
   useEffect(() => {
     const availableKeys = activityMetrics.map((metric) => metric.key);
     setSelectedActivityKeys((prev) => {
+      if (availableKeys.length === 0) {
+        return [];
+      }
       const filtered = prev.filter((key) => availableKeys.includes(key));
-      const fallback = availableKeys[0] ?? prev[0];
-      return ensureAtLeastOne(filtered, fallback ?? availableKeys[0] ?? "");
+      return ensureAtLeastOne(filtered, availableKeys[0]);
     });
   }, [activityMetrics]);
 
   useEffect(() => {
     const availableKeys = recoveryMetrics.map((metric) => metric.key);
     setSelectedRecoveryKeys((prev) => {
+      if (availableKeys.length === 0) {
+        return [];
+      }
       const filtered = prev.filter((key) => availableKeys.includes(key));
-      const fallback = availableKeys[0] ?? prev[0];
-      return ensureAtLeastOne(filtered, fallback ?? availableKeys[0] ?? "");
+      return ensureAtLeastOne(filtered, availableKeys[0]);
     });
   }, [recoveryMetrics]);
 
   const selectedActivityConfigs = useMemo(() => {
     const availableKeys = activityMetrics.map((metric) => metric.key);
     if (availableKeys.length === 0) {
-      return [] as MetricOption[];
+      return [] as ActivityMetricOption[];
     }
     const ensuredKeys = ensureAtLeastOne(
       selectedActivityKeys.filter((key) => availableKeys.includes(key)),
-      activityMetrics[0]?.key ?? availableKeys[0] ?? "",
+      availableKeys[0],
     );
     return ensuredKeys
       .map((key) => activityMetrics.find((metric) => metric.key === key))
-      .filter((metric): metric is MetricOption => Boolean(metric));
+      .filter((metric): metric is ActivityMetricOption => Boolean(metric));
   }, [activityMetrics, selectedActivityKeys]);
 
   const selectedRecoveryConfigs = useMemo(() => {
     const availableKeys = recoveryMetrics.map((metric) => metric.key);
     if (availableKeys.length === 0) {
-      return [] as MetricOption[];
+      return [] as RecoveryMetricOption[];
     }
     const ensuredKeys = ensureAtLeastOne(
       selectedRecoveryKeys.filter((key) => availableKeys.includes(key)),
-      recoveryMetrics[0]?.key ?? availableKeys[0] ?? DEFAULT_RECOVERY_KEYS[0],
+      availableKeys[0],
     );
     return ensuredKeys
       .map((key) => recoveryMetrics.find((metric) => metric.key === key))
-      .filter((metric): metric is MetricOption => Boolean(metric));
+      .filter((metric): metric is RecoveryMetricOption => Boolean(metric));
   }, [recoveryMetrics, selectedRecoveryKeys]);
 
   const moodDistribution: AnalyticsMoodDistributionEntry[] = recovery?.moodDistribution ?? [];
@@ -151,13 +165,16 @@ export function AnalyticsDashboard({
               activityMetrics={activityMetrics}
               selectedActivityKeys={selectedActivityKeys}
               selectedActivityConfigs={selectedActivityConfigs}
-              onToggleActivityMetric={(key) => {
+              onToggleActivityMetric={(key: ActivityMetricKey) => {
                 const availableKeys = activityMetrics.map((metric) => metric.key);
                 setSelectedActivityKeys((prev) => {
                   const next = prev.includes(key)
                     ? prev.filter((value) => value !== key)
                     : [...prev, key];
                   const fallback = availableKeys[0] ?? key;
+                  if (!fallback) {
+                    return next;
+                  }
                   return ensureAtLeastOne(next, fallback);
                 });
               }}
@@ -177,13 +194,16 @@ export function AnalyticsDashboard({
               recoveryMetrics={recoveryMetrics}
               selectedRecoveryKeys={selectedRecoveryKeys}
               selectedRecoveryConfigs={selectedRecoveryConfigs}
-              onToggleRecoveryMetric={(key) => {
+              onToggleRecoveryMetric={(key: RecoveryMetricKey) => {
                 const availableKeys = recoveryMetrics.map((metric) => metric.key);
                 setSelectedRecoveryKeys((prev) => {
                   const next = prev.includes(key)
                     ? prev.filter((value) => value !== key)
                     : [...prev, key];
                   const fallback = availableKeys[0] ?? key;
+                  if (!fallback) {
+                    return next;
+                  }
                   return ensureAtLeastOne(next, fallback);
                 });
               }}

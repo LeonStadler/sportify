@@ -8,7 +8,10 @@ import { useToast } from "@/hooks/use-toast";
 import { AnalyticsDashboard } from "@/features/analytics/components/AnalyticsDashboard";
 import { AnalyticsPeriodSelect } from "@/features/analytics/components/AnalyticsPeriodSelect";
 import { createAnalyticsFormatters } from "@/features/analytics/utils/formatters";
-import type { MetricOption } from "@/features/analytics/types";
+import type {
+  ActivityMetricOption,
+  RecoveryMetricOption,
+} from "@/features/analytics/types";
 
 export function Stats() {
   const { t, i18n } = useTranslation();
@@ -27,7 +30,7 @@ export function Stats() {
     }
   }, [error, t, toast]);
 
-  const activityMetrics = useMemo<MetricOption[]>(
+  const activityMetrics = useMemo<ActivityMetricOption[]>(
     () => [
       { key: "pullups", label: t("stats.pullups"), color: "#3b82f6" },
       { key: "pushups", label: t("stats.pushups"), color: "#ef4444" },
@@ -38,7 +41,7 @@ export function Stats() {
     [t],
   );
 
-  const recoveryMetrics = useMemo<MetricOption[]>(
+  const recoveryMetrics = useMemo<RecoveryMetricOption[]>(
     () => [
       { key: "avgEnergy", label: t("stats.energy"), color: "#3b82f6" },
       { key: "avgSleep", label: t("stats.sleep"), color: "#22c55e" },

@@ -14,15 +14,15 @@ import type {
 
 import type { AnalyticsFormatters } from "../utils/formatters";
 import { getTrend } from "../utils/metrics";
-import type { MetricOption } from "../types";
+import type { RecoveryMetricOption } from "../types";
 
 interface AnalyticsRecoveryTabProps {
   recovery?: AnalyticsRecoveryData;
   moodDistribution: AnalyticsMoodDistributionEntry[];
-  recoveryMetrics: MetricOption[];
-  selectedRecoveryKeys: string[];
-  selectedRecoveryConfigs: MetricOption[];
-  onToggleRecoveryMetric: (key: string) => void;
+  recoveryMetrics: RecoveryMetricOption[];
+  selectedRecoveryKeys: RecoveryMetricOption["key"][];
+  selectedRecoveryConfigs: RecoveryMetricOption[];
+  onToggleRecoveryMetric: (key: RecoveryMetricOption["key"]) => void;
   formatters: AnalyticsFormatters;
   t: TFunction;
 }

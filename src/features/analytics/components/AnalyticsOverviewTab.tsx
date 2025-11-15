@@ -15,17 +15,17 @@ import type {
 
 import type { AnalyticsFormatters } from "../utils/formatters";
 import { getTrend } from "../utils/metrics";
-import type { MetricOption } from "../types";
+import type { ActivityMetricOption } from "../types";
 
 interface AnalyticsOverviewTabProps {
   workouts?: AnalyticsWorkoutsData;
   recovery?: AnalyticsRecoveryData;
   balance?: AnalyticsBalanceData;
   range?: AnalyticsRange | null;
-  activityMetrics: MetricOption[];
-  selectedActivityKeys: string[];
-  selectedActivityConfigs: MetricOption[];
-  onToggleActivityMetric: (key: string) => void;
+  activityMetrics: ActivityMetricOption[];
+  selectedActivityKeys: ActivityMetricOption["key"][];
+  selectedActivityConfigs: ActivityMetricOption[];
+  onToggleActivityMetric: (key: ActivityMetricOption["key"]) => void;
   formatters: AnalyticsFormatters;
   t: TFunction;
 }

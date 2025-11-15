@@ -12,10 +12,18 @@ vi.mock('@/hooks/use-toast', () => ({
   useToast: () => ({ toast: toastMock }),
 }));
 
+type TranslationOptions = {
+  count?: number;
+  title?: string;
+  [key: string]: string | number | undefined;
+};
+
+type TranslationEntry = string | ((opts?: TranslationOptions) => string);
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, options?: Record<string, any>) => {
-      const dictionary: Record<string, string | ((opts?: Record<string, any>) => string)> = {
+    t: (key: string, options?: TranslationOptions) => {
+      const dictionary: Record<string, TranslationEntry> = {
         'activityFeed.title': 'Aktivitäten',
         'activityFeed.activityTypes.unknown': 'Unbekannte Aktivität',
         'activityFeed.repetitions': 'Wiederholungen',
@@ -98,8 +106,11 @@ describe('ActivityFeed', () => {
 
     render(<ActivityFeed />);
 
-    expect(await screen.findByText('Max Mustermann')).toBeInTheDocument();
-    expect(screen.getByText('25 Punkte')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalled();
+      expect(screen.getByText('Max Mustermann')).toBeInTheDocument();
+      expect(screen.getByText('25 Punkte')).toBeInTheDocument();
+    });
     expect(fetchMock).toHaveBeenCalledWith(
       `${import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api'}/feed?page=1&limit=10`,
       expect.objectContaining({ headers: { Authorization: 'Bearer test-token' } }),
@@ -115,6 +126,7 @@ describe('ActivityFeed', () => {
     render(<ActivityFeed />);
 
     await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalled();
       expect(screen.getByRole('alert')).toHaveTextContent('Aktivitäten konnten nicht geladen werden.');
     });
 

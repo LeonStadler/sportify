@@ -35,11 +35,12 @@ export class TestDatabase {
     return user;
   }
 
-  insertFriendship({ id = randomUUID(), userOneId, userTwoId, createdAt = new Date() }) {
+  insertFriendship({ id = randomUUID(), userOneId, userTwoId, status = 'accepted', createdAt = new Date() }) {
     const friendship = {
       id,
       user_one_id: userOneId,
       user_two_id: userTwoId,
+      status,
       created_at: createdAt,
     };
     this.friendships.push(friendship);
@@ -98,6 +99,14 @@ export class TestDatabase {
       return { rows: user ? [{ id: user.id }] : [], rowCount: user ? 1 : 0 };
     }
 
+    if (normalized.startsWith("select 1 from friendships where ((requester_id = $1 and addressee_id = $2) or (requester_id = $2 and addressee_id = $1)) and status = 'accepted'")) {
+      const [a, b] = params;
+      const exists = this.friendships.some(
+        (f) => (f.user_one_id === a && f.user_two_id === b) || (f.user_one_id === b && f.user_two_id === a)
+      );
+      return { rows: exists ? [{ '?column?': 1 }] : [], rowCount: exists ? 1 : 0 };
+    }
+
     if (normalized.startsWith('select 1 from friendships where user_one_id = $1 and user_two_id = $2')) {
       const [a, b] = params;
       const exists = this.friendships.some((f) => (f.user_one_id === a && f.user_two_id === b) || (f.user_one_id === b && f.user_two_id === a));
@@ -140,6 +149,20 @@ export class TestDatabase {
       return { rows: [], rowCount: exists ? 0 : 1 };
     }
 
+    if (normalized.startsWith("insert into friendships (id, requester_id, addressee_id, status) values ($1, $2, $3, 'accepted') on conflict on constraint friendships_requester_id_addressee_id_key do update set status = 'accepted'")) {
+      const [id, requesterId, addresseeId] = params;
+      const ordered = [requesterId, addresseeId].sort();
+      const existing = this.friendships.find(
+        (f) => f.user_one_id === ordered[0] && f.user_two_id === ordered[1]
+      );
+      if (existing) {
+        existing.status = 'accepted';
+        return { rows: [], rowCount: 1 };
+      }
+      this.insertFriendship({ id, userOneId: ordered[0], userTwoId: ordered[1], status: 'accepted' });
+      return { rows: [], rowCount: 1 };
+    }
+
     if (normalized.startsWith('select id, user_one_id, user_two_id from friendships where id = $1')) {
       const friendship = this.friendships.find((f) => f.id === params[0]);
       return { rows: friendship ? [friendship] : [], rowCount: friendship ? 1 : 0 };
@@ -157,6 +180,7 @@ export class TestDatabase {
     if (normalized.startsWith('select f.id as friendship_id')) {
       const userId = params[0];
       const rows = this.friendships
+        .filter((f) => f.status === 'accepted')
         .filter((f) => f.user_one_id === userId || f.user_two_id === userId)
         .sort((a, b) => (b.created_at?.getTime?.() || 0) - (a.created_at?.getTime?.() || 0))
         .map((f) => {
@@ -172,6 +196,16 @@ export class TestDatabase {
             avatar_url: user?.avatar_url ?? null,
           };
         });
+      return { rows, rowCount: rows.length };
+    }
+
+    if (normalized.startsWith("select case when requester_id = $1 then addressee_id else requester_id end as friend_id from friendships")) {
+      const [userId] = params;
+      const rows = this.friendships
+        .filter((f) => f.status === 'accepted' && (f.user_one_id === userId || f.user_two_id === userId))
+        .map((f) => ({
+          friend_id: f.user_one_id === userId ? f.user_two_id : f.user_one_id,
+        }));
       return { rows, rowCount: rows.length };
     }
 
@@ -243,6 +277,51 @@ export class TestDatabase {
       return { rows, rowCount: rows.length };
     }
 
+    if (normalized.startsWith('select id, email, first_name, last_name, nickname, display_preference, avatar_url from users where (')) {
+      const [patternParam, currentUserId, directMatchParam, limit, offset] = params;
+      const patternRegex = likeToRegex(patternParam);
+      const directRegex = likeToRegex(directMatchParam);
+      const filtered = this.users
+        .filter((user) => user.id !== currentUserId)
+        .filter((user) => {
+          const fields = [user.first_name, user.last_name, user.nickname, user.email];
+          return fields.some((field) => field && patternRegex.test(field));
+        })
+        .sort((a, b) => {
+          const priorityA = directRegex.test(a.first_name)
+            ? 1
+            : directRegex.test(a.last_name)
+            ? 2
+            : directRegex.test(a.nickname)
+            ? 3
+            : 4;
+          const priorityB = directRegex.test(b.first_name)
+            ? 1
+            : directRegex.test(b.last_name)
+            ? 2
+            : directRegex.test(b.nickname)
+            ? 3
+            : 4;
+          if (priorityA !== priorityB) {
+            return priorityA - priorityB;
+          }
+          const first = a.first_name.localeCompare(b.first_name, 'de', { sensitivity: 'base' });
+          if (first !== 0) return first;
+          return a.last_name.localeCompare(b.last_name, 'de', { sensitivity: 'base' });
+        });
+      const sliced = filtered.slice(offset, offset + limit);
+      const rows = sliced.map((user) => ({
+        id: user.id,
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        nickname: user.nickname,
+        display_preference: user.display_preference,
+        avatar_url: user.avatar_url,
+      }));
+      return { rows, rowCount: rows.length };
+    }
+
     if (normalized.startsWith('with friend_ids as')) {
       const [userId] = params;
       const friendIds = new Set(
@@ -281,6 +360,49 @@ export class TestDatabase {
         .slice(0, 20);
 
       return { rows, rowCount: rows.length };
+    }
+
+    if (normalized.startsWith('select wa.id, wa.activity_type, wa.quantity as amount')) {
+      const [userIdsParam, limit, offset] = params;
+      let allowedIds = [];
+      if (Array.isArray(userIdsParam)) {
+        allowedIds = userIdsParam;
+      } else if (typeof userIdsParam === 'string') {
+        allowedIds = userIdsParam
+          .replace(/[{}]/g, '')
+          .split(',')
+          .map((value) => value.trim().replace(/^"|"$/g, ''))
+          .filter(Boolean);
+      }
+      const activities = this.workoutActivities
+        .map((activity) => {
+          const workout = this.workouts.find((w) => w.id === activity.workout_id);
+          const user = workout ? this.users.find((u) => u.id === workout.user_id) : null;
+          if (!workout || !user || !allowedIds.includes(workout.user_id)) {
+            return null;
+          }
+          return {
+            id: activity.id,
+            activity_type: activity.activity_type,
+            amount: activity.quantity,
+            points: 0,
+            start_time: workout.workout_date,
+            workout_title: workout.title,
+            first_name: user.first_name,
+            last_name: user.last_name,
+            nickname: user.nickname,
+            display_preference: user.display_preference,
+            avatar_url: user.avatar_url,
+          };
+        })
+        .filter(Boolean)
+        .sort((a, b) => {
+          const dateDiff = new Date(b.start_time).getTime() - new Date(a.start_time).getTime();
+          if (dateDiff !== 0) return dateDiff;
+          return String((b).id).localeCompare(String((a).id));
+        });
+      const sliced = activities.slice(offset ?? 0, (offset ?? 0) + (limit ?? activities.length));
+      return { rows: sliced, rowCount: sliced.length };
     }
 
     throw new Error(`Unsupported query in test database: ${sql}`);

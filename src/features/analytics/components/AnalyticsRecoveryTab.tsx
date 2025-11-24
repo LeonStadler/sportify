@@ -125,6 +125,12 @@ export function AnalyticsRecoveryTab({
                 label: metric.label,
                 color: metric.color,
               }))}
+              formatDate={(value) => formatters.formatRangeDate(value)}
+              formatValue={(key, value) => {
+                if (key === "avgRestingHeartRate") return `${formatters.formatInteger(value)} bpm`;
+                if (key === "avgSleepDuration") return `${formatters.formatDecimal(value, 1)} h`;
+                return formatters.formatDecimal(value, 1);
+              }}
             />
           ) : (
             <p className="text-sm text-muted-foreground">{t("stats.noRecoveryData")}</p>

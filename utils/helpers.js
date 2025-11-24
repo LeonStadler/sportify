@@ -485,7 +485,38 @@ const PERIOD_WINDOWS = {
     }
 };
 
-export const getPeriodWindowExpressions = (value = 'week') => {
+export const getPeriodWindowExpressions = (value = 'week', { startDate, endDate } = {}) => {
+    const hasCustomRange = startDate && endDate;
+
+    if (value === 'custom' && hasCustomRange) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+
+        if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+            throw new Error('Invalid custom date range supplied');
+        }
+
+        if (end.getTime() < start.getTime()) {
+            throw new Error('Invalid custom date range supplied');
+        }
+
+        const normalizedStart = start.toISOString().slice(0, 10);
+        const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+        const interval = `INTERVAL '${days} days'`;
+
+        const startExpr = `DATE '${normalizedStart}'`;
+        const endExpr = `${startExpr} + ${interval}`;
+
+        return {
+            period: 'custom',
+            start: startExpr,
+            end: endExpr,
+            interval,
+            previousStart: `${startExpr} - ${interval}`,
+            previousEnd: startExpr
+        };
+    }
+
     const period = normalizeStatsPeriod(value);
     const config = PERIOD_WINDOWS[period] || PERIOD_WINDOWS.week;
 

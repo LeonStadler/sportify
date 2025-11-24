@@ -21,13 +21,23 @@ import {
     roundNumber
 } from './utils.js';
 
-const buildActivityBreakdown = (summary) => ({
-    pullups: summary.pullups,
-    pushups: summary.pushups,
-    running: summary.running,
-    cycling: summary.cycling,
-    situps: summary.situps
-});
+const buildActivityBreakdown = (summary) => {
+    const totals = [
+        { activity: 'pullups', total: summary.pullups },
+        { activity: 'pushups', total: summary.pushups },
+        { activity: 'running', total: summary.running },
+        { activity: 'cycling', total: summary.cycling },
+        { activity: 'situps', total: summary.situps }
+    ];
+
+    const grandTotal = totals.reduce((sum, entry) => sum + (entry.total ?? 0), 0);
+
+    return totals.map((entry) => ({
+        activity: entry.activity,
+        total: entry.total,
+        percentage: grandTotal ? roundNumber(((entry.total ?? 0) / grandTotal) * 100, 1) : 0
+    }));
+};
 
 const buildWorkoutHighlights = (timeline, summary, longestWorkoutRow) => {
     const longestWorkout = mapLongestWorkout(longestWorkoutRow);
@@ -69,6 +79,11 @@ const buildBalanceDaily = (workoutTimeline, recoveryTimeline) => {
             avgEnergy: recoveryEntry?.avgEnergy ?? null,
             avgSleep: recoveryEntry?.avgSleep ?? null,
             avgSoreness: recoveryEntry?.avgSoreness ?? null,
+            avgExertion: recoveryEntry?.avgExertion ?? null,
+            avgHydration: recoveryEntry?.avgHydration ?? null,
+            avgRestingHeartRate: recoveryEntry?.avgRestingHeartRate ?? null,
+            avgSleepDuration: recoveryEntry?.avgSleepDuration ?? null,
+            avgFocus: recoveryEntry?.avgFocus ?? null,
             readinessScore
         };
     });
@@ -88,8 +103,107 @@ const buildWorkoutsComparison = (current, previous) => ({
     }
 });
 
-export const getAnalyticsForPeriod = async (pool, userId, requestedPeriod) => {
-    const window = getPeriodWindowExpressions(requestedPeriod);
+const computePearsonCorrelation = (pairs) => {
+    if (!Array.isArray(pairs) || pairs.length < 2) {
+        return null;
+    }
+
+    const n = pairs.length;
+    const sumX = pairs.reduce((acc, { x }) => acc + x, 0);
+    const sumY = pairs.reduce((acc, { y }) => acc + y, 0);
+    const meanX = sumX / n;
+    const meanY = sumY / n;
+
+    let numerator = 0;
+    let denomX = 0;
+    let denomY = 0;
+
+    pairs.forEach(({ x, y }) => {
+        const dx = x - meanX;
+        const dy = y - meanY;
+        numerator += dx * dy;
+        denomX += dx * dx;
+        denomY += dy * dy;
+    });
+
+    if (denomX === 0 || denomY === 0) {
+        return null;
+    }
+
+    return roundNumber(numerator / Math.sqrt(denomX * denomY), 3);
+};
+
+const buildCorrelationPairs = (dailyEntries, trainingKey, recoveryKey) =>
+    dailyEntries
+        .map((entry) => ({
+            date: entry.date,
+            x: Number(entry[trainingKey]),
+            y: Number(entry[recoveryKey])
+        }))
+        .filter(({ x, y }) => Number.isFinite(x) && Number.isFinite(y));
+
+const buildCorrelationInsights = (balanceDaily) => {
+    const trainingMetrics = ['points', 'durationMinutes', 'workouts'];
+    const recoveryMetrics = [
+        'avgEnergy',
+        'avgFocus',
+        'avgSleep',
+        'avgSoreness',
+        'avgExertion',
+        'avgHydration',
+        'avgRestingHeartRate',
+        'avgSleepDuration'
+    ];
+
+    const correlations = [];
+
+    trainingMetrics.forEach((trainingMetric) => {
+        recoveryMetrics.forEach((recoveryMetric) => {
+            const pairs = buildCorrelationPairs(balanceDaily, trainingMetric, recoveryMetric);
+            const correlation = computePearsonCorrelation(pairs);
+            if (correlation !== null) {
+                correlations.push({
+                    trainingMetric,
+                    recoveryMetric,
+                    correlation,
+                    sampleSize: pairs.length
+                });
+            }
+        });
+    });
+
+    const sortedCorrelations = correlations
+        .filter((entry) => entry.sampleSize >= 2)
+        .sort((a, b) => Math.abs(b.correlation) - Math.abs(a.correlation));
+
+    const primaryCorrelation = sortedCorrelations[0] || null;
+    const primaryPairs = primaryCorrelation
+        ? buildCorrelationPairs(balanceDaily, primaryCorrelation.trainingMetric, primaryCorrelation.recoveryMetric)
+        : [];
+
+    const readinessDrivers = recoveryMetrics
+        .map((metric) => {
+            const pairs = buildCorrelationPairs(balanceDaily, 'readinessScore', metric);
+            const correlation = computePearsonCorrelation(pairs);
+            return correlation !== null
+                ? { metric, correlation, sampleSize: pairs.length }
+                : null;
+        })
+        .filter(Boolean)
+        .sort((a, b) => Math.abs(b.correlation) - Math.abs(a.correlation))
+        .slice(0, 5);
+
+    return {
+        correlations: sortedCorrelations.slice(0, 8),
+        primaryCorrelation: primaryCorrelation
+            ? { ...primaryCorrelation, pairs: primaryPairs.slice(0, 50) }
+            : null,
+        readinessDrivers
+    };
+};
+
+export const getAnalyticsForPeriod = async (pool, userId, requestedPeriod, { startDate, endDate } = {}) => {
+    const window = getPeriodWindowExpressions(requestedPeriod, { startDate, endDate });
     const { period, start, end, previousStart, previousEnd } = window;
 
     const [
@@ -192,6 +306,7 @@ export const getAnalyticsForPeriod = async (pool, userId, requestedPeriod) => {
         : null;
 
     const readinessChange = computeNullableChange(readinessAverage, recoveryPreviousReadiness);
+    const insights = buildCorrelationInsights(balanceDaily);
 
     return {
         period,
@@ -220,6 +335,7 @@ export const getAnalyticsForPeriod = async (pool, userId, requestedPeriod) => {
                 previousAverage: recoveryPreviousReadiness,
                 change: readinessChange
             }
-        }
+        },
+        insights
     };
 };

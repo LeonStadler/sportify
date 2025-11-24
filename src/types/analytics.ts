@@ -119,8 +119,13 @@ export interface AnalyticsBalanceDay {
   workouts: number;
   durationMinutes: number;
   avgEnergy: number | null;
+  avgFocus: number | null;
   avgSleep: number | null;
   avgSoreness: number | null;
+  avgExertion: number | null;
+  avgHydration: number | null;
+  avgRestingHeartRate: number | null;
+  avgSleepDuration: number | null;
   readinessScore: number | null;
 }
 
@@ -133,10 +138,28 @@ export interface AnalyticsBalanceData {
   };
 }
 
+export interface AnalyticsCorrelation {
+  trainingMetric: string;
+  recoveryMetric: string;
+  correlation: number;
+  sampleSize: number;
+}
+
+export interface AnalyticsCorrelationSeries extends AnalyticsCorrelation {
+  pairs: { date: string; x: number; y: number }[];
+}
+
+export interface AnalyticsInsightData {
+  correlations: AnalyticsCorrelation[];
+  primaryCorrelation: AnalyticsCorrelationSeries | null;
+  readinessDrivers: AnalyticsCorrelation[];
+}
+
 export interface AnalyticsResponse {
   period: string;
   range: AnalyticsRange;
   workouts: AnalyticsWorkoutsData;
   recovery: AnalyticsRecoveryData;
   balance: AnalyticsBalanceData;
+  insights: AnalyticsInsightData;
 }

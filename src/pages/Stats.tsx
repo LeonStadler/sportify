@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { de, enUS } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
+import type { DateRange } from "react-day-picker";
 
 import { PageTemplate } from "@/components/PageTemplate";
 import { useAnalytics } from "@/hooks/use-analytics";
@@ -17,8 +18,19 @@ export function Stats() {
   const { t, i18n } = useTranslation();
   const { toast } = useToast();
   const locale = useMemo(() => (i18n.language === "en" ? enUS : de), [i18n.language]);
-  const [timeRange, setTimeRange] = useState("week");
-  const { data, isLoading, error, reload } = useAnalytics(timeRange);
+  const [period, setPeriod] = useState("week");
+  const [customRange, setCustomRange] = useState<DateRange | undefined>();
+
+  const analyticsSelection = useMemo(
+    () => ({
+      period,
+      start: period === "custom" ? customRange?.from ?? null : null,
+      end: period === "custom" ? customRange?.to ?? null : null,
+    }),
+    [customRange?.from, customRange?.to, period],
+  );
+
+  const { data, isLoading, error, reload } = useAnalytics(analyticsSelection);
 
   useEffect(() => {
     if (error && error !== "missing-token") {
@@ -57,11 +69,34 @@ export function Stats() {
     [i18n.language, locale, t],
   );
 
+  const handlePeriodChange = useCallback(
+    (nextPeriod: string) => {
+      setPeriod(nextPeriod);
+    },
+    [],
+  );
+
+  const handleRangeChange = useCallback((range: DateRange | undefined) => {
+    setCustomRange(range);
+    if (range?.from && range?.to) {
+      setPeriod("custom");
+    }
+  }, []);
+
   return (
     <PageTemplate
       title={t("stats.title", "Statistics")}
       subtitle={t("stats.subtitle", "Detailed analysis of your athletic performance")}
-      headerActions={<AnalyticsPeriodSelect value={timeRange} onChange={setTimeRange} t={t} />}
+      headerActions={
+        <AnalyticsPeriodSelect
+          value={period}
+          range={customRange}
+          onPeriodChange={handlePeriodChange}
+          onRangeChange={handleRangeChange}
+          t={t}
+          formatDate={(date) => formatters.formatRangeDate(date.toISOString())}
+        />
+      }
       className="space-y-4 md:space-y-6"
     >
       <AnalyticsDashboard

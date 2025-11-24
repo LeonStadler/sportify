@@ -2,6 +2,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Brush,
   Legend,
   ResponsiveContainer,
   Tooltip,
@@ -20,9 +21,23 @@ export interface ActivityMetricConfig {
 interface ActivityTimelineChartProps {
   data: AnalyticsWorkoutDay[];
   metrics: ActivityMetricConfig[];
+  stacked?: boolean;
+  formatDate?: (value: string) => string;
+  formatValue?: (key: ActivityMetricConfig["key"], value: number) => string;
 }
 
-export function ActivityTimelineChart({ data, metrics }: ActivityTimelineChartProps) {
+export function ActivityTimelineChart({
+  data,
+  metrics,
+  stacked = true,
+  formatDate,
+  formatValue,
+}: ActivityTimelineChartProps) {
+  const formatLabel = (value: string) => {
+    if (formatDate) return formatDate(value);
+    return value.slice(5);
+  };
+
   return (
     <ResponsiveContainer width="100%" height={320}>
       <BarChart data={data}>
@@ -31,7 +46,7 @@ export function ActivityTimelineChart({ data, metrics }: ActivityTimelineChartPr
           dataKey="date"
           tickLine={false}
           axisLine={false}
-          tickFormatter={(value: string) => value.slice(5)}
+          tickFormatter={formatLabel}
         />
         <YAxis tickLine={false} axisLine={false} allowDecimals />
         <Tooltip
@@ -40,6 +55,12 @@ export function ActivityTimelineChart({ data, metrics }: ActivityTimelineChartPr
             borderRadius: 8,
             border: "1px solid hsl(var(--border))",
             backgroundColor: "hsl(var(--popover))",
+          }}
+          labelFormatter={formatLabel}
+          formatter={(value: number, key: string) => {
+            const metric = metrics.find((option) => option.key === key);
+            const formattedValue = metric && formatValue ? formatValue(metric.key, value) : value;
+            return [formattedValue, metric?.label ?? key];
           }}
         />
         <Legend wrapperStyle={{ paddingTop: 8 }} />
@@ -51,8 +72,10 @@ export function ActivityTimelineChart({ data, metrics }: ActivityTimelineChartPr
             fill={metric.color}
             radius={[4, 4, 0, 0]}
             maxBarSize={28}
+            stackId={stacked ? "activity" : undefined}
           />
         ))}
+        <Brush height={20} travellerWidth={12} stroke="hsl(var(--primary))" />
       </BarChart>
     </ResponsiveContainer>
   );

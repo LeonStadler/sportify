@@ -1,5 +1,6 @@
 import {
   Bar,
+  Brush,
   CartesianGrid,
   ComposedChart,
   Legend,
@@ -16,13 +17,24 @@ interface ReadinessTrendChartProps {
   data: AnalyticsBalanceDay[];
   readinessLabel: string;
   pointsLabel: string;
+  formatDate?: (value: string) => string;
+  formatPoints?: (value: number) => string;
+  formatReadiness?: (value: number) => string;
 }
 
 export function ReadinessTrendChart({
   data,
   readinessLabel,
   pointsLabel,
+  formatDate,
+  formatPoints,
+  formatReadiness,
 }: ReadinessTrendChartProps) {
+  const formatLabel = (value: string) => {
+    if (formatDate) return formatDate(value);
+    return value.slice(5);
+  };
+
   return (
     <ResponsiveContainer width="100%" height={320}>
       <ComposedChart data={data}>
@@ -31,7 +43,7 @@ export function ReadinessTrendChart({
           dataKey="date"
           tickLine={false}
           axisLine={false}
-          tickFormatter={(value: string) => value.slice(5)}
+          tickFormatter={formatLabel}
         />
         <YAxis yAxisId="points" orientation="left" tickLine={false} axisLine={false} />
         <YAxis
@@ -46,6 +58,16 @@ export function ReadinessTrendChart({
             borderRadius: 8,
             border: "1px solid hsl(var(--border))",
             backgroundColor: "hsl(var(--popover))",
+          }}
+          labelFormatter={formatLabel}
+          formatter={(value: number, key: string) => {
+            if (key === "readinessScore") {
+              return [formatReadiness ? formatReadiness(value) : value, readinessLabel];
+            }
+            if (key === "points") {
+              return [formatPoints ? formatPoints(value) : value, pointsLabel];
+            }
+            return [value, key];
           }}
         />
         <Legend wrapperStyle={{ paddingTop: 8 }} />
@@ -68,6 +90,7 @@ export function ReadinessTrendChart({
           activeDot={{ r: 4 }}
           connectNulls
         />
+        <Brush height={20} travellerWidth={12} stroke="hsl(var(--primary))" />
       </ComposedChart>
     </ResponsiveContainer>
   );

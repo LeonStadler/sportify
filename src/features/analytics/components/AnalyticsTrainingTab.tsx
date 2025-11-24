@@ -13,6 +13,11 @@ interface AnalyticsTrainingTabProps {
 }
 
 export function AnalyticsTrainingTab({ workouts, formatters, t }: AnalyticsTrainingTabProps) {
+  const highlights = workouts?.highlights;
+  const totals = workouts?.totals;
+  const timeline = (workouts?.timeline ?? []) as AnalyticsWorkoutDay[];
+  const hasTimeline = timeline.length > 0;
+
   return (
     <>
       <Card>
@@ -20,10 +25,16 @@ export function AnalyticsTrainingTab({ workouts, formatters, t }: AnalyticsTrain
           <CardTitle>{t("stats.pointsTrend")}</CardTitle>
         </CardHeader>
         <CardContent>
-          <PointsTrendChart
-            data={(workouts?.timeline ?? []) as AnalyticsWorkoutDay[]}
-            areaLabel={t("stats.points")}
-          />
+          {hasTimeline ? (
+            <PointsTrendChart
+              data={timeline}
+              areaLabel={t("stats.points")}
+              formatDate={(value) => formatters.formatRangeDate(value)}
+              formatValue={(value) => formatters.formatInteger(Math.round(value))}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">{t("stats.noWorkoutData")}</p>
+          )}
         </CardContent>
       </Card>
 
@@ -35,14 +46,14 @@ export function AnalyticsTrainingTab({ workouts, formatters, t }: AnalyticsTrain
           <div className="space-y-1">
             <p className="text-xs uppercase text-muted-foreground">{t("stats.peakDay")}</p>
             <p className="text-base font-medium">
-              {workouts?.highlights.peakDay
-                ? formatters.formatRangeDate(workouts.highlights.peakDay.date)
+              {highlights?.peakDay
+                ? formatters.formatRangeDate(highlights.peakDay.date)
                 : "—"}
             </p>
             <p className="text-sm text-muted-foreground">
-              {workouts?.highlights.peakDay
+              {highlights?.peakDay
                 ? t("stats.pointsWithUnit", {
-                    value: formatters.formatInteger(workouts.highlights.peakDay.points),
+                    value: formatters.formatInteger(highlights.peakDay.points),
                   })
                 : t("stats.noWorkoutData")}
             </p>
@@ -50,24 +61,24 @@ export function AnalyticsTrainingTab({ workouts, formatters, t }: AnalyticsTrain
           <div className="space-y-1">
             <p className="text-xs uppercase text-muted-foreground">{t("stats.longestWorkout")}</p>
             <p className="text-base font-medium">
-              {workouts?.highlights.longestWorkout?.title ?? "—"}
+              {highlights?.longestWorkout?.title ?? "—"}
             </p>
             <p className="text-sm text-muted-foreground">
-              {workouts?.highlights.longestWorkout
-                ? `${formatters.formatRangeDate(workouts.highlights.longestWorkout.startTime)} · ${formatters.formatDurationMinutes(workouts.highlights.longestWorkout.durationMinutes)}`
+              {highlights?.longestWorkout
+                ? `${formatters.formatRangeDate(highlights.longestWorkout.startTime)} · ${formatters.formatDurationMinutes(highlights.longestWorkout.durationMinutes)}`
                 : t("stats.noWorkoutData")}
             </p>
           </div>
           <div className="space-y-1">
             <p className="text-xs uppercase text-muted-foreground">{t("stats.activeDays")}</p>
             <p className="text-base font-medium">
-              {formatters.formatInteger(workouts?.highlights.activeDays ?? 0)}
+              {formatters.formatInteger(highlights?.activeDays ?? 0)}
             </p>
             <p className="text-sm text-muted-foreground">
               {t("stats.consistency", {
                 value:
-                  workouts?.totals.consistency !== null && workouts?.totals.consistency !== undefined
-                    ? formatters.formatDecimal(workouts.totals.consistency, 1)
+                  totals?.consistency !== null && totals?.consistency !== undefined
+                    ? formatters.formatDecimal(totals.consistency, 1)
                     : "0",
               })}
             </p>

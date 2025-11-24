@@ -20,11 +20,17 @@ export const createStatsRouter = (pool) => {
     router.get('/analytics', authMiddleware, async (req, res) => {
         try {
             const requestedPeriod = typeof req.query.period === 'string' ? req.query.period : 'week';
-            const analytics = await getAnalyticsForPeriod(pool, req.user.id, requestedPeriod);
+            const startDate = typeof req.query.start === 'string' ? req.query.start : undefined;
+            const endDate = typeof req.query.end === 'string' ? req.query.end : undefined;
+
+            const analytics = await getAnalyticsForPeriod(pool, req.user.id, requestedPeriod, { startDate, endDate });
             res.json(analytics);
         } catch (error) {
             console.error('Analytics stats error:', error);
-            res.status(500).json({ error: 'Serverfehler beim Laden der Analytics-Daten.' });
+            const message = error.message?.includes('Invalid custom date range')
+                ? 'Ungültiger Datumsbereich für Analytics.'
+                : 'Serverfehler beim Laden der Analytics-Daten.';
+            res.status(500).json({ error: message });
         }
     });
 

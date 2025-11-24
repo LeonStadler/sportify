@@ -193,6 +193,13 @@ test('getAnalyticsForPeriod aggregates workout and recovery analytics', async ()
   });
 
   assert.equal(analytics.workouts.timeline.length, 2);
+  assert.deepEqual(analytics.workouts.activityBreakdown, [
+    { activity: 'pullups', total: 30, percentage: 23.1 },
+    { activity: 'pushups', total: 45, percentage: 34.6 },
+    { activity: 'running', total: 15, percentage: 11.5 },
+    { activity: 'cycling', total: 5, percentage: 3.8 },
+    { activity: 'situps', total: 35, percentage: 26.9 },
+  ]);
   assert.deepEqual(analytics.workouts.comparison, {
     points: { current: 220, previous: 120, change: { difference: 100, percent: 83.3 } },
     workouts: { current: 2, previous: 1, change: { difference: 1, percent: 100 } },
@@ -246,15 +253,38 @@ test('getAnalyticsForPeriod aggregates workout and recovery analytics', async ()
     workouts: 1,
     durationMinutes: 45,
     avgEnergy: 7,
+    avgFocus: 6,
     avgSleep: 8,
     avgSoreness: 3,
+    avgExertion: 4,
+    avgHydration: 7,
+    avgRestingHeartRate: 52,
+    avgSleepDuration: 7.5,
     readinessScore: 69,
+  });
+  assert.deepEqual(analytics.balance.daily[1], {
+    date: '2024-01-02',
+    points: 120,
+    workouts: 1,
+    durationMinutes: 50,
+    avgEnergy: 6,
+    avgFocus: 5,
+    avgSleep: 7,
+    avgSoreness: 4,
+    avgExertion: 5,
+    avgHydration: 6,
+    avgRestingHeartRate: 54,
+    avgSleepDuration: 7,
+    readinessScore: 59,
   });
   assert.deepEqual(analytics.balance.readiness, {
     average: 64,
     previousAverage: 59,
     change: { difference: 5, percent: 8.5 },
   });
+
+  assert.ok(analytics.insights.primaryCorrelation);
+  assert.ok(analytics.insights.correlations.length > 0);
 });
 
 test('getAnalyticsForPeriod handles empty datasets gracefully', async () => {
@@ -279,6 +309,14 @@ test('getAnalyticsForPeriod handles empty datasets gracefully', async () => {
     averagePointsPerWorkout: null,
     consistency: null,
   });
+
+  assert.deepEqual(analytics.workouts.activityBreakdown, [
+    { activity: 'pullups', total: 0, percentage: 0 },
+    { activity: 'pushups', total: 0, percentage: 0 },
+    { activity: 'running', total: 0, percentage: 0 },
+    { activity: 'cycling', total: 0, percentage: 0 },
+    { activity: 'situps', total: 0, percentage: 0 },
+  ]);
 
   assert.deepEqual(analytics.workouts.comparison, {
     points: { current: 0, previous: 0, change: { difference: 0, percent: null } },
@@ -317,5 +355,11 @@ test('getAnalyticsForPeriod handles empty datasets gracefully', async () => {
       previousAverage: null,
       change: null,
     },
+  });
+
+  assert.deepEqual(analytics.insights, {
+    correlations: [],
+    primaryCorrelation: null,
+    readinessDrivers: [],
   });
 });

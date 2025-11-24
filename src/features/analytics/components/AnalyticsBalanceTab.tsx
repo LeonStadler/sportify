@@ -20,11 +20,18 @@ export function AnalyticsBalanceTab({ balanceData, formatters, t }: AnalyticsBal
           <CardTitle>{t("stats.readinessTrend")}</CardTitle>
         </CardHeader>
         <CardContent>
-          <ReadinessTrendChart
-            data={balanceData}
-            readinessLabel={t("stats.readinessLabel")}
-            pointsLabel={t("stats.points")}
-          />
+          {balanceData.length ? (
+            <ReadinessTrendChart
+              data={balanceData}
+              readinessLabel={t("stats.readinessLabel")}
+              pointsLabel={t("stats.points")}
+              formatDate={(value) => formatters.formatRangeDate(value)}
+              formatPoints={(value) => formatters.formatInteger(Math.round(value))}
+              formatReadiness={(value) => formatters.formatDecimal(value, 1)}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">{t("stats.noBalanceData")}</p>
+          )}
         </CardContent>
       </Card>
 

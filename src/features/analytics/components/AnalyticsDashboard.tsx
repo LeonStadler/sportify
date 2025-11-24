@@ -51,6 +51,7 @@ export function AnalyticsDashboard({
   const workouts = safeAnalyticsData?.workouts;
   const recovery = safeAnalyticsData?.recovery;
   const balance = safeAnalyticsData?.balance;
+  const insights = safeAnalyticsData?.insights;
   const range = safeAnalyticsData?.range;
 
   const [selectedActivityKeys, setSelectedActivityKeys] = useState<ActivityMetricKey[]>(() =>
@@ -147,20 +148,21 @@ export function AnalyticsDashboard({
         </div>
       ) : null}
 
-      {safeAnalyticsData ? (
-        <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="flex-wrap">
-            <TabsTrigger value="overview">{t("stats.overview")}</TabsTrigger>
-            <TabsTrigger value="training">{t("stats.training")}</TabsTrigger>
-            <TabsTrigger value="recovery">{t("stats.recovery")}</TabsTrigger>
-            <TabsTrigger value="balance">{t("stats.balance")}</TabsTrigger>
-          </TabsList>
+          {safeAnalyticsData ? (
+            <Tabs defaultValue="overview" className="w-full">
+              <TabsList className="flex-wrap">
+                <TabsTrigger value="overview">{t("stats.overview", "Übersicht")}</TabsTrigger>
+                <TabsTrigger value="training">{t("stats.training", "Training")}</TabsTrigger>
+                <TabsTrigger value="recovery">{t("stats.recovery", "Erholung")}</TabsTrigger>
+                <TabsTrigger value="balance">{t("stats.balance", "Balance")}</TabsTrigger>
+              </TabsList>
 
           <TabsContent value="overview" className="space-y-4 md:space-y-6">
             <AnalyticsOverviewTab
               workouts={workouts}
               recovery={recovery}
               balance={balance}
+              insights={insights}
               range={range ?? null}
               activityMetrics={activityMetrics}
               selectedActivityKeys={selectedActivityKeys}

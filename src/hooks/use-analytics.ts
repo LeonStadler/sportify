@@ -1,7 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { API_URL } from "@/lib/api";
 import type { AnalyticsResponse } from "@/types/analytics";
+
+export interface AnalyticsSelection {
+  period: string;
+  start?: Date | null;
+  end?: Date | null;
+}
 
 interface UseAnalyticsResult {
   data: AnalyticsResponse | null;
@@ -10,17 +16,38 @@ interface UseAnalyticsResult {
   reload: () => Promise<void>;
 }
 
-export function useAnalytics(period: string): UseAnalyticsResult {
+export function useAnalytics(selection: AnalyticsSelection): UseAnalyticsResult {
   const [data, setData] = useState<AnalyticsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  const rangeKey = useMemo(() => {
+    const start = selection.start ? selection.start.toISOString() : "";
+    const end = selection.end ? selection.end.toISOString() : "";
+    return `${selection.period}:${start}:${end}`;
+  }, [selection.end, selection.period, selection.start]);
+
+  const buildQueryString = useCallback(() => {
+    const params = new URLSearchParams({ period: selection.period });
+    if (selection.period === "custom" && selection.start && selection.end) {
+      params.set("start", selection.start.toISOString().slice(0, 10));
+      params.set("end", selection.end.toISOString().slice(0, 10));
+    }
+    return params.toString();
+  }, [selection.end, selection.period, selection.start]);
 
   const loadAnalytics = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) {
       setError("missing-token");
       setData(null);
+      return;
+    }
+
+    if (selection.period === "custom" && (!selection.start || !selection.end)) {
+      setData(null);
+      setError(null);
       return;
     }
 
@@ -32,7 +59,7 @@ export function useAnalytics(period: string): UseAnalyticsResult {
     setError(null);
 
     try {
-      const response = await fetch(`${API_URL}/stats/analytics?period=${encodeURIComponent(period)}`, {
+      const response = await fetch(`${API_URL}/stats/analytics?${buildQueryString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -56,7 +83,7 @@ export function useAnalytics(period: string): UseAnalyticsResult {
     } finally {
       setIsLoading(false);
     }
-  }, [period]);
+  }, [buildQueryString, selection.end, selection.period, selection.start]);
 
   useEffect(() => {
     loadAnalytics();
@@ -64,7 +91,7 @@ export function useAnalytics(period: string): UseAnalyticsResult {
     return () => {
       abortControllerRef.current?.abort();
     };
-  }, [loadAnalytics]);
+  }, [loadAnalytics, rangeKey]);
 
   return {
     data,

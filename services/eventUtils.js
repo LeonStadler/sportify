@@ -1,4 +1,4 @@
-import { addDays, endOfMonth, startOfMonth, startOfWeek, subWeeks } from 'date-fns';
+import { addDays, addMonths, startOfMonth, startOfWeek, subWeeks } from 'date-fns';
 
 const toDate = (value) => (value instanceof Date ? new Date(value.getTime()) : new Date(value));
 
@@ -27,16 +27,16 @@ export const resolveWeeklyWindow = (referenceDate, offsetMinutes) => {
 };
 
 export const resolveMonthlyWindow = (referenceDate, offsetMinutes) => {
-    const adjustedReference = referenceDate.getDate() === 1 ? addDays(referenceDate, -1) : referenceDate;
-    const offsetReference = applyOffset(adjustedReference, offsetMinutes);
-    const monthStartLocal = startOfMonth(offsetReference);
-    const monthEndLocal = endOfMonth(offsetReference);
+    const offsetReference = applyOffset(referenceDate, offsetMinutes);
+    const evaluationReference = offsetReference.getDate() === 1 ? addDays(offsetReference, -1) : offsetReference;
+    const monthStartLocal = startOfMonth(evaluationReference);
+    const exclusiveLocalEnd = startOfMonth(addMonths(monthStartLocal, 1));
 
     return {
         utcStart: revertOffset(monthStartLocal, offsetMinutes),
-        utcEnd: revertOffset(addDays(monthEndLocal, 1), offsetMinutes),
+        utcEnd: revertOffset(exclusiveLocalEnd, offsetMinutes),
         localStart: monthStartLocal,
-        localEnd: addDays(monthEndLocal, 1),
+        localEnd: exclusiveLocalEnd,
     };
 };
 

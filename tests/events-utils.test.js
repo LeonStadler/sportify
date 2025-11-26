@@ -5,6 +5,7 @@ import {
   buildFriendAdjacency,
   computeDirectLeaderboard,
   evaluateWeeklyGoals,
+  resolveMonthlyWindow,
 } from '../services/eventUtils.js';
 import {
   DEFAULT_WEEKLY_POINT_CHALLENGE,
@@ -82,5 +83,37 @@ describe('eventUtils.computeDirectLeaderboard', () => {
       false,
       'Alice should not appear in Carol\'s leaderboard because they are not friends',
     );
+  });
+});
+
+describe('eventUtils.resolveMonthlyWindow', () => {
+  it('evaluates the just-finished month in the configured timezone', () => {
+    const referenceDate = new Date('2025-07-01T00:05:00.000Z');
+    const offsetMinutes = 120; // UTC+2
+
+    const window = resolveMonthlyWindow(referenceDate, offsetMinutes);
+
+    assert.equal(window.localStart.getUTCMonth(), 5, 'local start should point to June');
+    assert.equal(window.localEnd.getUTCMonth(), 6, 'local end should roll into July');
+    assert.equal(
+      window.utcStart.toISOString(),
+      '2025-05-31T22:00:00.000Z',
+      'UTC start reflects June 1st local at UTC-2',
+    );
+    assert.equal(
+      window.utcEnd.toISOString(),
+      '2025-06-30T22:00:00.000Z',
+      'UTC end reflects July 1st local exclusive boundary',
+    );
+  });
+
+  it('keeps the current month when reference is after the first local day', () => {
+    const referenceDate = new Date('2025-07-05T10:00:00.000Z');
+    const offsetMinutes = -300; // UTC-5
+
+    const window = resolveMonthlyWindow(referenceDate, offsetMinutes);
+
+    assert.equal(window.localStart.getUTCMonth(), 6, 'local start should stay in July');
+    assert.equal(window.utcStart.toISOString(), '2025-07-01T05:00:00.000Z');
   });
 });

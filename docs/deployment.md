@@ -67,6 +67,17 @@ Die `vercel.json` Datei konfiguriert:
 - **Headers**: Security Headers (CSP, etc.)
 - **Static Assets**: Automatisches Serving
 
+## Event-Scheduling im Free-Plan
+
+Da der Vercel-Hobby-Plan nur zwei einfache Cron-Jobs zulässt, werden die Event-Auswertungen über **GitHub Actions** angestoßen:
+
+- Workflow: `.github/workflows/events-scheduler.yml`
+- Secrets im GitHub-Repo hinterlegen:
+  - `EVENTS_BASE_URL` (z. B. `https://<project>.vercel.app`)
+  - `EVENTS_CRON_SECRET` (muss mit der Server-Env übereinstimmen)
+- Frequenzen: wöchentlich (Montag), monatlich (1. des Monats) und alle 15 Minuten für den Mail-Dispatcher.
+- Optional per `workflow_dispatch` manuell triggerbar.
+
 ## Umgebungsvariablen
 
 ### Backend (Serverless Functions)

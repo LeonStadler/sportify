@@ -124,8 +124,8 @@ Zeitgesteuerte Auswertungen für Wochen- und Monatsziele:
 
 - `processWeeklyEvents` aggregiert Workouts, vergibt Badges/Awards und schreibt Leaderboard-Ränge.
 - `processMonthlyEvents` prüft Monats-Challenges und vergibt Monatsabzeichen.
-- Cron-Trigger (`routes/events.routes.js`) sichern sich über einen optionalen Bearer-Token (`EVENTS_CRON_SECRET`).
-- Zeitzone: per `EVENTS_UTC_OFFSET_MINUTES` (Default `0`) lässt sich der Auswertungszeitpunkt vom UTC-Cron entkoppeln.
+- Trigger werden im Free-Plan per **GitHub Actions** ausgelöst (`.github/workflows/events-scheduler.yml`). Der Workflow ruft die API-Endpunkte mit einem Bearer-Token (`EVENTS_CRON_SECRET`) auf und ersetzt damit die Vercel-Crons.
+- Zeitzone: per `EVENTS_UTC_OFFSET_MINUTES` (Default `0`) lässt sich der Auswertungszeitpunkt vom UTC-Cron/Scheduler entkoppeln.
 
 Zusätzliche Tabellen: `weekly_results`, `monthly_results`, `leaderboard_results`, `awards`, `user_badges`, `notifications`, `email_queue`, `push_subscriptions`.
 

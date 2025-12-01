@@ -829,9 +829,6 @@ const resources = {
         settingSaved: "{{setting}} wurde aktualisiert.",
         saveError: "Fehler beim Speichern",
       },
-      common: {
-        error: "Fehler",
-      },
       // Push Notifications
       pushNotifications: {
         title: "Push-Benachrichtigungen",
@@ -2490,9 +2487,6 @@ const resources = {
         saved: "Saved",
         settingSaved: "{{setting}} has been updated.",
         saveError: "Failed to save",
-      },
-      common: {
-        error: "Error",
       },
       // Push Notifications
       pushNotifications: {

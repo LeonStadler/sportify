@@ -1,105 +1,121 @@
-import { randomUUID } from 'crypto';
-import express from 'express';
-import authMiddleware from '../middleware/authMiddleware.js';
+import { randomUUID } from "crypto";
+import express from "express";
+import authMiddleware from "../middleware/authMiddleware.js";
 import {
-    getPushPublicKey,
-    listNotifications,
-    markNotificationsRead,
-    removePushSubscription,
-    upsertPushSubscription,
-} from '../services/notificationService.js';
-import { toCamelCase } from '../utils/helpers.js';
+  getPushPublicKey,
+  listNotifications,
+  markNotificationsRead,
+  removePushSubscription,
+  upsertPushSubscription,
+} from "../services/notificationService.js";
 
 export const createNotificationsRouter = (pool) => {
-    const router = express.Router();
+  const router = express.Router();
 
-    // Helper function to create notification
-    const createNotification = async (userId, type, relatedUserId, metadata = {}) => {
-        try {
-            const notificationId = randomUUID();
-            await pool.query(
-                `INSERT INTO notifications (id, user_id, type, related_user_id, metadata)
+  // Helper function to create notification
+  const createNotification = async (
+    userId,
+    type,
+    relatedUserId,
+    metadata = {}
+  ) => {
+    try {
+      const notificationId = randomUUID();
+      await pool.query(
+        `INSERT INTO notifications (id, user_id, type, related_user_id, metadata)
                  VALUES ($1, $2, $3, $4, $5)`,
-                [notificationId, userId, type, relatedUserId, JSON.stringify(metadata)]
-            );
-            return notificationId;
-        } catch (error) {
-            console.error('Error creating notification:', error);
-            // Don't throw - notifications are not critical
-            return null;
-        }
-    };
+        [notificationId, userId, type, relatedUserId, JSON.stringify(metadata)]
+      );
+      return notificationId;
+    } catch (error) {
+      console.error("Error creating notification:", error);
+      // Don't throw - notifications are not critical
+      return null;
+    }
+  };
 
-    // GET /api/notifications - Get user notifications
-    router.get('/', authMiddleware, async (req, res) => {
-        try {
-            const notifications = await listNotifications(pool, req.user.id, { limit: 100 });
-            const payload = notifications.map((notification) => ({
-                id: notification.id,
-                type: notification.type,
-                title: notification.title,
-                message: notification.message,
-                payload: notification.payload,
-                isRead: Boolean(notification.readAt),
-                createdAt: notification.createdAt,
-                // Include related user info if available
-                firstName: notification.firstName,
-                lastName: notification.lastName,
-                nickname: notification.nickname,
-                avatarUrl: notification.avatarUrl,
-            }));
-            res.json(payload);
-        } catch (error) {
-            console.error('Get notifications error:', error);
-            res.status(500).json({ error: 'Serverfehler beim Laden der Benachrichtigungen.' });
-        }
-    });
+  // GET /api/notifications - Get user notifications
+  router.get("/", authMiddleware, async (req, res) => {
+    try {
+      const notifications = await listNotifications(pool, req.user.id, {
+        limit: 100,
+      });
+      const payload = notifications.map((notification) => ({
+        id: notification.id,
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        payload: notification.payload,
+        isRead: Boolean(notification.readAt),
+        createdAt: notification.createdAt,
+        // Include related user info if available
+        firstName: notification.firstName,
+        lastName: notification.lastName,
+        nickname: notification.nickname,
+        avatarUrl: notification.avatarUrl,
+      }));
+      res.json(payload);
+    } catch (error) {
+      console.error("Get notifications error:", error);
+      res
+        .status(500)
+        .json({ error: "Serverfehler beim Laden der Benachrichtigungen." });
+    }
+  });
 
-    // POST /api/notifications/mark-read - Mark all notifications as read
-    router.post('/mark-read', authMiddleware, async (req, res) => {
-        try {
-            await markNotificationsRead(pool, req.user.id);
-            res.json({ message: 'Alle Benachrichtigungen wurden als gelesen markiert.' });
-        } catch (error) {
-            console.error('Mark notifications as read error:', error);
-            res.status(500).json({ error: 'Serverfehler beim Markieren der Benachrichtigungen.' });
-        }
-    });
+  // POST /api/notifications/mark-read - Mark all notifications as read
+  router.post("/mark-read", authMiddleware, async (req, res) => {
+    try {
+      await markNotificationsRead(pool, req.user.id);
+      res.json({
+        message: "Alle Benachrichtigungen wurden als gelesen markiert.",
+      });
+    } catch (error) {
+      console.error("Mark notifications as read error:", error);
+      res
+        .status(500)
+        .json({ error: "Serverfehler beim Markieren der Benachrichtigungen." });
+    }
+  });
 
-    // GET /api/notifications/public-key - Get VAPID public key for push notifications
-    router.get('/public-key', authMiddleware, (req, res) => {
-        const publicKey = getPushPublicKey();
-        res.json({ publicKey, enabled: Boolean(publicKey) });
-    });
+  // GET /api/notifications/public-key - Get VAPID public key for push notifications
+  router.get("/public-key", authMiddleware, (req, res) => {
+    const publicKey = getPushPublicKey();
+    res.json({ publicKey, enabled: Boolean(publicKey) });
+  });
 
-    // POST /api/notifications/subscriptions - Save push subscription
-    router.post('/subscriptions', authMiddleware, async (req, res) => {
-        try {
-            await upsertPushSubscription(pool, req.user.id, req.body);
-            res.status(201).json({ message: 'Push subscription gespeichert.' });
-        } catch (error) {
-            console.error('Save push subscription error:', error);
-            res.status(400).json({ error: error.message || 'Ungültiges Subscription-Objekt.' });
-        }
-    });
+  // POST /api/notifications/subscriptions - Save push subscription
+  router.post("/subscriptions", authMiddleware, async (req, res) => {
+    try {
+      await upsertPushSubscription(pool, req.user.id, req.body);
+      res.status(201).json({ message: "Push subscription gespeichert." });
+    } catch (error) {
+      console.error("Save push subscription error:", error);
+      res
+        .status(400)
+        .json({ error: error.message || "Ungültiges Subscription-Objekt." });
+    }
+  });
 
-    // DELETE /api/notifications/subscriptions - Remove push subscription
-    router.delete('/subscriptions', authMiddleware, async (req, res) => {
-        try {
-            const { endpoint } = req.body || {};
-            if (!endpoint) {
-                return res.status(400).json({ error: 'Endpoint ist erforderlich.' });
-            }
-            await removePushSubscription(pool, req.user.id, endpoint);
-            res.status(204).send();
-        } catch (error) {
-            console.error('Remove push subscription error:', error);
-            res.status(500).json({ error: 'Serverfehler beim Entfernen der Subscription.' });
-        }
-    });
+  // DELETE /api/notifications/subscriptions - Remove push subscription
+  router.delete("/subscriptions", authMiddleware, async (req, res) => {
+    try {
+      const { endpoint } = req.body || {};
+      if (!endpoint) {
+        return res.status(400).json({ error: "Endpoint ist erforderlich." });
+      }
+      await removePushSubscription(pool, req.user.id, endpoint);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Remove push subscription error:", error);
+      res
+        .status(500)
+        .json({ error: "Serverfehler beim Entfernen der Subscription." });
+    }
+  });
 
-    // Export helper function for use in other routes
-    router.createNotification = createNotification;
+  // Export helper function for use in other routes
+  router.createNotification = createNotification;
 
-    return router;
+  return router;
 };

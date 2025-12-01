@@ -9,6 +9,14 @@ const SUBJECT =
 const TTL = Number(process.env.WEB_PUSH_TTL_SECONDS ?? 0) || 60;
 
 const isConfigured = Boolean(PUBLIC_KEY && PRIVATE_KEY);
+
+// Debug-Log beim Server-Start
+console.log("[Push Service] Configuration status:", {
+  hasPublicKey: Boolean(PUBLIC_KEY),
+  hasPrivateKey: Boolean(PRIVATE_KEY),
+  subject: SUBJECT,
+  isConfigured,
+});
 let webPushModule = null;
 let loadPromise = null;
 

@@ -124,6 +124,7 @@ export const createFeedRouter = (pool, ensureFriendInfrastructure) => {
           id: activity.id,
           displayName,
           userName: displayName,
+          displayName: displayName,
           userAvatar: activity.avatarUrl || null,
           userFirstName: activity.firstName,
           userLastName: activity.lastName,

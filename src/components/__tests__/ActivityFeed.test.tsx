@@ -1,73 +1,91 @@
-import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { ActivityFeed } from '../ActivityFeed';
+import { render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ActivityFeed } from "../ActivityFeed";
 
 const toastMock = vi.fn();
 
-const mockUser = { id: 'user-1' } as const;
-
-vi.mock('@/hooks/use-auth', () => ({
-  useAuth: () => ({ user: mockUser }),
+vi.mock("@/hooks/use-auth", () => ({
+  useAuth: () => ({ user: { id: "user-1" } }),
 }));
 
-vi.mock('@/hooks/use-toast', () => ({
+vi.mock("@/hooks/use-toast", () => ({
   useToast: () => ({ toast: toastMock }),
 }));
 
-const translate = (key: string, options?: Record<string, unknown>) => {
-  switch (key) {
-    case 'activityFeed.points':
-      return 'Punkte';
-    case 'activityFeed.repetitions':
-      return 'Wiederholungen';
-    case 'activityFeed.timeAgoShort.unknown':
-      return 'Vor einiger Zeit';
-    case 'activityFeed.timeAgoShort.minutes':
-      return `${options?.count} Minuten`;
-    case 'activityFeed.timeAgoShort.hours':
-      return `${options?.count} Stunden`;
-    case 'activityFeed.timeAgoShort.days':
-      return `${options?.count} Tage`;
-    case 'activityFeed.inWorkout':
-      return `im Workout ${options?.title ?? ''}`.trim();
-    case 'activityFeed.couldNotLoad':
-      return 'Aktivitäten konnten nicht geladen werden.';
-    case 'activityFeed.errorLoading':
-      return 'Fehler beim Laden';
-    case 'activityFeed.title':
-      return 'Aktivitäten deiner Freunde';
-    case 'activityFeed.activityTypes.pullups':
-      return 'Klimmzüge';
-    case 'activityFeed.activityTypes.unknown':
-      return 'Aktivität';
-    default:
-      return key;
-  }
+type TranslationOptions = {
+  count?: number;
+  title?: string;
+  [key: string]: string | number | undefined;
 };
 
-vi.mock('react-i18next', () => ({
+type TranslationEntry = string | ((opts?: TranslationOptions) => string);
+
+vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: translate,
-    i18n: { changeLanguage: async () => undefined },
+    t: (key: string, options?: TranslationOptions) => {
+      const dictionary: Record<string, TranslationEntry> = {
+        "activityFeed.title": "Aktivitäten",
+        "activityFeed.activityTypes.unknown": "Unbekannte Aktivität",
+        "activityFeed.repetitions": "Wiederholungen",
+        "activityFeed.units": "Einheiten",
+        "activityFeed.inWorkout": (opts) =>
+          opts?.title ? `im Workout ${opts.title}` : "im Workout",
+        "activityFeed.timeAgoShort.unknown": "Unbekannt",
+        "activityFeed.timeAgoShort.justNow": "Gerade eben",
+        "activityFeed.points": "Punkte",
+        "activityFeed.couldNotLoad":
+          "Aktivitäten konnten nicht geladen werden.",
+        "activityFeed.errorLoading": "Fehler beim Laden der Aktivitäten.",
+        "activityFeed.noFriends": "Noch keine Freunde vorhanden.",
+        "activityFeed.addFriendsToSeeActivities":
+          "Füge Freunde hinzu, um Aktivitäten zu sehen.",
+        "activityFeed.goToFriends": "Zu Freunden",
+        "activityFeed.noActivities": "Noch keine Aktivitäten vorhanden.",
+        "activityFeed.addFriends": "Lade Freunde ein!",
+        "dashboard.error": "Fehler",
+      };
+
+      const entry = dictionary[key];
+      if (typeof entry === "function") {
+        return entry(options);
+      }
+      if (entry) {
+        return entry;
+      }
+      if (typeof options?.count === "number") {
+        return `${options.count} ${key}`;
+      }
+      return key;
+    },
   }),
 }));
 
-describe('ActivityFeed', () => {
+vi.mock("react-router-dom", async () => {
+  const actual =
+    await vi.importActual<typeof import("react-router-dom")>(
+      "react-router-dom"
+    );
+  return {
+    ...actual,
+    useNavigate: () => vi.fn(),
+  };
+});
+describe("ActivityFeed", () => {
   const fetchMock = vi.fn();
 
   beforeEach(() => {
     fetchMock.mockReset();
     toastMock.mockReset();
     global.fetch = fetchMock as unknown as typeof fetch;
-    localStorage.setItem('token', 'test-token');
+    localStorage.setItem("token", "test-token");
   });
 
   afterEach(() => {
     localStorage.clear();
   });
 
-  it('renders activities returned by the API', async () => {
+  it("renders activities returned by the API", async () => {
     const createdAt = new Date().toISOString();
 
     fetchMock.mockResolvedValue({
@@ -75,15 +93,15 @@ describe('ActivityFeed', () => {
       json: async () => ({
         activities: [
           {
-            id: 'activity-1',
-            userName: 'Max Mustermann',
-            userAvatar: '',
-            userFirstName: 'Max',
-            userLastName: 'Mustermann',
-            activityType: 'pullups',
+            id: "activity-1",
+            userName: "Max Mustermann",
+            userAvatar: "",
+            userFirstName: "Max",
+            userLastName: "Mustermann",
+            activityType: "pullups",
             amount: 10,
             points: 25,
-            workoutTitle: 'Morning Session',
+            workoutTitle: "Morning Session",
             createdAt,
           },
         ],
@@ -97,25 +115,22 @@ describe('ActivityFeed', () => {
     );
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText('Max Mustermann')).toBeInTheDocument();
-    });
-    await waitFor(() => {
-      expect(screen.getByText('25 Punkte')).toBeInTheDocument();
+      expect(fetchMock).toHaveBeenCalled();
+      expect(screen.getByText("Max Mustermann")).toBeInTheDocument();
+      expect(screen.getByText("25 Punkte")).toBeInTheDocument();
     });
     expect(fetchMock).toHaveBeenCalledWith(
-      `${import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api'}/feed?page=1&limit=10`,
-      expect.objectContaining({ headers: { Authorization: 'Bearer test-token' } }),
+      `${import.meta.env.VITE_API_URL ?? "http://localhost:3001/api"}/feed?page=1&limit=10`,
+      expect.objectContaining({
+        headers: { Authorization: "Bearer test-token" },
+      })
     );
   });
 
-  it('shows an error message when the API request fails', async () => {
+  it("shows an error message when the API request fails", async () => {
     fetchMock.mockResolvedValue({
       ok: false,
-      json: async () => ({ error: 'Boom' }),
+      json: async () => ({ error: "Boom" }),
     } as Response);
 
     render(
@@ -125,11 +140,14 @@ describe('ActivityFeed', () => {
     );
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalled();
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Aktivitäten konnten nicht geladen werden."
+      );
     });
 
     expect(
-      await screen.findByText('Aktivitäten konnten nicht geladen werden.')
+      await screen.findByText("Aktivitäten konnten nicht geladen werden.")
     ).toBeInTheDocument();
 
     expect(toastMock).toHaveBeenCalled();

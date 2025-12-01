@@ -142,6 +142,15 @@ class FakePool {
       return { rowCount: count, rows: [] };
     }
 
+    if (normalized.startsWith('delete from invitations where email = $1 and status = $2')) {
+      const [email, status] = params;
+      const before = this.invitations.length;
+      this.invitations = this.invitations.filter(
+        (invitation) => !(invitation.email === email && invitation.status === status)
+      );
+      return { rowCount: before - this.invitations.length, rows: [] };
+    }
+
     if (normalized.startsWith('insert into invitations')) {
       const [email, firstName, lastName, invitedBy, tokenHash, expiresAt, status] = params;
       const record = {

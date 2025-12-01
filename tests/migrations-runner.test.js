@@ -1,58 +1,65 @@
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import assert from "node:assert/strict";
+import test from "node:test";
 
-import { createMigrationRunner } from '../db/migrations.js';
+import { createMigrationRunner } from "../db/migrations.js";
 
-const createMockPool = (onStatement) => ({
-    query: async (sql) => {
-        const normalized = sql.trim().toLowerCase();
-        if (normalized.startsWith('select exists')) {
-            return { rows: [{ exists: true }], rowCount: 1 };
-        }
-        onStatement?.(sql);
-        return { rows: [], rowCount: 0 };
-    }
+const createFakePool = () => {
+  const executed = [];
+  return {
+    executed,
+    async query(sql) {
+      const normalized = sql.replace(/\s+/g, " ").trim().toLowerCase();
+      if (
+        normalized.startsWith("select exists") &&
+        normalized.includes("information_schema.tables")
+      ) {
+        return { rows: [{ exists: true }] };
+      }
+      if (
+        normalized.startsWith("select exists") &&
+        normalized.includes("information_schema.columns")
+      ) {
+        return { rows: [{ exists: true }] };
+      }
+      executed.push(sql);
+      return { rows: [], rowCount: 0 };
+    },
+  };
+};
+
+test("createMigrationRunner executes migrations only once per pool", async () => {
+  const fakePool = createFakePool();
+  const runMigrations = createMigrationRunner(fakePool);
+
+  await runMigrations();
+  const firstRunCount = fakePool.executed.length;
+  await runMigrations();
+
+  assert.ok(firstRunCount > 0);
+  assert.equal(fakePool.executed.length, firstRunCount);
+  assert.match(
+    fakePool.executed[0],
+    /CREATE TABLE IF NOT EXISTS training_journal_entries/
+  );
 });
 
-test('createMigrationRunner executes migrations only once per pool', async () => {
-    const executedQueries = [];
-    const fakePool = createMockPool((sql) => {
-        executedQueries.push(sql);
-    });
+test("each migration runner instance isolates execution per pool", async () => {
+  const firstPool = createFakePool();
+  const secondPool = createFakePool();
 
-    const runMigrations = createMigrationRunner(fakePool);
+  const firstRunner = createMigrationRunner(firstPool);
+  const secondRunner = createMigrationRunner(secondPool);
 
-    await runMigrations();
-    const firstRunCount = executedQueries.length;
-    await runMigrations();
+  await firstRunner();
+  const firstRunCount = firstPool.executed.length;
+  await firstRunner();
 
-    assert.ok(firstRunCount > 0);
-    assert.equal(executedQueries.length, firstRunCount);
-    assert(executedQueries.some((sql) => /CREATE TABLE IF NOT EXISTS training_journal_entries/i.test(sql)));
-});
+  await secondRunner();
+  const secondRunCount = secondPool.executed.length;
+  await secondRunner();
 
-test('each migration runner instance isolates execution per pool', async () => {
-    let firstPoolExecutions = 0;
-    let secondPoolExecutions = 0;
-
-    const firstRunner = createMigrationRunner(createMockPool(() => {
-        firstPoolExecutions += 1;
-    }));
-
-    const secondRunner = createMigrationRunner(createMockPool(() => {
-        secondPoolExecutions += 1;
-    }));
-
-    await firstRunner();
-    const firstRunCount = firstPoolExecutions;
-    await firstRunner();
-
-    await secondRunner();
-    const secondRunCount = secondPoolExecutions;
-    await secondRunner();
-
-    assert.ok(firstRunCount > 0);
-    assert.equal(firstPoolExecutions, firstRunCount);
-    assert.ok(secondRunCount > 0);
-    assert.equal(secondPoolExecutions, secondRunCount);
+  assert.ok(firstRunCount > 0);
+  assert.equal(firstPool.executed.length, firstRunCount);
+  assert.ok(secondRunCount > 0);
+  assert.equal(secondPool.executed.length, secondRunCount);
 });

@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
 import { parseAvatarConfig } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
+import { WEEKLY_CHALLENGE_POINTS_TARGET } from "@/config/events";
 import type {
   WeeklyChallengeLeaderboardEntry,
   WeeklyChallengeResponse,
@@ -68,8 +69,6 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
     [i18n.language]
   );
   const numberLocale = i18n.language === "en" ? "en-US" : "de-DE";
-
-  const WEEKLY_POINTS_TARGET = 1500;
 
   const visibleLeaderboard = useMemo(() => {
     if (!data || !user) {
@@ -278,7 +277,14 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
   }
 
   const formattedRange = `${format(new Date(data.week.start), "PPP", { locale })} – ${format(new Date(data.week.end), "PPP", { locale })}`;
-  const challengeCompleted = data.progress.totalPoints >= WEEKLY_POINTS_TARGET;
+  const pointsTarget = data?.targets?.points ?? WEEKLY_CHALLENGE_POINTS_TARGET;
+  const normalizedPointsTarget = pointsTarget > 0 ? pointsTarget : WEEKLY_CHALLENGE_POINTS_TARGET;
+  const challengeCompleted =
+    normalizedPointsTarget > 0 &&
+    data.progress.totalPoints >= normalizedPointsTarget;
+  const completionPercentage = normalizedPointsTarget
+    ? Math.round((data.progress.totalPoints / normalizedPointsTarget) * 100)
+    : 0;
 
   return (
     <Card className={cn("h-full", className)}>
@@ -321,9 +327,7 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
           </span>
           <span className="text-muted-foreground">
             {t("weeklyChallenge.progress")}:{" "}
-            {Math.round(
-              (data.progress.totalPoints / WEEKLY_POINTS_TARGET) * 100
-            )}
+            {completionPercentage}
             %
           </span>
         </div>
@@ -336,13 +340,15 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
             </span>
             <span className="text-muted-foreground">
               {data.progress.totalPoints.toLocaleString()} /{" "}
-              {WEEKLY_POINTS_TARGET.toLocaleString()}{" "}
+              {normalizedPointsTarget.toLocaleString()}{" "}
               {t("weeklyChallenge.points")}
             </span>
           </div>
           <Progress
             value={Math.min(
-              (data.progress.totalPoints / WEEKLY_POINTS_TARGET) * 100,
+              normalizedPointsTarget
+                ? (data.progress.totalPoints / normalizedPointsTarget) * 100
+                : 0,
               100
             )}
             className="h-2"

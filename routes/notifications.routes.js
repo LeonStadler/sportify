@@ -1,6 +1,13 @@
 import { randomUUID } from 'crypto';
 import express from 'express';
 import authMiddleware from '../middleware/authMiddleware.js';
+import {
+    getPushPublicKey,
+    listNotifications,
+    markNotificationsRead,
+    removePushSubscription,
+    upsertPushSubscription,
+} from '../services/notificationService.js';
 import { toCamelCase } from '../utils/helpers.js';
 
 export const createNotificationsRouter = (pool) => {
@@ -26,57 +33,22 @@ export const createNotificationsRouter = (pool) => {
     // GET /api/notifications - Get user notifications
     router.get('/', authMiddleware, async (req, res) => {
         try {
-            const userId = req.user.id;
-
-            // Check if notifications table exists
-            const tableCheck = await pool.query(`
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_schema = 'public' 
-                    AND table_name = 'notifications'
-                );
-            `);
-
-            if (!tableCheck.rows[0]?.exists) {
-                // Table doesn't exist yet - return empty array
-                return res.json([]);
-            }
-
-            // Get notifications from database
-            const { rows } = await pool.query(
-                `SELECT 
-                    n.id,
-                    n.type,
-                    n.is_read AS "isRead",
-                    n.created_at AS "createdAt",
-                    n.read_at AS "readAt",
-                    u.first_name AS "firstName",
-                    u.last_name AS "lastName",
-                    u.nickname,
-                    u.avatar_url AS "avatarUrl"
-                FROM notifications n
-                LEFT JOIN users u ON u.id = n.related_user_id
-                WHERE n.user_id = $1
-                ORDER BY n.created_at DESC
-                LIMIT 50`,
-                [userId]
-            );
-
-            const notifications = rows.map(row => {
-                const notification = toCamelCase(row);
-                return {
-                    id: notification.id,
-                    type: notification.type,
-                    isRead: notification.isRead,
-                    createdAt: notification.createdAt,
-                    firstName: notification.firstName,
-                    lastName: notification.lastName,
-                    nickname: notification.nickname,
-                    avatarUrl: notification.avatarUrl
-                };
-            });
-
-            res.json(notifications);
+            const notifications = await listNotifications(pool, req.user.id, { limit: 100 });
+            const payload = notifications.map((notification) => ({
+                id: notification.id,
+                type: notification.type,
+                title: notification.title,
+                message: notification.message,
+                payload: notification.payload,
+                isRead: Boolean(notification.readAt),
+                createdAt: notification.createdAt,
+                // Include related user info if available
+                firstName: notification.firstName,
+                lastName: notification.lastName,
+                nickname: notification.nickname,
+                avatarUrl: notification.avatarUrl,
+            }));
+            res.json(payload);
         } catch (error) {
             console.error('Get notifications error:', error);
             res.status(500).json({ error: 'Serverfehler beim Laden der Benachrichtigungen.' });
@@ -86,34 +58,43 @@ export const createNotificationsRouter = (pool) => {
     // POST /api/notifications/mark-read - Mark all notifications as read
     router.post('/mark-read', authMiddleware, async (req, res) => {
         try {
-            const userId = req.user.id;
-
-            // Check if notifications table exists
-            const tableCheck = await pool.query(`
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_schema = 'public' 
-                    AND table_name = 'notifications'
-                );
-            `);
-
-            if (!tableCheck.rows[0]?.exists) {
-                // Table doesn't exist yet - return success
-                return res.json({ message: 'Alle Benachrichtigungen wurden als gelesen markiert.' });
-            }
-
-            // Mark all unread notifications as read
-            await pool.query(
-                `UPDATE notifications 
-                 SET is_read = true, read_at = NOW()
-                 WHERE user_id = $1 AND is_read = false`,
-                [userId]
-            );
-
+            await markNotificationsRead(pool, req.user.id);
             res.json({ message: 'Alle Benachrichtigungen wurden als gelesen markiert.' });
         } catch (error) {
             console.error('Mark notifications as read error:', error);
             res.status(500).json({ error: 'Serverfehler beim Markieren der Benachrichtigungen.' });
+        }
+    });
+
+    // GET /api/notifications/public-key - Get VAPID public key for push notifications
+    router.get('/public-key', authMiddleware, (req, res) => {
+        const publicKey = getPushPublicKey();
+        res.json({ publicKey, enabled: Boolean(publicKey) });
+    });
+
+    // POST /api/notifications/subscriptions - Save push subscription
+    router.post('/subscriptions', authMiddleware, async (req, res) => {
+        try {
+            await upsertPushSubscription(pool, req.user.id, req.body);
+            res.status(201).json({ message: 'Push subscription gespeichert.' });
+        } catch (error) {
+            console.error('Save push subscription error:', error);
+            res.status(400).json({ error: error.message || 'Ungültiges Subscription-Objekt.' });
+        }
+    });
+
+    // DELETE /api/notifications/subscriptions - Remove push subscription
+    router.delete('/subscriptions', authMiddleware, async (req, res) => {
+        try {
+            const { endpoint } = req.body || {};
+            if (!endpoint) {
+                return res.status(400).json({ error: 'Endpoint ist erforderlich.' });
+            }
+            await removePushSubscription(pool, req.user.id, endpoint);
+            res.status(204).send();
+        } catch (error) {
+            console.error('Remove push subscription error:', error);
+            res.status(500).json({ error: 'Serverfehler beim Entfernen der Subscription.' });
         }
     });
 
@@ -122,4 +103,3 @@ export const createNotificationsRouter = (pool) => {
 
     return router;
 };
-

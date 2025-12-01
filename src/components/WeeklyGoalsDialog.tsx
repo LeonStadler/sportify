@@ -10,6 +10,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { DEFAULT_WEEKLY_POINTS_GOAL } from "@/config/events";
 import { Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -19,6 +20,7 @@ export interface WeeklyGoals {
   pushups: { target: number; current: number };
   running: { target: number; current: number };
   cycling: { target: number; current: number };
+  points: { target: number; current: number };
 }
 
 interface WeeklyGoalsDialogProps {
@@ -36,11 +38,17 @@ export function WeeklyGoalsDialog({
 }: WeeklyGoalsDialogProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const [localGoals, setLocalGoals] = useState<WeeklyGoals>(goals);
+  const [localGoals, setLocalGoals] = useState<WeeklyGoals>({
+    ...goals,
+    points: goals.points ?? { target: DEFAULT_WEEKLY_POINTS_GOAL, current: 0 },
+  });
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    setLocalGoals(goals);
+    setLocalGoals({
+      ...goals,
+      points: goals.points ?? { target: DEFAULT_WEEKLY_POINTS_GOAL, current: 0 },
+    });
   }, [goals, open]);
 
   const updateGoal = (activity: keyof WeeklyGoals, target: number) => {
@@ -74,6 +82,12 @@ export function WeeklyGoalsDialog({
   };
 
   const activities = [
+    {
+      key: "points" as const,
+      label: t("weeklyGoals.dialog.pointsLabel", "Punkte-Ziel"),
+      unit: t("weeklyGoals.dialog.pointsUnit", "Punkte"),
+      getPlaceholder: () => DEFAULT_WEEKLY_POINTS_GOAL.toString(),
+    },
     {
       key: "pullups" as const,
       label: t("dashboard.pullups", "Klimmzüge"),

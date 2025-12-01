@@ -8,15 +8,32 @@ export const createScoreboardRouter = (pool) => {
   // GET /api/scoreboard/overall - Overall leaderboard
   router.get("/overall", authMiddleware, async (req, res) => {
     try {
-      const { period = "all" } = req.query;
+      const { period = "all", start: startDate, end: endDate } = req.query;
       let dateFilter = "";
+      const params = [];
 
-      if (period === "week") {
+      const parseDate = (value) => {
+        if (!value) return null;
+        const parsed = new Date(value);
+        return isNaN(parsed.getTime()) ? null : parsed;
+      };
+
+      const start = parseDate(startDate);
+      const end = parseDate(endDate);
+      const hasExplicitRange = start && end;
+
+      if (hasExplicitRange) {
+        const [from, to] = start <= end ? [start, end] : [end, start];
+        params.push(from, to);
+        dateFilter = `AND w.start_time >= $1 AND w.start_time < $2::date + INTERVAL '1 day'`;
+      } else if (period === "week") {
         dateFilter = `AND w.start_time >= NOW() - INTERVAL '7 days'`;
       } else if (period === "month") {
         dateFilter = `AND w.start_time >= NOW() - INTERVAL '30 days'`;
       } else if (period === "year") {
         dateFilter = `AND w.start_time >= NOW() - INTERVAL '365 days'`;
+      } else if (period === "custom") {
+        return res.status(400).json({ error: "Ungültiger Zeitraum" });
       }
 
       const query = `
@@ -39,7 +56,7 @@ export const createScoreboardRouter = (pool) => {
                 LIMIT 50
             `;
 
-      const { rows } = await pool.query(query);
+      const { rows } = await pool.query(query, params);
 
       const leaderboard = rows.map((row, index) => {
         const converted = toCamelCase(row);
@@ -71,7 +88,7 @@ export const createScoreboardRouter = (pool) => {
   router.get("/activity/:activity", authMiddleware, async (req, res) => {
     try {
       const { activity } = req.params;
-      const { period = "all" } = req.query;
+      const { period = "all", start: startDate, end: endDate } = req.query;
 
       const validActivities = [
         "pullups",
@@ -84,13 +101,33 @@ export const createScoreboardRouter = (pool) => {
         return res.status(400).json({ error: "Ungültiger Aktivitätstyp" });
       }
 
+      const params = [activity];
+      let paramIndex = params.length + 1;
       let dateFilter = "";
-      if (period === "week") {
+
+      const parseDate = (value) => {
+        if (!value) return null;
+        const parsed = new Date(value);
+        return isNaN(parsed.getTime()) ? null : parsed;
+      };
+
+      const start = parseDate(startDate);
+      const end = parseDate(endDate);
+      const hasExplicitRange = start && end;
+
+      if (hasExplicitRange) {
+        const [from, to] = start <= end ? [start, end] : [end, start];
+        params.push(from, to);
+        dateFilter = `AND w.start_time >= $${paramIndex} AND w.start_time < $${paramIndex + 1}::date + INTERVAL '1 day'`;
+        paramIndex += 2;
+      } else if (period === "week") {
         dateFilter = `AND w.start_time >= NOW() - INTERVAL '7 days'`;
       } else if (period === "month") {
         dateFilter = `AND w.start_time >= NOW() - INTERVAL '30 days'`;
       } else if (period === "year") {
         dateFilter = `AND w.start_time >= NOW() - INTERVAL '365 days'`;
+      } else if (period === "custom") {
+        return res.status(400).json({ error: "Ungültiger Zeitraum" });
       }
 
       const query = `
@@ -109,7 +146,7 @@ export const createScoreboardRouter = (pool) => {
                 LIMIT 50
             `;
 
-      const { rows } = await pool.query(query, [activity]);
+      const { rows } = await pool.query(query, params);
 
       const leaderboard = rows.map((row, index) => {
         const converted = toCamelCase(row);

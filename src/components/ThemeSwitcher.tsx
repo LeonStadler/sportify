@@ -166,6 +166,7 @@ export default function ThemeSwitcher({
                 className="h-9 w-9 bg-muted/50 hover:bg-muted"
                 onClick={(e) => {
                   e.stopPropagation();
+                  handleToggleTheme();
                 }}
                 aria-label={currentThemeConfig.label}
               >

@@ -868,6 +868,223 @@ export class TestDatabase {
       return { rows: sliced, rowCount: sliced.length };
     }
 
+    // Query: INSERT INTO notifications - just accept it (notifications are non-critical)
+    if (
+      normalized.startsWith("insert into notifications") &&
+      normalized.includes("values")
+    ) {
+      // Notifications are non-critical, just return success
+      return { rows: [], rowCount: 1 };
+    }
+
+    // Query: SELECT push_subscriptions for a user (for push notifications)
+    if (
+      normalized.includes("from push_subscriptions") &&
+      normalized.includes("where user_id = $1")
+    ) {
+      // Return empty array - no push subscriptions in test environment
+      return { rows: [], rowCount: 0 };
+    }
+
+    // Query: Complex feed query with json_agg (grouped workouts with activities)
+    if (
+      normalized.includes("json_agg") &&
+      normalized.includes("from workouts w") &&
+      normalized.includes("join users u on w.user_id = u.id")
+    ) {
+      const [userIdsParam, limit, offset] = params;
+      let allowedIds = [];
+      if (Array.isArray(userIdsParam)) {
+        allowedIds = userIdsParam;
+      } else if (typeof userIdsParam === "string") {
+        allowedIds = userIdsParam
+          .replace(/[{}]/g, "")
+          .split(",")
+          .map((value) => value.trim().replace(/^"|"$/g, ""))
+          .filter(Boolean);
+      }
+
+      // Group activities by workout
+      const workoutMap = new Map();
+      for (const workout of this.workouts) {
+        if (!allowedIds.includes(workout.user_id)) continue;
+        const user = this.users.find((u) => u.id === workout.user_id);
+        if (!user) continue;
+
+        const activities = this.workoutActivities
+          .filter((wa) => wa.workout_id === workout.id)
+          .map((wa) => ({
+            id: wa.id,
+            activityType: wa.activity_type,
+            amount: wa.quantity,
+            points: 0,
+          }));
+
+        workoutMap.set(workout.id, {
+          workout_id: workout.id,
+          workout_title: workout.title,
+          start_time: workout.workout_date,
+          workout_notes: workout.notes || null,
+          user_id: user.id,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          nickname: user.nickname,
+          display_preference: user.display_preference,
+          avatar_url: user.avatar_url,
+          activities: activities,
+          total_points: 0,
+        });
+      }
+
+      const rows = Array.from(workoutMap.values())
+        .sort(
+          (a, b) =>
+            new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
+        )
+        .slice(offset ?? 0, (offset ?? 0) + (limit ?? 20));
+
+      return { rows, rowCount: rows.length };
+    }
+
+    // Query: SELECT first_name, last_name, nickname, display_preference FROM users WHERE id = $1
+    if (
+      normalized ===
+      "select first_name, last_name, nickname, display_preference from users where id = $1"
+    ) {
+      const [userId] = params;
+      const user = this.users.find((u) => u.id === userId);
+      if (!user) {
+        return { rows: [], rowCount: 0 };
+      }
+      return {
+        rows: [
+          {
+            first_name: user.first_name,
+            last_name: user.last_name,
+            nickname: user.nickname,
+            display_preference: user.display_preference,
+          },
+        ],
+        rowCount: 1,
+      };
+    }
+
+    // Query: Complex user search with NOT EXISTS clauses (friendships and friend_requests exclusions)
+    if (
+      normalized.includes("from users u") &&
+      normalized.includes("and not exists") &&
+      normalized.includes("from friendships f") &&
+      normalized.includes("from friend_requests fr")
+    ) {
+      const [patternParam, currentUserId, directMatchParam, limit, offset] =
+        params;
+      const patternRegex = likeToRegex(patternParam);
+      const directRegex = likeToRegex(directMatchParam);
+
+      // Get existing friends
+      const friendIds = new Set(
+        this.friendships
+          .filter(
+            (f) =>
+              f.status === "accepted" &&
+              (f.requester_id === currentUserId ||
+                f.addressee_id === currentUserId)
+          )
+          .map((f) =>
+            f.requester_id === currentUserId ? f.addressee_id : f.requester_id
+          )
+      );
+
+      // Get pending friend requests (both directions)
+      const pendingRequestUserIds = new Set(
+        this.friendRequests
+          .filter(
+            (fr) =>
+              fr.status === "pending" &&
+              (fr.requester_id === currentUserId ||
+                fr.target_id === currentUserId)
+          )
+          .map((fr) =>
+            fr.requester_id === currentUserId ? fr.target_id : fr.requester_id
+          )
+      );
+
+      const filtered = this.users
+        .filter((user) => user.id !== currentUserId)
+        .filter((user) => !friendIds.has(user.id))
+        .filter((user) => !pendingRequestUserIds.has(user.id))
+        .filter((user) => {
+          const fields = [
+            user.first_name,
+            user.last_name,
+            user.nickname,
+            user.email,
+          ];
+          return fields.some((field) => field && patternRegex.test(field));
+        })
+        .sort((a, b) => {
+          const priorityA = directRegex.test(a.first_name)
+            ? 1
+            : directRegex.test(a.last_name)
+              ? 2
+              : directRegex.test(a.nickname)
+                ? 3
+                : 4;
+          const priorityB = directRegex.test(b.first_name)
+            ? 1
+            : directRegex.test(b.last_name)
+              ? 2
+              : directRegex.test(b.nickname)
+                ? 3
+                : 4;
+          if (priorityA !== priorityB) {
+            return priorityA - priorityB;
+          }
+          const first = a.first_name.localeCompare(b.first_name, "de", {
+            sensitivity: "base",
+          });
+          if (first !== 0) return first;
+          return a.last_name.localeCompare(b.last_name, "de", {
+            sensitivity: "base",
+          });
+        });
+
+      const sliced = filtered.slice(offset ?? 0, (offset ?? 0) + (limit ?? 20));
+      const rows = sliced.map((user) => ({
+        id: user.id,
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        nickname: user.nickname,
+        display_preference: user.display_preference,
+        avatar_url: user.avatar_url,
+      }));
+      return { rows, rowCount: rows.length };
+    }
+
+    // Query: SELECT COUNT(DISTINCT w.id) as total FROM workouts w WHERE w.user_id = ANY($1::uuid[])
+    if (
+      normalized.includes("select count(distinct w.id) as total") &&
+      normalized.includes("from workouts w") &&
+      normalized.includes("w.user_id = any")
+    ) {
+      const [userIdsParam] = params;
+      let allowedIds = [];
+      if (Array.isArray(userIdsParam)) {
+        allowedIds = userIdsParam;
+      } else if (typeof userIdsParam === "string") {
+        allowedIds = userIdsParam
+          .replace(/[{}]/g, "")
+          .split(",")
+          .map((value) => value.trim().replace(/^"|"$/g, ""))
+          .filter(Boolean);
+      }
+      const count = this.workouts.filter((w) =>
+        allowedIds.includes(w.user_id)
+      ).length;
+      return { rows: [{ total: count }], rowCount: 1 };
+    }
+
     throw new Error(`Unsupported query in test database: ${sql}`);
   }
 }

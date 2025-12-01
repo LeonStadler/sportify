@@ -140,7 +140,7 @@ export default function ThemeSwitcher({
     };
 
     return (
-      <div 
+      <div
         className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 cursor-pointer"
         onClick={handleToggleTheme}
         role="button"
@@ -166,6 +166,7 @@ export default function ThemeSwitcher({
                 className="h-9 w-9 bg-muted/50 hover:bg-muted"
                 onClick={(e) => {
                   e.stopPropagation();
+                  handleToggleTheme();
                 }}
                 aria-label={currentThemeConfig.label}
               >

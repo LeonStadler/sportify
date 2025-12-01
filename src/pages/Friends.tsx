@@ -13,8 +13,8 @@ import { parseAvatarConfig } from "@/lib/avatar";
 import { Check, Search, UserPlus, Users, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
 import NiceAvatar from "react-nice-avatar";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
 // Type definitions based on API responses
@@ -145,18 +145,18 @@ function FriendsList() {
       if (Array.isArray(data)) {
         const mappedFriends: Friend[] = data.map(
           (friend: BackendFriendData) => {
-          // Backend gibt friendshipId zurück (von friendship_id nach toCamelCase)
-          return {
-            id: friend.id,
+            // Backend gibt friendshipId zurück (von friendship_id nach toCamelCase)
+            return {
+              id: friend.id,
               friendshipId: friend.friendshipId || friend.friendship_id || "",
-            displayName:
-              friend.displayName ||
-              friend.display_name ||
+              displayName:
+                friend.displayName ||
+                friend.display_name ||
                 `${friend.firstName || friend.first_name || ""} ${friend.lastName || friend.last_name || ""}`,
-            avatarUrl: friend.avatarUrl || friend.avatar_url,
+              avatarUrl: friend.avatarUrl || friend.avatar_url,
               firstName: friend.firstName || friend.first_name || "",
               lastName: friend.lastName || friend.last_name || "",
-          };
+            };
           }
         );
         setFriends(mappedFriends);
@@ -264,7 +264,10 @@ function FriendsList() {
                 key={friend.id}
                 className="flex items-center justify-between p-3 md:p-0"
               >
-                <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
+                <Link
+                  to={`/friends/${friend.id}`}
+                  className="flex items-center gap-3 md:gap-4 flex-1 min-w-0 hover:opacity-80 transition-opacity cursor-pointer"
+                >
                   <Avatar className="w-10 h-10 md:w-12 md:h-12">
                     {friend.avatarUrl && parseAvatarConfig(friend.avatarUrl) ? (
                       <NiceAvatar
@@ -283,16 +286,24 @@ function FriendsList() {
                   <p className="font-semibold text-sm md:text-base truncate">
                     {friend.displayName}
                   </p>
-                </div>
+                </Link>
                 <div className="flex items-center gap-2">
-                  <Button asChild size="sm" variant="ghost" className="text-xs md:text-sm">
+                  <Button
+                    asChild
+                    size="sm"
+                    variant="ghost"
+                    className="text-xs md:text-sm"
+                  >
                     <Link to={`/friends/${friend.id}`}>Profil</Link>
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() =>
-                      handleRemoveFriend(friend.friendshipId, friend.displayName)
+                      handleRemoveFriend(
+                        friend.friendshipId,
+                        friend.displayName
+                      )
                     }
                     className="text-destructive hover:text-destructive-foreground hover:bg-destructive flex-shrink-0 text-xs md:text-sm"
                   >

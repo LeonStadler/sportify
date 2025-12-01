@@ -4,11 +4,12 @@ import { useTranslation } from "react-i18next";
 import type { DateRange } from "react-day-picker";
 
 import { PageTemplate } from "@/components/PageTemplate";
+import { TimeRangeFilter } from "@/components/filters/TimeRangeFilter";
 import { useAnalytics } from "@/hooks/use-analytics";
 import { useToast } from "@/hooks/use-toast";
 import { AnalyticsDashboard } from "@/features/analytics/components/AnalyticsDashboard";
-import { AnalyticsPeriodSelect } from "@/features/analytics/components/AnalyticsPeriodSelect";
 import { createAnalyticsFormatters } from "@/features/analytics/utils/formatters";
+import { getNormalizedRange, getRangeForPeriod } from "@/utils/dateRanges";
 import type {
   ActivityMetricOption,
   RecoveryMetricOption,
@@ -20,14 +21,23 @@ export function Stats() {
   const locale = useMemo(() => (i18n.language === "en" ? enUS : de), [i18n.language]);
   const [period, setPeriod] = useState("week");
   const [customRange, setCustomRange] = useState<DateRange | undefined>();
+  const [offset, setOffset] = useState(0);
+
+  // Berechne den aufgelösten Zeitraum basierend auf period und offset
+  const resolvedRange = useMemo(
+    () => getNormalizedRange(getRangeForPeriod(period, customRange, offset)),
+    [customRange, period, offset]
+  );
+
+  const effectivePeriod = period === "custom" || offset > 0 ? "custom" : period;
 
   const analyticsSelection = useMemo(
     () => ({
-      period,
-      start: period === "custom" ? customRange?.from ?? null : null,
-      end: period === "custom" ? customRange?.to ?? null : null,
+      period: effectivePeriod,
+      start: effectivePeriod === "custom" ? resolvedRange?.from ?? null : null,
+      end: effectivePeriod === "custom" ? resolvedRange?.to ?? null : null,
     }),
-    [customRange?.from, customRange?.to, period],
+    [effectivePeriod, resolvedRange?.from, resolvedRange?.to],
   );
 
   const { data, isLoading, error, reload } = useAnalytics(analyticsSelection);
@@ -69,18 +79,24 @@ export function Stats() {
     [i18n.language, locale, t],
   );
 
-  const handlePeriodChange = useCallback(
-    (nextPeriod: string) => {
-      setPeriod(nextPeriod);
-    },
-    [],
-  );
+  const handlePeriodChange = useCallback((nextPeriod: string) => {
+    setPeriod(nextPeriod);
+    setOffset(0);
+    if (nextPeriod !== "custom") {
+      setCustomRange(undefined);
+    }
+  }, []);
 
   const handleRangeChange = useCallback((range: DateRange | undefined) => {
     setCustomRange(range);
     if (range?.from && range?.to) {
       setPeriod("custom");
+      setOffset(0);
     }
+  }, []);
+
+  const handleOffsetChange = useCallback((newOffset: number) => {
+    setOffset(newOffset);
   }, []);
 
   return (
@@ -88,12 +104,22 @@ export function Stats() {
       title={t("stats.title", "Statistics")}
       subtitle={t("stats.subtitle", "Detailed analysis of your athletic performance")}
       headerActions={
-        <AnalyticsPeriodSelect
-          value={period}
+        <TimeRangeFilter
+          period={period}
           range={customRange}
+          offset={offset}
           onPeriodChange={handlePeriodChange}
           onRangeChange={handleRangeChange}
+          onOffsetChange={handleOffsetChange}
           t={t}
+          locale={i18n.language}
+          presets={[
+            { value: "week", label: t("filters.period.week") },
+            { value: "month", label: t("filters.period.month") },
+            { value: "quarter", label: t("filters.period.quarter") },
+            { value: "year", label: t("filters.period.year") },
+            { value: "custom", label: t("filters.period.custom") },
+          ]}
           formatDate={(date) => formatters.formatRangeDate(date.toISOString())}
         />
       }

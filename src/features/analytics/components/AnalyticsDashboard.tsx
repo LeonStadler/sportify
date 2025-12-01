@@ -162,7 +162,16 @@ export function AnalyticsDashboard({
               workouts={workouts}
               recovery={recovery}
               balance={balance}
-              insights={insights}
+              range={range ?? null}
+              activityMetrics={activityMetrics}
+              formatters={formatters}
+              t={t}
+            />
+          </TabsContent>
+
+          <TabsContent value="training" className="space-y-4 md:space-y-6">
+            <AnalyticsTrainingTab
+              workouts={workouts}
               range={range ?? null}
               activityMetrics={activityMetrics}
               selectedActivityKeys={selectedActivityKeys}
@@ -185,13 +194,10 @@ export function AnalyticsDashboard({
             />
           </TabsContent>
 
-          <TabsContent value="training" className="space-y-4 md:space-y-6">
-            <AnalyticsTrainingTab workouts={workouts} formatters={formatters} t={t} />
-          </TabsContent>
-
           <TabsContent value="recovery" className="space-y-4 md:space-y-6">
             <AnalyticsRecoveryTab
               recovery={recovery}
+              insights={insights}
               moodDistribution={moodDistribution}
               recoveryMetrics={recoveryMetrics}
               selectedRecoveryKeys={selectedRecoveryKeys}

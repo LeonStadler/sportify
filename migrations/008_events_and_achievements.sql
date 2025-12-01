@@ -11,10 +11,11 @@ CREATE TABLE IF NOT EXISTS badges (
     icon TEXT,
     metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (slug, COALESCE(level, 0))
+    UNIQUE (slug, level)
 );
 
 CREATE INDEX IF NOT EXISTS idx_badges_slug ON badges (slug);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_badges_slug_level_unique ON badges (slug, COALESCE(level, 0));
 
 -- Progress table for repeatable badges
 CREATE TABLE IF NOT EXISTS user_badge_progress (

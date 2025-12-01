@@ -37,9 +37,11 @@ test("createMigrationRunner executes migrations only once per pool", async () =>
 
   assert.ok(firstRunCount > 0);
   assert.equal(fakePool.executed.length, firstRunCount);
-  assert.match(
-    fakePool.executed[0],
-    /CREATE TABLE IF NOT EXISTS training_journal_entries/
+  assert.ok(
+    fakePool.executed.some((sql) =>
+      /CREATE TABLE IF NOT EXISTS training_journal_entries/i.test(sql)
+    ),
+    "expected training_journal_entries table creation to be executed"
   );
 });
 

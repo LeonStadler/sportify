@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
 import { API_URL } from "@/lib/api";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 const urlBase64ToUint8Array = (base64String: string) => {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -24,18 +24,32 @@ export const usePushNotifications = () => {
     typeof Notification === "undefined" ? "default" : Notification.permission
   );
   const [isRegistering, setIsRegistering] = useState(false);
-  const [enabled, setEnabled] = useState(false);
+  const [subscribed, setSubscribed] = useState(false);
   const isSupported = useMemo(
-    () => typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window,
+    () =>
+      typeof window !== "undefined" &&
+      "serviceWorker" in navigator &&
+      "PushManager" in window,
     []
   );
 
-  useEffect(() => {
+  // Prüft nur ob eine Subscription existiert, erstellt keine neue
+  const checkSubscriptionStatus = useCallback(async () => {
     if (!isSupported) {
-      setEnabled(false);
+      return false;
+    }
+
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      return subscription !== null;
+    } catch (error) {
+      console.error("Failed to check subscription status:", error);
+      return false;
     }
   }, [isSupported]);
 
+  // Registriert eine neue Subscription
   const registerSubscription = useCallback(async () => {
     if (!isSupported) {
       return false;
@@ -83,6 +97,7 @@ export const usePushNotifications = () => {
       throw new Error("subscription-save-failed");
     }
 
+    setSubscribed(true);
     return true;
   }, [isSupported]);
 
@@ -98,11 +113,10 @@ export const usePushNotifications = () => {
       setIsRegistering(true);
       try {
         await registerSubscription();
-        setEnabled(true);
         return true;
       } catch (error) {
         console.error("Push subscription error:", error);
-        setEnabled(false);
+        setSubscribed(false);
       } finally {
         setIsRegistering(false);
       }
@@ -111,47 +125,34 @@ export const usePushNotifications = () => {
     return false;
   }, [isSupported, registerSubscription]);
 
+  // Beim Mount nur Status prüfen, nicht automatisch re-registrieren
   useEffect(() => {
     if (!isSupported) {
-      return;
-    }
-    if (permission !== "granted") {
-      setEnabled(false);
+      setSubscribed(false);
       return;
     }
 
-    let active = true;
-    setIsRegistering(true);
-    registerSubscription()
-      .then(() => {
-        if (active) {
-          setEnabled(true);
-        }
-      })
-      .catch((error) => {
-        console.error("Push subscription sync failed:", error);
-        if (active) {
-          setEnabled(false);
-        }
-      })
-      .finally(() => {
-        if (active) {
-          setIsRegistering(false);
-        }
-      });
+    checkSubscriptionStatus().then((hasSubscription) => {
+      setSubscribed(hasSubscription);
+    });
+  }, [isSupported, checkSubscriptionStatus]);
 
-    return () => {
-      active = false;
-    };
-  }, [isSupported, permission, registerSubscription]);
+  // Permission-Änderungen beobachten
+  useEffect(() => {
+    if (typeof Notification !== "undefined") {
+      setPermission(Notification.permission);
+    }
+  }, []);
 
   return {
     isSupported,
     permission,
-    enabled,
+    enabled: subscribed && permission === "granted",
     isRegistering,
     requestPermission,
   };
 };
 
-export type UsePushNotificationsResult = ReturnType<typeof usePushNotifications>;
+export type UsePushNotificationsResult = ReturnType<
+  typeof usePushNotifications
+>;

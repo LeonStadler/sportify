@@ -7,6 +7,7 @@ import type { TFunction } from "i18next";
 import { CalendarRange, Flame, Gauge, MoonStar } from "lucide-react";
 
 import type {
+  AnalyticsInsightData,
   AnalyticsMoodDistributionEntry,
   AnalyticsRecoveryData,
   AnalyticsRecoveryDay,
@@ -15,9 +16,11 @@ import type {
 import type { AnalyticsFormatters } from "../utils/formatters";
 import { getTrend } from "../utils/metrics";
 import type { RecoveryMetricOption } from "../types";
+import { AnalyticsInsights } from "./AnalyticsInsights";
 
 interface AnalyticsRecoveryTabProps {
   recovery?: AnalyticsRecoveryData;
+  insights?: AnalyticsInsightData;
   moodDistribution: AnalyticsMoodDistributionEntry[];
   recoveryMetrics: RecoveryMetricOption[];
   selectedRecoveryKeys: RecoveryMetricOption["key"][];
@@ -29,6 +32,7 @@ interface AnalyticsRecoveryTabProps {
 
 export function AnalyticsRecoveryTab({
   recovery,
+  insights,
   moodDistribution,
   recoveryMetrics,
   selectedRecoveryKeys,
@@ -150,6 +154,8 @@ export function AnalyticsRecoveryTab({
           )}
         </CardContent>
       </Card>
+
+      <AnalyticsInsights insights={insights} t={t} />
     </>
   );
 }

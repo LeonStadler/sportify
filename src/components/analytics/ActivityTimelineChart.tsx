@@ -38,9 +38,13 @@ export function ActivityTimelineChart({
     return value.slice(5);
   };
 
+  const isStacked = stacked;
+  const barCategoryGap = isStacked ? "10%" : "28%";
+  const barGap = isStacked ? 1 : 8;
+
   return (
     <ResponsiveContainer width="100%" height={320}>
-      <BarChart data={data}>
+      <BarChart data={data} barCategoryGap={barCategoryGap} barGap={barGap}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
         <XAxis
           dataKey="date"
@@ -72,7 +76,8 @@ export function ActivityTimelineChart({
             fill={metric.color}
             radius={[4, 4, 0, 0]}
             maxBarSize={28}
-            stackId={stacked ? "activity" : undefined}
+            stackId={isStacked ? "activity" : undefined}
+            barSize={isStacked ? undefined : 18}
           />
         ))}
         <Brush height={20} travellerWidth={12} stroke="hsl(var(--primary))" />

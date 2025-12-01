@@ -239,16 +239,8 @@ export class TestDatabase {
         "select 1 from friendships where ((requester_id = $1 and addressee_id = $2) or (requester_id = $2 and addressee_id = $1)) and status = 'accepted'"
       )
     ) {
-      const [a, b] = params;
-      const exists = this.friendships.some(
-        (f) =>
-          (f.user_one_id === a && f.user_two_id === b) ||
-          (f.user_one_id === b && f.user_two_id === a)
-      );
-      return {
-        rows: exists ? [{ "?column?": 1 }] : [],
-        rowCount: exists ? 1 : 0,
-      };
+      // Handled by the generic friendship existence check below
+      // (kept here for query shape parity)
     }
 
     if (
@@ -257,10 +249,9 @@ export class TestDatabase {
       )
     ) {
       const [a, b] = params;
+      const ordered = [a, b].sort();
       const exists = this.friendships.some(
-        (f) =>
-          (f.user_one_id === a && f.user_two_id === b) ||
-          (f.user_one_id === b && f.user_two_id === a)
+        (f) => f.user_one_id === ordered[0] && f.user_two_id === ordered[1]
       );
       return {
         rows: exists ? [{ "?column?": 1 }] : [],

@@ -76,36 +76,42 @@ The platform combines modern web technologies with a user-friendly interface to 
 Die Kernfunktionalität von Sportify umfasst folgende Hauptbereiche:
 
 #### 1. Workout-Management
+
 - **Erfassung von Trainingsaktivitäten**: Erstellen, bearbeiten und löschen von Workouts
 - **Vielseitige Aktivitätstypen**: Unterstützung für verschiedene Sportarten (Laufen, Radfahren, Krafttraining, etc.)
 - **Detaillierte Metriken**: Erfassung von Dauer, Distanz, Intensität, Kalorien und weiteren Parametern
 - **Zeitstempel und Historie**: Vollständige Chronik aller Trainingsaktivitäten
 
 #### 2. Statistiken & Analytics
+
 - **Umfassende Auswertungen**: Detaillierte Statistiken zu Trainingsvolumen, Häufigkeit und Entwicklung
 - **Interaktive Visualisierungen**: Charts und Grafiken für bessere Dateninterpretation
 - **Zeitraum-Filter**: Analyse nach Wochen, Monaten oder Jahren
 - **Trend-Analysen**: Erkennung von Fortschritten und Entwicklungen über die Zeit
 
 #### 3. Soziale Interaktion
+
 - **Freundschaftssystem**: Freunde hinzufügen, Anfragen verwalten und Profile ansehen
 - **Activity Feed**: Live-Feed mit Aktivitäten von Freunden
 - **Scoreboard & Rankings**: Wettbewerbe und Ranglisten nach verschiedenen Kriterien
 - **Einladungssystem**: Freunde per Link einladen
 
 #### 4. Zielsetzung & Motivation
+
 - **Wöchentliche Ziele**: Individuelle Ziele setzen und verfolgen
 - **Challenges**: Herausforderungen erstellen und teilnehmen
 - **Fortschritts-Tracking**: Visuelle Darstellung des Fortschritts zu gesetzten Zielen
 - **Benachrichtigungen**: Erinnerungen und Updates zu Zielen und Aktivitäten
 
 #### 5. Training Journal
+
 - **Tagebuch-Funktion**: Detaillierte Einträge zu Trainingseinheiten
 - **Stimmungs-Tracking**: Erfassung des Wohlbefindens und der Motivation
 - **Tags und Kategorien**: Organisation von Einträgen durch Tags
 - **Metriken-Integration**: Verknüpfung mit Workout-Daten
 
 #### 6. Benutzerverwaltung & Sicherheit
+
 - **Sicheres Authentifizierungssystem**: JWT-basierte Authentifizierung
 - **Zwei-Faktor-Authentifizierung (2FA)**: Zusätzliche Sicherheitsebene mit TOTP
 - **E-Mail-Verifizierung**: Sichere Kontoverifizierung
@@ -117,36 +123,42 @@ Die Kernfunktionalität von Sportify umfasst folgende Hauptbereiche:
 The core functionality of Sportify includes the following main areas:
 
 #### 1. Workout Management
+
 - **Training Activity Recording**: Create, edit, and delete workouts
 - **Versatile Activity Types**: Support for various sports (running, cycling, strength training, etc.)
 - **Detailed Metrics**: Capture duration, distance, intensity, calories, and other parameters
 - **Timestamps and History**: Complete chronicle of all training activities
 
 #### 2. Statistics & Analytics
+
 - **Comprehensive Evaluations**: Detailed statistics on training volume, frequency, and development
 - **Interactive Visualizations**: Charts and graphs for better data interpretation
 - **Time Period Filters**: Analysis by weeks, months, or years
 - **Trend Analyses**: Recognition of progress and developments over time
 
 #### 3. Social Interaction
+
 - **Friendship System**: Add friends, manage requests, and view profiles
 - **Activity Feed**: Live feed with activities from friends
 - **Scoreboard & Rankings**: Competitions and rankings by various criteria
 - **Invitation System**: Invite friends via link
 
 #### 4. Goal Setting & Motivation
+
 - **Weekly Goals**: Set and track individual goals
 - **Challenges**: Create and participate in challenges
 - **Progress Tracking**: Visual representation of progress toward set goals
 - **Notifications**: Reminders and updates on goals and activities
 
 #### 5. Training Journal
+
 - **Diary Function**: Detailed entries on training sessions
 - **Mood Tracking**: Capture well-being and motivation
 - **Tags and Categories**: Organization of entries through tags
 - **Metrics Integration**: Linking with workout data
 
 #### 6. User Management & Security
+
 - **Secure Authentication System**: JWT-based authentication
 - **Two-Factor Authentication (2FA)**: Additional security layer with TOTP
 - **Email Verification**: Secure account verification
@@ -447,31 +459,37 @@ The project follows modern React/TypeScript best practices:
 Die vollständige API-Dokumentation befindet sich im [`docs/api/`](docs/api/) Verzeichnis. Hier eine Übersicht der verfügbaren Endpunkt-Gruppen:
 
 #### Authentifizierung (`/api/auth`)
+
 - Registrierung, Login, Logout
 - E-Mail-Verifizierung
 - Passwort-Reset
 - Zwei-Faktor-Authentifizierung (2FA)
 
 #### Workouts (`/api/workouts`)
+
 - CRUD-Operationen für Workouts
 - Workout-Liste mit Filtern
 - Workout-Details und Metriken
 
 #### Training Journal (`/api/training-journal`)
+
 - Tagebuch-Einträge verwalten
 - Tags und Kategorien
 - Stimmungs-Tracking
 
 #### Soziale Features
+
 - **Freunde** (`/api/friends`): Freundschaftssystem, Anfragen, Suche
 - **Activity Feed** (`/api/feed`): Feed mit Aktivitäten von Freunden
 - **Benachrichtigungen** (`/api/notifications`): In-App Benachrichtigungen
 
 #### Statistiken & Rankings
+
 - **Scoreboard** (`/api/scoreboard`): Ranglisten nach Aktivitätstyp
 - **Statistiken** (`/api/stats`): Detaillierte Auswertungen und Charts
 
 #### Weitere Endpunkte
+
 - **Profil** (`/api/profile`): Profil-Verwaltung und Einstellungen
 - **Ziele** (`/api/goals`): Wöchentliche Ziele
 - **Challenges** (`/api/challenges`): Herausforderungen
@@ -485,31 +503,37 @@ Für detaillierte Informationen zu Request/Response-Formaten, Authentifizierung 
 The complete API documentation is located in the [`docs/api/`](docs/api/) directory. Here is an overview of available endpoint groups:
 
 #### Authentication (`/api/auth`)
+
 - Registration, Login, Logout
 - Email Verification
 - Password Reset
 - Two-Factor Authentication (2FA)
 
 #### Workouts (`/api/workouts`)
+
 - CRUD operations for workouts
 - Workout list with filters
 - Workout details and metrics
 
 #### Training Journal (`/api/training-journal`)
+
 - Manage diary entries
 - Tags and categories
 - Mood tracking
 
 #### Social Features
+
 - **Friends** (`/api/friends`): Friendship system, requests, search
 - **Activity Feed** (`/api/feed`): Feed with activities from friends
 - **Notifications** (`/api/notifications`): In-app notifications
 
 #### Statistics & Rankings
+
 - **Scoreboard** (`/api/scoreboard`): Rankings by activity type
 - **Statistics** (`/api/stats`): Detailed evaluations and charts
 
 #### Additional Endpoints
+
 - **Profile** (`/api/profile`): Profile management and settings
 - **Goals** (`/api/goals`): Weekly goals
 - **Challenges** (`/api/challenges`): Challenges
@@ -528,11 +552,13 @@ Die Anwendung ist für Vercel optimiert:
 The application is optimized for Vercel:
 
 1. **Vercel CLI** installieren / Install Vercel CLI:
+
    ```bash
    npm i -g vercel
    ```
 
 2. **Deployment**:
+
    ```bash
    vercel
    ```

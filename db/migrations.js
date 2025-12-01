@@ -6,6 +6,217 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const MIGRATIONS_DIR = path.join(__dirname, '../migrations');
 
+const ensureExtension = async (pool) => {
+    try {
+        await pool.query('CREATE EXTENSION IF NOT EXISTS "pgcrypto";');
+    } catch (error) {
+        console.warn('[Migration] Konnte pgcrypto Extension nicht erzwingen:', error.message);
+    }
+};
+
+const ensureCoreSchema = async (pool) => {
+    await ensureExtension(pool);
+
+    // Basis-Workout-Tabelle (wird von vielen Migrationen erwartet)
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS workouts (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            title TEXT NOT NULL,
+            description TEXT,
+            start_time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            duration INTEGER,
+            use_end_time BOOLEAN NOT NULL DEFAULT false,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+    `);
+    await pool.query(
+        'CREATE INDEX IF NOT EXISTS idx_workouts_user_start ON workouts(user_id, start_time DESC)'
+    );
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS workout_activities (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            workout_id UUID NOT NULL REFERENCES workouts(id) ON DELETE CASCADE,
+            activity_type VARCHAR(50) NOT NULL,
+            quantity NUMERIC,
+            points_earned NUMERIC,
+            notes TEXT,
+            order_index INTEGER,
+            sets_data JSONB,
+            unit VARCHAR(20),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+    `);
+    await pool.query(
+        'CREATE INDEX IF NOT EXISTS idx_workout_activities_workout_id ON workout_activities(workout_id)'
+    );
+
+    // Übungen/Konfiguration
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS exercises (
+            id VARCHAR(50) PRIMARY KEY,
+            name TEXT NOT NULL,
+            points_per_unit DECIMAL(10, 2) NOT NULL DEFAULT 1.0,
+            unit TEXT NOT NULL DEFAULT 'Wiederholungen',
+            has_weight BOOLEAN DEFAULT false,
+            has_set_mode BOOLEAN DEFAULT true,
+            unit_options JSONB DEFAULT '[]'::jsonb,
+            is_active BOOLEAN DEFAULT true,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE (id)
+        )
+    `);
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_exercises_active ON exercises (is_active)');
+    await pool.query(`
+        INSERT INTO exercises (id, name, points_per_unit, unit, has_weight, has_set_mode, unit_options, is_active)
+        VALUES
+            ('pullups', 'Klimmzüge', 3.0, 'Wiederholungen', false, true, '[{"value": "Wiederholungen", "label": "Wiederholungen", "multiplier": 1}]'::jsonb, true),
+            ('pushups', 'Liegestütze', 1.0, 'Wiederholungen', false, true, '[{"value": "Wiederholungen", "label": "Wiederholungen", "multiplier": 1}]'::jsonb, true),
+            ('situps', 'Sit-ups', 1.0, 'Wiederholungen', false, true, '[{"value": "Wiederholungen", "label": "Wiederholungen", "multiplier": 1}]'::jsonb, true),
+            ('running', 'Laufen', 10.0, 'km', false, false, '[{"value": "km", "label": "Kilometer", "multiplier": 1}, {"value": "m", "label": "Meter", "multiplier": 0.001}, {"value": "Meilen", "label": "Meilen", "multiplier": 1.609}]'::jsonb, true),
+            ('cycling', 'Radfahren', 5.0, 'km', false, false, '[{"value": "km", "label": "Kilometer", "multiplier": 1}, {"value": "m", "label": "Meter", "multiplier": 0.001}, {"value": "Meilen", "label": "Meilen", "multiplier": 1.609}]'::jsonb, true),
+            ('other', 'Sonstiges', 1.0, 'Einheiten', false, true, '[{"value": "Einheiten", "label": "Einheiten", "multiplier": 1}]'::jsonb, true)
+        ON CONFLICT (id) DO NOTHING
+    `);
+
+    // Badges/Leaderboards (werden bei Workout-Erstellung benötigt)
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS badges (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            slug TEXT NOT NULL,
+            category TEXT NOT NULL,
+            level INTEGER,
+            label TEXT NOT NULL,
+            description TEXT,
+            icon TEXT,
+            metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE (slug, level)
+        )
+    `);
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_badges_slug ON badges (slug)');
+    await pool.query(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_badges_slug_level_unique ON badges (slug, COALESCE(level, 0))'
+    );
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS user_badge_progress (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            badge_slug TEXT NOT NULL,
+            counter INTEGER NOT NULL DEFAULT 0,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE (user_id, badge_slug)
+        )
+    `);
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS user_badges (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            badge_id UUID NOT NULL REFERENCES badges(id) ON DELETE CASCADE,
+            earned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            context JSONB NOT NULL DEFAULT '{}'::jsonb,
+            UNIQUE (user_id, badge_id)
+        )
+    `);
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_user_badges_user_id ON user_badges (user_id)');
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS weekly_results (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            week_start DATE NOT NULL,
+            week_end DATE NOT NULL,
+            total_points INTEGER NOT NULL DEFAULT 0,
+            total_workouts INTEGER NOT NULL DEFAULT 0,
+            total_exercises INTEGER NOT NULL DEFAULT 0,
+            goal_exercises_met BOOLEAN NOT NULL DEFAULT FALSE,
+            goal_points_met BOOLEAN NOT NULL DEFAULT FALSE,
+            challenge_points_met BOOLEAN NOT NULL DEFAULT FALSE,
+            badges_awarded JSONB NOT NULL DEFAULT '[]'::jsonb,
+            awards_awarded JSONB NOT NULL DEFAULT '[]'::jsonb,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE (user_id, week_start)
+        )
+    `);
+    await pool.query(
+        'CREATE INDEX IF NOT EXISTS idx_weekly_results_week_start ON weekly_results (week_start)'
+    );
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS monthly_results (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            month_start DATE NOT NULL,
+            month_end DATE NOT NULL,
+            total_points INTEGER NOT NULL DEFAULT 0,
+            challenge_points_met BOOLEAN NOT NULL DEFAULT FALSE,
+            badges_awarded JSONB NOT NULL DEFAULT '[]'::jsonb,
+            awards_awarded JSONB NOT NULL DEFAULT '[]'::jsonb,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE (user_id, month_start)
+        )
+    `);
+    await pool.query(
+        'CREATE INDEX IF NOT EXISTS idx_monthly_results_month_start ON monthly_results (month_start)'
+    );
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS leaderboard_results (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            week_start DATE NOT NULL,
+            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            rank INTEGER NOT NULL,
+            total_points INTEGER NOT NULL DEFAULT 0,
+            participant_count INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE (week_start, user_id)
+        )
+    `);
+    await pool.query(
+        'CREATE INDEX IF NOT EXISTS idx_leaderboard_results_week ON leaderboard_results (week_start)'
+    );
+
+    // Benachrichtigungen / Push
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS notifications (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            message TEXT NOT NULL,
+            payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            read_at TIMESTAMPTZ
+        )
+    `);
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications (user_id)');
+    await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_notifications_unread 
+        ON notifications (user_id, read_at) WHERE read_at IS NULL
+    `);
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS push_subscriptions (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            endpoint TEXT NOT NULL,
+            expiration_time TIMESTAMPTZ,
+            keys JSONB NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            last_used_at TIMESTAMPTZ,
+            UNIQUE (endpoint)
+        )
+    `);
+    await pool.query(
+        'CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id)'
+    );
+};
+
 /**
  * Prüft ob eine Tabelle existiert
  */
@@ -57,7 +268,18 @@ export const ensureAllTablesExist = async (pool) => {
         'password_reset_tokens': ['id', 'user_id', 'token_hash', 'expires_at', 'used', 'used_at'],
         'outbound_emails': ['id', 'recipient', 'subject', 'body', 'sent_at'],
         'invitations': ['id', 'email', 'token_hash', 'expires_at', 'status', 'used', 'used_at'],
-        'user_backup_codes': ['id', 'user_id', 'code_hash', 'used_at']
+        'user_backup_codes': ['id', 'user_id', 'code_hash', 'used_at'],
+        'workouts': ['id', 'user_id', 'title', 'start_time', 'duration', 'use_end_time', 'created_at'],
+        'workout_activities': ['id', 'workout_id', 'activity_type', 'quantity', 'points_earned', 'order_index'],
+        'exercises': ['id', 'name', 'points_per_unit', 'unit', 'is_active'],
+        'notifications': ['id', 'user_id', 'type', 'title', 'message', 'payload', 'created_at'],
+        'push_subscriptions': ['id', 'user_id', 'endpoint', 'keys', 'created_at'],
+        'badges': ['id', 'slug', 'category', 'label'],
+        'user_badges': ['id', 'user_id', 'badge_id', 'earned_at'],
+        'user_badge_progress': ['id', 'user_id', 'badge_slug', 'counter'],
+        'weekly_results': ['id', 'user_id', 'week_start', 'total_points'],
+        'monthly_results': ['id', 'user_id', 'month_start', 'total_points'],
+        'leaderboard_results': ['id', 'week_start', 'user_id', 'rank', 'total_points', 'participant_count']
     };
 
     const missingTables = [];
@@ -100,6 +322,9 @@ export const createMigrationRunner = (pool) => {
         if (!migrationPromise) {
             migrationPromise = (async () => {
                 try {
+                    // Stelle sicher, dass benötigte Extensions vorhanden sind, bevor Migrationen laufen
+                    await ensureExtension(pool);
+
                     // Lese alle Migration-Dateien
                     const files = await fs.readdir(MIGRATIONS_DIR);
                     const migrationFiles = files
@@ -116,6 +341,9 @@ export const createMigrationRunner = (pool) => {
                         await pool.query(sql);
                         console.log(`[Migration] ✅ ${file} erfolgreich ausgeführt`);
                     }
+
+                    // Nach den Migrationen Kern-Tabellen sicherstellen (abhängig von users & Co.)
+                    await ensureCoreSchema(pool);
                     
                     // Prüfe ob alle Tabellen existieren
                     await ensureAllTablesExist(pool);

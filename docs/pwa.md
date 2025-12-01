@@ -118,10 +118,10 @@ Ermöglicht es, dass Sportify als Ziel für Share-Aktionen von anderen Apps verw
 **Konfiguration** (Environment Variablen):
 
 ```
-WEB_PUSH_PUBLIC_KEY=...
-WEB_PUSH_PRIVATE_KEY=...
-WEB_PUSH_SUBJECT=mailto:support@sportify.app
-WEB_PUSH_TTL_SECONDS=60
+VAPID_PUBLIC_KEY=...
+VAPID_PRIVATE_KEY=...
+VAPID_SUBJECT=mailto:support@sportify.app
+# Optional: TTL in Sekunden (Standard: 60)
 ```
 
 VAPID-Keys können z. B. mit `npx web-push generate-vapid-keys` erzeugt werden. Werden keine Keys gesetzt, bleibt das Feature inaktiv.
@@ -195,19 +195,24 @@ convert favicon.svg -resize 192x192 -gravity center -extent 192x192 icon-192x192
 **Implementierung**: CSS-basierte Lösung ohne zusätzliche Dateien
 
 ### iOS
+
 Nutzt automatisch:
+
 - `theme-color` Meta Tag für Hintergrundfarbe (Light/Dark Mode)
 - `apple-touch-icon` als Icon im Splash Screen
 - Smooth Fade-In Animation beim App-Start
 
 ### Android
+
 Nutzt automatisch:
+
 - `background_color` aus dem Web App Manifest für Hintergrundfarbe
 - Größtes Icon (512x512) aus dem Manifest als Splash Screen Icon
 - `theme_color` für die Status Bar Farbe
 - Smooth Fade-In Animation beim App-Start
 
 **Vorteile**:
+
 - Keine zusätzlichen Dateien nötig
 - Automatische Theme-Unterstützung (iOS: Light/Dark, Android: Light)
 - Bessere Performance (keine großen Bilder zu laden)
@@ -306,13 +311,14 @@ Wenn die Verbindung wiederhergestellt wird:
 Ein optionaler API-Client der automatisch die Offline-Queue nutzt:
 
 ```typescript
-import { api } from '@/utils/apiClient';
+import { api } from "@/utils/apiClient";
 
 // Automatisch in Queue wenn offline
-const response = await api.post('/workouts', workoutData);
+const response = await api.post("/workouts", workoutData);
 ```
 
 **Features**:
+
 - Automatische Offline-Queue für POST/PUT/DELETE/PATCH Requests
 - GET Requests nutzen Service Worker Cache
 - Bessere UX: Requests werden nicht verloren wenn offline

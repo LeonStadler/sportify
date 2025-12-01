@@ -30,9 +30,10 @@ export function useAnalytics(selection: AnalyticsSelection): UseAnalyticsResult 
 
   const buildQueryString = useCallback(() => {
     const params = new URLSearchParams({ period: selection.period });
-    if (selection.period === "custom" && selection.start && selection.end) {
-      params.set("start", selection.start.toISOString().slice(0, 10));
-      params.set("end", selection.end.toISOString().slice(0, 10));
+    if (selection.start && selection.end) {
+      const toParam = (date: Date) => date.toISOString().slice(0, 10);
+      params.set("start", toParam(selection.start));
+      params.set("end", toParam(selection.end));
     }
     return params.toString();
   }, [selection.end, selection.period, selection.start]);

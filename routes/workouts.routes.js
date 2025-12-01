@@ -9,16 +9,61 @@ export const createWorkoutsRouter = (pool) => {
   // GET /api/workouts - Get user workouts with pagination and filtering
   router.get("/", authMiddleware, async (req, res) => {
     try {
-      const { page = 1, limit = 10, type } = req.query;
-      const offset = (page - 1) * limit;
+      const { page = 1, limit = 10, type, startDate, endDate } = req.query;
+      const pageNumber = Math.max(parseInt(page, 10) || 1, 1);
+      const limitNumber = Math.max(Math.min(parseInt(limit, 10) || 10, 50), 1);
+      const offset = (pageNumber - 1) * limitNumber;
 
-      let typeFilter = "";
-      let params = [req.user.id, parseInt(limit), offset];
+      const filters = ["w.user_id = $1"];
+      const params = [req.user.id];
+
+      const parseDate = (value) => {
+        if (!value) return null;
+        const parsed = new Date(value);
+        return isNaN(parsed.getTime()) ? null : parsed;
+      };
+
+      let paramIndex = params.length + 1;
 
       if (type && type !== "all") {
-        typeFilter = "AND wa.activity_type = $4";
+        filters.push(
+          `EXISTS (SELECT 1 FROM workout_activities wa_filter WHERE wa_filter.workout_id = w.id AND wa_filter.activity_type = $${paramIndex})`
+        );
         params.push(type);
+        paramIndex++;
       }
+
+      const start = parseDate(startDate);
+      const end = parseDate(endDate);
+
+      if (startDate && !start) {
+        return res.status(400).json({ error: "Ungültiges Startdatum" });
+      }
+
+      if (endDate && !end) {
+        return res.status(400).json({ error: "Ungültiges Enddatum" });
+      }
+
+      if (start && end && start > end) {
+        filters.push(`w.start_time BETWEEN $${paramIndex} AND $${paramIndex + 1}::timestamp`);
+        params.push(end);
+        params.push(start);
+        paramIndex += 2;
+      } else {
+        if (start) {
+          filters.push(`w.start_time >= $${paramIndex}`);
+          params.push(start);
+          paramIndex++;
+        }
+        if (end) {
+          filters.push(`w.start_time < $${paramIndex}::date + INTERVAL '1 day'`);
+          params.push(end);
+          paramIndex++;
+        }
+      }
+
+      const filterClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+      const paramsWithPagination = [...params, limitNumber, offset];
 
       const query = `
                 SELECT 
@@ -46,24 +91,22 @@ export const createWorkoutsRouter = (pool) => {
                     ) as activities
                 FROM workouts w
                 LEFT JOIN workout_activities wa ON w.id = wa.workout_id
-                WHERE w.user_id = $1 ${typeFilter}
+                ${filterClause}
                 GROUP BY w.id, w.title, w.description, w.start_time, w.duration, w.use_end_time, w.created_at, w.updated_at
                 ORDER BY w.start_time DESC, w.created_at DESC
-                LIMIT $2 OFFSET $3;
+                LIMIT $${params.length + 1} OFFSET $${params.length + 2};
             `;
 
-      const { rows } = await pool.query(query, params);
+      const { rows } = await pool.query(query, paramsWithPagination);
 
       // Get total count for pagination
       const countQuery = `
                 SELECT COUNT(DISTINCT w.id) as total
                 FROM workouts w
-                LEFT JOIN workout_activities wa ON w.id = wa.workout_id
-                WHERE w.user_id = $1 ${typeFilter};
+                ${filterClause};
             `;
-      const countParams =
-        type && type !== "all" ? [req.user.id, type] : [req.user.id];
-      const { rows: countRows } = await pool.query(countQuery, countParams);
+      const { rows: countRows } = await pool.query(countQuery, params);
+      const totalCount = Number(countRows[0].total) || 0;
 
       const workouts = rows.map((row) => {
         const activities = Array.isArray(row.activities)
@@ -167,11 +210,11 @@ export const createWorkoutsRouter = (pool) => {
       res.json({
         workouts,
         pagination: {
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(countRows[0].total / limit),
-          totalItems: parseInt(countRows[0].total),
-          hasNext: page * limit < countRows[0].total,
-          hasPrev: page > 1,
+          currentPage: pageNumber,
+          totalPages: Math.max(Math.ceil(totalCount / limitNumber), 1),
+          totalItems: totalCount,
+          hasNext: pageNumber * limitNumber < totalCount,
+          hasPrev: pageNumber > 1,
         },
       });
     } catch (error) {

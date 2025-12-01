@@ -1,6 +1,8 @@
 import { PageTemplate } from "@/components/PageTemplate";
 import { TrainingDiarySection } from "@/components/TrainingDiarySection";
 import { WorkoutForm } from "@/components/WorkoutForm";
+import { TimeRangeFilter } from "@/components/filters/TimeRangeFilter";
+import { PaginationControls } from "@/components/pagination/PaginationControls";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,9 +27,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
+import { getNormalizedRange, getRangeForPeriod, toDateParam } from "@/utils/dateRanges";
 import type { Workout } from "@/types/workout";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { DateRange } from "react-day-picker";
 
 interface WorkoutResponse {
   workouts: Workout[];
@@ -40,11 +44,20 @@ interface WorkoutResponse {
   };
 }
 
+const WORKOUTS_PER_PAGE = 10;
+
 export function Training() {
   const { t } = useTranslation();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filterType, setFilterType] = useState<string>("all");
+  const [period, setPeriod] = useState<string>("month");
+  const [customRange, setCustomRange] = useState<DateRange | undefined>();
+  const [offset, setOffset] = useState(0);
+  const resolvedRange = useMemo(
+    () => getNormalizedRange(getRangeForPeriod(period, customRange, offset)),
+    [customRange, period, offset]
+  );
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({
     currentPage: 1,
@@ -80,9 +93,14 @@ export function Training() {
         const token = localStorage.getItem("token");
         const params = new URLSearchParams({
           page: page.toString(),
-          limit: "10",
+          limit: WORKOUTS_PER_PAGE.toString(),
           ...(type !== "all" && { type }),
         });
+
+        if (resolvedRange?.from && resolvedRange?.to) {
+          params.set("startDate", toDateParam(resolvedRange.from));
+          params.set("endDate", toDateParam(resolvedRange.to));
+        }
 
         const response = await fetch(`${API_URL}/workouts?${params}`, {
           headers: {
@@ -109,7 +127,7 @@ export function Training() {
         setIsLoading(false);
       }
     },
-    [user, toast, t]
+    [resolvedRange?.from, resolvedRange?.to, t, toast, user]
   );
 
   useEffect(() => {
@@ -140,6 +158,28 @@ export function Training() {
 
   const handleFilterChange = (value: string) => {
     setFilterType(value);
+    setCurrentPage(1);
+  };
+
+  const handlePeriodChange = (value: string) => {
+    setPeriod(value);
+    setOffset(0);
+    setCurrentPage(1);
+    if (value !== "custom") {
+      setCustomRange(undefined);
+    }
+  };
+
+  const handleRangeChange = (range: DateRange | undefined) => {
+    setCustomRange(range);
+    if (range?.from && range?.to) {
+      setPeriod("custom");
+      setCurrentPage(1);
+    }
+  };
+
+  const handleOffsetChange = (newOffset: number) => {
+    setOffset(newOffset);
     setCurrentPage(1);
   };
 
@@ -321,7 +361,7 @@ export function Training() {
             />
 
             <Card>
-              <CardHeader className="pb-4">
+              <CardHeader className="pb-4 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <CardTitle className="text-lg md:text-xl">
                     {t("training.yourWorkouts")}
@@ -338,6 +378,31 @@ export function Training() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <TimeRangeFilter
+                    period={period}
+                    range={customRange}
+                    offset={offset}
+                    onPeriodChange={handlePeriodChange}
+                    onRangeChange={handleRangeChange}
+                    onOffsetChange={handleOffsetChange}
+                    t={t}
+                    locale={user?.languagePreference || "de"}
+                    presets={[
+                      { value: "week", label: t("filters.period.week") },
+                      { value: "month", label: t("filters.period.month") },
+                      { value: "quarter", label: t("filters.period.quarter") },
+                      { value: "year", label: t("filters.period.year") },
+                      { value: "all", label: t("filters.period.all") },
+                      { value: "custom", label: t("filters.period.custom") },
+                    ]}
+                    formatDate={(date) =>
+                      date.toLocaleDateString(
+                        user?.languagePreference === "en" ? "en-US" : "de-DE"
+                      )
+                    }
+                  />
                 </div>
               </CardHeader>
               <CardContent>
@@ -477,37 +542,25 @@ export function Training() {
                       </div>
                     ))}
 
-                    {/* Pagination - Mobile optimiert */}
                     {pagination.totalPages > 1 && (
-                      <div className="flex items-center justify-between pt-4 border-t">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handlePageChange(currentPage - 1)}
-                          disabled={!pagination.hasPrev}
-                          className="text-xs md:text-sm"
-                        >
-                          <span className="hidden sm:inline">
-                            {t("training.previous")}
-                          </span>
-                          <span className="sm:hidden">←</span>
-                        </Button>
-                        <span className="text-xs md:text-sm text-muted-foreground">
-                          {pagination.currentPage}/{pagination.totalPages}
-                        </span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handlePageChange(currentPage + 1)}
-                          disabled={!pagination.hasNext}
-                          className="text-xs md:text-sm"
-                        >
-                          <span className="hidden sm:inline">
-                            {t("training.next")}
-                          </span>
-                          <span className="sm:hidden">→</span>
-                        </Button>
-                      </div>
+                      <PaginationControls
+                        pagination={pagination}
+                        onPageChange={handlePageChange}
+                        pageSize={WORKOUTS_PER_PAGE}
+                        disabled={isLoading}
+                        labels={{
+                          previous: t("filters.previous", t("training.previous")),
+                          next: t("filters.next", t("training.next")),
+                          page: (current, total) =>
+                            t("filters.pageLabel", { current, total }),
+                          summary: (start, end, total) =>
+                            t("filters.itemSummary", {
+                              start,
+                              end,
+                              total: total ?? end,
+                            }),
+                        }}
+                      />
                     )}
                   </div>
                 )}

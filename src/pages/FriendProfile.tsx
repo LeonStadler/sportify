@@ -1,14 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge as UiBadge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { API_URL } from "@/lib/api";
+import { parseAvatarConfig } from "@/lib/avatar";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
-import { API_URL } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge as UiBadge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Award, Medal } from "lucide-react";
+import { ArrowLeft, Award, Dumbbell, Medal } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import NiceAvatar from "react-nice-avatar";
+import { Link, useParams } from "react-router-dom";
 
 interface FriendBadge {
   id: string;
@@ -30,6 +33,22 @@ interface FriendAward {
   createdAt?: string;
 }
 
+interface WorkoutActivity {
+  id: string;
+  activityType: string;
+  amount: number;
+  points: number;
+}
+
+interface RecentWorkout {
+  workoutId: string;
+  workoutTitle: string;
+  startTimeTimestamp: string | null;
+  workoutNotes?: string;
+  activities: WorkoutActivity[];
+  totalPoints: number;
+}
+
 interface FriendProfileResponse {
   id: string;
   displayName: string;
@@ -37,6 +56,7 @@ interface FriendProfileResponse {
   joinedAt?: string;
   badges: FriendBadge[];
   awards: FriendAward[];
+  recentWorkouts: RecentWorkout[];
 }
 
 const formatDate = (value?: string) => {
@@ -70,8 +90,53 @@ const getInitials = (name: string) => {
     .toUpperCase();
 };
 
+const getActivityIcon = (activityType: string) => {
+  switch (activityType) {
+    case "pullups":
+      return "💪";
+    case "pushups":
+      return "🔥";
+    case "situps":
+      return "🚀";
+    case "running":
+      return "🏃";
+    case "cycling":
+      return "🚴";
+    default:
+      return "💪";
+  }
+};
+
+const getActivityColor = (activityType: string) => {
+  switch (activityType) {
+    case "pullups":
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+    case "pushups":
+      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+    case "situps":
+      return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
+    case "running":
+      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+    case "cycling":
+      return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
+    default:
+      return "bg-muted text-muted-foreground";
+  }
+};
+
+const formatAmount = (activityType: string, amount: number) => {
+  switch (activityType) {
+    case "running":
+    case "cycling":
+      return `${amount} km`;
+    default:
+      return `${amount}×`;
+  }
+};
+
 export function FriendProfile() {
   const { friendId } = useParams();
+  const { t, i18n } = useTranslation();
   const [profile, setProfile] = useState<FriendProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -97,7 +162,8 @@ export function FriendProfile() {
 
         if (!response.ok) {
           const payload = await response.json().catch(() => ({}));
-          const message = payload?.error || "Profil konnte nicht geladen werden.";
+          const message =
+            payload?.error || "Profil konnte nicht geladen werden.";
           throw new Error(message);
         }
 
@@ -106,7 +172,9 @@ export function FriendProfile() {
       } catch (fetchError) {
         if (controller.signal.aborted) return;
         setError(
-          fetchError instanceof Error ? fetchError.message : "Unbekannter Fehler beim Laden des Profils."
+          fetchError instanceof Error
+            ? fetchError.message
+            : "Unbekannter Fehler beim Laden des Profils."
         );
       } finally {
         if (!controller.signal.aborted) {
@@ -190,13 +258,21 @@ export function FriendProfile() {
           <CardContent className="p-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-4">
               <Avatar className="h-16 w-16">
-                {profile.avatarUrl ? (
-                  <AvatarImage src={profile.avatarUrl} alt={profile.displayName} />
-                ) : null}
-                <AvatarFallback>{getInitials(profile.displayName)}</AvatarFallback>
+                {profile.avatarUrl && parseAvatarConfig(profile.avatarUrl) ? (
+                  <NiceAvatar
+                    style={{ width: "64px", height: "64px" }}
+                    {...parseAvatarConfig(profile.avatarUrl)!}
+                  />
+                ) : (
+                  <AvatarFallback className="text-lg">
+                    {getInitials(profile.displayName)}
+                  </AvatarFallback>
+                )}
               </Avatar>
               <div>
-                <h1 className="text-2xl font-semibold">{profile.displayName}</h1>
+                <h1 className="text-2xl font-semibold">
+                  {profile.displayName}
+                </h1>
                 {profile.joinedAt && (
                   <p className="text-sm text-muted-foreground">
                     Mitglied seit {formatDate(profile.joinedAt)}
@@ -216,13 +292,16 @@ export function FriendProfile() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                <Award className="h-5 w-5 text-amber-500" /> Auszeichnungen
+                <Award className="h-5 w-5 text-amber-500" />{" "}
+                {t("friendProfile.awards", "Auszeichnungen")}
               </CardTitle>
               <UiBadge variant="outline">{sortedAwards.length}</UiBadge>
             </CardHeader>
             <CardContent className="space-y-3">
               {sortedAwards.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Noch keine Auszeichnungen.</p>
+                <p className="text-sm text-muted-foreground">
+                  {t("friendProfile.noAwards", "Noch keine Auszeichnungen.")}
+                </p>
               ) : (
                 sortedAwards.map((award) => (
                   <div
@@ -236,15 +315,17 @@ export function FriendProfile() {
                       </UiBadge>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {formatDateRange(award.periodStart, award.periodEnd) || "Auszeichnung"}
+                      {formatDateRange(award.periodStart, award.periodEnd) ||
+                        t("friendProfile.awardLabel", "Auszeichnung")}
                     </p>
-                    {award.metadata && Object.keys(award.metadata).length > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        {Object.entries(award.metadata)
-                          .map(([key, value]) => `${key}: ${value}`)
-                          .join(" · ")}
-                      </p>
-                    )}
+                    {award.metadata &&
+                      Object.keys(award.metadata).length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {Object.entries(award.metadata)
+                            .map(([key, value]) => `${key}: ${value}`)
+                            .join(" · ")}
+                        </p>
+                      )}
                   </div>
                 ))
               )}
@@ -260,7 +341,9 @@ export function FriendProfile() {
             </CardHeader>
             <CardContent className="grid gap-3">
               {sortedBadges.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Noch keine Badges.</p>
+                <p className="text-sm text-muted-foreground">
+                  {t("friendProfile.noBadges", "Noch keine Badges.")}
+                </p>
               ) : (
                 sortedBadges.map((badge) => (
                   <div
@@ -271,7 +354,9 @@ export function FriendProfile() {
                       <p className="font-medium leading-none">{badge.label}</p>
                       <p className="text-xs text-muted-foreground">
                         {badge.category}
-                        {badge.level ? ` · Stufe ${badge.level}` : null}
+                        {badge.level
+                          ? ` · ${t("friendProfile.level", "Stufe")} ${badge.level}`
+                          : null}
                       </p>
                       {badge.earnedAt && (
                         <p className="text-xs text-muted-foreground">
@@ -280,7 +365,10 @@ export function FriendProfile() {
                       )}
                     </div>
                     {badge.icon ? (
-                      <UiBadge variant="secondary" className="text-xs uppercase">
+                      <UiBadge
+                        variant="secondary"
+                        className="text-xs uppercase"
+                      >
                         {badge.icon}
                       </UiBadge>
                     ) : null}
@@ -290,6 +378,75 @@ export function FriendProfile() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Recent Workouts */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+              <Dumbbell className="h-5 w-5 text-primary" />{" "}
+              {t("friendProfile.recentWorkouts", "Letzte Aktivitäten")}
+            </CardTitle>
+            <UiBadge variant="outline">
+              {profile.recentWorkouts?.length || 0}
+            </UiBadge>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {!profile.recentWorkouts || profile.recentWorkouts.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {t(
+                  "friendProfile.noWorkouts",
+                  "Noch keine Trainings aufgezeichnet."
+                )}
+              </p>
+            ) : (
+              profile.recentWorkouts.map((workout) => (
+                <div
+                  key={workout.workoutId}
+                  className="rounded-lg border bg-card p-3"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium text-sm">
+                      {workout.workoutTitle}
+                    </span>
+                    <span className="text-sm font-semibold text-primary">
+                      +{workout.totalPoints}{" "}
+                      {t("activityFeed.points", "Punkte")}
+                    </span>
+                  </div>
+                  {workout.activities.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {workout.activities.map((activity) => (
+                        <UiBadge
+                          key={activity.id}
+                          variant="secondary"
+                          className={`text-xs py-0.5 px-2 ${getActivityColor(activity.activityType)}`}
+                        >
+                          {getActivityIcon(activity.activityType)}{" "}
+                          {formatAmount(activity.activityType, activity.amount)}
+                        </UiBadge>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    {workout.startTimeTimestamp
+                      ? new Date(workout.startTimeTimestamp).toLocaleDateString(
+                          i18n.language === "en" ? "en-US" : "de-DE",
+                          {
+                            weekday: "short",
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          }
+                        )
+                      : t("training.unknownDate", "Unbekanntes Datum")}
+                  </p>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
       </div>
     );
   };

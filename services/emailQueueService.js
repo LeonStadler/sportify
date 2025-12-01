@@ -28,12 +28,21 @@ export const markEmailAsProcessed = async (pool, id, { error = null } = {}) => {
 };
 
 export const claimPendingEmails = async (pool, { limit = 25 } = {}) => {
+    // Claim rows up-front to prevent double processing across concurrent workers
     const { rows } = await pool.query(
-        `SELECT id, user_id, recipient, subject, body, html
-         FROM email_queue
-         WHERE status = 'pending' AND scheduled_at <= NOW()
-         ORDER BY scheduled_at ASC
-         LIMIT $1`,
+        `WITH pending AS (
+            SELECT id
+            FROM email_queue
+            WHERE status = 'pending' AND scheduled_at <= NOW()
+            ORDER BY scheduled_at ASC
+            LIMIT $1
+            FOR UPDATE SKIP LOCKED
+        )
+        UPDATE email_queue e
+        SET status = 'processing'
+        FROM pending
+        WHERE e.id = pending.id
+        RETURNING e.id, e.user_id, e.recipient, e.subject, e.body, e.html`,
         [limit]
     );
     return rows;

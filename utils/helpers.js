@@ -95,10 +95,17 @@ export const getFrontendUrl = (req) => {
 
 // Helper function to convert snake_case to camelCase
 export const toCamelCase = (obj) => {
+    // Leave primitives and special objects (e.g. Date) untouched
     if (obj === null || typeof obj !== 'object') return obj;
+    if (obj instanceof Date) return obj;
 
     if (Array.isArray(obj)) {
         return obj.map(toCamelCase);
+    }
+
+    // Only transform plain objects; keep other instances (e.g. class instances) as-is
+    if (obj.constructor !== Object) {
+        return obj;
     }
 
     const converted = {};
@@ -488,7 +495,7 @@ const PERIOD_WINDOWS = {
 export const getPeriodWindowExpressions = (value = 'week', { startDate, endDate } = {}) => {
     const hasCustomRange = startDate && endDate;
 
-    if (value === 'custom' && hasCustomRange) {
+    if (hasCustomRange) {
         const start = new Date(startDate);
         const end = new Date(endDate);
 
@@ -617,4 +624,3 @@ Dein Sportify-Team`;
     });
     console.info(`[Password Reset] E-Mail erfolgreich in Queue eingefügt für: ${recipientEmail}`);
 };
-

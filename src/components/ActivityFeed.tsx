@@ -7,53 +7,33 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
 import { parseAvatarConfig } from "@/lib/avatar";
+import { ArrowRight } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import NiceAvatar from "react-nice-avatar";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
-interface ActivityFeedItem {
+interface WorkoutActivity {
   id: string;
-  userName: string;
-  userAvatar?: string;
-  userFirstName: string;
-  userLastName: string;
   activityType: string;
   amount: number;
   points: number;
-  workoutTitle: string;
-  startTimeTimestamp: string | null;
 }
 
-const formatActivity = (
-  activity: ActivityFeedItem,
-  t: (key: string, params?: Record<string, unknown>) => string
-) => {
-  const { activityType, amount, workoutTitle } = activity;
-
-  let formatted = `${amount}`;
-
-  // Add unit based on activity type
-  switch (activityType) {
-    case "pushups":
-    case "pullups":
-    case "situps":
-      formatted += ` ${t("activityFeed.repetitions")}`;
-      break;
-    case "running":
-    case "cycling":
-      formatted += " km";
-      break;
-    default:
-      formatted += ` ${t("activityFeed.units")}`;
-  }
-
-  if (workoutTitle) {
-    formatted += ` ${t("activityFeed.inWorkout", { title: workoutTitle })}`;
-  }
-
-  return formatted;
-};
+interface FeedWorkout {
+  workoutId: string;
+  workoutTitle: string;
+  workoutNotes?: string;
+  startTimeTimestamp: string | null;
+  userId: string;
+  userName: string;
+  userAvatar?: string | null;
+  userFirstName: string;
+  userLastName: string;
+  isOwnWorkout: boolean;
+  activities: WorkoutActivity[];
+  totalPoints: number;
+}
 
 const getActivityIcon = (activityType: string) => {
   switch (activityType) {
@@ -75,7 +55,6 @@ const getActivityIcon = (activityType: string) => {
 const getActivityName = (activityType: string, t: (key: string) => string) => {
   const translationKey = `activityFeed.activityTypes.${activityType.toLowerCase()}`;
   const translation = t(translationKey);
-  // Fallback to original if translation key doesn't exist
   return translation !== translationKey
     ? translation
     : t("activityFeed.activityTypes.unknown");
@@ -84,17 +63,27 @@ const getActivityName = (activityType: string, t: (key: string) => string) => {
 const getActivityColor = (activityType: string) => {
   switch (activityType) {
     case "pullups":
-      return "bg-blue-100 text-blue-800";
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
     case "pushups":
-      return "bg-red-100 text-red-800";
+      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
     case "situps":
-      return "bg-orange-100 text-orange-800";
+      return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
     case "running":
-      return "bg-green-100 text-green-800";
+      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
     case "cycling":
-      return "bg-purple-100 text-purple-800";
+      return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
     default:
-      return "bg-gray-100 text-gray-800";
+      return "bg-muted text-muted-foreground";
+  }
+};
+
+const formatAmount = (activityType: string, amount: number) => {
+  switch (activityType) {
+    case "running":
+    case "cycling":
+      return `${amount} km`;
+    default:
+      return `${amount}×`;
   }
 };
 
@@ -102,7 +91,6 @@ const formatTimeAgo = (
   dateString: string | null | undefined,
   t: (key: string, params?: Record<string, unknown>) => string
 ) => {
-  // Kein Fallback - wenn kein Datum vorhanden, zeige "Unbekannt"
   if (!dateString) {
     return t("activityFeed.timeAgoShort.unknown");
   }
@@ -110,24 +98,18 @@ const formatTimeAgo = (
   const date = new Date(dateString);
   const now = new Date();
 
-  // Prüfe ob das Datum gültig ist
   if (isNaN(date.getTime())) {
-    console.warn("Invalid date in formatTimeAgo:", dateString);
     return t("activityFeed.timeAgoShort.unknown");
   }
 
   const diffMs = now.getTime() - date.getTime();
 
-  // Wenn die Differenz negativ ist (Zukunft), zeige das Datum formatiert
   if (diffMs < 0) {
-    // Zeige formatiertes Datum für zukünftige Daten
     const locale = "de-DE";
     return date.toLocaleDateString(locale, {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
     });
   }
 
@@ -136,44 +118,23 @@ const formatTimeAgo = (
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   const diffWeeks = Math.floor(diffDays / 7);
   const diffMonths = Math.floor(diffDays / 30);
-  const diffYears = Math.floor(diffDays / 365);
 
-  // Unter 1 Stunde: Minuten
   if (diffMins < 60) {
     if (diffMins < 1) {
       return t("activityFeed.timeAgoShort.justNow");
     }
     return t("activityFeed.timeAgoShort.minutes", { count: diffMins });
-  }
-  // Unter 24 Stunden: Stunden:Minuten
-  else if (diffHours < 24) {
-    const remainingMinutes = diffMins % 60;
-    if (remainingMinutes === 0) {
-      return t("activityFeed.timeAgoShort.hours", { count: diffHours });
-    }
-    return t("activityFeed.timeAgoShort.hoursMinutes", {
-      hours: diffHours,
-      minutes: remainingMinutes,
-    });
-  }
-  // Unter 7 Tagen: Tage
-  else if (diffDays < 7) {
+  } else if (diffHours < 24) {
+    return t("activityFeed.timeAgoShort.hours", { count: diffHours });
+  } else if (diffDays < 7) {
     if (diffDays === 1) {
       return t("activityFeed.timeAgoShort.yesterday");
     }
     return t("activityFeed.timeAgoShort.days", { count: diffDays });
-  }
-  // Unter 30 Tagen: Wochen
-  else if (diffDays < 30) {
+  } else if (diffDays < 30) {
     return t("activityFeed.timeAgoShort.weeks", { count: diffWeeks });
-  }
-  // Unter 1 Jahr: Monate
-  else if (diffDays < 365) {
+  } else {
     return t("activityFeed.timeAgoShort.months", { count: diffMonths });
-  }
-  // Darüber: Jahre
-  else {
-    return t("activityFeed.timeAgoShort.years", { count: diffYears });
   }
 };
 
@@ -192,10 +153,11 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
   const { toast } = useToast();
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [activities, setActivities] = useState<ActivityFeedItem[]>([]);
+  const [workouts, setWorkouts] = useState<FeedWorkout[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasFriends, setHasFriends] = useState<boolean | null>(null);
+  const [hasMore, setHasMore] = useState(false);
 
   const loadActivityFeed = useCallback(async () => {
     setIsLoading(true);
@@ -203,32 +165,23 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
     try {
       const token = localStorage.getItem("token");
       if (!token) {
-        setActivities([]);
+        setWorkouts([]);
         setError(t("activityFeed.pleaseLogin"));
         return;
       }
 
-      const response = await fetch(`${API_URL}/feed?page=1&limit=10`, {
+      const response = await fetch(`${API_URL}/feed?page=1&limit=5`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       if (response.ok) {
         const data = await response.json();
-        const payload = Array.isArray(data) ? data : data?.activities;
-
-        if (Array.isArray(payload)) {
-          setActivities(payload);
-          // hasFriends sollte true sein, wenn es akzeptierte Freunde gibt
-          // Wenn payload leer ist, aber hasFriends true ist, bedeutet das, dass Freunde existieren, aber noch keine Aktivitäten
-          setHasFriends(data?.hasFriends ?? (payload.length > 0 ? true : null));
-        } else {
-          console.warn("ActivityFeed: Unexpected data format", data);
-          setActivities([]);
-          setHasFriends(data?.hasFriends ?? false);
-          setError(t("activityFeed.unexpectedFormat"));
-        }
+        const payload = Array.isArray(data.workouts) ? data.workouts : [];
+        setWorkouts(payload);
+        setHasFriends(data.hasFriends ?? payload.length > 0);
+        setHasMore(data.pagination?.hasNext ?? false);
       } else {
-        setActivities([]);
+        setWorkouts([]);
         setHasFriends(false);
         setError(t("activityFeed.couldNotLoad"));
         toast({
@@ -239,7 +192,7 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
       }
     } catch (error) {
       console.error("Error loading activity feed:", error);
-      setActivities([]);
+      setWorkouts([]);
       setHasFriends(false);
       setError(t("activityFeed.couldNotLoad"));
       toast({
@@ -267,13 +220,19 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <Skeleton className="w-10 h-10 rounded-full" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-3 w-1/2" />
+          <div className="space-y-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="p-4 rounded-lg border bg-muted/30">
+                <div className="flex items-center gap-3 mb-3">
+                  <Skeleton className="w-10 h-10 rounded-full" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Skeleton className="h-6 w-20" />
+                  <Skeleton className="h-6 w-24" />
                 </div>
               </div>
             ))}
@@ -286,9 +245,22 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
   return (
     <Card className={className}>
       <CardHeader className="pb-4">
-        <CardTitle className="text-lg md:text-xl">
-          {t("activityFeed.title")}
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg md:text-xl">
+            {t("activityFeed.title")}
+          </CardTitle>
+          {workouts.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/friends/activities")}
+              className="text-primary hover:text-primary/80"
+            >
+              {t("activityFeed.showAll", "Alle anzeigen")}
+              <ArrowRight className="ml-1 h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {error ? (
@@ -296,61 +268,126 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
             {error}
           </div>
         ) : (
-          <div className="space-y-3">
-            {activities.length > 0 ? (
-              activities.map((activity) => (
-                <div
-                  key={activity.id}
-                  className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30"
-                >
-                  <Avatar className="w-10 h-10 md:w-12 md:h-12">
-                    {activity.userAvatar &&
-                    parseAvatarConfig(activity.userAvatar) ? (
-                      <NiceAvatar
-                        style={{ width: "48px", height: "48px" }}
-                        {...parseAvatarConfig(activity.userAvatar)!}
-                      />
-                    ) : (
-                      <AvatarFallback className="text-xs md:text-sm">
-                        {getUserInitials(
-                          activity.userFirstName,
-                          activity.userLastName
-                        )}
-                      </AvatarFallback>
+          <div className="space-y-2">
+            {workouts.length > 0 ? (
+              <>
+                {workouts.map((workout) => (
+                  <div
+                    key={workout.workoutId}
+                    className={`p-3 rounded-lg border transition-all duration-200 hover:shadow-sm ${
+                      workout.isOwnWorkout
+                        ? "bg-primary/5 border-primary/20 dark:bg-primary/10 dark:border-primary/30"
+                        : "bg-muted/30 border-border"
+                    }`}
+                  >
+                    {/* Header: User + Time + Points */}
+                    <div className="flex items-center gap-2.5 mb-2">
+                      {workout.isOwnWorkout ? (
+                        <Avatar className="w-8 h-8">
+                          {workout.userAvatar &&
+                          parseAvatarConfig(workout.userAvatar) ? (
+                            <NiceAvatar
+                              style={{ width: "32px", height: "32px" }}
+                              {...parseAvatarConfig(workout.userAvatar)!}
+                            />
+                          ) : (
+                            <AvatarFallback className="text-xs">
+                              {getUserInitials(
+                                workout.userFirstName,
+                                workout.userLastName
+                              )}
+                            </AvatarFallback>
+                          )}
+                        </Avatar>
+                      ) : (
+                        <Link
+                          to={`/friends/${workout.userId}`}
+                          className="hover:opacity-80 transition-opacity shrink-0"
+                        >
+                          <Avatar className="w-8 h-8 cursor-pointer">
+                            {workout.userAvatar &&
+                            parseAvatarConfig(workout.userAvatar) ? (
+                              <NiceAvatar
+                                style={{ width: "32px", height: "32px" }}
+                                {...parseAvatarConfig(workout.userAvatar)!}
+                              />
+                            ) : (
+                              <AvatarFallback className="text-xs">
+                                {getUserInitials(
+                                  workout.userFirstName,
+                                  workout.userLastName
+                                )}
+                              </AvatarFallback>
+                            )}
+                          </Avatar>
+                        </Link>
+                      )}
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          {workout.isOwnWorkout ? (
+                            <span className="font-medium text-sm truncate text-foreground">
+                              {workout.userName}
+                              <span className="ml-1 text-xs text-muted-foreground">
+                                ({t("activityFeed.you", "Du")})
+                              </span>
+                            </span>
+                          ) : (
+                            <Link
+                              to={`/friends/${workout.userId}`}
+                              className="font-medium text-sm truncate text-foreground hover:text-primary transition-colors"
+                            >
+                              {workout.userName}
+                            </Link>
+                          )}
+                          <span className="text-muted-foreground">·</span>
+                          <span className="text-xs text-muted-foreground truncate">
+                            {workout.workoutTitle}
+                          </span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {formatTimeAgo(workout.startTimeTimestamp, t)}
+                        </span>
+                      </div>
+
+                      <span className="text-sm font-semibold text-primary whitespace-nowrap">
+                        +{workout.totalPoints}
+                      </span>
+                    </div>
+
+                    {/* Activities - compact inline */}
+                    {workout.activities.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {workout.activities.map((activity) => (
+                          <Badge
+                            key={activity.id}
+                            variant="secondary"
+                            className={`text-xs py-0.5 px-2 ${getActivityColor(activity.activityType)}`}
+                          >
+                            {getActivityIcon(activity.activityType)}{" "}
+                            {formatAmount(
+                              activity.activityType,
+                              activity.amount
+                            )}
+                          </Badge>
+                        ))}
+                      </div>
                     )}
-                  </Avatar>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium text-sm md:text-base truncate">
-                        {activity.userName}
-                      </span>
-                      <Badge
-                        variant="secondary"
-                        className={`text-xs ${getActivityColor(activity.activityType)}`}
-                      >
-                        {getActivityIcon(activity.activityType)}{" "}
-                        {getActivityName(activity.activityType, t)}
-                      </Badge>
-                    </div>
-
-                    <p className="text-xs md:text-sm text-muted-foreground mb-1">
-                      <span className="font-medium">
-                        {formatActivity(activity, t)}
-                      </span>
-                    </p>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">
-                        {formatTimeAgo(activity.startTimeTimestamp, t)}
-                      </span>
-                      <span className="text-xs font-medium text-primary">
-                        {activity.points} {t("activityFeed.points")}
-                      </span>
-                    </div>
                   </div>
-                </div>
-              ))
+                ))}
+
+                {/* Show More Button */}
+                {hasMore && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => navigate("/friends/activities")}
+                  >
+                    {t("activityFeed.showMore", "Mehr anzeigen")}
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                )}
+              </>
             ) : (
               <div className="text-center py-8">
                 <div className="text-4xl mb-4">👥</div>

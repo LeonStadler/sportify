@@ -2,6 +2,7 @@ import {
   BarChart,
   Dumbbell,
   Globe,
+  History,
   Home,
   LogOut,
   LucideIcon,
@@ -13,7 +14,12 @@ import {
 } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useLocation, useNavigate, type Location } from "react-router-dom";
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  type Location,
+} from "react-router-dom";
 import LanguageSwitcher from "./LanguageSwitcher";
 import ThemeSwitcher from "./ThemeSwitcher";
 
@@ -99,16 +105,11 @@ export function AppSidebar() {
       title: t("navigation.profile"),
       url: "/profile",
       icon: User,
-      isActive: (loc) =>
-        loc.pathname === "/profile" && !loc.search.includes("tab=preferences"),
-      onClick: () => navigate("/profile?tab=profile"),
     },
     {
-      title: t("navigation.settings"),
-      url: "/profile?tab=preferences",
-      icon: Settings,
-      isActive: (loc) =>
-        loc.pathname === "/profile" && loc.search.includes("tab=preferences"),
+      title: t("changelog.title", "Changelog"),
+      url: "/changelog",
+      icon: History,
     },
   ];
 
@@ -154,30 +155,30 @@ export function AppSidebar() {
                     ? item.isActive(location)
                     : location.pathname === item.url;
                   return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      className={`
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        asChild
+                        className={`
                         hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200
                         ${active ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""}
                       `}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (item.onClick) {
-                            item.onClick();
-                          } else {
-                            navigate(item.url);
-                          }
-                        }}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-base font-medium text-left"
                       >
-                        <item.icon size={36} />
-                        <span className="tracking-tight">{item.title}</span>
-                      </button>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (item.onClick) {
+                              item.onClick();
+                            } else {
+                              navigate(item.url);
+                            }
+                          }}
+                          className="w-full flex items-center gap-3 px-3 py-2 text-base font-medium text-left"
+                        >
+                          <item.icon size={36} />
+                          <span className="tracking-tight">{item.title}</span>
+                        </button>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
                   );
                 })}
               </SidebarMenu>
@@ -203,13 +204,13 @@ export function AppSidebar() {
                             ${location.pathname === item.url ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""}
                           `}
                         >
-                      <Link
-                        to={item.url}
-                        className="flex items-center gap-3 px-3 py-2 text-sm font-medium"
-                      >
-                        <item.icon size={28} />
-                        <span className="tracking-tight">{item.title}</span>
-                      </Link>
+                          <Link
+                            to={item.url}
+                            className="flex items-center gap-3 px-3 py-2 text-sm font-medium"
+                          >
+                            <item.icon size={28} />
+                            <span className="tracking-tight">{item.title}</span>
+                          </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     ))}
@@ -248,11 +249,11 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="p-3 border-t border-border bg-background mt-auto">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <div className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-accent transition-colors">
-                <Avatar className="h-9 w-9">
+              <div className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-accent transition-colors min-w-0 flex-1 overflow-hidden">
+                <Avatar className="h-9 w-9 shrink-0">
                   {user?.avatar && parseAvatarConfig(user.avatar) ? (
                     <NiceAvatar
                       style={{ width: "36px", height: "36px" }}
@@ -262,7 +263,7 @@ export function AppSidebar() {
                     <AvatarFallback>{getUserInitials(user)}</AvatarFallback>
                   )}
                 </Avatar>
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold truncate">
                     {getDisplayName()}
                   </p>

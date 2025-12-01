@@ -42,3 +42,4 @@ SET payload = metadata
 WHERE payload IS NULL OR payload = '{}'::jsonb;
 
 COMMIT;
+

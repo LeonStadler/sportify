@@ -154,7 +154,7 @@ app.use('/api/goals', createGoalsRouter(pool));
 app.use('/api/recent-workouts', createRecentWorkoutsRouter(pool));
 app.use('/api/feed', createFeedRouter(pool, ensureFriendInfrastructure));
 app.use('/api/challenges', createChallengesRouter(pool));
-app.use('/api/notifications', createNotificationsRouter());
+app.use('/api/notifications', createNotificationsRouter(pool));
 app.use('/api/contact', createContactRouter(pool));
 
 // Health check endpoint

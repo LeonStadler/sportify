@@ -140,7 +140,7 @@ export default function ThemeSwitcher({
     };
 
     return (
-      <div 
+      <div
         className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 cursor-pointer"
         onClick={handleToggleTheme}
         role="button"

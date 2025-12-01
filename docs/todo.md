@@ -123,8 +123,6 @@
 ## 📝 NOTIZEN
 - Backend läuft auf Port 3001
 - Frontend läuft auf Port 8083
-- Demo Account: demo@sportify.com / demo123
-- Datenbank: Neon PostgreSQL (black-shape-69339629)
 
 ## 🎉 ERFOLGREICH ABGESCHLOSSEN
 - ✅ Komplette Backend-Integration ohne Mock-Daten

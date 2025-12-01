@@ -14,6 +14,7 @@ import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
+import { DEFAULT_WEEKLY_POINTS_GOAL } from "@/config/events";
 import { BarChart, Dumbbell, Settings, TrendingUp, Trophy } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -33,13 +34,6 @@ interface DashboardStats {
     cycling: { total: number; period: number };
     situps: { total: number; period: number };
   };
-}
-
-interface Goals {
-  pullups: { target: number; current: number };
-  pushups: { target: number; current: number };
-  running: { target: number; current: number };
-  cycling: { target: number; current: number };
 }
 
 interface RecentWorkout {
@@ -114,11 +108,12 @@ export function Dashboard() {
     },
   });
 
-  const [goals, setGoals] = useState<Goals>({
+  const [goals, setGoals] = useState<WeeklyGoals>({
     pullups: { target: 100, current: 0 },
     pushups: { target: 400, current: 0 },
     running: { target: 25, current: 0 },
     cycling: { target: 100, current: 0 },
+    points: { target: DEFAULT_WEEKLY_POINTS_GOAL, current: 0 },
   });
 
   const [recentWorkouts, setRecentWorkouts] = useState<RecentWorkout[]>([]);
@@ -184,7 +179,11 @@ export function Dashboard() {
 
       if (response.ok) {
         const data = await response.json();
-        setGoals(data);
+        setGoals((prev) => ({
+          ...prev,
+          ...data,
+          points: data.points ?? prev.points,
+        }));
       }
     } catch (error) {
       console.error("Error loading goals:", error);
@@ -664,6 +663,29 @@ export function Dashboard() {
               <Progress
                 value={Math.min(
                   (goals.cycling.current / goals.cycling.target) * 100,
+                  100
+                )}
+                className="h-2"
+              />
+            </div>
+            <div>
+              <div className="flex justify-between text-sm mb-2">
+                <span>
+                  {t("weeklyGoals.dialog.pointsLabel", "Punkte-Ziel")} ({t(
+                    "dashboard.goal",
+                    "Ziel"
+                  )}
+                  : {goals.points.target})
+                </span>
+                <span className="font-medium">
+                  {goals.points.current}/{goals.points.target}
+                </span>
+              </div>
+              <Progress
+                value={Math.min(
+                  goals.points.target > 0
+                    ? (goals.points.current / goals.points.target) * 100
+                    : 0,
                   100
                 )}
                 className="h-2"

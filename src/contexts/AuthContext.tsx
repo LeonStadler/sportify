@@ -82,7 +82,7 @@ export interface AuthContextType extends AuthState {
   verify2FA: (token: string) => Promise<void>;
   disable2FA: (password: string) => Promise<void>;
   rotateBackupCodes: () => Promise<string[]>;
-  updateProfile: (data: Partial<User>) => Promise<void>;
+  updateProfile: (data: Partial<User>, silent?: boolean) => Promise<void>;
   deleteAccount: (password: string) => Promise<void>;
   inviteUser: (
     email: string,
@@ -400,7 +400,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         if (userResponse.ok) {
           const userData = await userResponse.json();
           // Ensure passwordChangedAt is properly set
-          if (userData.passwordChangedAt === undefined && userData.password_changed_at !== undefined) {
+          if (
+            userData.passwordChangedAt === undefined &&
+            userData.password_changed_at !== undefined
+          ) {
             userData.passwordChangedAt = userData.password_changed_at;
             delete userData.password_changed_at;
           }
@@ -767,8 +770,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
-  const updateProfile = async (data: Partial<User>): Promise<void> => {
-    setState((prev) => ({ ...prev, isLoading: true, error: null }));
+  const updateProfile = async (
+    data: Partial<User>,
+    silent = false
+  ): Promise<void> => {
+    // Im silent-Modus keinen globalen Loading-State setzen (für Auto-Save)
+    if (!silent) {
+      setState((prev) => ({ ...prev, isLoading: true, error: null }));
+    }
 
     try {
       const token = localStorage.getItem("token");
@@ -789,10 +798,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         );
       }
 
+      // User-State aktualisieren ohne Loading-State zu ändern
       setState((prev) => ({
         ...prev,
         user: responseData,
-        isLoading: false,
+        isLoading: silent ? prev.isLoading : false,
         error: null,
       }));
     } catch (error) {
@@ -800,7 +810,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         error instanceof Error
           ? error.message
           : "Ein unbekannter Fehler ist aufgetreten.";
-      setState((prev) => ({ ...prev, isLoading: false, error: errorMessage }));
+      if (!silent) {
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: errorMessage,
+        }));
+      }
       throw error;
     }
   };

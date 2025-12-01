@@ -13,6 +13,7 @@ import { createFriendsRouter } from './routes/friends.routes.js';
 import { createGoalsRouter } from './routes/goals.routes.js';
 import { createNotificationsRouter } from './routes/notifications.routes.js';
 import { createProfileRouter } from './routes/profile.routes.js';
+import { createEventsRouter } from './routes/events.routes.js';
 import { createRecentWorkoutsRouter } from './routes/recent-workouts.routes.js';
 import { createScoreboardRouter } from './routes/scoreboard.routes.js';
 import { createStatsRouter } from './routes/stats.routes.js';
@@ -154,6 +155,7 @@ app.use('/api/goals', createGoalsRouter(pool));
 app.use('/api/recent-workouts', createRecentWorkoutsRouter(pool));
 app.use('/api/feed', createFeedRouter(pool, ensureFriendInfrastructure));
 app.use('/api/challenges', createChallengesRouter(pool));
+app.use('/api/events', createEventsRouter(pool));
 app.use('/api/notifications', createNotificationsRouter(pool));
 app.use('/api/contact', createContactRouter(pool));
 

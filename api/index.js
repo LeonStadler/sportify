@@ -14,8 +14,8 @@ const runMigrationsOnce = async () => {
                 console.log('Migrations completed successfully on Vercel');
             } catch (error) {
                 console.error('Failed to run migrations on Vercel:', error);
-                // Don't throw - allow the app to continue
-                // Migrations might already be applied
+                migrationsRun = false;
+                throw error;
             } finally {
                 migrationPromise = null;
             }
@@ -30,4 +30,3 @@ runMigrationsOnce().catch(console.error);
 // Export für Vercel Serverless Functions
 // Vercel kann Express-Apps direkt als Handler verwenden
 export default app;
-

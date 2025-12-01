@@ -25,6 +25,14 @@ const Dashboard = lazy(() =>
 const Friends = lazy(() =>
   import("@/pages/Friends").then((m) => ({ default: m.Friends }))
 );
+const FriendProfile = lazy(() =>
+  import("@/pages/FriendProfile").then((m) => ({ default: m.FriendProfile }))
+);
+const FriendsActivities = lazy(() =>
+  import("@/pages/FriendsActivities").then((m) => ({
+    default: m.FriendsActivities,
+  }))
+);
 const Imprint = lazy(() => import("@/pages/Imprint"));
 const Invite = lazy(() =>
   import("@/pages/Invite").then((m) => ({ default: m.Invite }))
@@ -45,6 +53,9 @@ const Training = lazy(() =>
   import("@/pages/Training").then((m) => ({ default: m.Training }))
 );
 const Share = lazy(() => import("@/pages/Share"));
+const Changelog = lazy(() =>
+  import("@/pages/Changelog").then((m) => ({ default: m.Changelog }))
+);
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Loading component
@@ -128,6 +139,11 @@ const App = () => {
                 <Route path="/stats" element={<Stats />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/friends" element={<Friends />} />
+                <Route
+                  path="/friends/activities"
+                  element={<FriendsActivities />}
+                />
+                <Route path="/friends/:friendId" element={<FriendProfile />} />
                 <Route path="/invite/:userId" element={<Invite />} />
                 <Route path="/admin" element={<Admin />} />
                 <Route path="/contact" element={<Contact />} />
@@ -135,6 +151,7 @@ const App = () => {
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/imprint" element={<Imprint />} />
                 <Route path="/share" element={<Share />} />
+                <Route path="/changelog" element={<Changelog />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

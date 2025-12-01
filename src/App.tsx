@@ -7,6 +7,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
+import { usePWA } from "@/hooks/usePWA";
 import { lazy, Suspense } from "react";
 import { Route, Routes } from "react-router-dom";
 
@@ -16,6 +17,7 @@ const Admin = lazy(() =>
 );
 const EmailVerification = lazy(() => import("@/pages/auth/EmailVerification"));
 const Login = lazy(() => import("@/pages/auth/Login"));
+const PWAAuth = lazy(() => import("@/pages/auth/PWAAuth"));
 const Register = lazy(() => import("@/pages/auth/Register"));
 const ResetPassword = lazy(() => import("@/pages/auth/ResetPassword"));
 const Contact = lazy(() => import("@/pages/Contact"));
@@ -70,6 +72,7 @@ const PageLoader = () => (
 
 const App = () => {
   const { isAuthenticated, isLoading } = useAuth();
+  const { isMobilePWA } = usePWA();
 
   // Offline-Synchronisation aktivieren
   useOfflineSync();
@@ -87,6 +90,31 @@ const App = () => {
   }
 
   if (!isAuthenticated) {
+    // Mobile PWA: Zeige optimierten PWA-Auth-Screen
+    if (isMobilePWA) {
+      return (
+        <TooltipProvider>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/imprint" element={<Imprint />} />
+              <Route path="/invite/:userId" element={<Invite />} />
+              <Route path="/auth/reset-password" element={<ResetPassword />} />
+              <Route
+                path="/auth/email-verification"
+                element={<EmailVerification />}
+              />
+              {/* PWA Auth Screen für alle anderen Routen */}
+              <Route path="*" element={<PWAAuth />} />
+            </Routes>
+          </Suspense>
+        </TooltipProvider>
+      );
+    }
+
+    // Standard: Normale Auth-Seiten und Landing
     return (
       <TooltipProvider>
         <Suspense fallback={<PageLoader />}>

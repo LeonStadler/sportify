@@ -874,78 +874,137 @@ const resources = {
         login: "Anmelden",
         register: "Registrieren",
         registerShort: "Reg.",
-        newFeature: "Neu: Multi-Language Support",
-        heroTitle: "Deine ultimative",
-        heroSubtitle: "Sports Analytics",
-        heroSubtitle2: "Plattform",
-        heroDescription:
-          "Tracke deine Workouts, analysiere deine Fortschritte und erreiche deine Fitnessziele mit der modernsten Sports Analytics Plattform.",
-        startFree: "Kostenlos starten",
-        contactUs: "Kontakt aufnehmen",
-        noCreditCard: "Keine Kreditkarte erforderlich",
-        secure: "100% sicher",
-        startNow: "Sofort loslegen",
-        features: "Features",
-        featuresTitle: "Alles was du brauchst",
-        featuresDescription:
-          "Von Live-Tracking bis zu detaillierten Analytics - Sportify bietet alle Tools für deinen Fitness-Erfolg.",
-        testimonials: "Testimonials",
-        testimonialsTitle: "Was unsere Nutzer sagen",
-        testimonialsDescription:
-          "Tausende von Athleten vertrauen bereits auf Sportify",
-        ctaBadge: "Jetzt starten",
-        ctaTitle: "Bereit durchzustarten?",
-        ctaDescription:
-          "Schließe dich tausenden von Athleten an und beginne noch heute deine Fitness-Reise mit Sportify.",
-        ctaButton: "Jetzt kostenlos registrieren",
-        freeStart: "Kostenlos starten",
-        noCommitment: "Keine Bindung",
-        startImmediately: "Sofort loslegen",
-        footerDescription:
-          "Die moderne Sports Analytics Plattform für ambitionierte Athleten.",
-        footerDeveloped: "Entwickelt mit",
-        footerBy: "von Leon Stadler.",
-        footerFeatures: "Features",
-        footerDeveloper: "Entwickler",
-        footerLegal: "Rechtliches",
-        footerCopyright:
-          "© 2025 Sportify. Alle Rechte vorbehalten. Entwickelt von Leon Stadler.",
-        featuresList: {
-          liveScoreboard: "Live Scoreboard",
-          workoutTracking: "Workout Tracking",
-          statistics: "Statistiken & Analytics",
-          community: "Community Features",
+        // Hero Section
+        hero: {
+          badge: "Neu: PWA Support & Push-Benachrichtigungen",
+          title1: "Tracke deine",
+          title2: "Fitness-Reise",
+          title3: "wie ein Profi.",
+          description:
+            "Die All-in-One Plattform für Workout-Tracking, Fortschrittsanalyse und Community-Motivation. Erreiche deine Fitnessziele schneller.",
+          cta: "Jetzt kostenlos starten",
+          demo: "App entdecken",
+          trust1: "Kostenlos starten",
+          trust2: "Daten verschlüsselt",
+          trust3: "PWA installierbar",
         },
-        footerTech: {
-          react: "React & TypeScript",
-          modern: "Moderne Web-Technologien",
-          opensource: "Open Source Komponenten",
+        // Stats Section
+        stats: {
+          workouts: "Workouts getrackt",
+          athletes: "Aktive Athleten",
+          uptime: "Verfügbarkeit",
+          exercises: "Übungen verfügbar",
         },
-        footerLinks: {
-          privacy: "Datenschutz",
-          terms: "AGB",
-          imprint: "Impressum",
-          contact: "Kontakt",
+        // Features Section
+        features: {
+          badge: "Funktionen",
+          title: "Alles was du brauchst",
+          subtitle:
+            "Von Live-Scoreboards bis zu detaillierten Analytics – Sportify bietet alle Tools für deinen Erfolg.",
+          learnMore: "Mehr erfahren",
+          scoreboard: {
+            title: "Live Scoreboard",
+            description:
+              "Vergleiche deine Leistungen in Echtzeit mit Freunden. Wöchentliche, monatliche und Jahres-Rankings motivieren dich, dein Bestes zu geben.",
+          },
+          analytics: {
+            title: "Detaillierte Statistiken",
+            description:
+              "Analysiere deine Fortschritte mit interaktiven Charts, Heatmaps und umfassenden Workout-Metriken.",
+          },
+          friends: {
+            title: "Freunde & Community",
+            description:
+              "Verbinde dich mit Freunden, verfolge deren Aktivitäten und motiviert euch gegenseitig zu neuen Bestleistungen.",
+          },
+          training: {
+            title: "Workout Tracking",
+            description:
+              "Tracke über 50 verschiedene Übungen mit detaillierten Sätzen, Gewichten und Wiederholungen. Erstelle eigene Workout-Pläne.",
+          },
+          notifications: {
+            title: "Push-Benachrichtigungen",
+            description:
+              "Erhalte sofortige Updates wenn Freunde trainieren, neue Bestleistungen erreichen oder dich herausfordern.",
+          },
+          pwa: {
+            title: "PWA & Offline",
+            description:
+              "Installiere die App auf deinem Gerät und nutze sie auch ohne Internetverbindung. Daten werden automatisch synchronisiert.",
+          },
         },
-        featureTitles: {
-          detailedStats: "Detaillierte Statistiken",
-          realtime: "Echtzeit Updates",
-          secure: "Sichere Daten",
-          mobile: "Mobile First",
+        // Showcase Section
+        showcase: {
+          badge: "App Preview",
+          title: "Dein Dashboard, deine Daten",
+          subtitle:
+            "Behalte den Überblick über all deine Trainingsfortschritte mit einem übersichtlichen, modernen Dashboard.",
+          progress: {
+            title: "Fortschrittsverfolgung",
+            description:
+              "Visualisiere deine Entwicklung über Wochen, Monate und Jahre hinweg.",
+          },
+          goals: {
+            title: "Ziele setzen & erreichen",
+            description:
+              "Definiere persönliche Ziele und lass dich von Sportify dabei unterstützen.",
+          },
+          history: {
+            title: "Workout-Historie",
+            description:
+              "Greife jederzeit auf alle vergangenen Workouts und Statistiken zu.",
+          },
+          achievements: {
+            title: "Erfolge & Badges",
+            description:
+              "Sammle Auszeichnungen für erreichte Meilensteine und Streaks.",
+          },
+          preview: {
+            streak: "Streak",
+            days: "Tage",
+            thisWeek: "Diese Woche",
+            progress: "Wochenverlauf",
+            workout: "Krafttraining",
+            today: "Heute abgeschlossen",
+          },
         },
-        featureDescriptions: {
-          liveScoreboard:
-            "Verfolge deine Leistungen in Echtzeit und vergleiche dich mit anderen Athleten.",
-          detailedStats:
-            "Analysiere deine Fortschritte mit umfassenden Charts und Metriken.",
-          community:
-            "Verbinde dich mit Freunden, lade sie ein und motiviert euch gegenseitig.",
-          realtime:
-            "Erhalte sofortige Updates über deine Aktivitäten und Erfolge.",
-          secure:
-            "Deine persönlichen Daten sind mit modernster Verschlüsselung geschützt.",
-          mobile:
-            "Perfekt optimiert für mobile Geräte - trainiere und tracke überall.",
+        // CTA Section
+        cta: {
+          badge: "Bereit durchzustarten?",
+          title: "Starte jetzt deine Fitness-Reise",
+          subtitle:
+            "Schließe dich unserer Community an und bringe dein Training auf das nächste Level. Kostenlos und unverbindlich.",
+          button: "Kostenlos registrieren",
+          trust1: "Gratis starten",
+          trust2: "Keine Kreditkarte",
+          trust3: "Sofort loslegen",
+        },
+        // Footer
+        footer: {
+          description:
+            "Die moderne Sports Analytics Plattform für ambitionierte Athleten, die ihre Fitnessziele erreichen wollen.",
+          madeWith: "Entwickelt mit",
+          by: "von Leon Stadler",
+          features: "Features",
+          featuresList: {
+            dashboard: "Dashboard",
+            training: "Training",
+            stats: "Statistiken",
+            friends: "Freunde",
+          },
+          developer: "Entwickler",
+          tech: {
+            modern: "Moderne Web-Technologien",
+          },
+          legal: "Rechtliches",
+          legalLinks: {
+            privacy: "Datenschutz",
+            terms: "AGB",
+            imprint: "Impressum",
+            contact: "Kontakt",
+          },
+          copyright:
+            "© 2025 Sportify. Alle Rechte vorbehalten. Entwickelt von Leon Stadler.",
         },
       },
       // Auth Pages
@@ -1057,6 +1116,11 @@ const resources = {
           problems: "Probleme mit der Authentifizierung?",
           contactUs: "Kontaktieren Sie uns",
         },
+      },
+      // PWA Auth Screen
+      pwaAuth: {
+        welcomeTitle: "Willkommen bei Sportify!",
+        welcomeSubtitle: "Erstelle dein Konto und starte deine Fitness-Reise",
       },
       // Contact Page
       contact: {
@@ -2532,77 +2596,136 @@ const resources = {
         login: "Login",
         register: "Register",
         registerShort: "Reg.",
-        newFeature: "New: Multi-Language Support",
-        heroTitle: "Your ultimate",
-        heroSubtitle: "Sports Analytics",
-        heroSubtitle2: "Platform",
-        heroDescription:
-          "Track your workouts, analyze your progress and achieve your fitness goals with the most modern Sports Analytics platform.",
-        startFree: "Start free",
-        contactUs: "Contact us",
-        noCreditCard: "No credit card required",
-        secure: "100% secure",
-        startNow: "Start now",
-        features: "Features",
-        featuresTitle: "Everything you need",
-        featuresDescription:
-          "From live tracking to detailed analytics - Sportify provides all the tools for your fitness success.",
-        testimonials: "Testimonials",
-        testimonialsTitle: "What our users say",
-        testimonialsDescription: "Thousands of athletes already trust Sportify",
-        ctaBadge: "Get started",
-        ctaTitle: "Ready to get started?",
-        ctaDescription:
-          "Join thousands of athletes and start your fitness journey with Sportify today.",
-        ctaButton: "Register now for free",
-        freeStart: "Start free",
-        noCommitment: "No commitment",
-        startImmediately: "Start immediately",
-        footerDescription:
-          "The modern Sports Analytics platform for ambitious athletes.",
-        footerDeveloped: "Developed with",
-        footerBy: "by Leon Stadler.",
-        footerFeatures: "Features",
-        footerDeveloper: "Developer",
-        footerLegal: "Legal",
-        footerCopyright:
-          "© 2025 Sportify. All rights reserved. Developed by Leon Stadler.",
-        featuresList: {
-          liveScoreboard: "Live Scoreboard",
-          workoutTracking: "Workout Tracking",
-          statistics: "Statistics & Analytics",
-          community: "Community Features",
+        // Hero Section
+        hero: {
+          badge: "New: PWA Support & Push Notifications",
+          title1: "Track your",
+          title2: "Fitness Journey",
+          title3: "like a Pro.",
+          description:
+            "The all-in-one platform for workout tracking, progress analysis, and community motivation. Reach your fitness goals faster.",
+          cta: "Start free now",
+          demo: "Explore App",
+          trust1: "Start free",
+          trust2: "Data encrypted",
+          trust3: "PWA installable",
         },
-        footerTech: {
-          react: "React & TypeScript",
-          modern: "Modern Web Technologies",
-          opensource: "Open Source Components",
+        // Stats Section
+        stats: {
+          workouts: "Workouts tracked",
+          athletes: "Active athletes",
+          uptime: "Uptime",
+          exercises: "Exercises available",
         },
-        footerLinks: {
-          privacy: "Privacy",
-          terms: "Terms",
-          imprint: "Imprint",
-          contact: "Contact",
+        // Features Section
+        features: {
+          badge: "Features",
+          title: "Everything you need",
+          subtitle:
+            "From live scoreboards to detailed analytics – Sportify provides all the tools for your success.",
+          learnMore: "Learn more",
+          scoreboard: {
+            title: "Live Scoreboard",
+            description:
+              "Compare your performance in real-time with friends. Weekly, monthly, and yearly rankings motivate you to give your best.",
+          },
+          analytics: {
+            title: "Detailed Statistics",
+            description:
+              "Analyze your progress with interactive charts, heatmaps, and comprehensive workout metrics.",
+          },
+          friends: {
+            title: "Friends & Community",
+            description:
+              "Connect with friends, follow their activities, and motivate each other to new personal bests.",
+          },
+          training: {
+            title: "Workout Tracking",
+            description:
+              "Track over 50 different exercises with detailed sets, weights, and reps. Create custom workout plans.",
+          },
+          notifications: {
+            title: "Push Notifications",
+            description:
+              "Get instant updates when friends train, achieve new personal bests, or challenge you.",
+          },
+          pwa: {
+            title: "PWA & Offline",
+            description:
+              "Install the app on your device and use it even without internet. Data syncs automatically.",
+          },
         },
-        featureTitles: {
-          detailedStats: "Detailed Statistics",
-          realtime: "Real-time Updates",
-          secure: "Secure Data",
-          mobile: "Mobile First",
+        // Showcase Section
+        showcase: {
+          badge: "App Preview",
+          title: "Your Dashboard, your Data",
+          subtitle:
+            "Keep track of all your training progress with a clear, modern dashboard.",
+          progress: {
+            title: "Progress Tracking",
+            description:
+              "Visualize your development over weeks, months, and years.",
+          },
+          goals: {
+            title: "Set & Achieve Goals",
+            description:
+              "Define personal goals and let Sportify help you achieve them.",
+          },
+          history: {
+            title: "Workout History",
+            description: "Access all past workouts and statistics at any time.",
+          },
+          achievements: {
+            title: "Achievements & Badges",
+            description:
+              "Collect awards for milestones reached and streaks maintained.",
+          },
+          preview: {
+            streak: "Streak",
+            days: "Days",
+            thisWeek: "This Week",
+            progress: "Weekly Progress",
+            workout: "Strength Training",
+            today: "Completed today",
+          },
         },
-        featureDescriptions: {
-          liveScoreboard:
-            "Track your performance in real-time and compare yourself with other athletes.",
-          detailedStats:
-            "Analyze your progress with comprehensive charts and metrics.",
-          community:
-            "Connect with friends, invite them and motivate each other.",
-          realtime:
-            "Get instant updates about your activities and achievements.",
-          secure:
-            "Your personal data is protected with state-of-the-art encryption.",
-          mobile:
-            "Perfectly optimized for mobile devices - train and track anywhere.",
+        // CTA Section
+        cta: {
+          badge: "Ready to start?",
+          title: "Start your Fitness Journey now",
+          subtitle:
+            "Join our community and take your training to the next level. Free and no commitment.",
+          button: "Register for free",
+          trust1: "Start free",
+          trust2: "No credit card",
+          trust3: "Start immediately",
+        },
+        // Footer
+        footer: {
+          description:
+            "The modern Sports Analytics platform for ambitious athletes who want to reach their fitness goals.",
+          madeWith: "Made with",
+          by: "by Leon Stadler",
+          features: "Features",
+          featuresList: {
+            dashboard: "Dashboard",
+            training: "Training",
+            stats: "Statistics",
+            friends: "Friends",
+          },
+          developer: "Developer",
+          tech: {
+            modern: "Modern Web Technologies",
+          },
+          legal: "Legal",
+          legalLinks: {
+            privacy: "Privacy",
+            terms: "Terms",
+            imprint: "Imprint",
+            contact: "Contact",
+          },
+          copyright:
+            "© 2025 Sportify. All rights reserved. Developed by Leon Stadler.",
         },
       },
       // Auth Pages
@@ -2712,6 +2835,11 @@ const resources = {
           problems: "Problems with authentication?",
           contactUs: "Contact us",
         },
+      },
+      // PWA Auth Screen
+      pwaAuth: {
+        welcomeTitle: "Welcome to Sportify!",
+        welcomeSubtitle: "Create your account and start your fitness journey",
       },
       // Contact Page
       contact: {

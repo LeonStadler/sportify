@@ -1,11 +1,20 @@
-import { ArrowLeft, ArrowRight, Globe, Monitor, Moon, Palette, Settings, Sun } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Globe,
+  Monitor,
+  Moon,
+  Palette,
+  Settings,
+  Sun,
+} from "lucide-react";
 import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
 
-import { LogoFull } from "@/components/LogoFull";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { LogoFull } from "@/components/LogoFull";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 import { Button } from "@/components/ui/button";
 import {
@@ -120,25 +129,28 @@ export function PublicHeader({
                 <div className="px-2 py-1.5">
                   <div className="flex items-center gap-2 mb-2">
                     <Palette className="h-4 w-4" />
-                    <span className="text-sm font-medium">{t("landing.theme")}</span>
+                    <span className="text-sm font-medium">
+                      {t("landing.theme")}
+                    </span>
                   </div>
                   <div className="grid grid-cols-3 gap-1">
-                    {mounted && themes.map((themeOption) => {
-                      const Icon = themeOption.icon;
-                      const isSelected = currentTheme === themeOption.value;
-                      return (
-                        <Button
-                          key={themeOption.value}
-                          variant={isSelected ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setTheme(themeOption.value)}
-                          className="flex flex-col items-center gap-1 h-auto py-2 px-1"
-                        >
-                          <Icon className="h-4 w-4" />
-                          <span className="text-xs">{themeOption.label}</span>
-                        </Button>
-                      );
-                    })}
+                    {mounted &&
+                      themes.map((themeOption) => {
+                        const Icon = themeOption.icon;
+                        const isSelected = currentTheme === themeOption.value;
+                        return (
+                          <Button
+                            key={themeOption.value}
+                            variant={isSelected ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setTheme(themeOption.value)}
+                            className="flex flex-col items-center gap-1 h-auto py-2 px-1"
+                          >
+                            <Icon className="h-4 w-4" />
+                            <span className="text-xs">{themeOption.label}</span>
+                          </Button>
+                        );
+                      })}
                   </div>
                 </div>
               </DropdownMenuContent>
@@ -154,12 +166,23 @@ export function PublicHeader({
               <Button variant="outline" asChild>
                 <Link to="/auth/login">{t("auth.login")}</Link>
               </Button>
-              <Button asChild className={showContactButton ? "bg-primary hover:bg-primary/90 shadow-md" : ""}>
+              <Button
+                asChild
+                className={
+                  showContactButton
+                    ? "bg-primary hover:bg-primary/90 shadow-md"
+                    : ""
+                }
+              >
                 <Link to="/auth/register">
                   {showContactButton ? (
                     <>
-                      <span className="hidden sm:inline">{t("landing.register")}</span>
-                      <span className="sm:hidden">{t("landing.registerShort")}</span>
+                      <span className="hidden sm:inline">
+                        {t("landing.register")}
+                      </span>
+                      <span className="sm:hidden">
+                        {t("landing.registerShort")}
+                      </span>
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </>
                   ) : (
@@ -174,4 +197,3 @@ export function PublicHeader({
     </header>
   );
 }
-

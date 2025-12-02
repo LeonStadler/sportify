@@ -7,7 +7,6 @@ import {
   BookOpen,
   Calendar,
   Check,
-  ChevronRight,
   Dumbbell,
   Flame,
   Globe,
@@ -587,16 +586,6 @@ export default function Landing() {
                         {feature.description}
                       </p>
                     </div>
-
-                    {feature.size === "large" && (
-                      <div
-                        className="mt-6 flex items-center text-primary font-medium"
-                        aria-hidden="true"
-                      >
-                        <span>{t("landing.features.learnMore")}</span>
-                        <ChevronRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
               ))}

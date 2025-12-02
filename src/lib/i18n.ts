@@ -863,6 +863,123 @@ const resources = {
           "Hier findest du alle wichtigen Updates und neuen Features von Sportify.",
         latest: "Aktuell",
         moreUpdates: "Weitere Updates folgen – bleib gespannt! 🚀",
+        types: {
+          feature: "Neu",
+          improvement: "Verbesserung",
+          fix: "Bugfix",
+        },
+        entries: {
+          v150: {
+            title: "Web Push Notifications",
+            description:
+              "Erhalte Push-Benachrichtigungen direkt auf dein Gerät – auch wenn die App geschlossen ist.",
+            highlights: {
+              0: "Push-Benachrichtigungen für Freundschaftsanfragen",
+              1: "Benachrichtigungen für neue Badges und Erfolge",
+              2: "Einfache Aktivierung in den Einstellungen",
+              3: "Funktioniert auf Desktop und mobilen Geräten",
+            },
+          },
+          v140: {
+            title: "Auto-Save in Einstellungen",
+            description:
+              "Alle Einstellungen werden jetzt automatisch gespeichert – kein Speichern-Button mehr nötig.",
+            highlights: {
+              0: "Sofortige Speicherung bei jeder Änderung",
+              1: "Toast-Benachrichtigung bei erfolgreicher Speicherung",
+              2: "Kein Aufblitzen der Seite mehr beim Speichern",
+              3: "Gilt für Profil- und Einstellungsseite",
+            },
+          },
+          v130: {
+            title: "Freundes-Aktivitäten",
+            description:
+              "Neue dedizierte Seite für alle Trainingsaktivitäten von dir und deinen Freunden.",
+            highlights: {
+              0: "Übersicht aller Trainings von Freunden",
+              1: "Filterung nach Zeitraum",
+              2: "Kompaktes, übersichtliches Design",
+              3: "Direkter Link zum Freundesprofil",
+            },
+          },
+          v120: {
+            title: "Freundesprofile",
+            description:
+              "Sieh dir die Profile deiner Freunde an – mit Auszeichnungen, Badges und letzten Aktivitäten.",
+            highlights: {
+              0: "Anzeige von Auszeichnungen und Badges",
+              1: "Letzte Trainingsaktivitäten",
+              2: "Beitrittsdatum und Statistiken",
+              3: "Klickbare Avatare und Namen",
+            },
+          },
+          v110: {
+            title: "Verbesserte Zeitraum-Navigation",
+            description:
+              "Navigiere einfach zwischen Wochen, Monaten und Jahren mit den neuen Pfeiltasten.",
+            highlights: {
+              0: "Pfeiltasten für vorherige/nächste Periode",
+              1: "Dynamische Anzeige des aktuellen Zeitraums (z.B. 'KW 48')",
+              2: "Tooltip mit vollständigem Datumsbereich",
+              3: "Schneller 'Aktuell'-Button",
+            },
+          },
+          v100: {
+            title: "Notification Center",
+            description:
+              "Zentrales Benachrichtigungscenter für alle wichtigen Updates und Anfragen.",
+            highlights: {
+              0: "Freundschaftsanfragen und -antworten",
+              1: "Badge- und Award-Benachrichtigungen",
+              2: "Ungelesene Nachrichten-Indikator",
+              3: "Automatisches Markieren als gelesen",
+            },
+          },
+          v090: {
+            title: "Überarbeitete Statistiken",
+            description:
+              "Komplett neu gestaltete Statistikseite mit detaillierten Analysen und Visualisierungen.",
+            highlights: {
+              0: "Aktivitäts-Timeline mit Heatmap",
+              1: "Trainingsverteilung nach Typ",
+              2: "Erholungs- und Recovery-Metriken",
+              3: "Wochenvergleich und Trends",
+            },
+          },
+          v080: {
+            title: "Erfolge und Badges",
+            description:
+              "Verdiene Badges und Auszeichnungen für deine sportlichen Leistungen.",
+            highlights: {
+              0: "Verschiedene Badge-Kategorien",
+              1: "Fortschrittsanzeige für Badges",
+              2: "Wöchentliche und monatliche Awards",
+              3: "Anzeige im Profil und bei Freunden",
+            },
+          },
+          v070: {
+            title: "Personalisierte Profilbilder",
+            description:
+              "Erstelle deinen eigenen Avatar mit vielen Anpassungsmöglichkeiten.",
+            highlights: {
+              0: "Avatar-Editor mit vielen Optionen",
+              1: "Verschiedene Frisuren, Gesichter und Accessoires",
+              2: "Farbauswahl für alle Elemente",
+              3: "Zufalls-Generator für schnelle Erstellung",
+            },
+          },
+          v060: {
+            title: "Erste öffentliche Version",
+            description:
+              "Der Start von Sportify – deine persönliche Fitness-Tracking-Plattform.",
+            highlights: {
+              0: "Workout-Tracking mit Punktesystem",
+              1: "Rangliste mit Freunden",
+              2: "Wochenziele setzen und verfolgen",
+              3: "Dark Mode und Sprachauswahl",
+            },
+          },
+        },
       },
       // Landing Page
       landing: {
@@ -2629,6 +2746,123 @@ const resources = {
           "Here you can find all important updates and new features of Sportify.",
         latest: "Latest",
         moreUpdates: "More updates coming soon – stay tuned! 🚀",
+        types: {
+          feature: "New",
+          improvement: "Improvement",
+          fix: "Bugfix",
+        },
+        entries: {
+          v150: {
+            title: "Web Push Notifications",
+            description:
+              "Receive push notifications directly on your device – even when the app is closed.",
+            highlights: {
+              0: "Push notifications for friend requests",
+              1: "Notifications for new badges and achievements",
+              2: "Easy activation in settings",
+              3: "Works on desktop and mobile devices",
+            },
+          },
+          v140: {
+            title: "Auto-Save in Settings",
+            description:
+              "All settings are now saved automatically – no save button needed anymore.",
+            highlights: {
+              0: "Instant saving on every change",
+              1: "Toast notification on successful save",
+              2: "No more page flashing when saving",
+              3: "Applies to profile and settings page",
+            },
+          },
+          v130: {
+            title: "Friend Activities",
+            description:
+              "New dedicated page for all training activities from you and your friends.",
+            highlights: {
+              0: "Overview of all friend workouts",
+              1: "Filter by time period",
+              2: "Compact, clear design",
+              3: "Direct link to friend profile",
+            },
+          },
+          v120: {
+            title: "Friend Profiles",
+            description:
+              "View your friends' profiles – with achievements, badges and recent activities.",
+            highlights: {
+              0: "Display of achievements and badges",
+              1: "Recent training activities",
+              2: "Join date and statistics",
+              3: "Clickable avatars and names",
+            },
+          },
+          v110: {
+            title: "Improved Period Navigation",
+            description:
+              "Navigate easily between weeks, months and years with the new arrow keys.",
+            highlights: {
+              0: "Arrow keys for previous/next period",
+              1: "Dynamic display of current period (e.g. 'Week 48')",
+              2: "Tooltip with full date range",
+              3: "Quick 'Current' button",
+            },
+          },
+          v100: {
+            title: "Notification Center",
+            description:
+              "Central notification center for all important updates and requests.",
+            highlights: {
+              0: "Friend requests and responses",
+              1: "Badge and award notifications",
+              2: "Unread messages indicator",
+              3: "Automatic mark as read",
+            },
+          },
+          v090: {
+            title: "Redesigned Statistics",
+            description:
+              "Completely redesigned statistics page with detailed analyses and visualizations.",
+            highlights: {
+              0: "Activity timeline with heatmap",
+              1: "Training distribution by type",
+              2: "Recovery metrics",
+              3: "Weekly comparison and trends",
+            },
+          },
+          v080: {
+            title: "Achievements and Badges",
+            description:
+              "Earn badges and achievements for your athletic performance.",
+            highlights: {
+              0: "Various badge categories",
+              1: "Progress display for badges",
+              2: "Weekly and monthly awards",
+              3: "Display in profile and with friends",
+            },
+          },
+          v070: {
+            title: "Personalized Profile Pictures",
+            description:
+              "Create your own avatar with many customization options.",
+            highlights: {
+              0: "Avatar editor with many options",
+              1: "Various hairstyles, faces and accessories",
+              2: "Color selection for all elements",
+              3: "Random generator for quick creation",
+            },
+          },
+          v060: {
+            title: "First Public Release",
+            description:
+              "The launch of Sportify – your personal fitness tracking platform.",
+            highlights: {
+              0: "Workout tracking with point system",
+              1: "Leaderboard with friends",
+              2: "Set and track weekly goals",
+              3: "Dark mode and language selection",
+            },
+          },
+        },
       },
       // Landing Page
       landing: {

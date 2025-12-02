@@ -12,173 +12,166 @@ import {
   Camera,
   Heart,
   History,
+  LucideIcon,
   Rocket,
   Save,
   Sparkles,
   Users,
 } from "lucide-react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 interface ChangelogEntry {
   version: string;
   date: string;
-  title: string;
-  description: string;
-  icon: React.ReactNode;
+  titleKey: string;
+  descriptionKey: string;
+  icon: LucideIcon;
   type: "feature" | "improvement" | "fix";
-  highlights: string[];
+  highlightKeys: string[];
 }
 
-const changelogData: ChangelogEntry[] = [
+// Changelog-Daten mit i18n-Keys
+const changelogEntries: ChangelogEntry[] = [
   {
     version: "1.5.0",
     date: "2024-12-01",
-    title: "Web Push Notifications",
-    description:
-      "Erhalte Push-Benachrichtigungen direkt auf dein Gerät – auch wenn die App geschlossen ist.",
-    icon: <Bell className="h-5 w-5" />,
+    titleKey: "changelog.entries.v150.title",
+    descriptionKey: "changelog.entries.v150.description",
+    icon: Bell,
     type: "feature",
-    highlights: [
-      "Push-Benachrichtigungen für Freundschaftsanfragen",
-      "Benachrichtigungen für neue Badges und Erfolge",
-      "Einfache Aktivierung in den Einstellungen",
-      "Funktioniert auf Desktop und mobilen Geräten",
+    highlightKeys: [
+      "changelog.entries.v150.highlights.0",
+      "changelog.entries.v150.highlights.1",
+      "changelog.entries.v150.highlights.2",
+      "changelog.entries.v150.highlights.3",
     ],
   },
   {
     version: "1.4.0",
     date: "2024-11-28",
-    title: "Auto-Save in Einstellungen",
-    description:
-      "Alle Einstellungen werden jetzt automatisch gespeichert – kein Speichern-Button mehr nötig.",
-    icon: <Save className="h-5 w-5" />,
+    titleKey: "changelog.entries.v140.title",
+    descriptionKey: "changelog.entries.v140.description",
+    icon: Save,
     type: "improvement",
-    highlights: [
-      "Sofortige Speicherung bei jeder Änderung",
-      "Toast-Benachrichtigung bei erfolgreicher Speicherung",
-      "Kein Aufblitzen der Seite mehr beim Speichern",
-      "Gilt für Profil- und Einstellungsseite",
+    highlightKeys: [
+      "changelog.entries.v140.highlights.0",
+      "changelog.entries.v140.highlights.1",
+      "changelog.entries.v140.highlights.2",
+      "changelog.entries.v140.highlights.3",
     ],
   },
   {
     version: "1.3.0",
     date: "2024-11-25",
-    title: "Freundes-Aktivitäten",
-    description:
-      "Neue dedizierte Seite für alle Trainingsaktivitäten von dir und deinen Freunden.",
-    icon: <Users className="h-5 w-5" />,
+    titleKey: "changelog.entries.v130.title",
+    descriptionKey: "changelog.entries.v130.description",
+    icon: Users,
     type: "feature",
-    highlights: [
-      "Übersicht aller Trainings von Freunden",
-      "Filterung nach Zeitraum",
-      "Kompaktes, übersichtliches Design",
-      "Direkter Link zum Freundesprofil",
+    highlightKeys: [
+      "changelog.entries.v130.highlights.0",
+      "changelog.entries.v130.highlights.1",
+      "changelog.entries.v130.highlights.2",
+      "changelog.entries.v130.highlights.3",
     ],
   },
   {
     version: "1.2.0",
     date: "2024-11-22",
-    title: "Freundesprofile",
-    description:
-      "Sieh dir die Profile deiner Freunde an – mit Auszeichnungen, Badges und letzten Aktivitäten.",
-    icon: <Heart className="h-5 w-5" />,
+    titleKey: "changelog.entries.v120.title",
+    descriptionKey: "changelog.entries.v120.description",
+    icon: Heart,
     type: "feature",
-    highlights: [
-      "Anzeige von Auszeichnungen und Badges",
-      "Letzte Trainingsaktivitäten",
-      "Beitrittsdatum und Statistiken",
-      "Klickbare Avatare und Namen",
+    highlightKeys: [
+      "changelog.entries.v120.highlights.0",
+      "changelog.entries.v120.highlights.1",
+      "changelog.entries.v120.highlights.2",
+      "changelog.entries.v120.highlights.3",
     ],
   },
   {
     version: "1.1.0",
     date: "2024-11-18",
-    title: "Verbesserte Zeitraum-Navigation",
-    description:
-      "Navigiere einfach zwischen Wochen, Monaten und Jahren mit den neuen Pfeiltasten.",
-    icon: <Calendar className="h-5 w-5" />,
+    titleKey: "changelog.entries.v110.title",
+    descriptionKey: "changelog.entries.v110.description",
+    icon: Calendar,
     type: "improvement",
-    highlights: [
-      "Pfeiltasten für vorherige/nächste Periode",
-      "Dynamische Anzeige des aktuellen Zeitraums (z.B. 'KW 48')",
-      "Tooltip mit vollständigem Datumsbereich",
-      "Schneller 'Aktuell'-Button",
+    highlightKeys: [
+      "changelog.entries.v110.highlights.0",
+      "changelog.entries.v110.highlights.1",
+      "changelog.entries.v110.highlights.2",
+      "changelog.entries.v110.highlights.3",
     ],
   },
   {
     version: "1.0.0",
     date: "2024-11-15",
-    title: "Notification Center",
-    description:
-      "Zentrales Benachrichtigungscenter für alle wichtigen Updates und Anfragen.",
-    icon: <Bell className="h-5 w-5" />,
+    titleKey: "changelog.entries.v100.title",
+    descriptionKey: "changelog.entries.v100.description",
+    icon: Bell,
     type: "feature",
-    highlights: [
-      "Freundschaftsanfragen und -antworten",
-      "Badge- und Award-Benachrichtigungen",
-      "Ungelesene Nachrichten-Indikator",
-      "Automatisches Markieren als gelesen",
+    highlightKeys: [
+      "changelog.entries.v100.highlights.0",
+      "changelog.entries.v100.highlights.1",
+      "changelog.entries.v100.highlights.2",
+      "changelog.entries.v100.highlights.3",
     ],
   },
   {
     version: "0.9.0",
     date: "2024-11-10",
-    title: "Überarbeitete Statistiken",
-    description:
-      "Komplett neu gestaltete Statistikseite mit detaillierten Analysen und Visualisierungen.",
-    icon: <BarChart3 className="h-5 w-5" />,
+    titleKey: "changelog.entries.v090.title",
+    descriptionKey: "changelog.entries.v090.description",
+    icon: BarChart3,
     type: "improvement",
-    highlights: [
-      "Aktivitäts-Timeline mit Heatmap",
-      "Trainingsverteilung nach Typ",
-      "Erholungs- und Recovery-Metriken",
-      "Wochenvergleich und Trends",
+    highlightKeys: [
+      "changelog.entries.v090.highlights.0",
+      "changelog.entries.v090.highlights.1",
+      "changelog.entries.v090.highlights.2",
+      "changelog.entries.v090.highlights.3",
     ],
   },
   {
     version: "0.8.0",
     date: "2024-11-05",
-    title: "Erfolge und Badges",
-    description:
-      "Verdiene Badges und Auszeichnungen für deine sportlichen Leistungen.",
-    icon: <Award className="h-5 w-5" />,
+    titleKey: "changelog.entries.v080.title",
+    descriptionKey: "changelog.entries.v080.description",
+    icon: Award,
     type: "feature",
-    highlights: [
-      "Verschiedene Badge-Kategorien",
-      "Fortschrittsanzeige für Badges",
-      "Wöchentliche und monatliche Awards",
-      "Anzeige im Profil und bei Freunden",
+    highlightKeys: [
+      "changelog.entries.v080.highlights.0",
+      "changelog.entries.v080.highlights.1",
+      "changelog.entries.v080.highlights.2",
+      "changelog.entries.v080.highlights.3",
     ],
   },
   {
     version: "0.7.0",
     date: "2024-10-28",
-    title: "Personalisierte Profilbilder",
-    description:
-      "Erstelle deinen eigenen Avatar mit vielen Anpassungsmöglichkeiten.",
-    icon: <Camera className="h-5 w-5" />,
+    titleKey: "changelog.entries.v070.title",
+    descriptionKey: "changelog.entries.v070.description",
+    icon: Camera,
     type: "feature",
-    highlights: [
-      "Avatar-Editor mit vielen Optionen",
-      "Verschiedene Frisuren, Gesichter und Accessoires",
-      "Farbauswahl für alle Elemente",
-      "Zufalls-Generator für schnelle Erstellung",
+    highlightKeys: [
+      "changelog.entries.v070.highlights.0",
+      "changelog.entries.v070.highlights.1",
+      "changelog.entries.v070.highlights.2",
+      "changelog.entries.v070.highlights.3",
     ],
   },
   {
     version: "0.6.0",
     date: "2024-10-20",
-    title: "Erste öffentliche Version",
-    description:
-      "Der Start von Sportify – deine persönliche Fitness-Tracking-Plattform.",
-    icon: <Rocket className="h-5 w-5" />,
+    titleKey: "changelog.entries.v060.title",
+    descriptionKey: "changelog.entries.v060.description",
+    icon: Rocket,
     type: "feature",
-    highlights: [
-      "Workout-Tracking mit Punktesystem",
-      "Rangliste mit Freunden",
-      "Wochenziele setzen und verfolgen",
-      "Dark Mode und Sprachauswahl",
+    highlightKeys: [
+      "changelog.entries.v060.highlights.0",
+      "changelog.entries.v060.highlights.1",
+      "changelog.entries.v060.highlights.2",
+      "changelog.entries.v060.highlights.3",
     ],
   },
 ];
@@ -191,15 +184,22 @@ const typeColors = {
   fix: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
 };
 
-const typeLabels = {
-  feature: "Neu",
-  improvement: "Verbesserung",
-  fix: "Bugfix",
-};
-
 // Changelog-Content als separate Komponente für Wiederverwendung
 function ChangelogContent() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+
+  // Type-Labels basierend auf der aktuellen Sprache
+  const typeLabels = useMemo(
+    () => ({
+      feature: t("changelog.types.feature"),
+      improvement: t("changelog.types.improvement"),
+      fix: t("changelog.types.fix"),
+    }),
+    [t]
+  );
+
+  // Locale für Datumsformatierung
+  const dateLocale = i18n.language === "de" ? "de-DE" : "en-US";
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -212,13 +212,10 @@ function ChangelogContent() {
             </div>
             <div>
               <h2 className="text-lg font-semibold">
-                {t("changelog.stayUpdated", "Bleib auf dem Laufenden")}
+                {t("changelog.stayUpdated")}
               </h2>
               <p className="text-sm text-muted-foreground">
-                {t(
-                  "changelog.description",
-                  "Hier findest du alle wichtigen Updates und neuen Features von Sportify."
-                )}
+                {t("changelog.description")}
               </p>
             </div>
           </div>
@@ -231,86 +228,86 @@ function ChangelogContent() {
         <div className="absolute left-[27px] top-0 bottom-0 w-px bg-border" />
 
         <div className="space-y-6">
-          {changelogData.map((entry, index) => (
-            <div key={entry.version} className="relative pl-16">
-              {/* Timeline Dot */}
-              <div className="absolute left-0 top-0 flex items-center justify-center w-14 h-14 rounded-full bg-background border-2 border-border shadow-sm">
-                <div
-                  className={`p-2 rounded-full ${
-                    entry.type === "feature"
-                      ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
-                      : entry.type === "improvement"
-                        ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
-                        : "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
+          {changelogEntries.map((entry, index) => {
+            const IconComponent = entry.icon;
+            return (
+              <div key={entry.version} className="relative pl-16">
+                {/* Timeline Dot */}
+                <div className="absolute left-0 top-0 flex items-center justify-center w-14 h-14 rounded-full bg-background border-2 border-border shadow-sm">
+                  <div
+                    className={`p-2 rounded-full ${
+                      entry.type === "feature"
+                        ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+                        : entry.type === "improvement"
+                          ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                          : "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
+                    }`}
+                  >
+                    <IconComponent className="h-5 w-5" />
+                  </div>
+                </div>
+
+                <Card
+                  className={`transition-all hover:shadow-md ${
+                    index === 0 ? "ring-2 ring-primary/20" : ""
                   }`}
                 >
-                  {entry.icon}
-                </div>
-              </div>
-
-              <Card
-                className={`transition-all hover:shadow-md ${
-                  index === 0 ? "ring-2 ring-primary/20" : ""
-                }`}
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-2 flex-wrap">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="font-mono">
-                          v{entry.version}
-                        </Badge>
-                        <Badge className={typeColors[entry.type]}>
-                          {typeLabels[entry.type]}
-                        </Badge>
-                        {index === 0 && (
-                          <Badge className="bg-primary text-primary-foreground">
-                            {t("changelog.latest", "Aktuell")}
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-2 flex-wrap">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="font-mono">
+                            v{entry.version}
                           </Badge>
-                        )}
+                          <Badge className={typeColors[entry.type]}>
+                            {typeLabels[entry.type]}
+                          </Badge>
+                          {index === 0 && (
+                            <Badge className="bg-primary text-primary-foreground">
+                              {t("changelog.latest")}
+                            </Badge>
+                          )}
+                        </div>
+                        <CardTitle className="text-lg">
+                          {t(entry.titleKey)}
+                        </CardTitle>
                       </div>
-                      <CardTitle className="text-lg">{entry.title}</CardTitle>
+                      <time className="text-sm text-muted-foreground whitespace-nowrap">
+                        {new Date(entry.date).toLocaleDateString(dateLocale, {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </time>
                     </div>
-                    <time className="text-sm text-muted-foreground whitespace-nowrap">
-                      {new Date(entry.date).toLocaleDateString("de-DE", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </time>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <p className="text-muted-foreground mb-4">
-                    {entry.description}
-                  </p>
-                  <Separator className="mb-4" />
-                  <ul className="space-y-2">
-                    {entry.highlights.map((highlight, hIndex) => (
-                      <li
-                        key={hIndex}
-                        className="flex items-start gap-2 text-sm"
-                      >
-                        <History className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                        <span>{highlight}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            </div>
-          ))}
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <p className="text-muted-foreground mb-4">
+                      {t(entry.descriptionKey)}
+                    </p>
+                    <Separator className="mb-4" />
+                    <ul className="space-y-2">
+                      {entry.highlightKeys.map((highlightKey, hIndex) => (
+                        <li
+                          key={hIndex}
+                          className="flex items-start gap-2 text-sm"
+                        >
+                          <History className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                          <span>{t(highlightKey)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              </div>
+            );
+          })}
         </div>
       </div>
 
       {/* Footer */}
       <div className="mt-8 text-center text-sm text-muted-foreground">
-        <p>
-          {t(
-            "changelog.moreUpdates",
-            "Weitere Updates folgen – bleib gespannt! 🚀"
-          )}
-        </p>
+        <p>{t("changelog.moreUpdates")}</p>
       </div>
     </div>
   );

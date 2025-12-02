@@ -34,14 +34,32 @@ import { PublicHeader } from "@/components/PublicHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { API_URL } from "@/lib/api";
 
-// Check für reduced motion Präferenz
-const prefersReducedMotion =
-  typeof window !== "undefined" &&
-  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+// Custom Hook für reduced motion Präferenz - reaktiv auf System-Änderungen
+function usePrefersReducedMotion(): boolean {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const handleChange = (event: MediaQueryListEvent) => {
+      setPrefersReducedMotion(event.matches);
+    };
+
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, []);
+
+  return prefersReducedMotion;
+}
 
 // Custom Hook für Scroll-basierte Animationen mit reduced motion Support
-function useInView(threshold = 0.1) {
+function useInView(threshold = 0.1, prefersReducedMotion = false) {
   const ref = useRef<HTMLDivElement>(null);
   const [isInView, setIsInView] = useState(prefersReducedMotion);
 
@@ -57,33 +75,40 @@ function useInView(threshold = 0.1) {
           setIsInView(true);
         }
       },
-      { threshold }
+      { threshold, rootMargin: "50px" }
     );
 
-    if (ref.current) {
-      observer.observe(ref.current);
+    const currentRef = ref.current;
+    if (currentRef) {
+      observer.observe(currentRef);
     }
 
-    return () => observer.disconnect();
-  }, [threshold]);
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, [threshold, prefersReducedMotion]);
 
   return { ref, isInView };
 }
 
-// Optimierter Animated Counter mit reduced motion Support
+// Optimierter Animated Counter mit reduced motion Support und korrektem aria-label
 const AnimatedCounter = memo(function AnimatedCounter({
   end,
   suffix = "",
   duration = 2000,
   label,
+  prefersReducedMotion = false,
 }: {
   end: number;
   suffix?: string;
   duration?: number;
   label: string;
+  prefersReducedMotion?: boolean;
 }) {
   const [count, setCount] = useState(prefersReducedMotion ? end : 0);
-  const { ref, isInView } = useInView();
+  const { ref, isInView } = useInView(0.1, prefersReducedMotion);
   const hasAnimated = useRef(false);
 
   useEffect(() => {
@@ -96,7 +121,7 @@ const AnimatedCounter = memo(function AnimatedCounter({
     const animate = (currentTime: number) => {
       if (!startTime) startTime = currentTime;
       const progress = Math.min((currentTime - startTime) / duration, 1);
-      const easeOut = 1 - Math.pow(1 - progress, 3); // Ease-out cubic
+      const easeOut = 1 - Math.pow(1 - progress, 3);
       setCount(Math.floor(easeOut * end));
 
       if (progress < 1) {
@@ -106,26 +131,93 @@ const AnimatedCounter = memo(function AnimatedCounter({
 
     animationFrame = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animationFrame);
-  }, [isInView, end, duration]);
+  }, [isInView, end, duration, prefersReducedMotion]);
 
+  // Zeige immer den finalen Wert für Screen Reader (aria-label)
   return (
-    <span ref={ref} aria-label={`${count}${suffix} ${label}`}>
-      {count.toLocaleString()}
-      {suffix}
+    <span
+      ref={ref}
+      aria-label={`${end.toLocaleString()}${suffix} ${label}`}
+      role="text"
+    >
+      <span aria-hidden="true">
+        {count.toLocaleString()}
+        {suffix}
+      </span>
     </span>
   );
 });
 
-export default function Landing() {
-  const { t } = useTranslation();
-  const heroRef = useInView();
-  const featuresRef = useInView();
-  const statsRef = useInView();
-  const showcaseRef = useInView();
-  const highlightsRef = useInView();
-  const ctaRef = useInView();
+// CSS Keyframes als Konstante außerhalb der Komponente für bessere Performance
+const ANIMATION_STYLES = `
+  @media (prefers-reduced-motion: no-preference) {
+    @keyframes gradient {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+    .animate-gradient {
+      animation: gradient 6s ease infinite;
+    }
+    @keyframes scroll {
+      0%, 100% { transform: translateY(0); opacity: 1; }
+      50% { transform: translateY(4px); opacity: 0.5; }
+    }
+    .animate-scroll {
+      animation: scroll 1.5s ease-in-out infinite;
+    }
+  }
+`;
 
-  // Animation class helper
+// Interface für öffentliche Statistiken
+interface PublicStats {
+  users: number;
+  exercises: number;
+  reps: number;
+  free: number;
+}
+
+export default function Landing() {
+  const { t, i18n } = useTranslation();
+  const prefersReducedMotion = usePrefersReducedMotion();
+
+  // State für öffentliche Statistiken
+  const [publicStats, setPublicStats] = useState<PublicStats>({
+    users: 0,
+    exercises: 0,
+    reps: 0,
+    free: 100,
+  });
+  const [statsLoaded, setStatsLoaded] = useState(false);
+
+  // Öffentliche Statistiken laden
+  useEffect(() => {
+    const fetchPublicStats = async () => {
+      try {
+        const response = await fetch(`${API_URL}/stats/public`);
+        if (response.ok) {
+          const data = await response.json();
+          setPublicStats(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch public stats:", error);
+        // Fallback-Werte bleiben bestehen
+      } finally {
+        setStatsLoaded(true);
+      }
+    };
+
+    fetchPublicStats();
+  }, []);
+
+  // InView Hooks mit reduced motion Support
+  const heroRef = useInView(0.1, prefersReducedMotion);
+  const featuresRef = useInView(0.1, prefersReducedMotion);
+  const statsRef = useInView(0.1, prefersReducedMotion);
+  const showcaseRef = useInView(0.1, prefersReducedMotion);
+  const highlightsRef = useInView(0.1, prefersReducedMotion);
+  const ctaRef = useInView(0.1, prefersReducedMotion);
+
+  // Animation class helper - memoized
   const getAnimationClass = useCallback(
     (isInView: boolean, direction: "up" | "left" | "right" = "up") => {
       if (prefersReducedMotion) return "opacity-100";
@@ -140,38 +232,50 @@ export default function Landing() {
         ? "opacity-100 translate-y-0 translate-x-0"
         : `opacity-0 ${translateClass}`;
     },
-    []
+    [prefersReducedMotion]
   );
 
-  // Stats - realistische Zahlen
+  // Scroll to section handler - memoized
+  const scrollToSection = useCallback(
+    (sectionId: string) => {
+      const element = document.getElementById(sectionId);
+      element?.scrollIntoView({
+        behavior: prefersReducedMotion ? "auto" : "smooth",
+        block: "start",
+      });
+    },
+    [prefersReducedMotion]
+  );
+
+  // Stats - dynamische Werte aus der API
   const stats = useMemo(
     () => [
       {
-        value: 1250,
+        value: publicStats.reps,
         suffix: "+",
-        label: t("landing.stats.workouts"),
+        label: t("landing.stats.reps"),
         icon: Dumbbell,
       },
       {
-        value: 48,
+        value: publicStats.users,
         suffix: "",
         label: t("landing.stats.athletes"),
         icon: Users,
       },
       {
-        value: 52,
-        suffix: "",
+        value: publicStats.exercises,
+        suffix: "+",
         label: t("landing.stats.exercises"),
         icon: Activity,
       },
       {
-        value: 100,
+        value: publicStats.free,
         suffix: "%",
         label: t("landing.stats.free"),
         icon: Heart,
       },
     ],
-    [t]
+    [t, publicStats]
   );
 
   // Haupt-Features (Bento Grid)
@@ -300,18 +404,18 @@ export default function Landing() {
   );
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" lang={i18n.language}>
       {/* Skip to main content - Accessibility */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md focus:outline-none"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
       >
         {t("landing.skipToContent")}
       </a>
 
       <PublicHeader sticky={true} showContactButton={true} />
 
-      <main id="main-content" className="overflow-x-clip">
+      <main id="main-content" className="overflow-x-clip" tabIndex={-1}>
         {/* Hero Section */}
         <section
           ref={heroRef.ref}
@@ -504,6 +608,7 @@ export default function Landing() {
                       end={stat.value}
                       suffix={stat.suffix}
                       label={stat.label}
+                      prefersReducedMotion={prefersReducedMotion}
                     />
                   </div>
                   <div className="text-muted-foreground font-medium">
@@ -656,13 +761,20 @@ export default function Landing() {
               {/* Right - App Preview */}
               <div
                 className={`relative transition-all duration-700 ${getAnimationClass(showcaseRef.isInView, "right")}`}
-                aria-hidden="true"
+                role="img"
+                aria-label={t("landing.showcase.previewAlt")}
               >
                 {/* Glow Effect */}
-                <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-orange-500/20 to-primary/20 rounded-3xl blur-3xl" />
+                <div
+                  className="absolute inset-0 bg-gradient-to-r from-primary/20 via-orange-500/20 to-primary/20 rounded-3xl blur-3xl"
+                  aria-hidden="true"
+                />
 
                 {/* Mock App Preview */}
-                <div className="relative bg-card border border-border/50 rounded-3xl p-6 md:p-8 shadow-2xl">
+                <div
+                  className="relative bg-card border border-border/50 rounded-3xl p-6 md:p-8 shadow-2xl"
+                  aria-hidden="true"
+                >
                   {/* App Header */}
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
@@ -818,88 +930,177 @@ export default function Landing() {
         <section
           ref={ctaRef.ref}
           aria-labelledby="cta-title"
-          className="py-24 md:py-32 relative overflow-hidden bg-muted/30 dark:bg-muted/10 border-t border-border/40"
+          className="py-24 md:py-32 relative overflow-hidden border-t border-border/40"
         >
-          {/* Background */}
+          {/* Animated Background */}
           <div className="absolute inset-0 -z-10" aria-hidden="true">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/20 rounded-full blur-[150px]" />
+            {/* Gradient Orbs */}
+            <div
+              className={`absolute top-0 left-1/4 w-[600px] h-[600px] bg-primary/30 rounded-full blur-[150px] ${!prefersReducedMotion ? "animate-pulse" : ""}`}
+            />
+            <div
+              className={`absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-orange-500/20 rounded-full blur-[120px] ${!prefersReducedMotion ? "animate-pulse" : ""}`}
+              style={!prefersReducedMotion ? { animationDelay: "1s" } : {}}
+            />
+            {/* Grid Pattern */}
+            <div
+              className="absolute inset-0 opacity-[0.015] dark:opacity-[0.03]"
+              style={{
+                backgroundImage: `linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px)`,
+                backgroundSize: "50px 50px",
+              }}
+            />
           </div>
 
           <div className="container mx-auto px-4">
             <div
-              className={`max-w-4xl mx-auto text-center transition-all duration-700 ${getAnimationClass(ctaRef.isInView)}`}
+              className={`max-w-5xl mx-auto transition-all duration-700 ${getAnimationClass(ctaRef.isInView)}`}
             >
-              <Badge variant="secondary" className="mb-6">
-                <Sparkles
-                  className="w-3.5 h-3.5 mr-1.5 text-primary"
+              {/* Main CTA Card */}
+              <div className="relative rounded-3xl border border-border/50 bg-gradient-to-br from-card via-card to-muted/20 p-8 md:p-12 lg:p-16 shadow-2xl overflow-hidden">
+                {/* Decorative Elements */}
+                <div
+                  className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"
                   aria-hidden="true"
                 />
-                {t("landing.cta.badge")}
-              </Badge>
+                <div
+                  className="absolute bottom-0 left-0 w-48 h-48 bg-orange-500/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2"
+                  aria-hidden="true"
+                />
 
-              <h2
-                id="cta-title"
-                className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6"
-              >
-                {t("landing.cta.title")}
-              </h2>
-
-              <p className="text-xl text-muted-foreground mb-10 max-w-2xl mx-auto">
-                {t("landing.cta.subtitle")}
-              </p>
-
-              <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-                <Button
-                  size="lg"
-                  asChild
-                  className="group text-lg px-10 py-7 shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 transition-all duration-300 bg-primary hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                >
-                  <Link to="/auth/register">
-                    {t("landing.cta.button")}
-                    <ArrowRight
-                      className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform"
+                {/* Floating Icons */}
+                {!prefersReducedMotion && (
+                  <>
+                    <div
+                      className="absolute top-8 left-8 opacity-20 animate-bounce"
+                      style={{ animationDelay: "0.2s" }}
                       aria-hidden="true"
-                    />
-                  </Link>
-                </Button>
-              </div>
+                    >
+                      <Trophy className="w-8 h-8 text-yellow-500" />
+                    </div>
+                    <div
+                      className="absolute top-12 right-12 opacity-20 animate-bounce"
+                      style={{ animationDelay: "0.8s" }}
+                      aria-hidden="true"
+                    >
+                      <Medal className="w-6 h-6 text-primary" />
+                    </div>
+                    <div
+                      className="absolute bottom-12 left-16 opacity-20 animate-bounce"
+                      style={{ animationDelay: "0.5s" }}
+                      aria-hidden="true"
+                    >
+                      <Flame className="w-7 h-7 text-orange-500" />
+                    </div>
+                  </>
+                )}
 
-              {/* Trust Elements */}
-              <ul
-                className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl mx-auto"
-                aria-label={t("landing.cta.trustLabel")}
-              >
-                {[
-                  {
-                    icon: Check,
-                    text: t("landing.cta.trust1"),
-                    color: "text-green-500",
-                  },
-                  {
-                    icon: Shield,
-                    text: t("landing.cta.trust2"),
-                    color: "text-blue-500",
-                  },
-                  {
-                    icon: Zap,
-                    text: t("landing.cta.trust3"),
-                    color: "text-primary",
-                  },
-                ].map((item, index) => (
-                  <li
-                    key={index}
-                    className="flex items-center justify-center gap-2 p-4 rounded-xl bg-background/50 backdrop-blur-sm border border-border/50"
+                {/* Content */}
+                <div className="relative text-center">
+                  <Badge
+                    variant="secondary"
+                    className="mb-6 px-4 py-2 text-sm font-medium bg-primary/10 border-primary/20"
                   >
-                    <item.icon
-                      className={`w-5 h-5 ${item.color}`}
+                    <Sparkles
+                      className={`w-4 h-4 mr-2 text-primary ${!prefersReducedMotion ? "animate-pulse" : ""}`}
                       aria-hidden="true"
                     />
-                    <span className="text-foreground font-medium">
-                      {item.text}
+                    {t("landing.cta.badge")}
+                  </Badge>
+
+                  <h2
+                    id="cta-title"
+                    className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6"
+                  >
+                    <span className="text-foreground">
+                      {t("landing.cta.titlePart1")}
                     </span>
-                  </li>
-                ))}
-              </ul>
+                    <br className="hidden sm:block" />
+                    <span
+                      className={`bg-gradient-to-r from-primary via-orange-500 to-primary bg-clip-text text-transparent ${!prefersReducedMotion ? "bg-[length:200%_auto] animate-gradient" : ""}`}
+                    >
+                      {t("landing.cta.titlePart2")}
+                    </span>
+                  </h2>
+
+                  <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto leading-relaxed">
+                    {t("landing.cta.subtitle")}
+                  </p>
+
+                  {/* CTA Buttons */}
+                  <div
+                    className="flex flex-col sm:flex-row gap-4 justify-center mb-12"
+                    role="group"
+                    aria-label={t("landing.cta.buttonsLabel")}
+                  >
+                    <Button
+                      size="lg"
+                      asChild
+                      className="group text-lg px-10 py-7 shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 transition-all duration-300 bg-primary hover:bg-primary/90 hover:scale-105 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    >
+                      <Link to="/auth/register">
+                        <Sparkles className="mr-2 h-5 w-5" aria-hidden="true" />
+                        {t("landing.cta.button")}
+                        <ArrowRight
+                          className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform"
+                          aria-hidden="true"
+                        />
+                      </Link>
+                    </Button>
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      asChild
+                      className="group text-lg px-10 py-7 border-2 hover:bg-accent/50 backdrop-blur-sm transition-all duration-300 hover:scale-105 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    >
+                      <Link to="/auth/login">
+                        {t("landing.cta.loginButton")}
+                      </Link>
+                    </Button>
+                  </div>
+
+                  {/* Trust Elements */}
+                  <div className="flex flex-wrap items-center justify-center gap-6 md:gap-10">
+                    {[
+                      {
+                        icon: Check,
+                        text: t("landing.cta.trust1"),
+                        color: "text-green-500",
+                        bg: "bg-green-500/10",
+                      },
+                      {
+                        icon: Shield,
+                        text: t("landing.cta.trust2"),
+                        color: "text-blue-500",
+                        bg: "bg-blue-500/10",
+                      },
+                      {
+                        icon: Zap,
+                        text: t("landing.cta.trust3"),
+                        color: "text-primary",
+                        bg: "bg-primary/10",
+                      },
+                    ].map((item, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center gap-2 group"
+                      >
+                        <div
+                          className={`w-8 h-8 rounded-full ${item.bg} flex items-center justify-center group-hover:scale-110 transition-transform`}
+                        >
+                          <item.icon
+                            className={`w-4 h-4 ${item.color}`}
+                            aria-hidden="true"
+                          />
+                        </div>
+                        <span className="text-sm md:text-base text-muted-foreground font-medium">
+                          {item.text}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -967,15 +1168,8 @@ export default function Landing() {
                   ].map((item, index) => (
                     <li key={index}>
                       <button
-                        onClick={() => {
-                          const element = document.getElementById(
-                            item.sectionId
-                          );
-                          element?.scrollIntoView({
-                            behavior: prefersReducedMotion ? "auto" : "smooth",
-                            block: "start",
-                          });
-                        }}
+                        type="button"
+                        onClick={() => scrollToSection(item.sectionId)}
                         className="text-muted-foreground hover:text-primary transition-colors inline-flex items-center gap-2 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded cursor-pointer"
                       >
                         {item.label}
@@ -1058,24 +1252,7 @@ export default function Landing() {
       </main>
 
       {/* Global Styles for Animations - respects reduced motion */}
-      <style>{`
-        @media (prefers-reduced-motion: no-preference) {
-          @keyframes gradient {
-            0%, 100% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-          }
-          .animate-gradient {
-            animation: gradient 6s ease infinite;
-          }
-          @keyframes scroll {
-            0%, 100% { transform: translateY(0); opacity: 1; }
-            50% { transform: translateY(4px); opacity: 0.5; }
-          }
-          .animate-scroll {
-            animation: scroll 1.5s ease-in-out infinite;
-          }
-        }
-      `}</style>
+      <style>{ANIMATION_STYLES}</style>
     </div>
   );
 }

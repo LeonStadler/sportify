@@ -1011,9 +1011,9 @@ const resources = {
         // Stats Section
         stats: {
           title: "Sportify in Zahlen",
-          workouts: "Workouts getrackt",
+          reps: "Wiederholungen",
           athletes: "Aktive Nutzer",
-          exercises: "Übungen verfügbar",
+          exercises: "Übungen getrackt",
           free: "Kostenlos",
         },
         // Features Section
@@ -1080,6 +1080,8 @@ const resources = {
             description:
               "Sammle Auszeichnungen für erreichte Meilensteine und Streaks.",
           },
+          previewAlt:
+            "Vorschau des Sportify Dashboards mit Statistiken, Streak-Anzeige und Trainingsfortschritt",
           preview: {
             streak: "Streak",
             days: "Tage",
@@ -1130,13 +1132,21 @@ const resources = {
         cta: {
           badge: "Bereit durchzustarten?",
           title: "Starte jetzt deine Fitness-Reise",
+          titlePart1: "Bereit für dein",
+          titlePart2: "bestes Training?",
           subtitle:
-            "Schließe dich unserer Community an und bringe dein Training auf das nächste Level. Komplett kostenlos und unverbindlich.",
-          button: "Kostenlos registrieren",
-          trust1: "100% gratis",
+            "Schließe dich unserer Community an und bringe dein Training auf das nächste Level. Tracke deine Fortschritte, kämpfe um wöchentliche Trophäen und erreiche deine Ziele – komplett kostenlos.",
+          button: "Jetzt starten",
+          loginButton: "Anmelden",
+          buttonsLabel: "Registrierungs-Buttons",
+          trust1: "100% kostenlos",
           trust2: "Keine Kreditkarte",
           trust3: "Sofort loslegen",
           trustLabel: "Vorteile der Registrierung",
+          joinCommunity: "Schließe dich der wachsenden Community an",
+          activeUsers: "Aktive Nutzer",
+          totalReps: "Wiederholungen",
+          freeForever: "Für immer kostenlos",
         },
         // Footer
         footer: {
@@ -2894,9 +2904,9 @@ const resources = {
         // Stats Section
         stats: {
           title: "Sportify in numbers",
-          workouts: "Workouts tracked",
+          reps: "Repetitions",
           athletes: "Active users",
-          exercises: "Exercises available",
+          exercises: "Exercises tracked",
           free: "Free",
         },
         // Features Section
@@ -2962,6 +2972,8 @@ const resources = {
             description:
               "Collect awards for milestones reached and streaks maintained.",
           },
+          previewAlt:
+            "Preview of Sportify dashboard with statistics, streak display and training progress",
           preview: {
             streak: "Streak",
             days: "Days",
@@ -3012,13 +3024,21 @@ const resources = {
         cta: {
           badge: "Ready to start?",
           title: "Start your Fitness Journey now",
+          titlePart1: "Ready for your",
+          titlePart2: "best workout?",
           subtitle:
-            "Join our community and take your training to the next level. Completely free and no commitment.",
-          button: "Register for free",
+            "Join our community and take your training to the next level. Track your progress, compete for weekly trophies and achieve your goals – completely free.",
+          button: "Get started",
+          loginButton: "Login",
+          buttonsLabel: "Registration buttons",
           trust1: "100% free",
           trust2: "No credit card",
           trust3: "Start immediately",
           trustLabel: "Benefits of registration",
+          joinCommunity: "Join the growing community",
+          activeUsers: "Active users",
+          totalReps: "Repetitions",
+          freeForever: "Free forever",
         },
         // Footer
         footer: {

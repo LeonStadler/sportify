@@ -100,6 +100,7 @@ const App = () => {
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/imprint" element={<Imprint />} />
+              <Route path="/changelog" element={<Changelog />} />
               <Route path="/invite/:userId" element={<Invite />} />
               <Route path="/auth/reset-password" element={<ResetPassword />} />
               <Route
@@ -123,6 +124,7 @@ const App = () => {
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/imprint" element={<Imprint />} />
+            <Route path="/changelog" element={<Changelog />} />
             <Route path="/invite/:userId" element={<Invite />} />
             <Route path="/auth/login" element={<Login />} />
             <Route path="/auth/register" element={<Register />} />

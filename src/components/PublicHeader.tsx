@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { Logo } from "@/components/Logo";
 import { LogoFull } from "@/components/LogoFull";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 import { Button } from "@/components/ui/button";
@@ -83,14 +84,22 @@ export function PublicHeader({
           )}
           {!showBackButton && (
             <Link to="/" className="hover:opacity-80 transition-opacity">
-              <LogoFull className="h-12" />
+              {/* Mobile: Nur Icon */}
+              <Logo variant="icon" className="xs:hidden h-10 w-10" />
+              {/* Desktop: Volles Logo */}
+              <LogoFull className="h-12 hidden xs:block" />
             </Link>
           )}
           {showBackButton && (
             <div className="flex items-center gap-4">
-              <LogoFull className="h-12" />
+              {/* Mobile: Nur Icon */}
+              <Logo variant="icon" className="xs:hidden h-10 w-10" />
+              {/* Desktop: Volles Logo */}
+              <LogoFull className="h-12 hidden xs:block" />
               {title && (
-                <h1 className="text-xl font-bold text-foreground">{title}</h1>
+                <h1 className="text-xl font-bold text-foreground hidden sm:block">
+                  {title}
+                </h1>
               )}
             </div>
           )}
@@ -177,12 +186,7 @@ export function PublicHeader({
                 <Link to="/auth/register">
                   {showContactButton ? (
                     <>
-                      <span className="hidden sm:inline">
-                        {t("landing.register")}
-                      </span>
-                      <span className="sm:hidden">
-                        {t("landing.registerShort")}
-                      </span>
+                      {t("landing.register")}
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </>
                   ) : (

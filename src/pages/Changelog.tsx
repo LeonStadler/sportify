@@ -1,7 +1,9 @@
 import { PageTemplate } from "@/components/PageTemplate";
+import { PublicHeader } from "@/components/PublicHeader";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Award,
   BarChart3,
@@ -16,6 +18,7 @@ import {
   Users,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 interface ChangelogEntry {
   version: string;
@@ -194,128 +197,202 @@ const typeLabels = {
   fix: "Bugfix",
 };
 
-export function Changelog() {
+// Changelog-Content als separate Komponente für Wiederverwendung
+function ChangelogContent() {
   const { t } = useTranslation();
 
   return (
-    <PageTemplate
-      title={t("changelog.title", "Changelog")}
-      subtitle={t(
-        "changelog.subtitle",
-        "Alle Neuerungen und Verbesserungen auf einen Blick"
-      )}
-    >
-      <div className="max-w-3xl mx-auto">
-        {/* Header Card */}
-        <Card className="mb-8 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-primary/20">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Sparkles className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold">
-                  {t("changelog.stayUpdated", "Bleib auf dem Laufenden")}
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  {t(
-                    "changelog.description",
-                    "Hier findest du alle wichtigen Updates und neuen Features von Sportify."
-                  )}
-                </p>
-              </div>
+    <div className="max-w-3xl mx-auto">
+      {/* Header Card */}
+      <Card className="mb-8 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-primary/20">
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Sparkles className="h-6 w-6 text-primary" />
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <h2 className="text-lg font-semibold">
+                {t("changelog.stayUpdated", "Bleib auf dem Laufenden")}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {t(
+                  "changelog.description",
+                  "Hier findest du alle wichtigen Updates und neuen Features von Sportify."
+                )}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Timeline */}
-        <div className="relative">
-          {/* Vertical Line */}
-          <div className="absolute left-[27px] top-0 bottom-0 w-px bg-border" />
+      {/* Timeline */}
+      <div className="relative">
+        {/* Vertical Line */}
+        <div className="absolute left-[27px] top-0 bottom-0 w-px bg-border" />
 
-          <div className="space-y-6">
-            {changelogData.map((entry, index) => (
-              <div key={entry.version} className="relative pl-16">
-                {/* Timeline Dot */}
-                <div className="absolute left-0 top-0 flex items-center justify-center w-14 h-14 rounded-full bg-background border-2 border-border shadow-sm">
-                  <div
-                    className={`p-2 rounded-full ${
-                      entry.type === "feature"
-                        ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
-                        : entry.type === "improvement"
-                          ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
-                          : "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
-                    }`}
-                  >
-                    {entry.icon}
-                  </div>
-                </div>
-
-                <Card
-                  className={`transition-all hover:shadow-md ${
-                    index === 0 ? "ring-2 ring-primary/20" : ""
+        <div className="space-y-6">
+          {changelogData.map((entry, index) => (
+            <div key={entry.version} className="relative pl-16">
+              {/* Timeline Dot */}
+              <div className="absolute left-0 top-0 flex items-center justify-center w-14 h-14 rounded-full bg-background border-2 border-border shadow-sm">
+                <div
+                  className={`p-2 rounded-full ${
+                    entry.type === "feature"
+                      ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+                      : entry.type === "improvement"
+                        ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                        : "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
                   }`}
                 >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between gap-2 flex-wrap">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="font-mono">
-                            v{entry.version}
-                          </Badge>
-                          <Badge className={typeColors[entry.type]}>
-                            {typeLabels[entry.type]}
-                          </Badge>
-                          {index === 0 && (
-                            <Badge className="bg-primary text-primary-foreground">
-                              {t("changelog.latest", "Aktuell")}
-                            </Badge>
-                          )}
-                        </div>
-                        <CardTitle className="text-lg">{entry.title}</CardTitle>
-                      </div>
-                      <time className="text-sm text-muted-foreground whitespace-nowrap">
-                        {new Date(entry.date).toLocaleDateString("de-DE", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </time>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <p className="text-muted-foreground mb-4">
-                      {entry.description}
-                    </p>
-                    <Separator className="mb-4" />
-                    <ul className="space-y-2">
-                      {entry.highlights.map((highlight, hIndex) => (
-                        <li
-                          key={hIndex}
-                          className="flex items-start gap-2 text-sm"
-                        >
-                          <History className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                          <span>{highlight}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
+                  {entry.icon}
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Footer */}
-        <div className="mt-8 text-center text-sm text-muted-foreground">
-          <p>
+              <Card
+                className={`transition-all hover:shadow-md ${
+                  index === 0 ? "ring-2 ring-primary/20" : ""
+                }`}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between gap-2 flex-wrap">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="font-mono">
+                          v{entry.version}
+                        </Badge>
+                        <Badge className={typeColors[entry.type]}>
+                          {typeLabels[entry.type]}
+                        </Badge>
+                        {index === 0 && (
+                          <Badge className="bg-primary text-primary-foreground">
+                            {t("changelog.latest", "Aktuell")}
+                          </Badge>
+                        )}
+                      </div>
+                      <CardTitle className="text-lg">{entry.title}</CardTitle>
+                    </div>
+                    <time className="text-sm text-muted-foreground whitespace-nowrap">
+                      {new Date(entry.date).toLocaleDateString("de-DE", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </time>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <p className="text-muted-foreground mb-4">
+                    {entry.description}
+                  </p>
+                  <Separator className="mb-4" />
+                  <ul className="space-y-2">
+                    {entry.highlights.map((highlight, hIndex) => (
+                      <li
+                        key={hIndex}
+                        className="flex items-start gap-2 text-sm"
+                      >
+                        <History className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                        <span>{highlight}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="mt-8 text-center text-sm text-muted-foreground">
+        <p>
+          {t(
+            "changelog.moreUpdates",
+            "Weitere Updates folgen – bleib gespannt! 🚀"
+          )}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export function Changelog() {
+  const { t } = useTranslation();
+  const { isAuthenticated } = useAuth();
+
+  // Für eingeloggte Benutzer: PageTemplate verwenden
+  if (isAuthenticated) {
+    return (
+      <PageTemplate
+        title={t("changelog.title", "Changelog")}
+        subtitle={t(
+          "changelog.subtitle",
+          "Alle Neuerungen und Verbesserungen auf einen Blick"
+        )}
+      >
+        <ChangelogContent />
+      </PageTemplate>
+    );
+  }
+
+  // Für nicht-eingeloggte Benutzer: Öffentliches Layout (wie Legal-Seiten)
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      <PublicHeader
+        showBackButton={true}
+        backText={t("legal.backToHome")}
+        title={t("changelog.title", "Changelog")}
+      />
+
+      <div className="container mx-auto px-4 py-8 md:py-12">
+        {/* Titel */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
+            {t("changelog.title", "Changelog")}
+          </h1>
+          <p className="text-muted-foreground">
             {t(
-              "changelog.moreUpdates",
-              "Weitere Updates folgen – bleib gespannt! 🚀"
+              "changelog.subtitle",
+              "Alle Neuerungen und Verbesserungen auf einen Blick"
             )}
           </p>
         </div>
+
+        <ChangelogContent />
       </div>
-    </PageTemplate>
+
+      {/* Footer */}
+      <footer className="border-t border-border/40 py-8 mt-16">
+        <div className="container mx-auto px-4 text-center">
+          <p className="text-muted-foreground">{t("common.copyright")}</p>
+          <div className="flex justify-center gap-6 mt-4 flex-wrap">
+            <Link
+              to="/privacy"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              {t("landing.footerLinks.privacy")}
+            </Link>
+            <Link
+              to="/terms"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              {t("landing.footerLinks.terms")}
+            </Link>
+            <Link
+              to="/imprint"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              {t("landing.footerLinks.imprint")}
+            </Link>
+            <Link
+              to="/contact"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              {t("landing.footerLinks.contact")}
+            </Link>
+          </div>
+        </div>
+      </footer>
+    </div>
   );
 }

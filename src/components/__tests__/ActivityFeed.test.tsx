@@ -48,7 +48,9 @@ vi.mock("react-i18next", () => ({
 
 vi.mock("react-router-dom", async () => {
   const actual =
-    await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+    await vi.importActual<typeof import("react-router-dom")>(
+      "react-router-dom"
+    );
   return { ...actual, useNavigate: () => vi.fn() };
 });
 
@@ -89,7 +91,12 @@ describe("ActivityFeed", () => {
                 userLastName: "Mustermann",
                 isOwnWorkout: false,
                 activities: [
-                  { id: "activity-1", activityType: "pullups", amount: 10, points: 25 },
+                  {
+                    id: "activity-1",
+                    activityType: "pullups",
+                    amount: 10,
+                    points: 25,
+                  },
                 ],
                 totalPoints: 25,
               },

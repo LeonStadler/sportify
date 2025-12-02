@@ -503,8 +503,8 @@ export function Profile() {
     try {
       await updateProfile(
         {
-          ...profileForm,
-          avatar: user?.avatar || undefined,
+        ...profileForm,
+        avatar: user?.avatar || undefined,
         },
         true // silent mode - kein globaler Loading-State
       );
@@ -548,13 +548,13 @@ export function Profile() {
     try {
       await updateProfile(
         {
-          firstName: user?.firstName || "",
-          lastName: user?.lastName || "",
-          nickname: user?.nickname || "",
-          displayPreference: user?.displayPreference || "firstName",
+        firstName: user?.firstName || "",
+        lastName: user?.lastName || "",
+        nickname: user?.nickname || "",
+        displayPreference: user?.displayPreference || "firstName",
           languagePreference: newPreferences.languagePreference as "de" | "en",
           preferences: newPreferences,
-          avatar: user?.avatar || undefined,
+        avatar: user?.avatar || undefined,
         },
         true // silent mode - kein globaler Loading-State
       );
@@ -1314,109 +1314,109 @@ export function Profile() {
         </TabsContent>
 
         <TabsContent value="preferences" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            {/* Benutzereinstellungen */}
-            <Card>
-              <CardHeader>
+            <div className="grid gap-6 md:grid-cols-2">
+              {/* Benutzereinstellungen */}
+              <Card>
+                <CardHeader>
                 <CardTitle className="text-lg">Benutzereinstellungen</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Passe die App an deine Vorlieben an
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Sprache */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Sprache</Label>
-                  <Select
-                    value={preferencesForm.languagePreference}
-                    onValueChange={(value) =>
+                  <p className="text-sm text-muted-foreground">
+                    Passe die App an deine Vorlieben an
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Sprache */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Sprache</Label>
+                    <Select
+                      value={preferencesForm.languagePreference}
+                      onValueChange={(value) =>
                       savePreference(
                         { languagePreference: value as "de" | "en" },
                         "Sprache"
                       )
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="de">Deutsch</SelectItem>
-                      <SelectItem value="en">English</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="de">Deutsch</SelectItem>
+                        <SelectItem value="en">English</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                {/* Uhrzeitformat */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Uhrzeitformat</Label>
-                  <Select
-                    value={preferencesForm.timeFormat}
-                    onValueChange={(value) =>
+                  {/* Uhrzeitformat */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Uhrzeitformat</Label>
+                    <Select
+                      value={preferencesForm.timeFormat}
+                      onValueChange={(value) =>
                       savePreference(
                         { timeFormat: value as "12h" | "24h" },
                         "Uhrzeitformat"
                       )
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="24h">24-Stunden (14:30)</SelectItem>
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="24h">24-Stunden (14:30)</SelectItem>
                       <SelectItem value="12h">12-Stunden (2:30 PM)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                {/* Theme */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    {t("settings.theme")}
-                  </Label>
-                  <Select
-                    value={theme || "system"}
-                    onValueChange={(value) => {
-                      setTheme(value as "light" | "dark" | "system");
+                  {/* Theme */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">
+                      {t("settings.theme")}
+                    </Label>
+                    <Select
+                      value={theme || "system"}
+                      onValueChange={(value) => {
+                        setTheme(value as "light" | "dark" | "system");
                       savePreference(
                         { theme: value as "light" | "dark" | "system" },
                         t("settings.theme", "Design")
                       );
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="system">
-                        {t("settings.themeSystem")}
-                      </SelectItem>
-                      <SelectItem value="light">
-                        {t("settings.themeLight")}
-                      </SelectItem>
-                      <SelectItem value="dark">
-                        {t("settings.themeDark")}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="system">
+                          {t("settings.themeSystem")}
+                        </SelectItem>
+                        <SelectItem value="light">
+                          {t("settings.themeLight")}
+                        </SelectItem>
+                        <SelectItem value="dark">
+                          {t("settings.themeDark")}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
 
-            {/* Einheiten-Präferenzen */}
-            <Card>
-              <CardHeader>
+              {/* Einheiten-Präferenzen */}
+              <Card>
+                <CardHeader>
                 <CardTitle className="text-lg">Einheiten-Präferenzen</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Wähle deine bevorzugten Einheiten für Messungen
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Distanz */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Distanz</Label>
-                  <Select
-                    value={preferencesForm.units.distance}
-                    onValueChange={(value) =>
+                  <p className="text-sm text-muted-foreground">
+                    Wähle deine bevorzugten Einheiten für Messungen
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Distanz */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Distanz</Label>
+                    <Select
+                      value={preferencesForm.units.distance}
+                      onValueChange={(value) =>
                       savePreference(
                         {
                           units: {
@@ -1426,26 +1426,26 @@ export function Profile() {
                         },
                         "Distanzeinheit"
                       )
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="km">Kilometer (km)</SelectItem>
-                      <SelectItem value="m">Meter (m)</SelectItem>
-                      <SelectItem value="miles">Meilen</SelectItem>
-                      <SelectItem value="yards">Yards</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="km">Kilometer (km)</SelectItem>
+                        <SelectItem value="m">Meter (m)</SelectItem>
+                        <SelectItem value="miles">Meilen</SelectItem>
+                        <SelectItem value="yards">Yards</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                {/* Gewicht */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Gewicht</Label>
-                  <Select
-                    value={preferencesForm.units.weight}
-                    onValueChange={(value) =>
+                  {/* Gewicht */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Gewicht</Label>
+                    <Select
+                      value={preferencesForm.units.weight}
+                      onValueChange={(value) =>
                       savePreference(
                         {
                           units: {
@@ -1455,25 +1455,25 @@ export function Profile() {
                         },
                         "Gewichtseinheit"
                       )
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="kg">Kilogramm (kg)</SelectItem>
-                      <SelectItem value="lbs">Pfund (lbs)</SelectItem>
-                      <SelectItem value="stone">Stone</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="kg">Kilogramm (kg)</SelectItem>
+                        <SelectItem value="lbs">Pfund (lbs)</SelectItem>
+                        <SelectItem value="stone">Stone</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                {/* Temperatur */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Temperatur</Label>
-                  <Select
-                    value={preferencesForm.units.temperature}
-                    onValueChange={(value) =>
+                  {/* Temperatur */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Temperatur</Label>
+                    <Select
+                      value={preferencesForm.units.temperature}
+                      onValueChange={(value) =>
                       savePreference(
                         {
                           units: {
@@ -1483,40 +1483,40 @@ export function Profile() {
                         },
                         "Temperatureinheit"
                       )
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="celsius">Celsius (°C)</SelectItem>
-                      <SelectItem value="fahrenheit">
-                        Fahrenheit (°F)
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* App-Einstellungen */}
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <CardTitle className="text-lg">App-Einstellungen</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="text-sm font-medium">
-                      E-Mail-Benachrichtigungen
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      Wöchentliche Zusammenfassung deiner Fortschritte
-                    </p>
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="celsius">Celsius (°C)</SelectItem>
+                        <SelectItem value="fahrenheit">
+                          Fahrenheit (°F)
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <Switch
-                    checked={preferencesForm.notifications.email}
-                    onCheckedChange={(checked) =>
+                </CardContent>
+              </Card>
+
+              {/* App-Einstellungen */}
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="text-lg">App-Einstellungen</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm font-medium">
+                        E-Mail-Benachrichtigungen
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Wöchentliche Zusammenfassung deiner Fortschritte
+                      </p>
+                    </div>
+                    <Switch
+                      checked={preferencesForm.notifications.email}
+                      onCheckedChange={(checked) =>
                       savePreference(
                         {
                           notifications: {
@@ -1526,23 +1526,23 @@ export function Profile() {
                         },
                         "E-Mail-Benachrichtigungen"
                       )
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="text-sm font-medium">
-                      Öffentliches Profil
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      Andere Benutzer können dein Profil und deine Aktivitäten
-                      sehen
-                    </p>
+                      }
+                    />
                   </div>
-                  <Switch
-                    checked={preferencesForm.privacy.publicProfile}
-                    onCheckedChange={(checked) =>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm font-medium">
+                        Öffentliches Profil
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Andere Benutzer können dein Profil und deine Aktivitäten
+                        sehen
+                      </p>
+                    </div>
+                    <Switch
+                      checked={preferencesForm.privacy.publicProfile}
+                      onCheckedChange={(checked) =>
                       savePreference(
                         {
                           privacy: {
@@ -1552,12 +1552,12 @@ export function Profile() {
                         },
                         "Öffentliches Profil"
                       )
-                    }
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                      }
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
           {/* Push-Benachrichtigungen */}
           <PushNotificationSettings />
@@ -1748,8 +1748,8 @@ export function Profile() {
         <TabsContent value="achievements" className="space-y-6">
           {loadingAchievements ? (
             <div className="grid gap-6 md:grid-cols-2">
-              <Card>
-                <CardHeader>
+          <Card>
+            <CardHeader>
                   <div className="h-6 w-32 bg-muted animate-pulse rounded" />
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -1932,9 +1932,9 @@ export function Profile() {
                   <CardTitle className="text-lg font-semibold flex items-center gap-2">
                     <Award className="h-5 w-5 text-green-500" />
                     {t("profile.achievements.progress", "Fortschritt")}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {Object.entries(achievements.progress).map(
                       ([slug, data]) => (
@@ -1958,8 +1958,8 @@ export function Profile() {
                       )
                     )}
                   </div>
-                </CardContent>
-              </Card>
+            </CardContent>
+          </Card>
             )}
 
           {/* Empty State */}

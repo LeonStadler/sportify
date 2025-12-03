@@ -73,7 +73,7 @@ Da der Vercel-Hobby-Plan nur zwei einfache Cron-Jobs zulässt, werden die Event-
 
 - Workflow: `.github/workflows/events-scheduler.yml`
 - Secrets im GitHub-Repo hinterlegen:
-  - `EVENTS_BASE_URL` (z. B. `https://<project>.vercel.app`)
+  - `EVENTS_BASE_URL` (z. B. `https://<project>.vercel.app`; fällt auf `FRONTEND_URL` zurück, wenn nicht gesetzt)
   - `EVENTS_CRON_SECRET` (muss mit der Server-Env übereinstimmen)
 - Frequenzen: wöchentlich (Montag), monatlich (1. des Monats) und alle 15 Minuten für den Mail-Dispatcher.
 - Optional per `workflow_dispatch` manuell triggerbar.

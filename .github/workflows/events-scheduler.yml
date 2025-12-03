@@ -25,35 +25,67 @@ jobs:
     runs-on: ubuntu-latest
     env:
       EVENTS_BASE_URL: ${{ secrets.EVENTS_BASE_URL }}
+      FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
       EVENTS_CRON_SECRET: ${{ secrets.EVENTS_CRON_SECRET }}
       WEEKLY_SCHEDULE: '5 0 * * 1'
       MONTHLY_SCHEDULE: '10 0 1 * *'
       EMAIL_SCHEDULE: '*/15 * * * *'
     steps:
-      - name: Validate base URL
+      - name: Check required secrets
+        id: check-secrets
         run: |
-          if [ -z "${EVENTS_BASE_URL}" ]; then
-            echo "::error::Set the EVENTS_BASE_URL secret to your deployed API host (e.g. https://<project>.vercel.app)." >&2
-            exit 1
+          missing_secrets=()
+
+          base_url="${EVENTS_BASE_URL:-$FRONTEND_URL}"
+
+          if [ -z "${base_url}" ]; then
+            missing_secrets+=("EVENTS_BASE_URL (or FRONTEND_URL)")
           fi
 
+          if [ -z "${EVENTS_CRON_SECRET}" ]; then
+            missing_secrets+=("EVENTS_CRON_SECRET")
+          fi
+
+          if [ ${#missing_secrets[@]} -gt 0 ]; then
+            echo "missing=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "message<<'EOF'"
+              echo "Set the following secrets to enable scheduled events: ${missing_secrets[*]}"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "missing=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set base URL
+        if: steps.check-secrets.outputs.missing == 'false'
+        run: |
+          base_url="${EVENTS_BASE_URL:-$FRONTEND_URL}"
+          echo "BASE_URL=${base_url}" >> "$GITHUB_ENV"
+
+      - name: Missing secrets notice
+        if: steps.check-secrets.outputs.missing == 'true'
+        run: |
+          echo "Skipping scheduled event triggers."
+          echo "${{ steps.check-secrets.outputs.message }}"
+
       - name: Trigger weekly events
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.runWeekly == 'true' || github.event.schedule == env.WEEKLY_SCHEDULE }}
+        if: ${{ steps.check-secrets.outputs.missing == 'false' && (github.event_name == 'workflow_dispatch' && inputs.runWeekly == 'true' || github.event.schedule == env.WEEKLY_SCHEDULE) }}
         run: |
           curl --fail --show-error --silent -X POST \
             -H "Authorization: Bearer ${EVENTS_CRON_SECRET}" \
-            "${EVENTS_BASE_URL}/api/events/weekly"
+            "${BASE_URL}/api/events/weekly"
 
       - name: Trigger monthly events
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.runMonthly == 'true' || github.event.schedule == env.MONTHLY_SCHEDULE }}
+        if: ${{ steps.check-secrets.outputs.missing == 'false' && (github.event_name == 'workflow_dispatch' && inputs.runMonthly == 'true' || github.event.schedule == env.MONTHLY_SCHEDULE) }}
         run: |
           curl --fail --show-error --silent -X POST \
             -H "Authorization: Bearer ${EVENTS_CRON_SECRET}" \
-            "${EVENTS_BASE_URL}/api/events/monthly"
+            "${BASE_URL}/api/events/monthly"
 
       - name: Dispatch emails
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.runEmailDispatch == 'true' || github.event.schedule == env.EMAIL_SCHEDULE }}
+        if: ${{ steps.check-secrets.outputs.missing == 'false' && (github.event_name == 'workflow_dispatch' && inputs.runEmailDispatch == 'true' || github.event.schedule == env.EMAIL_SCHEDULE) }}
         run: |
           curl --fail --show-error --silent -X POST \
             -H "Authorization: Bearer ${EVENTS_CRON_SECRET}" \
-            "${EVENTS_BASE_URL}/api/events/emails/dispatch"
+            "${BASE_URL}/api/events/emails/dispatch"

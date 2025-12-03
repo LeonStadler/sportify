@@ -869,6 +869,28 @@ const resources = {
           fix: "Bugfix",
         },
         entries: {
+          v170: {
+            title: "Freunde einladen",
+            description:
+              "Lade deine Freunde per E-Mail oder Einladungslink ein und trainiert gemeinsam.",
+            highlights: {
+              0: "Einladung per E-Mail-Adresse",
+              1: "Einladungslink zum Teilen",
+              2: "Übersicht aller gesendeten Einladungen",
+              3: "Einfache Registrierung für neue Nutzer",
+            },
+          },
+          v160: {
+            title: "Wochen- und Monatsauswertung",
+            description:
+              "Erhalte automatische E-Mail-Benachrichtigungen mit deinen wöchentlichen und monatlichen Trainingszusammenfassungen.",
+            highlights: {
+              0: "Wöchentliche E-Mail mit Punkten und Workouts",
+              1: "Monatliche Zusammenfassung mit Auszeichnungen",
+              2: "Automatische Badge- und Award-Benachrichtigungen",
+              3: "Zielerreichung und Leaderboard-Status",
+            },
+          },
           v150: {
             title: "Web Push Notifications",
             description:
@@ -2762,6 +2784,28 @@ const resources = {
           fix: "Bugfix",
         },
         entries: {
+          v170: {
+            title: "Invite Friends",
+            description:
+              "Invite your friends via email or invitation link and train together.",
+            highlights: {
+              0: "Invitation via email address",
+              1: "Invitation link to share",
+              2: "Overview of all sent invitations",
+              3: "Easy registration for new users",
+            },
+          },
+          v160: {
+            title: "Weekly and Monthly Reports",
+            description:
+              "Receive automatic email notifications with your weekly and monthly training summaries.",
+            highlights: {
+              0: "Weekly email with points and workouts",
+              1: "Monthly summary with awards",
+              2: "Automatic badge and award notifications",
+              3: "Goal achievement and leaderboard status",
+            },
+          },
           v150: {
             title: "Web Push Notifications",
             description:

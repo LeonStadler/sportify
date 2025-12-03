@@ -18,10 +18,13 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
 import {
+  Activity,
+  AlertTriangle,
   Edit,
   Eye,
   EyeOff,
   Plus,
+  RefreshCw,
   Settings,
   Shield,
   Trophy,
@@ -66,6 +69,8 @@ export function Admin() {
   const [showEmails, setShowEmails] = useState(false);
   const [isExerciseFormOpen, setIsExerciseFormOpen] = useState(false);
   const [editingExercise, setEditingExercise] = useState<Exercise | null>(null);
+  const [monitoringData, setMonitoringData] = useState<any>(null);
+  const [isLoadingMonitoring, setIsLoadingMonitoring] = useState(false);
   const [exerciseForm, setExerciseForm] = useState({
     id: "",
     name: "",
@@ -109,6 +114,58 @@ export function Admin() {
       }
     } catch (error) {
       console.error("Error loading exercises:", error);
+    }
+  };
+
+  const loadMonitoringData = async () => {
+    setIsLoadingMonitoring(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/admin/monitoring`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setMonitoringData(data);
+      }
+    } catch (error) {
+      console.error("Error loading monitoring data:", error);
+      toast({
+        title: "Fehler",
+        description: "Fehler beim Laden der Monitoring-Daten",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingMonitoring(false);
+    }
+  };
+
+  const handleCleanupJobs = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/admin/monitoring/cleanup-jobs`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Erfolg",
+          description: "Stuck Jobs wurden bereinigt",
+        });
+        await loadMonitoringData();
+      }
+    } catch (error) {
+      toast({
+        title: "Fehler",
+        description: "Fehler beim Cleanup der Jobs",
+        variant: "destructive",
+      });
     }
   };
 
@@ -338,10 +395,11 @@ export function Admin() {
       </Alert>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview">Übersicht</TabsTrigger>
           <TabsTrigger value="users">Benutzerverwaltung</TabsTrigger>
           <TabsTrigger value="scoring">Wertung</TabsTrigger>
+          <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6 mt-6">
@@ -827,6 +885,216 @@ export function Admin() {
           >
             {isLoading ? "Wird geladen..." : "Übungen aktualisieren"}
           </Button>
+        </TabsContent>
+
+        <TabsContent value="monitoring" className="space-y-6 mt-6">
+          <div className="flex items-center justify-between">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="w-5 h-5" />
+                System Monitoring
+              </CardTitle>
+            </CardHeader>
+            <Button
+              onClick={loadMonitoringData}
+              variant="outline"
+              disabled={isLoadingMonitoring}
+            >
+              <RefreshCw
+                className={`w-4 h-4 mr-2 ${isLoadingMonitoring ? "animate-spin" : ""}`}
+              />
+              Aktualisieren
+            </Button>
+          </div>
+
+          {monitoringData && (
+            <>
+              {/* Job Stats */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Job-Status</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {monitoringData.jobs.stuckJobs.length > 0 && (
+                    <Alert variant="destructive">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>
+                        {monitoringData.jobs.stuckJobs.length} stuck job(s)
+                        gefunden
+                        <Button
+                          onClick={handleCleanupJobs}
+                          variant="outline"
+                          size="sm"
+                          className="ml-4"
+                        >
+                          Cleanup durchführen
+                        </Button>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {monitoringData.jobs.stats.map((stat: any) => (
+                      <div
+                        key={`${stat.job_name}-${stat.status}`}
+                        className="p-4 border rounded-lg"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium">
+                              {stat.job_name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {stat.status}
+                            </p>
+                          </div>
+                          <Badge
+                            variant={
+                              stat.status === "completed"
+                                ? "default"
+                                : stat.status === "failed"
+                                  ? "destructive"
+                                  : "secondary"
+                            }
+                          >
+                            {stat.count}
+                          </Badge>
+                        </div>
+                        {stat.last_run && (
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Letzter Lauf:{" "}
+                            {new Date(stat.last_run).toLocaleString("de-DE")}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {monitoringData.jobs.recentFailures.length > 0 && (
+                    <div className="mt-4">
+                      <h4 className="font-semibold mb-2">
+                        Fehler der letzten 7 Tage
+                      </h4>
+                      <div className="space-y-2">
+                        {monitoringData.jobs.recentFailures.map(
+                          (failure: any) => (
+                            <div
+                              key={failure.job_name}
+                              className="flex items-center justify-between p-2 bg-destructive/10 rounded"
+                            >
+                              <span className="text-sm">
+                                {failure.job_name}
+                              </span>
+                              <Badge variant="destructive">
+                                {failure.count}
+                              </Badge>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Email Queue Stats */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>E-Mail-Warteschlange</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {monitoringData.emails.stats.map((stat: any) => (
+                      <div key={stat.status} className="p-4 border rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium">{stat.status}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {stat.status === "failed" &&
+                              stat.failed_after_retries > 0
+                                ? `${stat.failed_after_retries} nach Retries`
+                                : "Gesamt"}
+                            </p>
+                          </div>
+                          <Badge
+                            variant={
+                              stat.status === "sent"
+                                ? "default"
+                                : stat.status === "failed"
+                                  ? "destructive"
+                                  : "secondary"
+                            }
+                          >
+                            {stat.count}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold mb-2">Letzte E-Mails (24h)</h4>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Empfänger</TableHead>
+                            <TableHead>Betreff</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Versuche</TableHead>
+                            <TableHead>Erstellt</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {monitoringData.emails.recent
+                            .slice(0, 10)
+                            .map((email: any) => (
+                              <TableRow key={email.id}>
+                                <TableCell className="font-mono text-xs">
+                                  {email.recipient}
+                                </TableCell>
+                                <TableCell className="max-w-xs truncate">
+                                  {email.subject}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge
+                                    variant={
+                                      email.status === "sent"
+                                        ? "default"
+                                        : email.status === "failed"
+                                          ? "destructive"
+                                          : "secondary"
+                                    }
+                                  >
+                                    {email.status}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>{email.attempts}</TableCell>
+                                <TableCell className="text-xs">
+                                  {new Date(email.createdAt).toLocaleString(
+                                    "de-DE"
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
+
+          {!monitoringData && !isLoadingMonitoring && (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <p className="text-muted-foreground">
+                  Klicken Sie auf "Aktualisieren", um Monitoring-Daten zu laden
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>

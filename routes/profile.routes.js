@@ -608,6 +608,73 @@ Die Einladung läuft am ${expiresDate} ab.`;
         return res.json([]);
       }
 
+      const now = new Date();
+      const fourteenDaysAgo = new Date(
+        now.getTime() - 14 * 24 * 60 * 60 * 1000
+      );
+
+      // Auto-Bereinigung: Lösche Einladungen, die mehr als 14 Tage nach Ablauf sind
+      await pool.query(
+        `DELETE FROM invitations 
+         WHERE invited_by = $1 
+         AND expires_at < $2 
+         AND status != 'accepted'`,
+        [req.user.id, fourteenDaysAgo]
+      );
+
+      // Prüfe auf abgelaufene Einladungen und erstelle Notifications
+      const { rows: expiredRows } = await pool.query(
+        `SELECT id, email, first_name, last_name, expires_at
+         FROM invitations
+         WHERE invited_by = $1
+         AND status = 'pending'
+         AND expires_at < $2
+         AND expires_at >= $3`,
+        [req.user.id, now, fourteenDaysAgo]
+      );
+
+      // Erstelle Notifications für abgelaufene Einladungen (nur einmal pro Einladung)
+      const { createNotification } = await import(
+        "../services/notificationService.js"
+      );
+      for (const expiredInvitation of expiredRows) {
+        // Prüfe ob bereits eine Notification für diese abgelaufene Einladung existiert
+        const { rows: existingNotifications } = await pool.query(
+          `SELECT id FROM notifications 
+           WHERE user_id = $1 
+           AND type = 'invitation-expired' 
+           AND payload->>'invitationId' = $2`,
+          [req.user.id, expiredInvitation.id]
+        );
+
+        if (existingNotifications.length === 0) {
+          const displayName =
+            expiredInvitation.first_name && expiredInvitation.last_name
+              ? `${expiredInvitation.first_name} ${expiredInvitation.last_name}`
+              : expiredInvitation.first_name || expiredInvitation.email;
+
+          try {
+            await createNotification(pool, {
+              userId: req.user.id,
+              type: "invitation-expired",
+              title: "Einladung abgelaufen",
+              message: `Die Einladung für ${displayName} (${expiredInvitation.email}) ist abgelaufen.`,
+              payload: {
+                invitationId: expiredInvitation.id,
+                email: expiredInvitation.email,
+                displayName,
+              },
+            });
+          } catch (notifError) {
+            console.error(
+              "Error creating expiration notification:",
+              notifError
+            );
+            // Nicht kritisch, weiter machen
+          }
+        }
+      }
+
       const { rows } = await pool.query(
         `SELECT id, email, first_name, last_name, status, created_at, expires_at, used, used_at, invited_by
                  FROM invitations
@@ -648,6 +715,139 @@ Die Einladung läuft am ${expiresDate} ab.`;
         details:
           process.env.NODE_ENV === "development" ? error.message : undefined,
         stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+      });
+    }
+  });
+
+  // POST /api/profile/invitations/:id/resend - Resend expired invitation
+  router.post("/invitations/:id/resend", authMiddleware, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Prüfe ob Einladung existiert und dem User gehört
+      const { rows } = await pool.query(
+        `SELECT id, email, first_name, last_name, expires_at, status, used
+         FROM invitations
+         WHERE id = $1 AND invited_by = $2`,
+        [id, req.user.id]
+      );
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: "Einladung nicht gefunden." });
+      }
+
+      const invitation = rows[0];
+      const now = new Date();
+
+      // Prüfe ob Einladung abgelaufen ist
+      if (new Date(invitation.expires_at) >= now) {
+        return res.status(400).json({
+          error: "Einladung ist noch nicht abgelaufen.",
+        });
+      }
+
+      // Prüfe ob bereits angenommen
+      if (invitation.used || invitation.status === "accepted") {
+        return res.status(400).json({
+          error: "Einladung wurde bereits angenommen.",
+        });
+      }
+
+      // Lösche alte Einladung
+      await pool.query("DELETE FROM invitations WHERE id = $1", [id]);
+
+      // Erstelle neue Einladung
+      const { createInvitation } = await import(
+        "../services/invitationService.js"
+      );
+      const { invitation: newInvitation, token } = await createInvitation(
+        pool,
+        {
+          email: invitation.email,
+          firstName: invitation.first_name || "",
+          lastName: invitation.last_name || "",
+          invitedBy: req.user.id,
+        }
+      );
+
+      // Sende E-Mail
+      const frontendUrl = getFrontendUrl(req);
+      const inviteLink = `${frontendUrl}/invite/${req.user.id}`;
+      const expiresDate = new Date(newInvitation.expires_at).toLocaleDateString(
+        "de-DE"
+      );
+
+      const emailBody = `Hallo!
+
+Du wurdest zu Sportify eingeladen.
+
+Klicke auf folgenden Link, um dich zu registrieren:
+${inviteLink}
+
+Oder verwende diesen Code bei der Registrierung: ${token}
+
+Die Einladung läuft am ${expiresDate} ab.`;
+
+      const { createActionEmail } = await import("../utils/emailTemplates.js");
+      const emailHtml = createActionEmail({
+        greeting: "Hallo!",
+        title: "Du wurdest zu Sportify eingeladen",
+        message:
+          "Jemand hat dich eingeladen, Teil der Sportify-Community zu werden. Registriere dich jetzt und starte dein Training!",
+        buttonText: "Jetzt registrieren",
+        buttonUrl: inviteLink,
+        additionalText: `Die Einladung läuft am ${expiresDate} ab.`,
+        frontendUrl,
+        preheader: "Du wurdest zu Sportify eingeladen",
+      });
+
+      const { queueEmail } = await import("../services/emailService.js");
+      await queueEmail(pool, {
+        recipient: invitation.email,
+        subject: "Sportify – Einladung",
+        body: emailBody,
+        html: emailHtml,
+      });
+
+      res.json({
+        message: "Einladung erneut versendet.",
+        invitation: toCamelCase(newInvitation),
+      });
+    } catch (error) {
+      console.error("Resend invitation error:", error);
+      res.status(500).json({
+        error: "Serverfehler beim erneuten Versenden der Einladung.",
+        details:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
+      });
+    }
+  });
+
+  // DELETE /api/profile/invitations/:id - Delete invitation
+  router.delete("/invitations/:id", authMiddleware, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Prüfe ob Einladung existiert und dem User gehört
+      const { rows } = await pool.query(
+        `SELECT id FROM invitations WHERE id = $1 AND invited_by = $2`,
+        [id, req.user.id]
+      );
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: "Einladung nicht gefunden." });
+      }
+
+      // Lösche Einladung
+      await pool.query("DELETE FROM invitations WHERE id = $1", [id]);
+
+      res.json({ message: "Einladung gelöscht." });
+    } catch (error) {
+      console.error("Delete invitation error:", error);
+      res.status(500).json({
+        error: "Serverfehler beim Löschen der Einladung.",
+        details:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
       });
     }
   });

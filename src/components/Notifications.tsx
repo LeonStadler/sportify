@@ -17,6 +17,7 @@ import {
   Award,
   Bell,
   CheckCircle,
+  Clock,
   Trophy,
   UserMinus,
   UserPlus,
@@ -45,6 +46,8 @@ const notificationIcons: Record<string, JSX.Element> = {
   // Badge & Award types
   "badge-earned": <Award className="w-5 h-5 text-yellow-500" />,
   "award-earned": <Trophy className="w-5 h-5 text-amber-500" />,
+  // Invitation types
+  "invitation-expired": <Clock className="w-5 h-5 text-orange-500" />,
 };
 
 export function Notifications() {

@@ -13,8 +13,10 @@ import {
   Heart,
   History,
   LucideIcon,
+  Mail,
   Rocket,
   Save,
+  Share2,
   Sparkles,
   Users,
 } from "lucide-react";
@@ -34,6 +36,34 @@ interface ChangelogEntry {
 
 // Changelog-Daten mit i18n-Keys
 const changelogEntries: ChangelogEntry[] = [
+  {
+    version: "1.7.0",
+    date: "2024-12-15",
+    titleKey: "changelog.entries.v170.title",
+    descriptionKey: "changelog.entries.v170.description",
+    icon: Share2,
+    type: "feature",
+    highlightKeys: [
+      "changelog.entries.v170.highlights.0",
+      "changelog.entries.v170.highlights.1",
+      "changelog.entries.v170.highlights.2",
+      "changelog.entries.v170.highlights.3",
+    ],
+  },
+  {
+    version: "1.6.0",
+    date: "2024-12-10",
+    titleKey: "changelog.entries.v160.title",
+    descriptionKey: "changelog.entries.v160.description",
+    icon: Mail,
+    type: "feature",
+    highlightKeys: [
+      "changelog.entries.v160.highlights.0",
+      "changelog.entries.v160.highlights.1",
+      "changelog.entries.v160.highlights.2",
+      "changelog.entries.v160.highlights.3",
+    ],
+  },
   {
     version: "1.5.0",
     date: "2024-12-01",

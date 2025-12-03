@@ -2,38 +2,38 @@ name: Events Scheduler
 
 on:
   schedule:
-    - cron: '5 0 * * 1'
-    - cron: '10 0 1 * *'
-    - cron: '*/15 * * * *'
+    - cron: "5 0 * * 1"
+    - cron: "10 0 1 * *"
+    - cron: "*/15 * * * *"
   workflow_dispatch:
     inputs:
       runWeekly:
-        description: 'Force weekly events'
+        description: "Force weekly events"
         required: false
-        default: 'false'
+        default: "false"
       runMonthly:
-        description: 'Force monthly events'
+        description: "Force monthly events"
         required: false
-        default: 'false'
+        default: "false"
       runEmailDispatch:
-        description: 'Force email dispatch'
+        description: "Force email dispatch"
         required: false
-        default: 'false'
+        default: "false"
 
 jobs:
   trigger-events:
     runs-on: ubuntu-latest
     env:
-      EVENTS_BASE_URL: ${{ secrets.EVENTS_BASE_URL }}
+      EVENTS_BASE_URL: ${{ secrets.EVENTS_BASE_URL || secrets.FRONTEND_URL }}
       EVENTS_CRON_SECRET: ${{ secrets.EVENTS_CRON_SECRET }}
-      WEEKLY_SCHEDULE: '5 0 * * 1'
-      MONTHLY_SCHEDULE: '10 0 1 * *'
-      EMAIL_SCHEDULE: '*/15 * * * *'
+      WEEKLY_SCHEDULE: "5 0 * * 1"
+      MONTHLY_SCHEDULE: "10 0 1 * *"
+      EMAIL_SCHEDULE: "*/15 * * * *"
     steps:
       - name: Validate base URL
         run: |
           if [ -z "${EVENTS_BASE_URL}" ]; then
-            echo "::error::Set the EVENTS_BASE_URL secret to your deployed API host (e.g. https://<project>.vercel.app)." >&2
+            echo "::error::Set either EVENTS_BASE_URL or FRONTEND_URL secret to your deployed host (e.g. https://vertic-id.com)." >&2
             exit 1
           fi
 

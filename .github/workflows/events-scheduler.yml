@@ -29,6 +29,7 @@ jobs:
       WEEKLY_SCHEDULE: "5 0 * * 1"
       MONTHLY_SCHEDULE: "10 0 1 * *"
       EMAIL_SCHEDULE: "*/15 * * * *"
+      CURL_OPTS: "--fail --show-error --silent --ipv4 --connect-timeout 10 --max-time 45 --retry 5 --retry-all-errors --retry-delay 5"
     steps:
       - name: Validate base URL
         run: |
@@ -40,20 +41,20 @@ jobs:
       - name: Trigger weekly events
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.runWeekly == 'true' || github.event.schedule == env.WEEKLY_SCHEDULE }}
         run: |
-          curl --fail --show-error --silent -X POST \
+          curl ${CURL_OPTS} -X POST \
             -H "Authorization: Bearer ${EVENTS_CRON_SECRET}" \
             "${EVENTS_BASE_URL}/api/events/weekly"
 
       - name: Trigger monthly events
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.runMonthly == 'true' || github.event.schedule == env.MONTHLY_SCHEDULE }}
         run: |
-          curl --fail --show-error --silent -X POST \
+          curl ${CURL_OPTS} -X POST \
             -H "Authorization: Bearer ${EVENTS_CRON_SECRET}" \
             "${EVENTS_BASE_URL}/api/events/monthly"
 
       - name: Dispatch emails
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.runEmailDispatch == 'true' || github.event.schedule == env.EMAIL_SCHEDULE }}
         run: |
-          curl --fail --show-error --silent -X POST \
+          curl ${CURL_OPTS} -X POST \
             -H "Authorization: Bearer ${EVENTS_CRON_SECRET}" \
             "${EVENTS_BASE_URL}/api/events/emails/dispatch"

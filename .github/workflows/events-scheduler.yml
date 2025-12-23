@@ -118,14 +118,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.setup-matrix.outputs.matrix) }}
-    env:
-      # Retry policy: retries on transient errors (network, DNS, SSL, timeouts) but not on HTTP errors (401/403/404/500)
-      # --retry 3: up to 3 retries on transient failures
-      # --retry-delay 10: wait 10 seconds between retries
-      # --retry-max-time 45: total time limit for all retries (prevents infinite retry loops)
-      # --fail-with-body: treat HTTP errors (4xx/5xx) as failures but include response body in error output (requires curl 7.76.0+)
-      # Falls --fail-with-body nicht verfügbar ist, wird --fail verwendet (Response-Body wird dann unterdrückt)
-      CURL_OPTS: "--fail-with-body --show-error --ipv4 --connect-timeout 15 --max-time 60 --retry 3 --retry-delay 10 --retry-max-time 45 --tlsv1.2 --tls-max 1.3 --location --post301 --post302 --post303"
+      # CURL_OPTS wird dynamisch im "Validate base URL" Step gesetzt, basierend auf curl-Version
     steps:
       - name: Set environment variables
         shell: bash
@@ -153,6 +146,11 @@ jobs:
             echo "::error::Set EVENTS_CRON_SECRET secret." >&2
             exit 1
           fi
+          # Debug: Check if secret is set (without revealing value)
+          if [ -n "${EVENTS_CRON_SECRET}" ]; then
+            secret_length=${#EVENTS_CRON_SECRET}
+            echo "EVENTS_CRON_SECRET is set (length: ${secret_length} characters)"
+          fi
           # Ensure URL starts with http:// or https://
           if [[ ! "${EVENTS_BASE_URL}" =~ ^https?:// ]]; then
             echo "::warning::URL does not start with http:// or https://, prepending https://"
@@ -162,23 +160,35 @@ jobs:
           # Remove trailing slash
           EVENTS_BASE_URL="${EVENTS_BASE_URL%/}"
           echo "EVENTS_BASE_URL=${EVENTS_BASE_URL}" >> "$GITHUB_ENV"
+          
+          # Check curl version and set CURL_OPTS accordingly (once, to avoid repeated warnings)
+          # --fail-with-body requires curl 7.76.0+, otherwise use --fail
+          if curl --help 2>/dev/null | grep -q "fail-with-body"; then
+            CURL_OPTS="--fail-with-body --show-error --ipv4 --connect-timeout 15 --max-time 60 --retry 3 --retry-delay 10 --retry-max-time 45 --tlsv1.2 --tls-max 1.3 --location --post301 --post302 --post303"
+          else
+            CURL_OPTS="--fail --show-error --ipv4 --connect-timeout 15 --max-time 60 --retry 3 --retry-delay 10 --retry-max-time 45 --tlsv1.2 --tls-max 1.3 --location --post301 --post302 --post303"
+          fi
+          echo "CURL_OPTS=${CURL_OPTS}" >> "$GITHUB_ENV"
 
       - name: ${{ matrix.name }}
         shell: bash
         run: |
           echo "Calling ${EVENTS_BASE_URL}${{ matrix.path }}"
-          # Check if --fail-with-body is supported (requires curl 7.76.0+)
-          # If not, fall back to --fail (response body will be suppressed on HTTP errors)
-          if curl --help | grep -q "fail-with-body"; then
-            curl_opts="${CURL_OPTS}"
-          else
-            echo "::warning::curl version does not support --fail-with-body, using --fail instead"
-            curl_opts="${CURL_OPTS/--fail-with-body/--fail}"
+          
+          # Debug: Verify secret is set (without revealing value)
+          if [ -z "${EVENTS_CRON_SECRET}" ]; then
+            echo "::error::EVENTS_CRON_SECRET is not set in environment"
+            exit 1
           fi
+          secret_length=${#EVENTS_CRON_SECRET}
+          echo "EVENTS_CRON_SECRET is set (length: ${secret_length} characters)"
+          
+          # CURL_OPTS is already set in the previous step based on curl version
+          # No need to check again - this avoids the warning message
           
           # Use set +e around curl to ensure error handling works correctly with command substitution
           set +e
-          response=$(curl ${curl_opts} -X POST \
+          response=$(curl ${CURL_OPTS} -X POST \
             -H "Authorization: Bearer ${EVENTS_CRON_SECRET}" \
             -w "\nHTTP_CODE:%{http_code}\n" \
             "${EVENTS_BASE_URL}${{ matrix.path }}" 2>&1)
@@ -187,6 +197,13 @@ jobs:
           if [ "$exit_code" -ne 0 ]; then
             echo "::error::curl failed with exit code $exit_code"
             echo "Response: $response"
+            # Additional debug info for 401 errors
+            if echo "$response" | grep -q "401"; then
+              echo "::error::Authentication failed (401). Please verify:"
+              echo "  1. EVENTS_CRON_SECRET in GitHub Actions matches EVENTS_CRON_SECRET in Vercel"
+              echo "  2. The secret is set in all Vercel environments (Production, Preview, Development)"
+              echo "  3. No extra whitespace or newlines in the secret value"
+            fi
             exit $exit_code
           fi
           echo "$response"

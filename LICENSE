@@ -1,25 +1,37 @@
+Sportify Source-Available License
+
 Copyright (c) 2024 Leon Stadler
 
-All rights reserved.
-
 This software and associated documentation files (the "Software") are the
-proprietary and confidential property of Leon Stadler.
+proprietary property of Leon Stadler.
 
-No part of this Software may be reproduced, distributed, transmitted,
-displayed, published, or broadcast without the prior written permission of
-Leon Stadler, except in the following cases:
+Permission is granted to view, study, and use the Software privately for
+non-commercial purposes. You may modify the Software for your private,
+non-commercial use.
 
-1. You may view and study the source code for personal, non-commercial
-   educational purposes.
+You may not distribute, sublicense, sell, or otherwise transfer the Software
+or any derivative works to third parties, except for the limited publication
+of source code required below when you have written permission to make the
+Software publicly available. You may not make the Software available to third
+parties (including hosting, SaaS, or network access) without prior written
+permission from the copyright holder.
 
-2. You may fork this repository for personal use and experimentation, but
-   you may not distribute, publish, or make available your modifications
-   without explicit written permission.
+If you receive written permission to make the Software publicly available,
+you must comply with all of the following:
 
-3. You may not use this Software for any commercial purpose without
-   obtaining a separate license from the copyright holder.
+1) Attribution in the frontend UI: "Powered by Sportify by Leon Stadler"
+   with a link to https://leon-stadler.com, and a link to the official
+   repository at https://github.com/LeonStadler/sportify.
+2) Publish the complete corresponding source code of your deployed version
+   in a public repository that includes this license and the required
+   attribution.
+3) Ensure the public repository clearly credits Leon Stadler and links to
+   the official repository.
 
-4. You may not remove or alter any copyright notices or proprietary markings.
+To request permission for any public use, contact contact@leon-stadler.com.
+
+No trademark rights are granted. No contributions are accepted unless
+explicitly requested in writing.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -28,5 +40,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-For licensing inquiries, please contact: [Your Contact Information]

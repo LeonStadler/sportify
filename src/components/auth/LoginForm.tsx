@@ -17,9 +17,14 @@ import { useAuth } from '@/hooks/use-auth';
 interface LoginFormProps {
   onSuccess?: () => void;
   redirectTo?: string;
+  defaultRememberMe?: boolean;
 }
 
-export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/dashboard' }) => {
+export const LoginForm: React.FC<LoginFormProps> = ({
+  onSuccess,
+  redirectTo = '/dashboard',
+  defaultRememberMe = false,
+}) => {
   const { t } = useTranslation();
   const { login, error, clearError } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
@@ -31,7 +36,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, redirectTo = '/
   const [showBackupCodeField, setShowBackupCodeField] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [lastSubmittedCode, setLastSubmittedCode] = useState<string | null>(null);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(defaultRememberMe);
   const navigate = useNavigate();
 
   const loginSchema = useMemo(() => z.object({

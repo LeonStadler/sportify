@@ -1,5 +1,4 @@
 import {
-  ArrowLeft,
   ArrowRight,
   Globe,
   Monitor,
@@ -11,7 +10,7 @@ import {
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { Logo } from "@/components/Logo";
@@ -29,25 +28,22 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 
 interface PublicHeaderProps {
-  showBackButton?: boolean;
-  backText?: string;
-  shortBackText?: string;
   title?: string;
   sticky?: boolean;
   showContactButton?: boolean;
+  variant?: "default" | "minimal";
 }
 
 export function PublicHeader({
-  showBackButton = false,
-  backText,
-  shortBackText,
   title,
-  sticky = false,
+  sticky = true,
   showContactButton = false,
+  variant = "default",
 }: PublicHeaderProps) {
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const { theme, setTheme } = useTheme();
+  const location = useLocation();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
@@ -59,49 +55,47 @@ export function PublicHeader({
     { value: "system", icon: Monitor, label: t("settings.themeSystem") },
   ];
 
-  const defaultBackText = backText || t("legal.backToHome");
-  const defaultShortBackText =
-    shortBackText ||
-    defaultBackText.split(" ").filter(Boolean).pop() ||
-    defaultBackText;
+  // Route-Erkennung
+  const isLoginPage = location.pathname.startsWith("/auth/login");
+  const isRegisterPage = location.pathname.startsWith("/auth/register");
+  const isAuthPage = location.pathname.startsWith("/auth/");
+  const isContactPage = location.pathname === "/contact";
+  const isNotAuthPage = !isAuthPage;
+
+  // Zeige Auth-Buttons nur wenn nicht authentifiziert
+  const shouldShowAuthButtons = !isAuthenticated;
+
+  // Auf nicht-Auth-Seiten: Immer Login- und Register-Button (außer auf der jeweiligen Seite)
+  const showLoginButton = shouldShowAuthButtons && (isNotAuthPage && !isLoginPage) || (isAuthPage && (isRegisterPage || (!isLoginPage && !isRegisterPage)));
+  const showRegisterButton = shouldShowAuthButtons && (isNotAuthPage && !isRegisterPage) || (isAuthPage && (isLoginPage || (!isLoginPage && !isRegisterPage)));
+
+  // Kontakt-Button: Nur wenn showContactButton=true, nicht auf Contact-Seite, und bei genug Platz (sm+)
+  const showContactButtonDisplay = shouldShowAuthButtons && showContactButton && isNotAuthPage && !isContactPage;
 
   return (
     <header
-      className={`border-b border-border/40 bg-background/95 backdrop-blur-sm ${
-        sticky ? "sticky top-0 z-50 shadow-sm backdrop-blur-md" : ""
-      }`}
+      className={`border-b border-border/40 bg-background/95 backdrop-blur-sm ${sticky ? "sticky top-0 z-50 shadow-sm backdrop-blur-md" : ""} ${variant === "minimal" ? "py-3" : "py-4"}`}
     >
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          {showBackButton && (
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                <span className="hidden sm:inline">{defaultBackText}</span>
-                <span className="sm:hidden">{defaultShortBackText}</span>
-              </Link>
-            </Button>
-          )}
-          {!showBackButton && (
-            <Link to="/" className="hover:opacity-80 transition-opacity">
-              {/* Mobile: Nur Icon */}
-              <Logo variant="icon" className="xs:hidden h-10 w-10" />
-              {/* Desktop: Volles Logo */}
-              <LogoFull className="h-12 hidden xs:block" />
-            </Link>
-          )}
-          {showBackButton && (
-            <div className="flex items-center gap-4">
-              {/* Mobile: Nur Icon */}
-              <Logo variant="icon" className="xs:hidden h-10 w-10" />
-              {/* Desktop: Volles Logo */}
-              <LogoFull className="h-12 hidden xs:block" />
-              {title && (
-                <h1 className="text-xl font-bold text-foreground hidden sm:block">
-                  {title}
-                </h1>
-              )}
-            </div>
+          {/* Logo - immer zuerst (ganz links) */}
+          <Link to="/" className="hover:opacity-80 transition-opacity">
+            {variant === "minimal" ? (
+              <LogoFull className="h-10 sm:h-12" />
+            ) : (
+              <>
+                {/* Mobile: Nur Icon */}
+                <Logo variant="icon" className="xs:hidden h-10 w-10" />
+                {/* Desktop: Volles Logo */}
+                <LogoFull className="h-12 hidden xs:block" />
+              </>
+            )}
+          </Link>
+          {/* Title - optional */}
+          {title && (
+            <h1 className="text-xl font-bold text-foreground hidden sm:block">
+              {title}
+            </h1>
           )}
         </div>
         {!isAuthenticated && (
@@ -165,36 +159,45 @@ export function PublicHeader({
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Auth Buttons */}
-            <div className="flex gap-2">
-              {showContactButton && (
-                <Button variant="ghost" asChild className="hidden sm:flex">
-                  <Link to="/contact">{t("landing.contact")}</Link>
-                </Button>
-              )}
-              <Button variant="outline" asChild>
-                <Link to="/auth/login">{t("auth.login")}</Link>
-              </Button>
-              <Button
-                asChild
-                className={
-                  showContactButton
-                    ? "bg-primary hover:bg-primary/90 shadow-md"
-                    : ""
-                }
-              >
-                <Link to="/auth/register">
-                  {showContactButton ? (
-                    <>
-                      {t("landing.register")}
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </>
-                  ) : (
-                    t("auth.register")
-                  )}
-                </Link>
-              </Button>
-            </div>
+            {/* Auth Buttons - auf nicht-Auth-Seiten immer Login/Register, Kontakt bei Platz */}
+            {shouldShowAuthButtons && (
+              <div className="flex gap-2">
+                {/* Kontakt-Button: nur bei genug Platz (sm+), nicht auf Contact-Seite */}
+                {showContactButtonDisplay && (
+                  <Button variant="ghost" asChild className="hidden sm:flex">
+                    <Link to="/contact">{t("landing.contact")}</Link>
+                  </Button>
+                )}
+                {/* Login-Button: auf allen nicht-Auth-Seiten außer Login-Seite, oder auf Auth-Seiten (Register oder andere) */}
+                {showLoginButton && (
+                  <Button variant="outline" asChild>
+                    <Link to="/auth/login">{t("auth.login")}</Link>
+                  </Button>
+                )}
+                {/* Register-Button: auf allen nicht-Auth-Seiten außer Register-Seite, oder auf Auth-Seiten (Login oder andere) */}
+                {showRegisterButton && (
+                  <Button
+                    asChild
+                    className={
+                      showContactButtonDisplay
+                        ? "bg-primary hover:bg-primary/90 shadow-md"
+                        : ""
+                    }
+                  >
+                    <Link to="/auth/register">
+                      {showContactButtonDisplay ? (
+                        <>
+                          {t("landing.register")}
+                          <ArrowRight className="ml-2 h-4 w-4" />
+                        </>
+                      ) : (
+                        t("auth.register")
+                      )}
+                    </Link>
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

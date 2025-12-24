@@ -246,6 +246,7 @@ const resources = {
       // Dashboard
       dashboard: {
         welcome: "Willkommen",
+        welcomeMessage: "Willkommen zurück, {{name}}!",
         overview: "Übersicht",
         recentActivity: "Letzte Aktivitäten",
         statistics: "Statistiken",
@@ -1357,6 +1358,15 @@ const resources = {
           devicesTitle: "Welche Geräte werden unterstützt?",
           devicesAnswer:
             "Sportify funktioniert auf allen modernen Browsern und ist vollständig responsive für Desktop, Tablet und Smartphone optimiert.",
+          appTitle: "Gibt es eine App?",
+          appAnswer:
+            "Sportify ist eine Progressive Web App (PWA). Sie können sie auf Smartphone, Tablet oder Desktop installieren und wie eine App nutzen.",
+          responseTitle: "Wie schnell erhalte ich eine Antwort?",
+          responseAnswer:
+            "In der Regel antworten wir innerhalb von 24 Stunden an Werktagen. Bei komplexen Anliegen kann es etwas länger dauern.",
+          exportTitle: "Kann ich meine Daten exportieren?",
+          exportAnswer:
+            "Aktuell gibt es keinen Self-Service-Export. Wenn Sie Ihre Daten benötigen, schreiben Sie uns bitte und wir helfen Ihnen weiter.",
           deleteTitle: "Kann ich mein Konto jederzeit löschen?",
           deleteAnswer:
             "Ja, Sie können Ihr Konto jederzeit vollständig löschen. Alle Ihre Daten werden dabei unwiderruflich entfernt.",
@@ -1418,7 +1428,7 @@ const resources = {
               "Beim Besuch dieser Website wird Ihr Surf-Verhalten nicht statistisch ausgewertet. Wir verwenden keine Analyseprogramme, Tracking-Tools oder ähnliche Technologien. Detaillierte Informationen hierzu finden Sie in der folgenden Datenschutzerklärung.",
           },
           responsibility:
-            "Verantwortlicher für die Datenverarbeitung ist Leon Stadler, Uferstraße 42, 88149 Nonnenorn, Deutschland.",
+            "Verantwortlicher für die Datenverarbeitung ist <0></0>, <1></1>.",
           legalBasis:
             "Diese Datenschutzerklärung entspricht den Vorgaben der Datenschutz-Grundverordnung (DSGVO) und des Bundesdatenschutzgesetzes (BDSG).",
         },
@@ -1458,7 +1468,7 @@ const resources = {
           responsible: {
             title: "3.2 Hinweis zur verantwortlichen Stelle",
             content:
-              "Die verantwortliche Stelle für die Datenverarbeitung auf dieser Website ist: Leon Stadler, Uferstraße 42, 88149 Nonnenorn, Deutschland. Telefon: +49 176 35491384, E-Mail: sportify@leon-stadler.com",
+              "Die verantwortliche Stelle für die Datenverarbeitung auf dieser Website ist: <0></0>, <1></1>. Telefon: <2></2>, E-Mail: <3></3>",
             definition:
               "Verantwortliche Stelle ist die natürliche oder juristische Person, die allein oder gemeinsam mit anderen über die Zwecke und Mittel der Verarbeitung von personenbezogenen Daten (z. B. Namen, E-Mail-Adressen o. Ä.) entscheidet.",
           },
@@ -2174,6 +2184,7 @@ const resources = {
       // Dashboard
       dashboard: {
         welcome: "Welcome",
+        welcomeMessage: "Welcome back, {{name}}!",
         overview: "Overview",
         recentActivity: "Recent Activity",
         statistics: "Statistics",
@@ -3267,6 +3278,15 @@ const resources = {
           devicesTitle: "Which devices are supported?",
           devicesAnswer:
             "Sportify works on all modern browsers and is fully responsive optimized for desktop, tablet and smartphone.",
+          appTitle: "Is there an app?",
+          appAnswer:
+            "Sportify is a Progressive Web App (PWA). You can install it on smartphone, tablet, or desktop and use it like an app.",
+          responseTitle: "How fast do I get a response?",
+          responseAnswer:
+            "We usually respond within 24 hours on business days. Complex requests may take a bit longer.",
+          exportTitle: "Can I export my data?",
+          exportAnswer:
+            "There is no self-service export yet. If you need your data, reach out and we will help you.",
           deleteTitle: "Can I delete my account at any time?",
           deleteAnswer:
             "Yes, you can delete your account completely at any time. All your data will be permanently removed.",
@@ -3380,7 +3400,7 @@ const resources = {
               "When visiting this website, your surfing behavior is not statistically analyzed. We do not use analysis programs, tracking tools or similar technologies. Detailed information on this can be found in the following privacy policy.",
           },
           responsibility:
-            "The person responsible for data processing is Leon Stadler, Uferstraße 42, 88149 Nonnenorn, Germany.",
+            "The person responsible for data processing is <0></0>, <1></1>.",
           legalBasis:
             "This privacy policy complies with the requirements of the General Data Protection Regulation (GDPR) and the Federal Data Protection Act (BDSG).",
         },
@@ -3420,7 +3440,7 @@ const resources = {
           responsible: {
             title: "3.2 Information on the Responsible Party",
             content:
-              "The party responsible for data processing on this website is: Leon Stadler, Uferstraße 42, 88149 Nonnenorn, Germany. Phone: +49 176 35491384, Email: sportify@leon-stadler.com",
+              "The party responsible for data processing on this website is: <0></0>, <1></1>. Phone: <2></2>, Email: <3></3>",
             definition:
               "The responsible party is the natural or legal person who alone or jointly with others decides on the purposes and means of processing personal data (e.g. names, e-mail addresses, etc.).",
           },

@@ -8,31 +8,47 @@
 /**
  * Kontaktdaten
  */
+const getEnvValue = (value?: string) => (value ? value.trim() : '');
+
+const address = {
+  street: getEnvValue(import.meta.env.VITE_CONTACT_ADDRESS_STREET),
+  postalCode: getEnvValue(import.meta.env.VITE_CONTACT_ADDRESS_POSTAL_CODE),
+  city: getEnvValue(import.meta.env.VITE_CONTACT_ADDRESS_CITY),
+  country: getEnvValue(import.meta.env.VITE_CONTACT_ADDRESS_COUNTRY),
+};
+
+const addressLines = [
+  address.street,
+  [address.postalCode, address.city].filter(Boolean).join(' ').trim(),
+  address.country,
+].filter(Boolean);
+
+const addressFull = addressLines.join('\n');
+const addressHtml = addressLines.join('<br />\n');
+const addressSingleLine = addressLines.join(', ');
+
 export const contactInfo = {
   // E-Mail-Adresse
-  email: 'sportify@leon-stadler.com',
+  email: getEnvValue(import.meta.env.VITE_CONTACT_EMAIL),
   
   // Telefonnummer
-  phone: '+49 176 35491384',
+  phone: getEnvValue(import.meta.env.VITE_CONTACT_PHONE),
   
   // Adresse
   address: {
-    street: 'Uferstraße 42',
-    postalCode: '88149',
-    city: 'Nonnenorn',
-    country: 'Deutschland',
+    ...address,
     // Vollständige Adresse als mehrzeiliger String
-    full: 'Uferstraße 42\n88149 Nonnenorn\nDeutschland',
+    full: addressFull,
     // Vollständige Adresse als HTML
-    fullHtml: 'Uferstraße 42<br />\n88149 Nonnenorn<br />\nDeutschland',
+    fullHtml: addressHtml,
   },
   
   // Name des Verantwortlichen
-  responsiblePerson: 'Leon Stadler',
+  responsiblePerson: getEnvValue(import.meta.env.VITE_CONTACT_RESPONSIBLE_PERSON),
   
   // Domain (wird aus ENV genommen, Fallback für Entwicklung)
   get domain(): string {
-    return import.meta.env.VITE_FRONTEND_URL || 'https://www.vertic-id.com';
+    return getEnvValue(import.meta.env.VITE_FRONTEND_URL) || 'http://localhost:8080';
   },
   
   // Hosting-Informationen
@@ -52,14 +68,8 @@ export const contactInfo = {
  * Formatierte Kontaktdaten für verschiedene Verwendungszwecke
  */
 export const formattedContactInfo = {
-  // E-Mail als Link
-  emailLink: `mailto:${contactInfo.email}`,
-  
-  // Telefon als Link
-  phoneLink: `tel:${contactInfo.phone.replace(/\s/g, '')}`,
-  
   // Adresse als einzeiliger String
-  addressSingleLine: `${contactInfo.address.street}, ${contactInfo.address.postalCode} ${contactInfo.address.city}, ${contactInfo.address.country}`,
+  addressSingleLine,
   
   // Adresse für Impressum (mehrzeilig)
   addressImprint: contactInfo.address.full,
@@ -67,4 +77,3 @@ export const formattedContactInfo = {
   // Adresse für HTML (mit <br />)
   addressHtml: contactInfo.address.fullHtml,
 } as const;
-

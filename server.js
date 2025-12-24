@@ -56,29 +56,44 @@ const adminMiddleware = createAdminMiddleware(pool);
 // Trust proxy for accurate IP addresses (for rate limiting)
 app.set("trust proxy", 1);
 
+const normalizeOrigin = (value) => value.replace(/\/$/, "");
+
+const parseOriginList = (value) =>
+  value
+    ? value
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+        .map(normalizeOrigin)
+    : [];
+
 // CORS Configuration
+const corsAllowList = new Set([
+  "http://localhost:4000",
+  "http://localhost:8080",
+  "http://127.0.0.1:4000",
+  "http://127.0.0.1:8080",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  process.env.FRONTEND_URL ? normalizeOrigin(process.env.FRONTEND_URL) : "",
+  ...parseOriginList(process.env.CORS_ALLOW_ORIGINS),
+].filter(Boolean));
+
 const corsOptions = {
   origin: (origin, callback) => {
-    const allowedOrigins = [
-      "http://localhost:4000",
-      "http://localhost:8080",
-      "http://127.0.0.1:4000",
-      "http://127.0.0.1:8080",
-      "http://localhost:5173",
-      "http://127.0.0.1:5173",
-      process.env.FRONTEND_URL,
-      "https://vertic-id.com",
-      "https://www.vertic-id.com",
-      "http://vertic-id.com",
-      "http://www.vertic-id.com",
-    ].filter(Boolean);
-
     // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin) {
       callback(null, true);
-    } else {
-      callback(null, true); // Allow all origins in production for now
+      return;
     }
+
+    const normalizedOrigin = normalizeOrigin(origin);
+    if (corsAllowList.has(normalizedOrigin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(null, false);
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],

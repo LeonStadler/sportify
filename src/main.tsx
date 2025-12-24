@@ -6,8 +6,8 @@ import { BrowserRouter } from 'react-router-dom';
 
 import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider } from '@/contexts/AuthContext';
-import { initSvgThemeListener } from '@/utils/updateSvgTheme';
 import { registerServiceWorker } from '@/utils/serviceWorker';
+import { initSvgThemeListener } from '@/utils/updateSvgTheme';
 import App from './App.tsx';
 import './index.css';
 import './lib/i18n';

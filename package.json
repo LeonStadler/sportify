@@ -6,6 +6,7 @@
   "packageManager": "npm@10.8.2",
   "author": "Leon Stadler",
   "description": "Modern sports analytics and fitness tracking application",
+  "license": "SEE LICENSE IN LICENSE",
   "scripts": {
     "dev": "concurrently \"npm:dev:frontend\" \"npm:dev:backend\"",
     "dev:frontend": "vite --host",

@@ -53,7 +53,7 @@ The platform combines modern web technologies with a user-friendly interface to 
 - **Langfristige Fortschrittsverfolgung**: Entwicklung über Wochen, Monate und Jahre hinweg dokumentieren
 - **Zielorientiertes Training**: Durch Ziele und Challenges strukturiert trainieren
 
-**Die Vision** ist es, die führende Open-Source-Lösung für persönliches Fitness-Tracking zu werden, die sowohl für Einsteiger als auch für fortgeschrittene Athleten geeignet ist.
+**Die Vision** ist es, eine fuehrende source-available Loesung fuer persoenliches Fitness-Tracking zu werden, die sowohl fuer Einsteiger als auch fuer fortgeschrittene Athleten geeignet ist.
 
 ### English
 
@@ -65,7 +65,7 @@ The platform combines modern web technologies with a user-friendly interface to 
 - **Long-Term Progress Tracking**: Document development over weeks, months, and years
 - **Goal-Oriented Training**: Train systematically through goals and challenges
 
-**The vision** is to become the leading open-source solution for personal fitness tracking, suitable for both beginners and advanced athletes.
+**The vision** is to become a leading source-available solution for personal fitness tracking, suitable for both beginners and advanced athletes.
 
 ---
 
@@ -623,8 +623,9 @@ Complete documentation is available in the [`docs/`](docs/) folder:
 
 ## Lizenz / License
 
-Alle Rechte vorbehalten - Leon Stadler  
-All rights reserved - Leon Stadler
+Dieses Projekt ist source-available (nicht Open Source). Private, nicht-kommerzielle Nutzung ist erlaubt. Jede Weitergabe oder oeffentliche Bereitstellung (Hosting/SaaS) ist nur mit schriftlicher Genehmigung erlaubt und erfordert Namensnennung im Frontend sowie im oeffentlichen Repo. Details: siehe `LICENSE`. Genehmigungen: contact@leon-stadler.com.  
+This project is source-available (not open source). Private, non-commercial use is allowed. Any distribution or public availability (hosting/SaaS) requires written permission and attribution in the frontend and the public repo. See `LICENSE` for details. Permission requests: contact@leon-stadler.com.  
+Beitraege werden derzeit nicht angenommen. Contributions are not accepted at this time.
 
 ---
 

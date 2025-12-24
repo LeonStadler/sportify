@@ -1,8 +1,9 @@
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 
-import { AuthHeader } from '@/components/auth/AuthHeader';
 import { LoginForm } from '@/components/auth/LoginForm';
+import { LegalFooter } from '@/components/LegalFooter';
+import { PublicHeader } from '@/components/PublicHeader';
 
 export default function Login() {
   const { t } = useTranslation();
@@ -14,7 +15,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex flex-col">
-      <AuthHeader showAuthButtons={true} authButtonType="register" />
+      <PublicHeader variant="minimal" />
 
       {/* Main Content */}
       <div className="flex-1 flex items-center justify-center p-4">
@@ -32,14 +33,7 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="border-t border-border/40 py-6">
-        <div className="container mx-auto px-4 text-center">
-          <p className="text-sm text-muted-foreground">
-            {t('common.copyright')}
-          </p>
-        </div>
-      </footer>
+      <LegalFooter />
     </div>
   );
 } 

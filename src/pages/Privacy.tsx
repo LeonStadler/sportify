@@ -1,8 +1,9 @@
 import { Shield } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 
+import { ObfuscatedText } from '@/components/ObfuscatedText';
 import { LegalPageTemplate } from '@/components/LegalPageTemplate';
-import { contactInfo } from '@/config/contactInfo';
+import { contactInfo, formattedContactInfo } from '@/config/contactInfo';
 
 export default function Privacy() {
   const { t } = useTranslation();
@@ -28,7 +29,21 @@ export default function Privacy() {
             <p className="mb-4">{t('privacy.overview.dataCollection.rights.content')}</p>
             <h3 className="text-xl font-semibold mb-3 mt-6">{t('privacy.overview.noAnalysis.title')}</h3>
             <p className="mb-4">{t('privacy.overview.noAnalysis.content')}</p>
-            <p className="mb-4">{t('privacy.overview.responsibility')}</p>
+            <p className="mb-4">
+              <Trans
+                i18nKey="privacy.overview.responsibility"
+                components={[
+                  <ObfuscatedText
+                    key="responsible-person"
+                    value={contactInfo.responsiblePerson}
+                  />,
+                  <ObfuscatedText
+                    key="address-single-line"
+                    value={formattedContactInfo.addressSingleLine}
+                  />,
+                ]}
+              />
+            </p>
             <p>{t('privacy.overview.legalBasis')}</p>
           </section>
 
@@ -51,7 +66,23 @@ export default function Privacy() {
             <p className="mb-4">{t('privacy.generalInfo.dataProtection.content')}</p>
             <p className="mb-4">{t('privacy.generalInfo.dataProtection.security')}</p>
             <h3 className="text-xl font-semibold mb-3 mt-6">{t('privacy.generalInfo.responsible.title')}</h3>
-            <p className="mb-4">{t('privacy.generalInfo.responsible.content')}</p>
+            <p className="mb-4">
+              <Trans
+                i18nKey="privacy.generalInfo.responsible.content"
+                components={[
+                  <ObfuscatedText
+                    key="responsible-person"
+                    value={contactInfo.responsiblePerson}
+                  />,
+                  <ObfuscatedText
+                    key="address-single-line"
+                    value={formattedContactInfo.addressSingleLine}
+                  />,
+                  <ObfuscatedText key="phone" value={contactInfo.phone} />,
+                  <ObfuscatedText key="email" value={contactInfo.email} />,
+                ]}
+              />
+            </p>
             <p className="mb-4">{t('privacy.generalInfo.responsible.definition')}</p>
             <h3 className="text-xl font-semibold mb-3 mt-6">{t('privacy.generalInfo.retention.title')}</h3>
             <p className="mb-4">{t('privacy.generalInfo.retention.content')}</p>
@@ -167,7 +198,12 @@ export default function Privacy() {
             <h2 className="text-2xl font-bold mb-4">{t('privacy.contact.title')}</h2>
             <p className="mb-4">{t('privacy.contact.content')}</p>
             <p>
-              <strong>{t('privacy.contact.email')}</strong>: <a href={`mailto:${contactInfo.email}`} className="text-primary hover:underline">{contactInfo.email}</a>
+              <strong>{t('privacy.contact.email')}</strong>:{" "}
+              <ObfuscatedText
+                value={contactInfo.email}
+                hrefPrefix="mailto:"
+                className="text-primary hover:underline"
+              />
             </p>
           </section>
 
@@ -186,4 +222,3 @@ export default function Privacy() {
     />
   );
 }
-

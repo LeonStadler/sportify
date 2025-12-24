@@ -2,6 +2,7 @@ import { Building2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
+import { ObfuscatedText } from '@/components/ObfuscatedText';
 import { LegalPageTemplate } from '@/components/LegalPageTemplate';
 import { contactInfo } from '@/config/contactInfo';
 
@@ -23,9 +24,11 @@ export default function Imprint() {
               <p>
                 <strong>{t('imprint.responsibility.address')}</strong>
               </p>
-              <p className="pl-4 whitespace-pre-line">
-                {contactInfo.address.full}
-              </p>
+              <ObfuscatedText
+                value={contactInfo.address.full}
+                as="p"
+                className="pl-4 whitespace-pre-line"
+              />
               <p className="mt-2 text-muted-foreground">
                 {t('imprint.responsibility.content')}
               </p>
@@ -37,10 +40,21 @@ export default function Imprint() {
             <div className="space-y-2">
               <p className="mb-2">{t('imprint.contact.content')}</p>
               <p>
-                <strong>{t('imprint.contact.email')}</strong>: <a href={`mailto:${contactInfo.email}`} className="text-primary hover:underline">{contactInfo.email}</a>
+                <strong>{t('imprint.contact.email')}</strong>:{" "}
+                <ObfuscatedText
+                  value={contactInfo.email}
+                  hrefPrefix="mailto:"
+                  className="text-primary hover:underline"
+                />
               </p>
               <p>
-                <strong>{t('imprint.contact.phone')}</strong>: <a href={`tel:${contactInfo.phone.replace(/\s/g, '')}`} className="text-primary hover:underline">{contactInfo.phone}</a>
+                <strong>{t('imprint.contact.phone')}</strong>:{" "}
+                <ObfuscatedText
+                  value={contactInfo.phone}
+                  hrefPrefix="tel:"
+                  hrefValue={contactInfo.phone.replace(/\s/g, '')}
+                  className="text-primary hover:underline"
+                />
               </p>
             </div>
           </section>
@@ -99,4 +113,3 @@ export default function Imprint() {
     />
   );
 }
-

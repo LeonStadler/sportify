@@ -1,21 +1,10 @@
-import { ArrowLeft, Globe, Palette, Settings } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 
 import { RegisterForm } from '@/components/auth/RegisterForm';
-import { AuthHeader } from '@/components/auth/AuthHeader';
-import LanguageSwitcher from '@/components/LanguageSwitcher';
-import ThemeSwitcher from '@/components/ThemeSwitcher';
-import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { LegalFooter } from '@/components/LegalFooter';
+import { PublicHeader } from '@/components/PublicHeader';
 
 export default function Register() {
   const { t } = useTranslation();
@@ -43,7 +32,7 @@ export default function Register() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex flex-col">
-      <AuthHeader showAuthButtons={true} authButtonType="login" />
+      <PublicHeader variant="minimal" />
 
       {/* Main Content */}
       <div className="flex-1 flex items-center justify-center p-4 py-8">
@@ -60,14 +49,7 @@ export default function Register() {
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="border-t border-border/40 py-6">
-        <div className="container mx-auto px-4 text-center">
-          <p className="text-sm text-muted-foreground">
-            {t('common.copyright')}
-          </p>
-        </div>
-      </footer>
+      <LegalFooter />
     </div>
   );
 } 

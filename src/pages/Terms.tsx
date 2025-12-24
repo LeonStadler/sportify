@@ -1,6 +1,7 @@
 import { Scale } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { ObfuscatedText } from '@/components/ObfuscatedText';
 import { LegalPageTemplate } from '@/components/LegalPageTemplate';
 import { contactInfo } from '@/config/contactInfo';
 
@@ -118,7 +119,12 @@ export default function Terms() {
             <h2 className="text-2xl font-bold mb-4">{t('terms.contact.title')}</h2>
             <p className="mb-4">{t('terms.contact.content')}</p>
             <p>
-              <strong>{t('terms.contact.email')}</strong>: <a href={`mailto:${contactInfo.email}`} className="text-primary hover:underline">{contactInfo.email}</a>
+              <strong>{t('terms.contact.email')}</strong>:{" "}
+              <ObfuscatedText
+                value={contactInfo.email}
+                hrefPrefix="mailto:"
+                className="text-primary hover:underline"
+              />
             </p>
           </section>
 
@@ -132,4 +138,3 @@ export default function Terms() {
     />
   );
 }
-

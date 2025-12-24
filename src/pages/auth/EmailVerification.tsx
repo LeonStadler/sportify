@@ -6,7 +6,8 @@ import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { z } from "zod";
 
-import { AuthHeader } from "@/components/auth/AuthHeader";
+import { LegalFooter } from "@/components/LegalFooter";
+import { PublicHeader } from "@/components/PublicHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -179,10 +180,7 @@ export default function EmailVerification() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex flex-col">
-      <AuthHeader
-        backTo="/auth/login"
-        backText={t("authPages.emailVerification.backToLogin")}
-      />
+      <PublicHeader variant="minimal" />
 
       {/* Main Content */}
       <div className="flex-1 flex items-center justify-center p-4">
@@ -261,11 +259,11 @@ export default function EmailVerification() {
                       <CardDescription>
                         {email
                           ? t("authPages.emailVerification.resendDescription", {
-                              email,
-                            })
+                            email,
+                          })
                           : t(
-                              "authPages.emailVerification.resendDescriptionAlt"
-                            )}
+                            "authPages.emailVerification.resendDescriptionAlt"
+                          )}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -387,14 +385,7 @@ export default function EmailVerification() {
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="border-t border-border/40 py-6">
-        <div className="container mx-auto px-4 text-center">
-          <p className="text-sm text-muted-foreground">
-            {t("common.copyright")}
-          </p>
-        </div>
-      </footer>
+      <LegalFooter />
     </div>
   );
 }

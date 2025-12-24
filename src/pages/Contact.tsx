@@ -1,12 +1,23 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Mail, MapPin, Phone, Send } from "lucide-react";
+import {
+  Clock,
+  Download,
+  Monitor,
+  Send,
+  ShieldCheck,
+  Smartphone,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 import React from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { z } from "zod";
 
+import { PublicFooter } from "@/components/PublicFooter";
 import { PublicHeader } from "@/components/PublicHeader";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,11 +32,57 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { API_URL } from "@/lib/api";
 import { toast } from "sonner";
-import { contactInfo, formattedContactInfo } from "@/config/contactInfo";
 
 export default function Contact() {
   const { t } = useTranslation();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const faqItems = React.useMemo(
+    () => [
+      {
+        id: "free",
+        icon: Sparkles,
+        title: t("contact.faq.freeTitle"),
+        answer: t("contact.faq.freeAnswer"),
+      },
+      {
+        id: "secure",
+        icon: ShieldCheck,
+        title: t("contact.faq.secureTitle"),
+        answer: t("contact.faq.secureAnswer"),
+      },
+      {
+        id: "devices",
+        icon: Monitor,
+        title: t("contact.faq.devicesTitle"),
+        answer: t("contact.faq.devicesAnswer"),
+      },
+      {
+        id: "app",
+        icon: Smartphone,
+        title: t("contact.faq.appTitle"),
+        answer: t("contact.faq.appAnswer"),
+      },
+      {
+        id: "response",
+        icon: Clock,
+        title: t("contact.faq.responseTitle"),
+        answer: t("contact.faq.responseAnswer"),
+      },
+      {
+        id: "export",
+        icon: Download,
+        title: t("contact.faq.exportTitle"),
+        answer: t("contact.faq.exportAnswer"),
+      },
+      {
+        id: "delete",
+        icon: Trash2,
+        title: t("contact.faq.deleteTitle"),
+        answer: t("contact.faq.deleteAnswer"),
+      },
+    ],
+    [t]
+  );
 
   const contactSchema = React.useMemo(
     () =>
@@ -95,8 +152,6 @@ export default function Contact() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       <PublicHeader
-        showBackButton={true}
-        backText={t("contact.back")}
         title={t("contact.title")}
       />
 
@@ -111,272 +166,169 @@ export default function Contact() {
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          {/* Contact Information */}
-          <div className="lg:col-span-1">
-            <Card className="h-fit">
-              <CardHeader>
-                <CardTitle>{t("contact.contactInfo")}</CardTitle>
-                <CardDescription>{t("contact.contactWays")}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                    <Mail className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">
-                      {t("contact.email")}
-                    </p>
-                    <a 
-                      href={formattedContactInfo.emailLink}
-                      className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                    >
-                      {contactInfo.email}
-                    </a>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                    <Phone className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">
-                      {t("contact.phone")}
-                    </p>
-                    <a 
-                      href={formattedContactInfo.phoneLink}
-                      className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                    >
-                      {contactInfo.phone}
-                    </a>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                    <MapPin className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">
-                      {t("contact.address")}
-                    </p>
-                    <p className="text-sm text-muted-foreground whitespace-pre-line">
-                      {contactInfo.address.full}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-border">
-                  <p className="text-sm text-muted-foreground">
-                    <strong>{t("contact.responseTime")}</strong>
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Contact Form */}
-          <div className="lg:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>{t("contact.sendMessage")}</CardTitle>
-                <CardDescription>
-                  {t("contact.formDescription")}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">{t("contact.name")} *</Label>
-                      <Input
-                        id="name"
-                        placeholder={t("contact.namePlaceholder")}
-                        {...register("name")}
-                        className={errors.name ? "border-destructive" : ""}
-                      />
-                      {errors.name && (
-                        <p className="text-sm text-destructive">
-                          {errors.name.message}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="email">{t("auth.email")} *</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder={t(
-                          "authPages.emailVerification.emailPlaceholder"
-                        )}
-                        {...register("email")}
-                        className={errors.email ? "border-destructive" : ""}
-                      />
-                      {errors.email && (
-                        <p className="text-sm text-destructive">
-                          {errors.email.message}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
+        <div className="max-w-4xl mx-auto">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("contact.sendMessage")}</CardTitle>
+              <CardDescription>
+                {t("contact.formDescription")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="subject">{t("contact.subject")} *</Label>
+                    <Label htmlFor="name">{t("contact.name")} *</Label>
                     <Input
-                      id="subject"
-                      placeholder={t("contact.subjectPlaceholder")}
-                      {...register("subject")}
-                      className={errors.subject ? "border-destructive" : ""}
+                      id="name"
+                      placeholder={t("contact.namePlaceholder")}
+                      {...register("name")}
+                      className={errors.name ? "border-destructive" : ""}
                     />
-                    {errors.subject && (
+                    {errors.name && (
                       <p className="text-sm text-destructive">
-                        {errors.subject.message}
+                        {errors.name.message}
                       </p>
                     )}
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="message">{t("contact.message")} *</Label>
-                    <Textarea
-                      id="message"
-                      placeholder={t("contact.messagePlaceholder")}
-                      rows={6}
-                      {...register("message")}
-                      className={errors.message ? "border-destructive" : ""}
+                    <Label htmlFor="email">{t("auth.email")} *</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder={t(
+                        "authPages.emailVerification.emailPlaceholder"
+                      )}
+                      {...register("email")}
+                      className={errors.email ? "border-destructive" : ""}
                     />
-                    {errors.message && (
+                    {errors.email && (
                       <p className="text-sm text-destructive">
-                        {errors.message.message}
+                        {errors.email.message}
                       </p>
                     )}
                   </div>
+                </div>
 
-                  <Alert>
-                    <AlertDescription>
-                      {t("contact.privacyNote")}{" "}
-                      <Link
-                        to="/privacy"
-                        className="text-primary hover:underline"
-                      >
-                        {t("contact.privacyLink")}
-                      </Link>
-                      .
-                    </AlertDescription>
-                  </Alert>
+                <div className="space-y-2">
+                  <Label htmlFor="subject">{t("contact.subject")} *</Label>
+                  <Input
+                    id="subject"
+                    placeholder={t("contact.subjectPlaceholder")}
+                    {...register("subject")}
+                    className={errors.subject ? "border-destructive" : ""}
+                  />
+                  {errors.subject && (
+                    <p className="text-sm text-destructive">
+                      {errors.subject.message}
+                    </p>
+                  )}
+                </div>
 
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-background border-t-transparent rounded-full animate-spin mr-2" />
-                        {t("contact.sending")}
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-4 h-4 mr-2" />
-                        {t("contact.sendMessageButton")}
-                      </>
-                    )}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </div>
+                <div className="space-y-2">
+                  <Label htmlFor="message">{t("contact.message")} *</Label>
+                  <Textarea
+                    id="message"
+                    placeholder={t("contact.messagePlaceholder")}
+                    rows={6}
+                    {...register("message")}
+                    className={errors.message ? "border-destructive" : ""}
+                  />
+                  {errors.message && (
+                    <p className="text-sm text-destructive">
+                      {errors.message.message}
+                    </p>
+                  )}
+                </div>
+
+                <Alert>
+                  <AlertDescription>
+                    {t("contact.privacyNote")}{" "}
+                    <Link
+                      to="/privacy"
+                      className="text-primary hover:underline"
+                    >
+                      {t("contact.privacyLink")}
+                    </Link>
+                    .
+                  </AlertDescription>
+                </Alert>
+
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-background border-t-transparent rounded-full animate-spin mr-2" />
+                      {t("contact.sending")}
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4 mr-2" />
+                      {t("contact.sendMessageButton")}
+                    </>
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
         </div>
 
         {/* FAQ Section */}
         <div className="mt-16 max-w-4xl mx-auto">
-          <h2 className="text-2xl font-bold text-foreground mb-8 text-center">
+          <h2 className="text-2xl font-bold text-foreground mb-6 text-center">
             {t("contact.faqTitle")}
           </h2>
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">
-                  {t("contact.faq.freeTitle")}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  {t("contact.faq.freeAnswer")}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">
-                  {t("contact.faq.secureTitle")}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  {t("contact.faq.secureAnswer")}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">
-                  {t("contact.faq.devicesTitle")}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  {t("contact.faq.devicesAnswer")}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">
-                  {t("contact.faq.deleteTitle")}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  {t("contact.faq.deleteAnswer")}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+          <Card className="relative overflow-hidden border-border/70 bg-gradient-to-br from-muted/30 via-background to-background shadow-[0_30px_60px_-45px_rgba(15,23,42,0.6)]">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -top-20 right-[-10%] h-44 w-44 rounded-full bg-primary/15 blur-3xl"
+            />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -bottom-20 left-[-10%] h-44 w-44 rounded-full bg-primary/10 blur-3xl"
+            />
+            <CardContent className="relative p-0">
+              <Accordion type="single" collapsible>
+                {faqItems.map((item, index) => {
+                  const Icon = item.icon;
+                  return (
+                    <AccordionItem
+                      key={item.id}
+                      value={item.id}
+                      className="border-border/60 data-[state=open]:bg-muted/20"
+                    >
+                      <AccordionTrigger className="group px-6 py-5 hover:no-underline data-[state=open]:bg-muted/40">
+                        <div className="flex items-center gap-4 text-left">
+                          <div className="h-11 w-11 rounded-2xl border border-primary/20 bg-primary/10 text-primary flex items-center justify-center transition-all duration-300 group-hover:-translate-y-0.5 group-hover:shadow-[0_10px_30px_-15px_rgba(15,23,42,0.4)] group-data-[state=open]:bg-primary/20 group-data-[state=open]:border-primary/40">
+                            <Icon className="h-5 w-5" aria-hidden="true" />
+                          </div>
+                          <div>
+                            <span className="inline-flex items-center rounded-full border border-border/70 bg-background/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                              {String(index + 1).padStart(2, "0")}
+                            </span>
+                            <p className="mt-2 text-base font-semibold text-foreground">
+                              {item.title}
+                            </p>
+                          </div>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="px-6 pb-6 text-muted-foreground leading-relaxed">
+                        {item.answer}
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
+              </Accordion>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="border-t border-border/40 py-8 mt-16">
-        <div className="container mx-auto px-4 text-center">
-          <p className="text-muted-foreground">{t("common.copyright")}</p>
-          <div className="flex justify-center gap-6 mt-4">
-            <Link
-              to="/privacy"
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              {t("landing.footerLinks.privacy")}
-            </Link>
-            <Link
-              to="/terms"
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              {t("landing.footerLinks.terms")}
-            </Link>
-            <Link
-              to="/imprint"
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              {t("landing.footerLinks.imprint")}
-            </Link>
-          </div>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }

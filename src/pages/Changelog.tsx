@@ -366,8 +366,6 @@ export function Changelog() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       <PublicHeader
-        showBackButton={true}
-        backText={t("legal.backToHome")}
         title={t("changelog.title", "Changelog")}
       />
 
@@ -397,25 +395,25 @@ export function Changelog() {
               to="/privacy"
               className="text-sm text-muted-foreground hover:text-foreground"
             >
-              {t("landing.footerLinks.privacy")}
+              {t("landing.footer.legalLinks.privacy")}
             </Link>
             <Link
               to="/terms"
               className="text-sm text-muted-foreground hover:text-foreground"
             >
-              {t("landing.footerLinks.terms")}
+              {t("landing.footer.legalLinks.terms")}
             </Link>
             <Link
               to="/imprint"
               className="text-sm text-muted-foreground hover:text-foreground"
             >
-              {t("landing.footerLinks.imprint")}
+              {t("landing.footer.legalLinks.imprint")}
             </Link>
             <Link
               to="/contact"
               className="text-sm text-muted-foreground hover:text-foreground"
             >
-              {t("landing.footerLinks.contact")}
+              {t("landing.footer.legalLinks.contact")}
             </Link>
           </div>
         </div>

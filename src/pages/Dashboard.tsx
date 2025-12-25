@@ -11,10 +11,10 @@ import { WeeklyGoals, WeeklyGoalsDialog } from "@/components/WeeklyGoalsDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { DEFAULT_WEEKLY_POINTS_GOAL } from "@/config/events";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
-import { DEFAULT_WEEKLY_POINTS_GOAL } from "@/config/events";
 import { BarChart, Dumbbell, Settings, TrendingUp, Trophy } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -215,10 +215,10 @@ export function Dashboard() {
                 ...workout,
                 activities: Array.isArray(workout.activities)
                   ? workout.activities.map((activity) => ({
-                      activityType: activity.activityType,
-                      amount: activity.amount ?? activity.quantity ?? 0,
-                      points: activity.points ?? 0,
-                    }))
+                    activityType: activity.activityType,
+                    amount: activity.amount ?? activity.quantity ?? 0,
+                    points: activity.points ?? 0,
+                  }))
                   : [],
               }))
             );
@@ -428,9 +428,9 @@ export function Dashboard() {
           error instanceof Error
             ? error.message
             : t(
-                "weeklyGoals.saveError",
-                "Fehler beim Speichern der Wochenziele"
-              ),
+              "weeklyGoals.saveError",
+              "Fehler beim Speichern der Wochenziele"
+            ),
         variant: "destructive",
       });
       throw error;
@@ -578,9 +578,9 @@ export function Dashboard() {
         onSave={handleSaveGoals}
       />
 
-      {/* Progress Section - Mobile Stack Layout */}
+      {/* Goals and Activity Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6 mt-6 md:mt-8">
-        <Card className="relative">
+        <Card className="relative xl:col-span-1 xl:row-start-2 xl:col-start-1">
           <CardHeader className="pb-4">
             <CardTitle className="text-lg md:text-xl">
               {t("dashboard.weeklyGoals")}
@@ -693,15 +693,10 @@ export function Dashboard() {
             </div>
           </CardContent>
         </Card>
-        <WeeklyChallengeCard className="xl:col-span-2" />
+        <WeeklyChallengeCard className="xl:col-span-2 xl:row-start-1 xl:col-start-1" />
+        <MonthlyGoalCard className="xl:col-span-1 xl:row-start-1 xl:col-start-3" />
+        <ActivityFeed className="xl:col-span-2 xl:row-start-2 xl:col-start-2" />
       </div>
-
-      {/* Monthly Goal Section */}
-      <div className="mt-6 md:mt-8">
-        <MonthlyGoalCard />
-      </div>
-
-      <ActivityFeed className="mt-6 md:mt-8" />
     </PageTemplate>
   );
 }

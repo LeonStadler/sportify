@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
 import { parseAvatarConfig } from "@/lib/avatar";
+import { cn } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -213,13 +214,13 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
 
   if (isLoading) {
     return (
-      <Card className={className}>
+      <Card className={cn("h-full flex flex-col min-h-0", className)}>
         <CardHeader className="pb-4">
           <CardTitle className="text-lg md:text-xl">
             {t("activityFeed.title")}
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-1 min-h-0 overflow-auto">
           <div className="space-y-4">
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="p-4 rounded-lg border bg-muted/30">
@@ -243,7 +244,7 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
   }
 
   return (
-    <Card className={className}>
+    <Card className={cn("h-full flex flex-col min-h-0", className)}>
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg md:text-xl">
@@ -262,7 +263,7 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
           )}
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex-1 min-h-0 overflow-auto">
         {error ? (
           <div role="alert" className="text-sm text-destructive">
             {error}

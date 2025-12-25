@@ -18,6 +18,15 @@ const cleanEnvValue = (value) => {
   return cleaned.trim();
 };
 
+// Helper für bedingtes Logging
+const shouldLog = () => {
+  // In Production standardmäßig aus, außer explizit aktiviert
+  if (process.env.NODE_ENV === 'production' && process.env.LOG_EMAIL_DETAILS !== 'true') {
+    return false;
+  }
+  return true;
+};
+
 /**
  * Erstellt einen SMTP-Transporter mit Validierung und Verbindungstest
  */
@@ -67,14 +76,17 @@ const createTransporter = () => {
     }
   };
 
-  console.info('[Email Service] ✅ SMTP-Konfiguration geladen:', {
-    host: smtpHost,
-    port: config.port,
-    secure: config.secure,
-    user: smtpUser,
-    passwordLength: smtpPassword.length,
-    passwordSet: smtpPassword ? '✓' : '✗'
-  });
+  // Konfiguration nur loggen, wenn explizit gewünscht (reduziert Rauschen) oder bei Debug
+  if (process.env.LOG_EMAIL_CONFIG === 'true') {
+    console.info('[Email Service] ✅ SMTP-Konfiguration geladen:', {
+      host: smtpHost,
+      port: config.port,
+      secure: config.secure,
+      user: smtpUser,
+      passwordLength: smtpPassword.length,
+      passwordSet: smtpPassword ? '✓' : '✗'
+    });
+  }
 
   try {
     const transporter = nodemailer.createTransport(config);
@@ -130,17 +142,21 @@ export const sendEmail = async ({ recipient, subject, body, html }) => {
       html: html || body?.replace(/\n/g, '<br>'), // Text zu HTML konvertieren falls nötig
     };
 
-    console.info(`[Email Service] 📧 Versende E-Mail: "${subject}" an ${recipient}`);
-    console.info(`[Email Service] 📤 Von: ${fromAddress}`);
+    if (shouldLog()) {
+      console.info(`[Email Service] 📧 Versende E-Mail: "${subject}" an ${recipient}`);
+      console.info(`[Email Service] 📤 Von: ${fromAddress}`);
+    }
 
     const info = await transporter.sendMail(mailOptions);
 
-    console.info(`[Email Service] ✅ E-Mail erfolgreich via SMTP versendet: ${subject} an ${recipient}`, {
-      messageId: info.messageId,
-      response: info.response,
-      accepted: info.accepted?.length > 0 ? info.accepted : 'Keine',
-      rejected: info.rejected?.length > 0 ? info.rejected : 'Keine'
-    });
+    if (shouldLog()) {
+      console.info(`[Email Service] ✅ E-Mail erfolgreich via SMTP versendet: ${subject} an ${recipient}`, {
+        messageId: info.messageId,
+        response: info.response,
+        accepted: info.accepted?.length > 0 ? info.accepted : 'Keine',
+        rejected: info.rejected?.length > 0 ? info.rejected : 'Keine'
+      });
+    }
 
     return { queued: true, messageId: info.messageId };
   } catch (error) {
@@ -189,7 +205,9 @@ export const queueEmail = async (pool, { recipient, subject, body, html }) => {
     throw new Error('Datenbank-Pool ist erforderlich für queueEmail');
   }
 
-  console.info(`[Email Service] 📬 Starte E-Mail-Versand: "${subject}" an ${recipient}`);
+  if (shouldLog()) {
+    console.info(`[Email Service] 📬 Starte E-Mail-Versand: "${subject}" an ${recipient}`);
+  }
 
   // Versende E-Mail direkt
   let emailSent = false;
@@ -206,7 +224,9 @@ export const queueEmail = async (pool, { recipient, subject, body, html }) => {
       emailError = new Error(errorMsg);
       console.error(`[Email Service] ❌ E-Mail-Versand fehlgeschlagen: ${errorMsg}`);
     } else {
-      console.info(`[Email Service] ✅ E-Mail-Versand erfolgreich: ${subject} an ${recipient}`);
+      if (shouldLog()) {
+        console.info(`[Email Service] ✅ E-Mail-Versand erfolgreich: ${subject} an ${recipient}`);
+      }
     }
   } catch (sendError) {
     emailError = sendError;
@@ -228,7 +248,10 @@ export const queueEmail = async (pool, { recipient, subject, body, html }) => {
 
     emailId = result.rows[0]?.id;
     const status = emailSent ? '✅ Versendet' : '❌ Fehlgeschlagen';
-    console.info(`[Email Service] 💾 E-Mail in Datenbank gespeichert (ID: ${emailId}): ${subject} an ${recipient} - ${status}`);
+    
+    if (shouldLog()) {
+      console.info(`[Email Service] 💾 E-Mail in Datenbank gespeichert (ID: ${emailId}): ${subject} an ${recipient} - ${status}`);
+    }
 
     if (emailSent && emailId && !messageId) {
       // Aktualisiere sent_at falls noch nicht gesetzt

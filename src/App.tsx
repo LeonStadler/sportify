@@ -8,8 +8,12 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { usePWA } from "@/hooks/usePWA";
-import { lazy, Suspense } from "react";
+import { ToastAction } from "@/components/ui/toast";
+import { useToast } from "@/hooks/use-toast";
+import { APP_VERSION } from "@/version";
+import { lazy, Suspense, useEffect } from "react";
 import { Route, Routes } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 // Lazy load pages for code splitting
 const Admin = lazy(() =>
@@ -73,9 +77,43 @@ const PageLoader = () => (
 const App = () => {
   const { isAuthenticated, isLoading } = useAuth();
   const { isMobilePWA } = usePWA();
+  const { toast } = useToast();
+  const { t } = useTranslation();
 
   // Offline-Synchronisation aktivieren
   useOfflineSync();
+
+  useEffect(() => {
+    const storageKey = "sportify_app_version_seen";
+    try {
+      const seenVersion = localStorage.getItem(storageKey);
+      if (seenVersion !== APP_VERSION) {
+        toast({
+          title: t("common.versionUpdateTitle", "Neue Version verfügbar"),
+          description: t("common.versionUpdateDescription", {
+            version: APP_VERSION,
+            defaultValue: `Version ${APP_VERSION} ist verfügbar. Schau dir den Changelog an.`,
+          }),
+          action: (
+            <ToastAction
+              altText={t(
+                "common.versionUpdateActionAlt",
+                "Changelog öffnen"
+              )}
+              onClick={() => {
+                window.location.href = "/changelog";
+              }}
+            >
+              {t("common.versionUpdateAction", "Changelog")}
+            </ToastAction>
+          ),
+        });
+        localStorage.setItem(storageKey, APP_VERSION);
+      }
+    } catch (error) {
+      console.error("Version notification error", error);
+    }
+  }, [toast, t]);
 
   // Zeige einen Loader während der Auth-Initialisierung
   if (isLoading) {

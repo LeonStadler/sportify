@@ -275,18 +275,17 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
                 {workouts.map((workout) => (
                   <div
                     key={workout.workoutId}
-                    className={`p-3 rounded-lg border transition-all duration-200 hover:shadow-sm ${
-                      workout.isOwnWorkout
+                    className={`p-3 rounded-lg border transition-all duration-200 hover:shadow-sm ${workout.isOwnWorkout
                         ? "bg-primary/5 border-primary/20 dark:bg-primary/10 dark:border-primary/30"
                         : "bg-muted/30 border-border"
-                    }`}
+                      }`}
                   >
                     {/* Header: User + Time + Points */}
                     <div className="flex items-center gap-2.5 mb-2">
                       {workout.isOwnWorkout ? (
                         <Avatar className="w-8 h-8">
                           {workout.userAvatar &&
-                          parseAvatarConfig(workout.userAvatar) ? (
+                            parseAvatarConfig(workout.userAvatar) ? (
                             <NiceAvatar
                               style={{ width: "32px", height: "32px" }}
                               {...parseAvatarConfig(workout.userAvatar)!}
@@ -307,7 +306,7 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
                         >
                           <Avatar className="w-8 h-8 cursor-pointer">
                             {workout.userAvatar &&
-                            parseAvatarConfig(workout.userAvatar) ? (
+                              parseAvatarConfig(workout.userAvatar) ? (
                               <NiceAvatar
                                 style={{ width: "32px", height: "32px" }}
                                 {...parseAvatarConfig(workout.userAvatar)!}
@@ -431,3 +430,4 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
     </Card>
   );
 }
+

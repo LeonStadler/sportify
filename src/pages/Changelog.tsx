@@ -37,6 +37,22 @@ interface ChangelogEntry {
 // Changelog-Daten mit i18n-Keys
 const changelogEntries: ChangelogEntry[] = [
   {
+    version: "1.8.0",
+    date: "2025-12-26",
+    titleKey: "changelog.entries.v180.title",
+    descriptionKey: "changelog.entries.v180.description",
+    icon: Sparkles,
+    type: "feature",
+    highlightKeys: [
+      "changelog.entries.v180.highlights.0",
+      "changelog.entries.v180.highlights.1",
+      "changelog.entries.v180.highlights.2",
+      "changelog.entries.v180.highlights.3",
+      "changelog.entries.v180.highlights.4",
+      "changelog.entries.v180.highlights.5",
+    ],
+  },
+  {
     version: "1.7.0",
     date: "2024-12-15",
     titleKey: "changelog.entries.v170.title",
@@ -265,22 +281,20 @@ function ChangelogContent() {
                 {/* Timeline Dot */}
                 <div className="absolute left-0 top-0 flex items-center justify-center w-14 h-14 rounded-full bg-background border-2 border-border shadow-sm">
                   <div
-                    className={`p-2 rounded-full ${
-                      entry.type === "feature"
-                        ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
-                        : entry.type === "improvement"
-                          ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
-                          : "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
-                    }`}
+                    className={`p-2 rounded-full ${entry.type === "feature"
+                      ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+                      : entry.type === "improvement"
+                        ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                        : "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
+                      }`}
                   >
                     <IconComponent className="h-5 w-5" />
                   </div>
                 </div>
 
                 <Card
-                  className={`transition-all hover:shadow-md ${
-                    index === 0 ? "ring-2 ring-primary/20" : ""
-                  }`}
+                  className={`transition-all hover:shadow-md ${index === 0 ? "ring-2 ring-primary/20" : ""
+                    }`}
                 >
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between gap-2 flex-wrap">

@@ -870,6 +870,19 @@ const resources = {
           fix: "Bugfix",
         },
         entries: {
+          v180: {
+            title: "Rangliste, Ziele & Erholung aufgebohrt",
+            description:
+              "Neue Privatsphäre-Optionen in der Rangliste, bessere Weekly-Challenge/Weekly-Goals, Recovery-Kachel und frisches Dashboard-Layout.",
+            highlights: {
+              0: "Global-Ranglisten-Opt-in: Sichtbarkeit steuerbar, Warn-Dialog beim Deaktivieren.",
+              1: "Scoreboard: Dropdowns für Woche/Monat und Freunde/Global; Top 3 plus eigener Platz.",
+              2: "Wochenziele: Sit-ups-Ziel, Reset-Button, echte Wochenfortschritte statt 0-Werten.",
+              3: "Wochen-Challenge: persönliches Punkteziel wird genutzt, echte Wochenpunkte/Workouts, Icon oben rechts.",
+              4: "Recovery-Kachel: Erholungstagebuch-Metriken, Einträge & letzter Eintrag, Zeitraum-Umschalter.",
+              5: "Dashboard-Layout: Bento-Grid mit klarer Ordnung (Ziele links, Challenge/Monthly, Scoreboard+Recovery, Aktivitäten groß).",
+            },
+          },
           v170: {
             title: "Freunde einladen",
             description:
@@ -1942,6 +1955,11 @@ const resources = {
         and: "und der",
         privacyPolicy: "Datenschutzerklärung",
         to: "zu",
+        versionUpdateTitle: "Neue Version verfügbar",
+        versionUpdateDescription:
+          "Version {{version}} ist verfügbar. Schau dir den Changelog an.",
+        versionUpdateAction: "Changelog",
+        versionUpdateActionAlt: "Changelog öffnen",
       },
     },
   },
@@ -2795,6 +2813,19 @@ const resources = {
           fix: "Bugfix",
         },
         entries: {
+          v180: {
+            title: "Rankings, goals & recovery upgraded",
+            description:
+              "New privacy controls for the leaderboard, improved weekly challenge/goals, recovery card, and a refreshed dashboard layout.",
+            highlights: {
+              0: "Global leaderboard opt-in: control visibility, warning dialog when disabling.",
+              1: "Scoreboard: dropdowns for week/month and friends/global; top 3 plus your rank.",
+              2: "Weekly goals: sit-ups goal, reset button, real weekly progress instead of zeros.",
+              3: "Weekly challenge: uses personal points goal, real weekly points/workouts, settings icon top-right.",
+              4: "Recovery card: recovery diary metrics, entries & last entry, period switcher.",
+              5: "Dashboard layout: bento grid with clear order (goals left, challenge/monthly, scoreboard+recovery, activities large).",
+            },
+          },
           v170: {
             title: "Invite Friends",
             description:
@@ -3344,6 +3375,11 @@ const resources = {
         and: "and the",
         privacyPolicy: "Privacy Policy",
         to: "",
+        versionUpdateTitle: "New version available",
+        versionUpdateDescription:
+          "Version {{version}} is available. Check out the changelog.",
+        versionUpdateAction: "Changelog",
+        versionUpdateActionAlt: "Open changelog",
       },
       // Legal Pages
       legal: {

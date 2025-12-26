@@ -191,11 +191,6 @@
     @apply bg-background border-ring/50;
   }
 
-  /* Better dropdown menus */
-  .dark [data-radix-popper-content-wrapper] {
-    @apply backdrop-blur-md;
-  }
-
   /* Enhanced tooltips */
   .dark [data-tooltip] {
     @apply bg-popover/95 backdrop-blur-sm;

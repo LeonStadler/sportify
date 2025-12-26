@@ -185,12 +185,12 @@ export function DashboardLeaderboardCard({
 
   return (
     <Card className={cn("flex flex-col h-full", className)}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-lg font-medium flex items-center gap-2">
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-2 space-y-0 pb-2">
+        <CardTitle className="text-lg font-medium flex flex-wrap items-center gap-2">
           <Trophy className="h-5 w-5 text-yellow-500" />
           {t("scoreboard.title", "Rangliste")}
         </CardTitle>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 justify-start sm:justify-end w-full sm:w-auto">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-2">

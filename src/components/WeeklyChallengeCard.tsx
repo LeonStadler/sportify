@@ -181,8 +181,8 @@ export function WeeklyChallengeCard({
   return (
     <Card className={cn("h-full relative", className)}>
       <CardHeader className="space-y-2 relative pr-10">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="flex flex-wrap items-center gap-2 text-lg md:text-xl">
             <Flame className="h-5 w-5 text-orange-500" />
             {t("weeklyChallenge.title")}
           </CardTitle>

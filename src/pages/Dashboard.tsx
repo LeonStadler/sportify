@@ -621,7 +621,7 @@ export function Dashboard() {
 
       {/* Stats Grid - Mobile optimiert */}
       <div className="relative">
-        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+        <div className="grid grid-cols-1 2xs:grid-cols-2 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
           {cardConfigs.map((config) => renderStatCard(config))}
         </div>
         <Button
@@ -660,10 +660,10 @@ export function Dashboard() {
       />
 
       {/* Goals and Activity Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mt-6 md:mt-8 auto-rows-auto">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mt-6 md:mt-8 auto-rows-auto">
         {/* Wochenziele links, 1/3 Breite, doppelte Höhe */}
         <WeeklyGoalsCard
-          className="col-span-1 lg:col-span-1 lg:row-span-2"
+          className="col-span-1 md:col-span-1 lg:col-span-1 lg:row-span-2"
           goals={goals}
           progress={weeklyProgress}
           onOpenSettings={() => setGoalsDialogOpen(true)}
@@ -671,22 +671,22 @@ export function Dashboard() {
 
         {/* Wochen-Challenge oben rechts, 2/3 Breite */}
         <WeeklyChallengeCard
-          className="col-span-1 lg:col-span-2"
+          className="col-span-1 md:col-span-1 lg:col-span-2"
           userPointsGoal={goals.points.target}
           onOpenSettings={() => setPointsGoalDialogOpen(true)}
         />
 
         {/* Monthly Goal unterhalb der Weekly Challenge, ebenfalls 2/3 Breite */}
-        <MonthlyGoalCard className="col-span-1 lg:col-span-2" />
+        <MonthlyGoalCard className="col-span-1 md:col-span-1 lg:col-span-2" />
 
         {/* Aktivitäten von dir und Freunden: links, 2/3 Breite, doppelte Höhe */}
-        <ActivityFeed className="col-span-1 lg:col-span-2 lg:row-span-2 order-last lg:order-none" />
+        <ActivityFeed className="col-span-1 md:col-span-1 lg:col-span-2 lg:row-span-2 order-last lg:order-none" />
 
         {/* Scoreboard rechts oben, 1/3 Breite */}
-        <DashboardLeaderboardCard className="col-span-1 lg:col-span-1" />
+        <DashboardLeaderboardCard className="col-span-1 md:col-span-1 lg:col-span-1" />
 
         {/* Erholungstagebuch rechts unten, 1/3 Breite */}
-        <RecoveryJournalCard className="col-span-1 lg:col-span-1" />
+        <RecoveryJournalCard className="col-span-1 md:col-span-1 lg:col-span-1" />
       </div>
     </PageTemplate>
   );

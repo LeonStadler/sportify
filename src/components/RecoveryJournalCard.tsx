@@ -131,9 +131,9 @@ export function RecoveryJournalCard({ className }: { className?: string }) {
 
   return (
     <Card className={className}>
-      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
-        <div className="space-y-1.5">
-          <CardTitle className="text-lg md:text-xl flex items-center gap-2">
+      <CardHeader className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 space-y-0 pb-3">
+        <div className="space-y-1.5 min-w-0">
+          <CardTitle className="text-lg md:text-xl flex items-center gap-2 flex-wrap">
             <BarChart3 className="h-5 w-5 text-amber-500" />
             {t("recoveryDiary.title", "Erholungstagebuch")}
           </CardTitle>
@@ -157,28 +157,30 @@ export function RecoveryJournalCard({ className }: { className?: string }) {
             ) : null}
           </div>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-1">
-              <CalendarDays className="h-4 w-4" />
-              {periodLabel}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setPeriod("week")}>
-              {t("common.week", "Woche")}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setPeriod("month")}>
-              {t("common.month", "Monat")}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setPeriod("quarter")}>
-              {t("common.quarter", "Quartal")}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setPeriod("year")}>
-              {t("common.year", "Jahr")}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex flex-wrap items-center gap-2 justify-start md:justify-end">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1">
+                <CalendarDays className="h-4 w-4" />
+                {periodLabel}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setPeriod("week")}>
+                {t("common.week", "Woche")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setPeriod("month")}>
+                {t("common.month", "Monat")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setPeriod("quarter")}>
+                {t("common.quarter", "Quartal")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setPeriod("year")}>
+                {t("common.year", "Jahr")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {isLoading ? (

@@ -26,6 +26,7 @@ export const createProfileRouter = (pool) => {
         languagePreference,
         preferences,
         avatar,
+        showInGlobalRankings,
       } = req.body;
 
       if (!firstName || !lastName) {
@@ -43,11 +44,12 @@ export const createProfileRouter = (pool) => {
                     language_preference = $5,
                     preferences = $6,
                     avatar_url = $7,
+                    show_in_global_rankings = COALESCE($8, show_in_global_rankings),
                     updated_at = CURRENT_TIMESTAMP
-                WHERE id = $8
+                WHERE id = $9
                 RETURNING id, email, first_name, last_name, nickname, display_preference, avatar_url,
                          is_email_verified, has_2fa, language_preference, preferences, 
-                         created_at, last_login_at, role
+                         show_in_global_rankings, created_at, last_login_at, role
             `;
 
       const { rows } = await pool.query(updateQuery, [
@@ -62,6 +64,7 @@ export const createProfileRouter = (pool) => {
             ? avatar
             : JSON.stringify(avatar)
           : null,
+        showInGlobalRankings !== undefined ? showInGlobalRankings : null,
         req.user.id,
       ]);
 

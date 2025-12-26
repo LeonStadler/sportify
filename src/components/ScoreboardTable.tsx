@@ -28,12 +28,14 @@ interface ScoreboardTableProps {
   activity: string;
   period: string;
   dateRange?: DateRange;
+  scope: string;
 }
 
 export function ScoreboardTable({
   activity,
   period,
   dateRange,
+  scope,
 }: ScoreboardTableProps) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -73,7 +75,7 @@ export function ScoreboardTable({
         url += `activity/${activity}`;
       }
 
-      const params = new URLSearchParams({ period });
+      const params = new URLSearchParams({ period, scope });
       if (dateRange?.from && dateRange?.to) {
         params.set("start", toDateParam(dateRange.from));
         params.set("end", toDateParam(dateRange.to));
@@ -97,7 +99,7 @@ export function ScoreboardTable({
     } finally {
       setIsLoading(false);
     }
-  }, [activity, dateRange?.from, dateRange?.to, period, t]);
+  }, [activity, dateRange?.from, dateRange?.to, period, scope, t]);
 
   useEffect(() => {
     fetchLeaderboard();
@@ -194,14 +196,14 @@ export function ScoreboardTable({
               {activity === "all" && (
                 <div className="flex flex-wrap gap-2 mt-1">
                   <Badge variant="outline" className="text-xs">
-                    {t("scoreboard.stats.pullups")}: {player.totalPullups || 0}
+                    {t("scoreboard.stats.pullups", "Klimmzüge")}: {player.totalPullups || 0}
                   </Badge>
                   <Badge variant="outline" className="text-xs">
-                    {t("scoreboard.stats.pushups")}: {player.totalPushups || 0}
+                    {t("scoreboard.stats.pushups", "Liegestütze")}: {player.totalPushups || 0}
                   </Badge>
                   <Badge variant="outline" className="text-xs">
-                    {t("scoreboard.stats.running")}: {player.totalRunning || 0}{" "}
-                    {t("scoreboard.units.kilometers")}
+                    {t("scoreboard.stats.running", "Laufen")}: {player.totalRunning || 0}{" "}
+                    {t("scoreboard.units.kilometers", "km")}
                   </Badge>
                 </div>
               )}

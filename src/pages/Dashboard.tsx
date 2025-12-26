@@ -1,16 +1,20 @@
 import { ActivityFeed } from "@/components/ActivityFeed";
+import { DashboardLeaderboardCard } from "@/components/DashboardLeaderboardCard";
 import {
   DashboardSettingsDialog,
   StatCardConfig,
 } from "@/components/DashboardSettingsDialog";
 import { MonthlyGoalCard } from "@/components/MonthlyGoalCard";
 import { PageTemplate } from "@/components/PageTemplate";
+import { RecoveryJournalCard } from "@/components/RecoveryJournalCard";
 import { StatCard } from "@/components/StatCard";
 import { WeeklyChallengeCard } from "@/components/WeeklyChallengeCard";
-import { WeeklyGoals, WeeklyGoalsDialog } from "@/components/WeeklyGoalsDialog";
+import { WeeklyGoalsCard, WeeklyProgress } from "@/components/WeeklyGoalsCard";
+import { WeeklyGoalsDialog } from "@/components/WeeklyGoalsDialog";
+import { WeeklyGoals } from "@/components/WeeklyGoalsForm";
+import { WeeklyPointsGoalDialog } from "@/components/WeeklyPointsGoalDialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { Card, CardContent } from "@/components/ui/card";
 import { DEFAULT_WEEKLY_POINTS_GOAL } from "@/config/events";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -51,20 +55,8 @@ interface RecentWorkout {
 
 const DEFAULT_CARDS: StatCardConfig[] = [
   { id: "1", type: "points", period: "week", color: "orange" },
-  {
-    id: "2",
-    type: "activity",
-    period: "week",
-    activityType: "pullups",
-    color: "blue",
-  },
-  {
-    id: "3",
-    type: "activity",
-    period: "week",
-    activityType: "running",
-    color: "green",
-  },
+  { id: "2", type: "activity", period: "week", activityType: "pullups", color: "blue" },
+  { id: "3", type: "activity", period: "week", activityType: "running", color: "green" },
   { id: "4", type: "rank", period: "week", color: "purple" },
 ];
 
@@ -75,6 +67,7 @@ export function Dashboard() {
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [goalsDialogOpen, setGoalsDialogOpen] = useState(false);
+  const [pointsGoalDialogOpen, setPointsGoalDialogOpen] = useState(false);
   const [cardConfigs, setCardConfigs] = useState<StatCardConfig[]>(() => {
     const saved = localStorage.getItem("dashboard-card-configs");
     if (saved) {
@@ -108,19 +101,29 @@ export function Dashboard() {
     },
   });
 
-  const [goals, setGoals] = useState<WeeklyGoals>({
+  const defaultGoals: WeeklyGoals = {
     pullups: { target: 100, current: 0 },
     pushups: { target: 400, current: 0 },
+    situps: { target: 200, current: 0 },
     running: { target: 25, current: 0 },
     cycling: { target: 100, current: 0 },
     points: { target: DEFAULT_WEEKLY_POINTS_GOAL, current: 0 },
-  });
+  };
+
+  const [goals, setGoals] = useState<WeeklyGoals>(defaultGoals);
 
   const [recentWorkouts, setRecentWorkouts] = useState<RecentWorkout[]>([]);
   const [recentWorkoutsError, setRecentWorkoutsError] = useState<string | null>(
     null
   );
   const [isLoading, setIsLoading] = useState(true);
+  const [weeklyProgress, setWeeklyProgress] = useState<WeeklyProgress>({
+    pullups: 0,
+    pushups: 0,
+    situps: 0,
+    running: 0,
+    cycling: 0,
+  });
 
   const loadStats = async (
     token: string,
@@ -165,6 +168,24 @@ export function Dashboard() {
       // Set default stats (week)
       if (statsMap["week"]) {
         setStats(statsMap["week"]);
+        const w = statsMap["week"].activities;
+        setWeeklyProgress({
+          pullups: w.pullups?.period ?? 0,
+          pushups: w.pushups?.period ?? 0,
+          situps: w.situps?.period ?? 0,
+          running: w.running?.period ?? 0,
+          cycling: w.cycling?.period ?? 0,
+        });
+      } else {
+        // fallback auf aktuelle stats falls week nicht geladen
+        const w = stats.activities;
+        setWeeklyProgress({
+          pullups: w.pullups?.period ?? 0,
+          pushups: w.pushups?.period ?? 0,
+          situps: w.situps?.period ?? 0,
+          running: w.running?.period ?? 0,
+          cycling: w.cycling?.period ?? 0,
+        });
       }
     } catch (error) {
       console.error("Error loading stats for cards:", error);
@@ -178,11 +199,32 @@ export function Dashboard() {
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const data = (await response.json()) || {};
         setGoals((prev) => ({
-          ...prev,
-          ...data,
-          points: data.points ?? prev.points,
+          pullups: {
+            target: data.pullups?.target ?? prev.pullups?.target ?? defaultGoals.pullups.target,
+            current: data.pullups?.current ?? prev.pullups?.current ?? 0,
+          },
+          pushups: {
+            target: data.pushups?.target ?? prev.pushups?.target ?? defaultGoals.pushups.target,
+            current: data.pushups?.current ?? prev.pushups?.current ?? 0,
+          },
+          situps: {
+            target: data.situps?.target ?? prev.situps?.target ?? defaultGoals.situps.target,
+            current: data.situps?.current ?? prev.situps?.current ?? 0,
+          },
+          running: {
+            target: data.running?.target ?? prev.running?.target ?? defaultGoals.running.target,
+            current: data.running?.current ?? prev.running?.current ?? 0,
+          },
+          cycling: {
+            target: data.cycling?.target ?? prev.cycling?.target ?? defaultGoals.cycling.target,
+            current: data.cycling?.current ?? prev.cycling?.current ?? 0,
+          },
+          points: {
+            target: data.points?.target ?? prev.points?.target ?? defaultGoals.points.target,
+            current: data.points?.current ?? prev.points?.current ?? 0,
+          },
         }));
       }
     } catch (error) {
@@ -412,8 +454,33 @@ export function Dashboard() {
         throw new Error(errorData.error || t("dashboard.saveGoalsError"));
       }
 
-      const updatedGoals = await response.json();
-      setGoals(updatedGoals);
+      const updatedGoals = (await response.json()) || {};
+      setGoals((prev) => ({
+        pullups: {
+          target: updatedGoals.pullups?.target ?? newGoals.pullups?.target ?? defaultGoals.pullups.target,
+          current: updatedGoals.pullups?.current ?? newGoals.pullups?.current ?? prev.pullups?.current ?? 0,
+        },
+        pushups: {
+          target: updatedGoals.pushups?.target ?? newGoals.pushups?.target ?? defaultGoals.pushups.target,
+          current: updatedGoals.pushups?.current ?? newGoals.pushups?.current ?? prev.pushups?.current ?? 0,
+        },
+        situps: {
+          target: updatedGoals.situps?.target ?? newGoals.situps?.target ?? defaultGoals.situps.target,
+          current: updatedGoals.situps?.current ?? newGoals.situps?.current ?? prev.situps?.current ?? 0,
+        },
+        running: {
+          target: updatedGoals.running?.target ?? newGoals.running?.target ?? defaultGoals.running.target,
+          current: updatedGoals.running?.current ?? newGoals.running?.current ?? prev.running?.current ?? 0,
+        },
+        cycling: {
+          target: updatedGoals.cycling?.target ?? newGoals.cycling?.target ?? defaultGoals.cycling.target,
+          current: updatedGoals.cycling?.current ?? newGoals.cycling?.current ?? prev.cycling?.current ?? 0,
+        },
+        points: {
+          target: updatedGoals.points?.target ?? newGoals.points?.target ?? defaultGoals.points.target,
+          current: updatedGoals.points?.current ?? newGoals.points?.current ?? prev.points?.current ?? 0,
+        },
+      }));
       toast({
         title: t("weeklyGoals.saved", "Wochenziele gespeichert"),
         description: t(
@@ -435,6 +502,13 @@ export function Dashboard() {
       });
       throw error;
     }
+  };
+
+  const handleSavePointsGoal = async (points: number) => {
+    await handleSaveGoals({
+      ...goals,
+      points: { ...goals.points, target: points },
+    });
   };
 
   const getPeriodLabel = (period: string) => {
@@ -578,124 +652,41 @@ export function Dashboard() {
         onSave={handleSaveGoals}
       />
 
+      <WeeklyPointsGoalDialog
+        open={pointsGoalDialogOpen}
+        onOpenChange={setPointsGoalDialogOpen}
+        currentGoal={goals.points.target}
+        onSave={handleSavePointsGoal}
+      />
+
       {/* Goals and Activity Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6 mt-6 md:mt-8">
-        <Card className="relative xl:col-span-1 xl:row-start-2 xl:col-start-1">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg md:text-xl">
-              {t("dashboard.weeklyGoals")}
-            </CardTitle>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute -top-2 right-0"
-              onClick={() => setGoalsDialogOpen(true)}
-              title={t("weeklyGoals.dialog.title", "Wochenziele einstellen")}
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span>
-                  {t("dashboard.pullups")} ({t("dashboard.goal")}:{" "}
-                  {goals.pullups.target})
-                </span>
-                <span className="font-medium">
-                  {goals.pullups.current}/{goals.pullups.target}
-                </span>
-              </div>
-              <Progress
-                value={Math.min(
-                  (goals.pullups.current / goals.pullups.target) * 100,
-                  100
-                )}
-                className="h-2"
-              />
-            </div>
-            <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span>
-                  {t("dashboard.pushups")} ({t("dashboard.goal")}:{" "}
-                  {goals.pushups.target})
-                </span>
-                <span className="font-medium">
-                  {goals.pushups.current}/{goals.pushups.target}
-                </span>
-              </div>
-              <Progress
-                value={Math.min(
-                  (goals.pushups.current / goals.pushups.target) * 100,
-                  100
-                )}
-                className="h-2"
-              />
-            </div>
-            <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span>
-                  {t("dashboard.running")} ({t("dashboard.goal")}:{" "}
-                  {goals.running.target} km)
-                </span>
-                <span className="font-medium">
-                  {goals.running.current}/{goals.running.target} km
-                </span>
-              </div>
-              <Progress
-                value={Math.min(
-                  (goals.running.current / goals.running.target) * 100,
-                  100
-                )}
-                className="h-2"
-              />
-            </div>
-            <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span>
-                  {t("dashboard.cycling")} ({t("dashboard.goal")}:{" "}
-                  {goals.cycling.target} km)
-                </span>
-                <span className="font-medium">
-                  {goals.cycling.current}/{goals.cycling.target} km
-                </span>
-              </div>
-              <Progress
-                value={Math.min(
-                  (goals.cycling.current / goals.cycling.target) * 100,
-                  100
-                )}
-                className="h-2"
-              />
-            </div>
-            <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span>
-                  {t("weeklyGoals.dialog.pointsLabel", "Punkte-Ziel")} ({t(
-                    "dashboard.goal",
-                    "Ziel"
-                  )}
-                  : {goals.points.target})
-                </span>
-                <span className="font-medium">
-                  {goals.points.current}/{goals.points.target}
-                </span>
-              </div>
-              <Progress
-                value={Math.min(
-                  goals.points.target > 0
-                    ? (goals.points.current / goals.points.target) * 100
-                    : 0,
-                  100
-                )}
-                className="h-2"
-              />
-            </div>
-          </CardContent>
-        </Card>
-        <WeeklyChallengeCard className="xl:col-span-2 xl:row-start-1 xl:col-start-1" />
-        <MonthlyGoalCard className="xl:col-span-1 xl:row-start-1 xl:col-start-3" />
-        <ActivityFeed className="xl:col-span-2 xl:row-start-2 xl:col-start-2" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mt-6 md:mt-8 auto-rows-auto">
+        {/* Wochenziele links, 1/3 Breite, doppelte Höhe */}
+        <WeeklyGoalsCard
+          className="col-span-1 lg:col-span-1 lg:row-span-2"
+          goals={goals}
+          progress={weeklyProgress}
+          onOpenSettings={() => setGoalsDialogOpen(true)}
+        />
+
+        {/* Wochen-Challenge oben rechts, 2/3 Breite */}
+        <WeeklyChallengeCard
+          className="col-span-1 lg:col-span-2"
+          userPointsGoal={goals.points.target}
+          onOpenSettings={() => setPointsGoalDialogOpen(true)}
+        />
+
+        {/* Monthly Goal unterhalb der Weekly Challenge, ebenfalls 2/3 Breite */}
+        <MonthlyGoalCard className="col-span-1 lg:col-span-2" />
+
+        {/* Aktivitäten von dir und Freunden: links, 2/3 Breite, doppelte Höhe */}
+        <ActivityFeed className="col-span-1 lg:col-span-2 lg:row-span-2 order-last lg:order-none" />
+
+        {/* Scoreboard rechts oben, 1/3 Breite */}
+        <DashboardLeaderboardCard className="col-span-1 lg:col-span-1" />
+
+        {/* Erholungstagebuch rechts unten, 1/3 Breite */}
+        <RecoveryJournalCard className="col-span-1 lg:col-span-1" />
       </div>
     </PageTemplate>
   );

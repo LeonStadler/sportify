@@ -8,9 +8,15 @@ export const createScoreboardRouter = (pool) => {
   // GET /api/scoreboard/overall - Overall leaderboard
   router.get("/overall", authMiddleware, async (req, res) => {
     try {
-      const { period = "all", start: startDate, end: endDate } = req.query;
+      const {
+        period = "all",
+        start: startDate,
+        end: endDate,
+        scope = "friends",
+      } = req.query;
       let dateFilter = "";
       const params = [];
+      let paramIndex = 1;
 
       const parseDate = (value) => {
         if (!value) return null;
@@ -25,7 +31,8 @@ export const createScoreboardRouter = (pool) => {
       if (hasExplicitRange) {
         const [from, to] = start <= end ? [start, end] : [end, start];
         params.push(from, to);
-        dateFilter = `AND w.start_time >= $1 AND w.start_time < $2::date + INTERVAL '1 day'`;
+        dateFilter = `AND w.start_time >= $${paramIndex} AND w.start_time < $${paramIndex + 1}::date + INTERVAL '1 day'`;
+        paramIndex += 2;
       } else if (period === "week") {
         dateFilter = `AND w.start_time >= NOW() - INTERVAL '7 days'`;
       } else if (period === "month") {
@@ -34,6 +41,29 @@ export const createScoreboardRouter = (pool) => {
         dateFilter = `AND w.start_time >= NOW() - INTERVAL '365 days'`;
       } else if (period === "custom") {
         return res.status(400).json({ error: "Ungültiger Zeitraum" });
+      }
+
+      let scopeFilter = "";
+      // Scope filter logic
+      if (scope === "friends") {
+        params.push(req.user.id);
+        const userParamIndex = paramIndex;
+        paramIndex++; // Increment for next param if any
+        scopeFilter = `
+          AND (
+            u.id = $${userParamIndex} OR
+            EXISTS (
+              SELECT 1 FROM friendships f
+              WHERE f.status = 'accepted' AND (
+                (f.requester_id = $${userParamIndex} AND f.addressee_id = u.id) OR
+                (f.requester_id = u.id AND f.addressee_id = $${userParamIndex})
+              )
+            )
+          )
+        `;
+      } else {
+        // Global scope: only show users who opted in
+        scopeFilter = "AND u.show_in_global_rankings = true";
       }
 
       const query = `
@@ -50,6 +80,7 @@ export const createScoreboardRouter = (pool) => {
                 FROM users u
                 LEFT JOIN workouts w ON u.id = w.user_id ${dateFilter}
                 LEFT JOIN workout_activities wa ON w.id = wa.workout_id
+                WHERE 1=1 ${scopeFilter}
                 GROUP BY u.id, u.first_name, u.last_name, u.nickname, u.display_preference, u.avatar_url
                 HAVING COALESCE(SUM(wa.points_earned), 0) > 0
                 ORDER BY total_points DESC
@@ -88,7 +119,12 @@ export const createScoreboardRouter = (pool) => {
   router.get("/activity/:activity", authMiddleware, async (req, res) => {
     try {
       const { activity } = req.params;
-      const { period = "all", start: startDate, end: endDate } = req.query;
+      const {
+        period = "all",
+        start: startDate,
+        end: endDate,
+        scope = "friends",
+      } = req.query;
 
       const validActivities = [
         "pullups",
@@ -130,6 +166,27 @@ export const createScoreboardRouter = (pool) => {
         return res.status(400).json({ error: "Ungültiger Zeitraum" });
       }
 
+      let scopeFilter = "";
+      if (scope === "friends") {
+        params.push(req.user.id);
+        const userParamIndex = paramIndex;
+        paramIndex++;
+        scopeFilter = `
+          AND (
+            u.id = $${userParamIndex} OR
+            EXISTS (
+              SELECT 1 FROM friendships f
+              WHERE f.status = 'accepted' AND (
+                (f.requester_id = $${userParamIndex} AND f.addressee_id = u.id) OR
+                (f.requester_id = u.id AND f.addressee_id = $${userParamIndex})
+              )
+            )
+          )
+        `;
+      } else {
+        scopeFilter = "AND u.show_in_global_rankings = true";
+      }
+
       const query = `
                 SELECT
                     u.id,
@@ -140,6 +197,7 @@ export const createScoreboardRouter = (pool) => {
                 FROM users u
                 LEFT JOIN workouts w ON u.id = w.user_id ${dateFilter}
                 LEFT JOIN workout_activities wa ON w.id = wa.workout_id AND wa.activity_type = $1
+                WHERE 1=1 ${scopeFilter}
                 GROUP BY u.id, u.first_name, u.last_name, u.nickname, u.display_preference, u.avatar_url
                 HAVING COALESCE(SUM(wa.points_earned), 0) > 0
                 ORDER BY total_points DESC

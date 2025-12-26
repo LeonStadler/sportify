@@ -140,3 +140,36 @@ export const computeDirectLeaderboard = (userPointsMap, friendGraph) => {
 
     return results;
 };
+
+/**
+ * Berechnet Rankings für eine Liste von Benutzern basierend auf einer Metrik.
+ * @param {Array} users Liste der Benutzerobjekte
+ * @param {Function} metricFn Funktion zum Extrahieren des Wertes (z.B. user => user.totalPoints)
+ */
+export const computeRankingForGroup = (users, metricFn) => {
+    // Filtern nach Benutzern mit Wert > 0, um Rauschen zu vermeiden (optional, aber sinnvoll für Leaderboards)
+    // Wir behalten alle, sortieren aber Nullen nach unten.
+    const withMetrics = users.map(user => ({
+        userId: user.userId,
+        value: metricFn(user)
+    }));
+
+    // Sortieren: Höchster Wert zuerst
+    withMetrics.sort((a, b) => {
+        if (b.value === a.value) return a.userId.localeCompare(b.userId);
+        return b.value - a.value;
+    });
+
+    const rankMap = new Map();
+    withMetrics.forEach((entry, index) => {
+        // Rang ist index + 1
+        // Bei gleichen Werten könnte man den gleichen Rang vergeben, hier vereinfacht strikt
+        rankMap.set(entry.userId, {
+            rank: index + 1,
+            value: entry.value,
+            totalParticipants: withMetrics.length
+        });
+    });
+
+    return rankMap;
+};

@@ -7,21 +7,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { DEFAULT_WEEKLY_POINTS_GOAL } from "@/config/events";
 import { Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-
-export interface WeeklyGoals {
-  pullups: { target: number; current: number };
-  pushups: { target: number; current: number };
-  running: { target: number; current: number };
-  cycling: { target: number; current: number };
-  points: { target: number; current: number };
-}
+import { WeeklyGoals, WeeklyGoalsForm } from "./WeeklyGoalsForm";
 
 interface WeeklyGoalsDialogProps {
   open: boolean;
@@ -29,6 +20,8 @@ interface WeeklyGoalsDialogProps {
   goals: WeeklyGoals;
   onSave: (goals: WeeklyGoals) => Promise<void>;
 }
+
+export type { WeeklyGoals };
 
 export function WeeklyGoalsDialog({
   open,
@@ -38,8 +31,20 @@ export function WeeklyGoalsDialog({
 }: WeeklyGoalsDialogProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const defaultGoals: WeeklyGoals = {
+    pullups: { target: 100, current: goals.pullups?.current ?? 0 },
+    pushups: { target: 400, current: goals.pushups?.current ?? 0 },
+    situps: { target: 200, current: goals.situps?.current ?? 0 },
+    running: { target: 25, current: goals.running?.current ?? 0 },
+    cycling: { target: 100, current: goals.cycling?.current ?? 0 },
+    points: {
+      target: DEFAULT_WEEKLY_POINTS_GOAL,
+      current: goals.points?.current ?? 0,
+    },
+  };
   const [localGoals, setLocalGoals] = useState<WeeklyGoals>({
     ...goals,
+    situps: goals.situps ?? { target: 0, current: 0 },
     points: goals.points ?? { target: DEFAULT_WEEKLY_POINTS_GOAL, current: 0 },
   });
   const [isSaving, setIsSaving] = useState(false);
@@ -47,6 +52,7 @@ export function WeeklyGoalsDialog({
   useEffect(() => {
     setLocalGoals({
       ...goals,
+      situps: goals.situps ?? { target: 0, current: 0 },
       points: goals.points ?? { target: DEFAULT_WEEKLY_POINTS_GOAL, current: 0 },
     });
   }, [goals, open]);
@@ -56,6 +62,10 @@ export function WeeklyGoalsDialog({
       ...prev,
       [activity]: { ...prev[activity], target: Math.max(0, target) },
     }));
+  };
+
+  const handleReset = () => {
+    setLocalGoals(defaultGoals);
   };
 
   const handleSave = async () => {
@@ -81,42 +91,9 @@ export function WeeklyGoalsDialog({
     }
   };
 
-  const activities = [
-    {
-      key: "points" as const,
-      label: t("weeklyGoals.dialog.pointsLabel", "Punkte-Ziel"),
-      unit: t("weeklyGoals.dialog.pointsUnit", "Punkte"),
-      getPlaceholder: () => DEFAULT_WEEKLY_POINTS_GOAL.toString(),
-    },
-    {
-      key: "pullups" as const,
-      label: t("dashboard.pullups", "Klimmzüge"),
-      unit: "",
-      getPlaceholder: () => "100",
-    },
-    {
-      key: "pushups" as const,
-      label: t("dashboard.pushups", "Liegestütze"),
-      unit: "",
-      getPlaceholder: () => "400",
-    },
-    {
-      key: "running" as const,
-      label: t("dashboard.running", "Laufen"),
-      unit: "km",
-      getPlaceholder: () => "25",
-    },
-    {
-      key: "cycling" as const,
-      label: t("dashboard.cycling", "Radfahren"),
-      unit: "km",
-      getPlaceholder: () => "100",
-    },
-  ];
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
@@ -130,47 +107,7 @@ export function WeeklyGoalsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
-          {activities.map((activity) => (
-            <div
-              key={activity.key}
-              className="p-4 border rounded-lg space-y-2 bg-muted/30"
-            >
-              <Label
-                htmlFor={`goal-${activity.key}`}
-                className="text-base font-semibold"
-              >
-                {activity.label}
-                {activity.unit && ` (${activity.unit})`}
-              </Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id={`goal-${activity.key}`}
-                  type="number"
-                  min="0"
-                  step={activity.unit === "km" ? "0.1" : "1"}
-                  value={localGoals[activity.key]?.target ?? ""}
-                  onChange={(e) => {
-                    const value = parseFloat(e.target.value);
-                    updateGoal(activity.key, isNaN(value) ? 0 : value);
-                  }}
-                  placeholder={activity.getPlaceholder()}
-                  className="flex-1"
-                />
-                {activity.unit && (
-                  <span className="text-sm text-muted-foreground min-w-[2rem]">
-                    {activity.unit}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {t("weeklyGoals.dialog.current", "Aktuell")}:{" "}
-                {localGoals[activity.key].current}{" "}
-                {activity.unit && activity.unit}
-              </p>
-            </div>
-          ))}
-        </div>
+        <WeeklyGoalsForm goals={localGoals} onChange={updateGoal} />
 
         <DialogFooter>
           <Button
@@ -179,6 +116,13 @@ export function WeeklyGoalsDialog({
             disabled={isSaving}
           >
             {t("common.cancel", "Abbrechen")}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={handleReset}
+            disabled={isSaving}
+          >
+            {t("common.reset", "Zurücksetzen")}
           </Button>
           <Button onClick={handleSave} disabled={isSaving}>
             {isSaving
@@ -190,3 +134,4 @@ export function WeeklyGoalsDialog({
     </Dialog>
   );
 }
+

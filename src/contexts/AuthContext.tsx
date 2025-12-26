@@ -20,6 +20,7 @@ export interface User {
   passwordChangedAt?: string;
   backupCodesCreatedAt?: string;
   role: "user" | "admin";
+  showInGlobalRankings?: boolean;
   preferences: {
     timeFormat: "12h" | "24h";
     units: {

@@ -28,6 +28,7 @@ export const getOverviewStats = async (pool, userId, requestedPeriod) => {
             COALESCE(SUM(CASE WHEN wa.activity_type = 'pushups' THEN wa.quantity ELSE 0 END), 0) as period_pushups,
             COALESCE(SUM(CASE WHEN wa.activity_type = 'running' THEN wa.quantity ELSE 0 END), 0) as period_running,
             COALESCE(SUM(CASE WHEN wa.activity_type = 'cycling' THEN wa.quantity ELSE 0 END), 0) as period_cycling,
+            COALESCE(SUM(CASE WHEN wa.activity_type = 'situps' THEN wa.quantity ELSE 0 END), 0) as period_situps,
             COUNT(DISTINCT w.id) as period_workouts
         FROM workouts w
         LEFT JOIN workout_activities wa ON w.id = wa.workout_id
@@ -84,6 +85,10 @@ export const getOverviewStats = async (pool, userId, requestedPeriod) => {
             pushups: {
                 total: toNumber(totalStats.totalPushups),
                 period: toNumber(periodStats.periodPushups)
+            },
+            situps: {
+                total: toNumber(totalStats.totalSitups),
+                period: toNumber(periodStats.periodSitups)
             },
             running: {
                 total: toNumber(totalStats.totalRunning),

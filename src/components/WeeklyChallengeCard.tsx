@@ -1,15 +1,12 @@
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { WEEKLY_CHALLENGE_POINTS_TARGET } from "@/config/events";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
-import { parseAvatarConfig } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
-import { WEEKLY_CHALLENGE_POINTS_TARGET } from "@/config/events";
 import type {
-  WeeklyChallengeLeaderboardEntry,
   WeeklyChallengeResponse,
 } from "@/types/challenges";
 import { format } from "date-fns";
@@ -17,142 +14,33 @@ import { de, enUS } from "date-fns/locale";
 import { Flame, ShieldCheck, Target } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import NiceAvatar from "react-nice-avatar";
 
 import { Skeleton } from "./ui/skeleton";
 
-interface BackendFriend {
-  id: string;
-  displayName?: string;
-  display_name?: string;
-  firstName?: string;
-  first_name?: string;
-  lastName?: string;
-  last_name?: string;
-  avatarUrl?: string;
-  avatar_url?: string;
-}
-
-interface Friend {
-  id: string;
-  displayName: string;
-  avatarUrl?: string | null;
-}
+import { Button } from "@/components/ui/button";
+import { Settings } from "lucide-react";
 
 interface WeeklyChallengeCardProps {
   className?: string;
+  userPointsGoal?: number;
+  onOpenSettings?: () => void;
 }
 
-const getAvatarFallback = (name: string) => {
-  const initials = name
-    .split(" ")
-    .map((part) => part.trim()[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-
-  return initials || "S";
-};
-
-export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
+export function WeeklyChallengeCard({
+  className,
+  userPointsGoal,
+  onOpenSettings,
+}: WeeklyChallengeCardProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const { t, i18n } = useTranslation();
   const [data, setData] = useState<WeeklyChallengeResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [friends, setFriends] = useState<Friend[]>([]);
-  const [friendsError, setFriendsError] = useState<string | null>(null);
 
   const locale = useMemo(
     () => (i18n.language === "en" ? enUS : de),
     [i18n.language]
   );
-  const numberLocale = i18n.language === "en" ? "en-US" : "de-DE";
-
-  const visibleLeaderboard = useMemo(() => {
-    if (!data || !user) {
-      return [] as WeeklyChallengeLeaderboardEntry[];
-    }
-
-    // Erstelle Set von Freunde-IDs inklusive eigener ID
-    const friendIds = new Set([user.id, ...friends.map((f) => f.id)]);
-
-    // Filtere Leaderboard nach Freunden (sich selbst + Freunde)
-    const friendsLeaderboard = data.leaderboard
-      .filter((entry) => friendIds.has(entry.id))
-      .sort((a, b) => {
-        // Sortiere nach Punkten (absteigend), dann nach Rank
-        if (b.totalPoints !== a.totalPoints) {
-          return b.totalPoints - a.totalPoints;
-        }
-        return a.rank - b.rank;
-      });
-
-    return friendsLeaderboard;
-  }, [data, friends, user]);
-
-  useEffect(() => {
-    if (!user) {
-      setFriends([]);
-      setFriendsError(null);
-      return;
-    }
-
-    const loadFriends = async () => {
-      try {
-        setFriendsError(null);
-        const token = localStorage.getItem("token");
-        if (!token) return;
-
-        const response = await fetch(`${API_URL}/friends`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!response.ok) {
-          const errorMessage = t("weeklyChallenge.errorLoadingFriends");
-          setFriendsError(errorMessage);
-          setFriends([]);
-          toast({
-            title: t("common.error"),
-            description: errorMessage,
-            variant: "destructive",
-          });
-          return;
-        }
-
-        const data = await response.json();
-        if (Array.isArray(data)) {
-          setFriends(
-            data.map((friend: BackendFriend) => ({
-              id: friend.id,
-              displayName:
-                friend.displayName ||
-                friend.display_name ||
-                `${friend.firstName || friend.first_name || ""} ${friend.lastName || friend.last_name || ""}`,
-              avatarUrl: friend.avatarUrl || friend.avatar_url,
-            }))
-          );
-        } else {
-          setFriends([]);
-        }
-      } catch (error) {
-        console.error("Error loading friends:", error);
-        const errorMessage = t("weeklyChallenge.errorLoadingFriends");
-        setFriendsError(errorMessage);
-        setFriends([]);
-        toast({
-          title: t("common.error"),
-          description: errorMessage,
-          variant: "destructive",
-        });
-      }
-    };
-
-    loadFriends();
-  }, [user, toast, t]);
 
   useEffect(() => {
     if (!user) {
@@ -277,8 +165,12 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
   }
 
   const formattedRange = `${format(new Date(data.week.start), "PPP", { locale })} – ${format(new Date(data.week.end), "PPP", { locale })}`;
-  const pointsTarget = data?.targets?.points ?? WEEKLY_CHALLENGE_POINTS_TARGET;
-  const normalizedPointsTarget = pointsTarget > 0 ? pointsTarget : WEEKLY_CHALLENGE_POINTS_TARGET;
+
+  // Use user goal if set and > 0, otherwise fallback to API target
+  const apiTarget = data?.targets?.points ?? WEEKLY_CHALLENGE_POINTS_TARGET;
+  const normalizedPointsTarget =
+    userPointsGoal && userPointsGoal > 0 ? userPointsGoal : apiTarget > 0 ? apiTarget : WEEKLY_CHALLENGE_POINTS_TARGET;
+
   const challengeCompleted =
     normalizedPointsTarget > 0 &&
     data.progress.totalPoints >= normalizedPointsTarget;
@@ -287,8 +179,8 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
     : 0;
 
   return (
-    <Card className={cn("h-full", className)}>
-      <CardHeader className="space-y-2">
+    <Card className={cn("h-full relative", className)}>
+      <CardHeader className="space-y-2 relative pr-10">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
             <Flame className="h-5 w-5 text-orange-500" />
@@ -296,7 +188,7 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
           </CardTitle>
           <Badge
             variant={challengeCompleted ? "default" : "secondary"}
-            className="flex items-center gap-1"
+            className="flex items-center mr-4 gap-1"
           >
             {challengeCompleted ? (
               <>
@@ -314,6 +206,17 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
             )}
           </Badge>
         </div>
+        {onOpenSettings && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute -top-2 right-0"
+            onClick={onOpenSettings}
+            title={t("weeklyGoals.pointsTitle", "Wochenziel festlegen")}
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+        )}
         <p className="text-sm text-muted-foreground">{formattedRange}</p>
         <div className="flex flex-wrap items-center gap-4 text-sm">
           <span className="font-medium">
@@ -355,99 +258,21 @@ export function WeeklyChallengeCard({ className }: WeeklyChallengeCardProps) {
           />
         </div>
 
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">
-              {t("weeklyChallenge.leaderboard")}
-            </h3>
-            {challengeCompleted ? (
-              <Badge
-                variant="outline"
-                className="bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
-              >
-                <ShieldCheck className="mr-1 h-4 w-4" />
-                {t("weeklyChallenge.bonusPointsSecured")}
-              </Badge>
-            ) : (
-              <span className="text-xs text-muted-foreground">
-                {t("weeklyChallenge.collectPoints")}
-              </span>
-            )}
-          </div>
-
-          {friendsError && (
-            <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive dark:bg-destructive/20">
-              {friendsError}
+        {challengeCompleted && (
+          <div className="flex items-center justify-center p-4 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
+            <div className="flex flex-col items-center gap-2 text-center">
+              <ShieldCheck className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
+              <div>
+                <p className="font-semibold text-emerald-700 dark:text-emerald-300">
+                  {t("weeklyChallenge.completedTitle", "Challenge geschafft!")}
+                </p>
+                <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80">
+                  {t("weeklyChallenge.bonusPointsSecured", "Du hast dir die Bonuspunkte gesichert.")}
+                </p>
+              </div>
             </div>
-          )}
-
-          <div className="space-y-2">
-            {visibleLeaderboard.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                {friends.length === 0
-                  ? t("weeklyChallenge.noFriendsYet")
-                  : t("weeklyChallenge.noActivitiesYet")}
-              </p>
-            ) : (
-              visibleLeaderboard.map(
-                (entry: WeeklyChallengeLeaderboardEntry) => (
-                  <div
-                    key={entry.id}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg border p-3 transition-colors",
-                      entry.isCurrentUser
-                        ? "bg-primary/10 dark:bg-primary/20 border-primary/30 dark:border-primary/40"
-                        : "bg-card border-border/50 hover:bg-accent/50"
-                    )}
-                  >
-                    <Badge
-                      variant="secondary"
-                      className={cn(
-                        "w-10 justify-center font-semibold shrink-0",
-                        entry.isCurrentUser &&
-                          "bg-primary/20 dark:bg-primary/30 text-primary"
-                      )}
-                    >
-                      #{entry.rank}
-                    </Badge>
-                    <Avatar className="h-10 w-10 shrink-0">
-                      {entry.avatarUrl && parseAvatarConfig(entry.avatarUrl) ? (
-                        <NiceAvatar
-                          style={{ width: "40px", height: "40px" }}
-                          {...parseAvatarConfig(entry.avatarUrl)!}
-                        />
-                      ) : (
-                        <AvatarFallback
-                          className={cn(
-                            entry.isCurrentUser
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted text-muted-foreground"
-                          )}
-                        >
-                          {getAvatarFallback(entry.displayName)}
-                        </AvatarFallback>
-                      )}
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium leading-tight truncate">
-                        {entry.displayName}
-                        {entry.isCurrentUser && (
-                          <span className="ml-1 text-primary font-semibold">
-                            ({t("weeklyChallenge.you")})
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {entry.totalPoints.toLocaleString()}{" "}
-                        {t("weeklyChallenge.points")}
-                      </p>
-                    </div>
-                  </div>
-                )
-              )
-            )}
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );

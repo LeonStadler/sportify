@@ -1,6 +1,7 @@
 import { AvatarEditor } from "@/components/AvatarEditor";
 import { DeleteAccountConfirmationDialog } from "@/components/DeleteAccountConfirmationDialog";
 import { DeleteAccountPasswordDialog } from "@/components/DeleteAccountPasswordDialog";
+import { GlobalRankingWarningDialog } from "@/components/GlobalRankingWarningDialog";
 import { InviteFriendForm } from "@/components/InviteFriendForm";
 import { PageTemplate } from "@/components/PageTemplate";
 import { PasswordDialog } from "@/components/PasswordDialog";
@@ -23,7 +24,8 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { WeeklyGoals } from "@/components/WeeklyGoalsDialog";
+import { WeeklyGoalsDialog } from "@/components/WeeklyGoalsDialog";
+import { WeeklyGoalsForm, WeeklyGoals } from "@/components/WeeklyGoalsForm";
 import { DEFAULT_WEEKLY_POINTS_GOAL } from "@/config/events";
 import { Invitation } from "@/contexts/AuthContext";
 import { useAuth } from "@/hooks/use-auth";
@@ -221,20 +223,16 @@ export function Profile() {
     useState(false);
   const [recoveryCodesDialogOpen, setRecoveryCodesDialogOpen] = useState(false);
   const [newRecoveryCodes, setNewRecoveryCodes] = useState<string[]>([]);
-  const [goals, setGoals] = useState<WeeklyGoals>({
+  const defaultGoals: WeeklyGoals = {
     pullups: { target: 100, current: 0 },
     pushups: { target: 400, current: 0 },
+    situps: { target: 200, current: 0 },
     running: { target: 25, current: 0 },
     cycling: { target: 100, current: 0 },
     points: { target: DEFAULT_WEEKLY_POINTS_GOAL, current: 0 },
-  });
-  const [goalsForm, setGoalsForm] = useState<WeeklyGoals>({
-    pullups: { target: 100, current: 0 },
-    pushups: { target: 400, current: 0 },
-    running: { target: 25, current: 0 },
-    cycling: { target: 100, current: 0 },
-    points: { target: DEFAULT_WEEKLY_POINTS_GOAL, current: 0 },
-  });
+  };
+  const [goals, setGoals] = useState<WeeklyGoals>(defaultGoals);
+  const [goalsForm, setGoalsForm] = useState<WeeklyGoals>(defaultGoals);
   const [loadingGoals, setLoadingGoals] = useState(false);
   const [savingGoals, setSavingGoals] = useState(false);
   const [achievements, setAchievements] = useState<AchievementsData>({
@@ -300,24 +298,28 @@ export function Profile() {
         const data = await response.json();
         const mergedGoals: WeeklyGoals = {
           pullups: {
-            target: data.pullups?.target ?? 100,
-            current: data.pullups?.current ?? 0,
+            target: data.pullups?.target ?? defaultGoals.pullups.target,
+            current: data.pullups?.current ?? defaultGoals.pullups.current,
           },
           pushups: {
-            target: data.pushups?.target ?? 400,
-            current: data.pushups?.current ?? 0,
+            target: data.pushups?.target ?? defaultGoals.pushups.target,
+            current: data.pushups?.current ?? defaultGoals.pushups.current,
           },
           running: {
-            target: data.running?.target ?? 25,
-            current: data.running?.current ?? 0,
+            target: data.running?.target ?? defaultGoals.running.target,
+            current: data.running?.current ?? defaultGoals.running.current,
           },
           cycling: {
-            target: data.cycling?.target ?? 100,
-            current: data.cycling?.current ?? 0,
+            target: data.cycling?.target ?? defaultGoals.cycling.target,
+            current: data.cycling?.current ?? defaultGoals.cycling.current,
+          },
+          situps: {
+            target: data.situps?.target ?? defaultGoals.situps.target,
+            current: data.situps?.current ?? defaultGoals.situps.current,
           },
           points: {
-            target: data.points?.target ?? DEFAULT_WEEKLY_POINTS_GOAL,
-            current: data.points?.current ?? 0,
+            target: data.points?.target ?? defaultGoals.points.target,
+            current: data.points?.current ?? defaultGoals.points.current,
           },
         };
         setGoals(mergedGoals);
@@ -356,9 +358,36 @@ export function Profile() {
         );
       }
 
-      const updatedGoals = await response.json();
-      setGoals(updatedGoals);
-      setGoalsForm(updatedGoals);
+      const updatedGoals = (await response.json()) || {};
+      const mergedGoals: WeeklyGoals = {
+        pullups: {
+          target: updatedGoals.pullups?.target ?? newGoals.pullups?.target ?? defaultGoals.pullups.target,
+          current: updatedGoals.pullups?.current ?? newGoals.pullups?.current ?? goals.pullups?.current ?? 0,
+        },
+        pushups: {
+          target: updatedGoals.pushups?.target ?? newGoals.pushups?.target ?? defaultGoals.pushups.target,
+          current: updatedGoals.pushups?.current ?? newGoals.pushups?.current ?? goals.pushups?.current ?? 0,
+        },
+        situps: {
+          target: updatedGoals.situps?.target ?? newGoals.situps?.target ?? defaultGoals.situps.target,
+          current: updatedGoals.situps?.current ?? newGoals.situps?.current ?? goals.situps?.current ?? 0,
+        },
+        running: {
+          target: updatedGoals.running?.target ?? newGoals.running?.target ?? defaultGoals.running.target,
+          current: updatedGoals.running?.current ?? newGoals.running?.current ?? goals.running?.current ?? 0,
+        },
+        cycling: {
+          target: updatedGoals.cycling?.target ?? newGoals.cycling?.target ?? defaultGoals.cycling.target,
+          current: updatedGoals.cycling?.current ?? newGoals.cycling?.current ?? goals.cycling?.current ?? 0,
+        },
+        points: {
+          target: updatedGoals.points?.target ?? newGoals.points?.target ?? defaultGoals.points.target,
+          current: updatedGoals.points?.current ?? newGoals.points?.current ?? goals.points?.current ?? 0,
+        },
+      };
+
+      setGoals(mergedGoals);
+      setGoalsForm(mergedGoals);
       toast({
         title: t("goals.saved", "Wochenziele gespeichert"),
         description: t(
@@ -384,6 +413,16 @@ export function Profile() {
     await handleSaveGoals(goalsForm);
   };
 
+  const handleResetGoals = () => {
+    setGoalsForm(defaultGoals);
+  };
+
+  // Global Rankings state
+  const [showInGlobalRankings, setShowInGlobalRankings] = useState(
+    user?.showInGlobalRankings ?? true
+  );
+  const [showWarningDialog, setShowWarningDialog] = useState(false);
+
   // Update form when user changes
   useEffect(() => {
     if (user) {
@@ -393,8 +432,51 @@ export function Profile() {
         nickname: user.nickname || "",
         displayPreference: user.displayPreference || "firstName",
       });
+      setShowInGlobalRankings(user.showInGlobalRankings ?? true);
     }
   }, [user]);
+
+  const handleGlobalRankingToggle = (checked: boolean) => {
+    if (!checked) {
+      setShowWarningDialog(true);
+    } else {
+      performGlobalRankingUpdate(true);
+    }
+  };
+
+  const performGlobalRankingUpdate = async (checked: boolean) => {
+    setShowInGlobalRankings(checked);
+    try {
+      await updateProfile(
+        {
+          firstName: user?.firstName || "",
+          lastName: user?.lastName || "",
+          nickname: user?.nickname || "",
+          displayPreference: user?.displayPreference || "firstName",
+          showInGlobalRankings: checked,
+        },
+        true
+      );
+      toast({
+        title: t("settings.saved", "Gespeichert"),
+        description: t(
+          "settings.settingSaved",
+          "{{setting}} wurde aktualisiert.",
+          { setting: "Sichtbarkeit in globaler Rangliste" }
+        ),
+      });
+    } catch (error) {
+      setShowInGlobalRankings(!checked); // Revert on error
+      toast({
+        title: t("common.error", "Fehler"),
+        description:
+          error instanceof Error
+            ? error.message
+            : t("settings.saveError", "Fehler beim Speichern"),
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleAvatarSave = async (config: NiceAvatarProps) => {
     try {
@@ -406,6 +488,7 @@ export function Profile() {
         lastName: user?.lastName || "",
         nickname: user?.nickname || "",
         displayPreference: user?.displayPreference || "firstName",
+        showInGlobalRankings,
       });
       toast({
         title: "Avatar gespeichert",
@@ -432,6 +515,7 @@ export function Profile() {
         lastName: user?.lastName || "",
         nickname: user?.nickname || "",
         displayPreference: user?.displayPreference || "firstName",
+        showInGlobalRankings,
       });
       toast({
         title: "Avatar entfernt",
@@ -506,6 +590,7 @@ export function Profile() {
         {
           ...profileForm,
           avatar: user?.avatar || undefined,
+          showInGlobalRankings,
         },
         true // silent mode - kein globaler Loading-State
       );
@@ -556,6 +641,7 @@ export function Profile() {
           languagePreference: newPreferences.languagePreference as "de" | "en",
           preferences: newPreferences,
           avatar: user?.avatar || undefined,
+          showInGlobalRankings,
         },
         true // silent mode - kein globaler Loading-State
       );
@@ -1670,6 +1756,22 @@ export function Profile() {
                     }
                   />
                 </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-medium">
+                      In globaler Rangliste anzeigen
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Dein Profil erscheint in den globalen Statistiken und
+                      Ranglisten für alle Nutzer
+                    </p>
+                  </div>
+                  <Switch
+                    checked={showInGlobalRankings}
+                    onCheckedChange={handleGlobalRankingToggle}
+                  />
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -1692,168 +1794,35 @@ export function Profile() {
               {loadingGoals ? (
                 <p className="text-muted-foreground">Lädt...</p>
               ) : (
-                <form onSubmit={handleGoalsSubmit} className="space-y-6">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="goal-pullups">Klimmzüge</Label>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          id="goal-pullups"
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={goalsForm.pullups.target || ""}
-                          onChange={(e) => {
-                            const value = parseFloat(e.target.value);
-                            setGoalsForm((prev) => ({
-                              ...prev,
-                              pullups: {
-                                ...prev.pullups,
-                                target: isNaN(value) ? 0 : Math.max(0, value),
-                              },
-                            }));
-                          }}
-                          placeholder="100"
-                          className="flex-1"
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Aktuell: {goals.pullups.current} / Ziel:{" "}
-                        {goals.pullups.target}
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="goal-pushups">Liegestütze</Label>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          id="goal-pushups"
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={goalsForm.pushups.target || ""}
-                          onChange={(e) => {
-                            const value = parseFloat(e.target.value);
-                            setGoalsForm((prev) => ({
-                              ...prev,
-                              pushups: {
-                                ...prev.pushups,
-                                target: isNaN(value) ? 0 : Math.max(0, value),
-                              },
-                            }));
-                          }}
-                          placeholder="400"
-                          className="flex-1"
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Aktuell: {goals.pushups.current} / Ziel:{" "}
-                        {goals.pushups.target}
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="goal-running">Laufen (km)</Label>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          id="goal-running"
-                          type="number"
-                          min="0"
-                          step="0.1"
-                          value={goalsForm.running.target || ""}
-                          onChange={(e) => {
-                            const value = parseFloat(e.target.value);
-                            setGoalsForm((prev) => ({
-                              ...prev,
-                              running: {
-                                ...prev.running,
-                                target: isNaN(value) ? 0 : Math.max(0, value),
-                              },
-                            }));
-                          }}
-                          placeholder="25"
-                          className="flex-1"
-                        />
-                        <span className="text-sm text-muted-foreground min-w-[2rem]">
-                          km
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Aktuell: {goals.running.current} km / Ziel:{" "}
-                        {goals.running.target} km
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="goal-cycling">Radfahren (km)</Label>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          id="goal-cycling"
-                          type="number"
-                          min="0"
-                          step="0.1"
-                          value={goalsForm.cycling.target || ""}
-                          onChange={(e) => {
-                            const value = parseFloat(e.target.value);
-                            setGoalsForm((prev) => ({
-                              ...prev,
-                              cycling: {
-                                ...prev.cycling,
-                                target: isNaN(value) ? 0 : Math.max(0, value),
-                              },
-                            }));
-                          }}
-                          placeholder="100"
-                          className="flex-1"
-                        />
-                        <span className="text-sm text-muted-foreground min-w-[2rem]">
-                          km
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Aktuell: {goals.cycling.current} km / Ziel:{" "}
-                        {goals.cycling.target} km
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="goal-points">Punkte</Label>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          id="goal-points"
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={goalsForm.points.target || ""}
-                          onChange={(e) => {
-                            const value = parseFloat(e.target.value);
-                            setGoalsForm((prev) => ({
-                              ...prev,
-                              points: {
-                                ...prev.points,
-                                target: isNaN(value) ? 0 : Math.max(0, value),
-                              },
-                            }));
-                          }}
-                          placeholder={DEFAULT_WEEKLY_POINTS_GOAL.toString()}
-                          className="flex-1"
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Aktuell: {goals.points.current} / Ziel:{" "}
-                        {goals.points.target}
-                      </p>
-                    </div>
+                <form onSubmit={handleGoalsSubmit}>
+                  <WeeklyGoalsForm
+                    goals={goalsForm}
+                    onChange={(key, target) => {
+                      setGoalsForm((prev) => ({
+                        ...prev,
+                        [key]: { ...prev[key], target: Math.max(0, target) },
+                      }));
+                    }}
+                  />
+                  <div className="flex flex-col gap-3 mt-6">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={handleResetGoals}
+                      disabled={savingGoals || isLoading}
+                    >
+                      {t("common.reset", "Zurücksetzen")}
+                    </Button>
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={savingGoals || isLoading}
+                    >
+                      {savingGoals
+                        ? "Wird gespeichert..."
+                        : "Wochenziele speichern"}
+                    </Button>
                   </div>
-
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={savingGoals || isLoading}
-                  >
-                    {savingGoals
-                      ? "Wird gespeichert..."
-                      : "Wochenziele speichern"}
-                  </Button>
                 </form>
               )}
             </CardContent>
@@ -2152,6 +2121,12 @@ export function Profile() {
         onOpenChange={setAvatarEditorOpen}
         currentConfig={getCurrentAvatarConfig()}
         onSave={handleAvatarSave}
+      />
+
+      <GlobalRankingWarningDialog
+        open={showWarningDialog}
+        onOpenChange={setShowWarningDialog}
+        onConfirm={() => performGlobalRankingUpdate(false)}
       />
 
       {/* Password Dialog for 2FA */}

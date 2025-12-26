@@ -7,6 +7,7 @@ import {
 } from "../config/badges.js";
 import { sendJobFailureAlert } from "./alertService.js";
 import {
+  grantCategoryRankAward,
   grantLeaderboardAward,
   grantMonthlyChampionAward,
 } from "./awardService.js";
@@ -15,6 +16,7 @@ import { queueEmailSummary } from "./emailQueueService.js";
 import {
   buildFriendAdjacency,
   computeDirectLeaderboard,
+  computeRankingForGroup,
   evaluateWeeklyGoals,
   parseWeeklyGoals,
   resolveMonthlyWindow,
@@ -25,6 +27,14 @@ const OFFSET_ENV_KEYS = [
   "EVENTS_UTC_OFFSET_MINUTES",
   "EVENTS_TIMEZONE_OFFSET_MINUTES",
 ];
+
+const ACTIVITY_LABELS = {
+  pullups: "Klimmzüge",
+  pushups: "Liegestütze",
+  situps: "Sit-ups",
+  running: "Laufen (km)",
+  cycling: "Radfahren (km)",
+};
 
 const parseNumber = (value, fallback = 0) => {
   const parsed = Number(value);
@@ -189,6 +199,7 @@ export const processWeeklyEvents = async (
                 u.nickname,
                 u.display_preference,
                 u.weekly_goals,
+                u.show_in_global_rankings,
                 COALESCE(SUM(wa.points_earned), 0) AS total_points,
                 COUNT(DISTINCT wir.id) AS total_workouts
             FROM users u
@@ -245,6 +256,7 @@ export const processWeeklyEvents = async (
         lastName: row.last_name,
         nickname: row.nickname,
         displayPreference: row.display_preference,
+        showInGlobalRankings: row.show_in_global_rankings,
         weeklyGoals: parseWeeklyGoals(row.weekly_goals),
         totalsByType,
         totalPoints,
@@ -266,6 +278,7 @@ export const processWeeklyEvents = async (
       goalEvaluationMap.set(summary.userId, evaluation);
 
       const badgesEarned = [];
+      // Use new counter-based badge logic
       if (evaluation.exerciseGoalsMet) {
         const earned = await badgeService.handleWeeklyProgress(
           pool,
@@ -406,28 +419,45 @@ export const processWeeklyEvents = async (
         const evaluation = goalEvaluationMap.get(summary.userId);
         const leaderboard = leaderboardEvaluations.get(summary.userId);
 
+        const activityLines = Object.entries(summary.totalsByType)
+          .map(([type, amount]) => {
+            const label = ACTIVITY_LABELS[type] || type;
+            return `• ${label}: ${amount}`;
+          })
+          .filter(Boolean);
+
         const lines = [
           `Hallo ${summary.firstName ?? "Athlet"},`,
           "",
-          `• Gesamtpunkte der Woche: ${summary.totalPoints}`,
+          "Deine Wochenübersicht:",
+          `• Gesamtpunkte: ${summary.totalPoints}`,
           `• Workouts: ${summary.totalWorkouts}`,
+          ...activityLines,
+          "",
+          "Ziele:",
           evaluation.hasExerciseGoals
-            ? `• Wochenziel (Übungen): ${evaluation.exerciseGoalsMet ? "erreicht" : "nicht erreicht"}`
-            : "• Wochenziel (Übungen): nicht definiert",
+            ? `• Übungs-Ziele: ${evaluation.exerciseGoalsMet ? "erreicht" : "nicht erreicht"}`
+            : null,
           evaluation.pointsTarget > 0
-            ? `• Wochenziel (Punkte): ${evaluation.pointsGoalMet ? "erreicht" : "nicht erreicht"} (${summary.totalPoints}/${evaluation.pointsTarget})`
-            : "• Wochenziel (Punkte): nicht definiert",
-          `• Wochen-Challenge (${DEFAULT_WEEKLY_POINT_CHALLENGE} Punkte): ${evaluation.challengeMet ? "geschafft" : "offen"}`,
+            ? `• Punkte-Ziel: ${evaluation.pointsGoalMet ? "erreicht" : "nicht erreicht"} (${summary.totalPoints}/${evaluation.pointsTarget})`
+            : null,
+          `• Wochen-Challenge: ${evaluation.challengeMet ? "geschafft" : "offen"}`,
+          "",
           leaderboard &&
           leaderboard.rank <= Math.min(3, leaderboard.participantCount) &&
           leaderboard.participantCount >= 2
-            ? `• Leaderboard Platz: ${leaderboard.rank} von ${leaderboard.participantCount}`
+            ? `• Leaderboard Platz (Freunde): ${leaderboard.rank} von ${leaderboard.participantCount}`
             : undefined,
-          `• Neue Badges: ${badges.length > 0 ? badges.map((badge) => badge.label).join(", ") : "keine"}`,
-          `• Neue Auszeichnungen: ${awards.length > 0 ? awards.map((award) => award.label).join(", ") : "keine"}`,
+          "",
+          badges.length > 0
+            ? `• Neue Meilensteine: ${badges.map((b) => b.label).join(", ")}`
+            : null,
+          awards.length > 0
+            ? `• Neue Auszeichnungen: ${awards.map((a) => a.label).join(", ")}`
+            : null,
           "",
           "Bleib dran und viel Erfolg für die nächste Woche!",
-        ].filter(Boolean);
+        ].filter((line) => line !== null && line !== undefined);
 
         const body = lines.join("\n");
         await queueEmailSummary(pool, {
@@ -524,6 +554,8 @@ export const processMonthlyEvents = async (
                 u.email,
                 u.first_name,
                 u.last_name,
+                u.nickname,
+                u.show_in_global_rankings,
                 COALESCE(SUM(wa.points_earned), 0) AS total_points
             FROM users u
             LEFT JOIN workouts_in_range wir ON wir.user_id = u.id
@@ -531,25 +563,88 @@ export const processMonthlyEvents = async (
             GROUP BY u.id
         `;
 
-    const { rows } = await pool.query(summaryQuery, [
-      monthStart,
-      monthEndExclusive,
+    const activityTotalsQuery = `
+            WITH bounds AS (
+                SELECT $1::timestamptz AS start_at, $2::timestamptz AS end_at
+            ), workouts_in_range AS (
+                SELECT w.*
+                FROM workouts w
+                CROSS JOIN bounds b
+                WHERE w.start_time >= b.start_at AND w.start_time < b.end_at
+            )
+            SELECT
+                wir.user_id,
+                wa.activity_type,
+                SUM(wa.quantity) AS total_quantity
+            FROM workouts_in_range wir
+            JOIN workout_activities wa ON wa.workout_id = wir.id
+            GROUP BY wir.user_id, wa.activity_type
+        `;
+
+    const [{ rows }, activityTotalsResult] = await Promise.all([
+      pool.query(summaryQuery, [monthStart, monthEndExclusive]),
+      pool.query(activityTotalsQuery, [monthStart, monthEndExclusive]),
     ]);
 
+    const activityTotalsMap = buildActivityTotalsMap(activityTotalsResult.rows);
+    const friendships = await fetchFriendships(pool);
+    const friendGraph = buildFriendAdjacency(friendships);
+
     const monthlyAwardsMap = new Map();
+    const monthlyBadgesMap = new Map(); // Store badges (counter milestones)
+
     const summaries = rows.map((row) => ({
       userId: row.user_id,
       email: row.email,
       firstName: row.first_name,
       lastName: row.last_name,
       totalPoints: parseNumber(row.total_points, 0),
+      totalsByType: activityTotalsMap.get(row.user_id) ?? {},
+      showInGlobalRankings: row.show_in_global_rankings !== false, // default true
     }));
+
+    // --- Ranking Calculations ---
+
+    // 1. Global Rankings (Points & Activities) - Filter: showInGlobalRankings = true
+    const globalParticipants = summaries.filter(
+      (s) => s.showInGlobalRankings && s.totalPoints > 0
+    );
+    const globalPointsRank = computeRankingForGroup(
+      globalParticipants,
+      (s) => s.totalPoints
+    );
+
+    const activities = [
+      "pullups",
+      "pushups",
+      "situps",
+      "running",
+      "cycling",
+    ];
+    const globalActivityRanks = {};
+    for (const activity of activities) {
+      // Filter for users who actually did the activity and opted in
+      const participants = summaries.filter(
+        (s) =>
+          s.showInGlobalRankings && (s.totalsByType[activity] || 0) > 0
+      );
+      globalActivityRanks[activity] = computeRankingForGroup(
+        participants,
+        (s) => s.totalsByType[activity] || 0
+      );
+    }
+
+    // 2. Friends Rankings (Points & Activities) - No Filter
+    // Will be computed per user inside the loop
 
     for (const summary of summaries) {
       const challengeMet =
         summary.totalPoints >= DEFAULT_MONTHLY_POINT_CHALLENGE;
 
       const awardsGranted = [];
+      const badgesEarned = [];
+
+      // A. Monthly Goal Badge (Counter)
       if (challengeMet) {
         const award = await grantMonthlyChampionAward(
           pool,
@@ -561,10 +656,118 @@ export const processMonthlyEvents = async (
         if (award) {
           awardsGranted.push(award);
         }
+
+        // New: Counter Badge
+        const badges = await badgeService.handleMonthlyProgress(
+          pool,
+          summary.userId,
+          "monthly-challenge-points",
+          true
+        );
+        badgesEarned.push(...badges);
+      }
+
+      // B. Rank Awards (Global)
+      if (summary.showInGlobalRankings) {
+        // Points
+        const rankInfo = globalPointsRank.get(summary.userId);
+        if (rankInfo && rankInfo.rank <= 3) {
+          const award = await grantCategoryRankAward(
+            pool,
+            summary.userId,
+            rankInfo.rank,
+            "points",
+            "global",
+            monthStart,
+            monthEndInclusive,
+            rankInfo.value
+          );
+          if (award) awardsGranted.push(award);
+        }
+        // Activities
+        for (const activity of activities) {
+          const actRankInfo = globalActivityRanks[activity]?.get(
+            summary.userId
+          );
+          if (actRankInfo && actRankInfo.rank <= 3) {
+            const award = await grantCategoryRankAward(
+              pool,
+              summary.userId,
+              actRankInfo.rank,
+              activity,
+              "global",
+              monthStart,
+              monthEndInclusive,
+              actRankInfo.value
+            );
+            if (award) awardsGranted.push(award);
+          }
+        }
+      }
+
+      // C. Rank Awards (Friends)
+      // Get friends + self
+      const friendIds = friendGraph.get(summary.userId) ?? new Set();
+      const groupIds = new Set([...friendIds, summary.userId]);
+      const groupSummaries = summaries.filter((s) => groupIds.has(s.userId));
+
+      // Friend Rank: Points
+      const friendPointsRank = computeRankingForGroup(
+        groupSummaries.filter((s) => s.totalPoints > 0),
+        (s) => s.totalPoints
+      );
+      const myFriendRank = friendPointsRank.get(summary.userId);
+      if (
+        myFriendRank &&
+        myFriendRank.rank <= 3 &&
+        myFriendRank.totalParticipants >= 2
+      ) {
+        const award = await grantCategoryRankAward(
+          pool,
+          summary.userId,
+          myFriendRank.rank,
+          "points",
+          "friends",
+          monthStart,
+          monthEndInclusive,
+          myFriendRank.value
+        );
+        if (award) awardsGranted.push(award);
+      }
+
+      // Friend Rank: Activities
+      for (const activity of activities) {
+        const participants = groupSummaries.filter(
+          (s) => (s.totalsByType[activity] || 0) > 0
+        );
+        const actRankMap = computeRankingForGroup(
+          participants,
+          (s) => s.totalsByType[activity] || 0
+        );
+        const myActRank = actRankMap.get(summary.userId);
+        if (
+          myActRank &&
+          myActRank.rank <= 3 &&
+          myActRank.totalParticipants >= 2
+        ) {
+          const award = await grantCategoryRankAward(
+            pool,
+            summary.userId,
+            myActRank.rank,
+            activity,
+            "friends",
+            monthStart,
+            monthEndInclusive,
+            myActRank.value
+          );
+          if (award) awardsGranted.push(award);
+        }
       }
 
       monthlyAwardsMap.set(summary.userId, awardsGranted);
+      monthlyBadgesMap.set(summary.userId, badgesEarned);
 
+      // Store results in DB (Note: monthly_results table structure might need activity breakdown column in future)
       await pool.query(
         `INSERT INTO monthly_results (
                     id, user_id, month_start, month_end, total_points, challenge_points_met, badges_awarded, awards_awarded
@@ -584,7 +787,7 @@ export const processMonthlyEvents = async (
           toISODate(monthEndInclusive),
           summary.totalPoints,
           challengeMet,
-          JSON.stringify([]),
+          JSON.stringify(badgesEarned),
           JSON.stringify(awardsGranted),
         ]
       );
@@ -596,18 +799,69 @@ export const processMonthlyEvents = async (
       if (!summary.email) continue;
       try {
         const awards = monthlyAwardsMap.get(summary.userId) || [];
+        const badges = monthlyBadgesMap.get(summary.userId) || [];
         const challengeMet =
           summary.totalPoints >= DEFAULT_MONTHLY_POINT_CHALLENGE;
+
+        // Build Ranking Strings for Email
+        const rankingLines = [];
+
+        // Global Rank (if opted in)
+        if (summary.showInGlobalRankings && summary.totalPoints > 0) {
+          const gRank = globalPointsRank.get(summary.userId);
+          if (gRank) {
+            rankingLines.push(
+              `• Globaler Rang (Punkte): ${gRank.rank} von ${gRank.totalParticipants}`
+            );
+          }
+        }
+
+        // Friend Rank
+        if (summary.totalPoints > 0) {
+          const friendIds = friendGraph.get(summary.userId) ?? new Set();
+          const groupIds = new Set([...friendIds, summary.userId]);
+          const groupSummaries = summaries.filter(
+            (s) => groupIds.has(s.userId) && s.totalPoints > 0
+          );
+          const friendRankMap = computeRankingForGroup(
+            groupSummaries,
+            (s) => s.totalPoints
+          );
+          const fRank = friendRankMap.get(summary.userId);
+          if (fRank) {
+            rankingLines.push(
+              `• Freundes-Rang (Punkte): ${fRank.rank} von ${fRank.totalParticipants}`
+            );
+          }
+        }
+
+        const activityLines = Object.entries(summary.totalsByType)
+          .map(([type, amount]) => {
+            const label = ACTIVITY_LABELS[type] || type;
+            return `• ${label}: ${amount}`;
+          })
+          .filter(Boolean);
 
         const lines = [
           `Hallo ${summary.firstName ?? "Athlet"},`,
           "",
-          `• Monats-Punktestand: ${summary.totalPoints}`,
+          "Dein Monatsabschluss:",
+          `• Gesamtpunkte: ${summary.totalPoints}`,
+          ...activityLines,
+          "",
           `• Monats-Challenge (${DEFAULT_MONTHLY_POINT_CHALLENGE} Punkte): ${challengeMet ? "geschafft" : "offen"}`,
-          `• Neue Auszeichnungen: ${awards.length > 0 ? awards.map((award) => award.label).join(", ") : "keine"}`,
+          "",
+          ...rankingLines,
+          "",
+          badges.length > 0
+            ? `• Neue Meilensteine: ${badges.map((b) => b.label).join(", ")}`
+            : null,
+          awards.length > 0
+            ? `• Neue Auszeichnungen: ${awards.map((a) => a.label).join(", ")}`
+            : null,
           "",
           "Großartige Arbeit in diesem Monat – weiter so!",
-        ];
+        ].filter((line) => line !== null && line !== undefined);
 
         const body = lines.join("\n");
         await queueEmailSummary(pool, {

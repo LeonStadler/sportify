@@ -7,6 +7,15 @@ const AWARD_LABELS = {
     'friends-bronze': 'Friends Bronze',
 };
 
+const CATEGORY_LABELS = {
+    'points': 'Punkte',
+    'pullups': 'Klimmzüge',
+    'pushups': 'Liegestütze',
+    'situps': 'Sit-ups',
+    'running': 'Laufen',
+    'cycling': 'Radfahren'
+};
+
 export const grantAward = async (pool, userId, { type, label, periodStart, periodEnd, metadata = {} }) => {
     if (!type || !label) {
         throw new Error('Missing award information');
@@ -70,5 +79,26 @@ export const grantMonthlyChampionAward = async (pool, userId, periodStart, perio
         periodStart,
         periodEnd,
         metadata: { points }
+    });
+};
+
+export const grantCategoryRankAward = async (pool, userId, rank, category, scope, periodStart, periodEnd, value) => {
+    if (rank > 3) return null;
+
+    const rankNames = { 1: 'Gold', 2: 'Silber', 3: 'Bronze' };
+    const scopeNames = { 'global': 'Global', 'friends': 'Friends' };
+    const catLabel = CATEGORY_LABELS[category] || category;
+    
+    // Type konstruieren um Einzigartigkeit zu garantieren
+    // z.B. monthly-rank-global-pullups-1
+    const type = `monthly-rank-${scope}-${category}-${rank}`;
+    const label = `${scopeNames[scope]} ${rankNames[rank]} - ${catLabel}`;
+
+    return grantAward(pool, userId, {
+        type,
+        label,
+        periodStart,
+        periodEnd,
+        metadata: { rank, category, scope, value }
     });
 };

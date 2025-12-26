@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import {
   LIFETIME_ACTIVITY_BADGES,
+  MONTHLY_PROGRESS_BADGES,
   WEEKLY_PROGRESS_BADGES,
 } from "../config/badges.js";
 import { createNotification } from "./notificationService.js";
@@ -50,13 +51,13 @@ const ensureBadgeCatalog = async (pool) => {
 
   if (!badgeCatalogInitPromise) {
     badgeCatalogInitPromise = (async () => {
-      for (const badge of WEEKLY_PROGRESS_BADGES) {
-        for (const threshold of badge.thresholds) {
-          await ensureBadgeRecord(pool, badge, threshold);
-        }
-      }
+      const allBadges = [
+        ...WEEKLY_PROGRESS_BADGES,
+        ...MONTHLY_PROGRESS_BADGES,
+        ...LIFETIME_ACTIVITY_BADGES,
+      ];
 
-      for (const badge of LIFETIME_ACTIVITY_BADGES) {
+      for (const badge of allBadges) {
         for (const threshold of badge.thresholds) {
           await ensureBadgeRecord(pool, badge, threshold);
         }
@@ -147,6 +148,35 @@ export const badgeService = {
 
     const progressCount = await incrementProgress(pool, userId, slug, 1);
     const badgeDefinition = WEEKLY_PROGRESS_BADGES.find(
+      (item) => item.slug === slug
+    );
+    if (!badgeDefinition) {
+      return [];
+    }
+
+    const earned = [];
+    for (const threshold of badgeDefinition.thresholds) {
+      if (progressCount === threshold) {
+        const badge = await getBadgeBySlugAndLevel(pool, slug, threshold);
+        const granted = await grantBadge(pool, userId, badge, {
+          progressCount,
+        });
+        if (granted) {
+          earned.push(granted);
+        }
+      }
+    }
+    return earned;
+  },
+  async handleMonthlyProgress(pool, userId, slug, achieved) {
+    await ensureBadgeCatalog(pool);
+
+    if (!achieved) {
+      return [];
+    }
+
+    const progressCount = await incrementProgress(pool, userId, slug, 1);
+    const badgeDefinition = MONTHLY_PROGRESS_BADGES.find(
       (item) => item.slug === slug
     );
     if (!badgeDefinition) {

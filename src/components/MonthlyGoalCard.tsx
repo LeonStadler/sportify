@@ -75,7 +75,7 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
         <CardHeader className="pb-4">
           <CardTitle className="text-lg md:text-xl flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            {t("dashboard.monthlyGoal", "Monatsziel")}
+            {t("dashboard.monthlyGoal", "Monthly goal")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -93,7 +93,7 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
       <CardHeader className="pb-4">
         <CardTitle className="text-lg md:text-xl flex items-center gap-2">
           <Calendar className="h-5 w-5" />
-          {t("dashboard.monthlyGoal", "Monatsziel")}
+          {t("dashboard.monthlyGoal", "Monthly goal")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">

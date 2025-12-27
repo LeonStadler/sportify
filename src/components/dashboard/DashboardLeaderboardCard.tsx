@@ -21,6 +21,7 @@ import {
   MoreVertical,
   Trophy,
   Users,
+  ArrowRight,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -261,11 +262,16 @@ export function DashboardLeaderboardCard({
           </div>
         </ScrollArea>
         <div className="mt-4">
-          <Button asChild variant="ghost" className="w-full justify-center">
-            <Link to="/scoreboard">
-              {t("scoreboard.showMore", "Mehr anzeigen")}
-            </Link>
-          </Button>
+        <Button
+          asChild
+          variant="outline"
+          className="w-full justify-center gap-2"
+        >
+          <Link to="/scoreboard">
+            {t("scoreboard.showMore", "Mehr anzeigen")}
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </Button>
         </div>
       </CardContent>
     </Card>

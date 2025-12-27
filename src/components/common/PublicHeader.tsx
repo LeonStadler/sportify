@@ -73,7 +73,7 @@ export function PublicHeader({
 
   return (
     <header
-      className={`border-b border-border/40 bg-background/95 backdrop-blur-sm ${sticky ? "sticky top-0 z-50 shadow-sm backdrop-blur-md" : ""} ${variant === "minimal" ? "py-3" : "py-4"}`}
+      className={`border-b border-border/40 shadow-none bg-background/95 backdrop-blur-md ${sticky ? "sticky top-0 z-50 shadow-lg border-border/60 bg-background/75 backdrop-blur-md" : ""} ${variant === "minimal" ? "py-3" : "py-4"}`}
     >
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">

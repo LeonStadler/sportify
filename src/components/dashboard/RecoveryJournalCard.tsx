@@ -8,13 +8,21 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CalendarDays, CalendarRange, BarChart3, FileText, Info } from "lucide-react";
+import {
+  CalendarDays,
+  CalendarRange,
+  BarChart3,
+  FileText,
+  Info,
+  ArrowRight,
+} from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { API_URL } from "@/lib/api";
 import { useTranslation } from "react-i18next";
 import { format } from "date-fns";
 import { de, enUS } from "date-fns/locale";
 import type { TrainingJournalEntry } from "@/types/training-journal";
+import { useNavigate } from "react-router-dom";
 
 type PeriodOption = "week" | "month" | "quarter" | "year";
 
@@ -47,6 +55,7 @@ interface RecentWorkoutOption {
 export function RecoveryJournalCard({ className }: { className?: string }) {
   const { user } = useAuth();
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const [period, setPeriod] = useState<PeriodOption>("week");
   const [data, setData] = useState<RecoveryAnalytics>({
     summary: {
@@ -378,6 +387,15 @@ export function RecoveryJournalCard({ className }: { className?: string }) {
                 </div>
               </div>
             ) : null}
+
+            <Button
+              variant="outline"
+              className="w-full justify-center gap-2"
+              onClick={() => navigate("/training?tab=recovery")}
+            >
+              {t("recoveryDiary.openRecoveryDiary", "Zum Erholungstagebuch")}
+              <ArrowRight className="h-4 w-4" />
+            </Button>
           </>
         )}
       </CardContent>

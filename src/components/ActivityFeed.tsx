@@ -393,7 +393,7 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
                 {hasMore && (
                   <Button
                     variant="outline"
-                    className="w-full"
+                    className="w-full justify-between"
                     onClick={() => navigate("/friends/activities")}
                   >
                     {t("activityFeed.showMore", "Mehr anzeigen")}

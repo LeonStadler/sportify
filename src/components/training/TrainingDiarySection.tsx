@@ -886,11 +886,11 @@ export function TrainingDiarySection({
           )}
           <Button
             variant="outline"
-            className="w-full"
+            className="w-full justify-center gap-2"
             onClick={() => navigate("/stats?tab=recovery")}
           >
             {t("recoveryDiary.viewDetailedStats", "Detaillierte Statistiken")}
-            <ArrowRight className="ml-2 h-4 w-4" />
+            <ArrowRight className="h-4 w-4" />
           </Button>
         </CardContent>
       </Card>

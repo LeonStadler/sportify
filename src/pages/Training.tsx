@@ -39,7 +39,7 @@ import { ArrowRight, Info } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 interface WorkoutResponse {
   workouts: Workout[];
@@ -57,6 +57,7 @@ const WORKOUTS_PER_PAGE = 10;
 export function Training() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filterType, setFilterType] = useState<string>("all");
@@ -159,6 +160,14 @@ export function Training() {
     // Wechsle zum Erholungstagebuch-Tab
     setActiveTab("recovery");
   };
+
+  // Initiales Tab aus Query-Param übernehmen (z.B. ?tab=recovery)
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "recovery") {
+      setActiveTab("recovery");
+    }
+  }, [searchParams]);
 
   const handleRecoveryDialogCancel = () => {
     setShowRecoveryDialog(false);
@@ -627,11 +636,11 @@ export function Training() {
                     {/* Show More Button */}
                     <Button
                       variant="outline"
-                      className="w-full"
+                      className="w-full justify-center gap-2"
                       onClick={() => navigate("/my-workouts")}
                     >
                       {t("training.viewAllWorkouts", "Alle anzeigen")}
-                      <ArrowRight className="ml-2 h-4 w-4" />
+                      <ArrowRight className="h-4 w-4" />
                     </Button>
                   </div>
                 )}

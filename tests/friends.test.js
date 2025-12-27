@@ -38,25 +38,32 @@ const signToken = (userId) => jwt.sign({ userId }, process.env.JWT_SECRET);
 
 before(async () => {
   try {
-  ({ app, pool, ensureFriendInfrastructure } = await serverModulePromise);
-  pool.query = (sql, params) => db.query(sql, params);
-  pool.connect = async () => ({
-    query: (sql, params) => db.query(sql, params),
-    release: () => {},
-  });
-  await ensureFriendInfrastructure();
+    ({ app, pool, ensureFriendInfrastructure } = await serverModulePromise);
+    pool.query = (sql, params) => db.query(sql, params);
+    pool.connect = async () => ({
+      query: (sql, params) => db.query(sql, params),
+      release: () => { },
+    });
+    await ensureFriendInfrastructure();
 
     await new Promise((resolve, reject) => {
-    server = app.listen(0, () => resolve());
+      server = app.listen(0, "127.0.0.1", () => {
+        const address = server.address();
+        if (!address) {
+          reject(
+            new Error("Server address is null - server may have failed to start")
+          );
+          return;
+        }
+        if (typeof address === "string") {
+          reject(new Error(`Unexpected server address type: ${address}`));
+          return;
+        }
+        baseUrl = `http://127.0.0.1:${address.port}`;
+        resolve();
+      });
       server.on("error", reject);
-  });
-  const address = server.address();
-    if (!address) {
-      throw new Error(
-        "Server address is null - server may have failed to start"
-      );
-    }
-  baseUrl = `http://127.0.0.1:${address.port}`;
+    });
   } catch (error) {
     console.error("Failed to start test server:", error);
     throw error;
@@ -116,7 +123,7 @@ describe("Friends API", () => {
       `/api/friends/requests/${requestId}`,
       {
         method: "PUT",
-      token: bobToken,
+        token: bobToken,
         body: { action: "accept" },
       }
     );
@@ -166,7 +173,7 @@ describe("Friends API", () => {
       `/api/friends/requests/${requestId}`,
       {
         method: "PUT",
-      token: charlieToken,
+        token: charlieToken,
         body: { action: "accept" },
       }
     );
@@ -176,7 +183,7 @@ describe("Friends API", () => {
       `/api/friends/requests/${requestId}`,
       {
         method: "PUT",
-      token: dianaToken,
+        token: dianaToken,
         body: { action: "decline" },
       }
     );

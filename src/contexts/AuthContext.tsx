@@ -1004,14 +1004,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         body: JSON.stringify({ targetUserId }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(
-          data.error || "Fehler beim Senden der Freundschaftsanfrage"
-        );
+        let errorMessage = "Fehler beim Senden der Freundschaftsanfrage";
+        const contentType = response.headers.get("content-type");
+        
+        if (contentType && contentType.includes("application/json")) {
+          try {
+            const data = await response.json();
+            errorMessage = data.error || data.message || errorMessage;
+          } catch (parseError) {
+            // Wenn JSON-Parsing fehlschlägt, verwende Standard-Fehlermeldung
+            console.error("Error parsing error response:", parseError);
+          }
+        } else {
+          try {
+            const text = await response.text();
+            if (text) {
+              errorMessage = text;
+            }
+          } catch (textError) {
+            console.error("Error reading error response:", textError);
+          }
+        }
+        
+        throw new Error(errorMessage);
       }
 
+      const data = await response.json();
       setState((prev) => ({ ...prev, isLoading: false }));
     } catch (error) {
       const errorMessage =

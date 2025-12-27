@@ -145,6 +145,8 @@ const getUserInitials = (firstName: string, lastName: string) => {
   return `${first}${last}`.toUpperCase();
 };
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 interface ActivityFeedProps {
   className?: string;
 }
@@ -163,39 +165,50 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
   const loadActivityFeed = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        setWorkouts([]);
-        setError(t("activityFeed.pleaseLogin"));
-        return;
-      }
 
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setWorkouts([]);
+      setError(t("activityFeed.pleaseLogin"));
+      setIsLoading(false);
+      return;
+    }
+
+    const fetchOnce = async () => {
       const response = await fetch(`${API_URL}/feed?page=1&limit=5`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        const payload = Array.isArray(data.workouts) ? data.workouts : [];
-        setWorkouts(payload);
-        setHasFriends(data.hasFriends ?? payload.length > 0);
-        setHasMore(data.pagination?.hasNext ?? false);
-      } else {
-        setWorkouts([]);
-        setHasFriends(false);
-        setError(t("activityFeed.couldNotLoad"));
-        toast({
-          title: t("dashboard.error"),
-          description: t("activityFeed.errorLoading"),
-          variant: "destructive",
-        });
+      if (!response.ok) {
+        const status = response.status;
+        const message =
+          status === 401 || status === 403
+            ? t("activityFeed.sessionExpired", "Bitte melde dich erneut an.")
+            : t("activityFeed.couldNotLoad");
+
+        throw Object.assign(new Error(message), { status });
       }
-    } catch (error) {
+
+      const data = await response.json();
+      const payload = Array.isArray(data.workouts) ? data.workouts : [];
+      setWorkouts(payload);
+      setHasFriends(data.hasFriends ?? payload.length > 0);
+      setHasMore(data.pagination?.hasNext ?? false);
+    };
+
+    try {
+      try {
+        await fetchOnce();
+      } catch (error) {
+        // einmal kurz warten und ein zweites Mal versuchen (Backend-Warmup / kurzzeitige Netzwerkfehler)
+        await sleep(800);
+        await fetchOnce();
+      }
+    } catch (error: any) {
       console.error("Error loading activity feed:", error);
       setWorkouts([]);
       setHasFriends(false);
-      setError(t("activityFeed.couldNotLoad"));
+      setError(error?.message ?? t("activityFeed.couldNotLoad"));
       toast({
         title: t("dashboard.error"),
         description: t("activityFeed.errorLoading"),
@@ -204,7 +217,7 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [t, toast]);
+  }, [t, toast, navigate]);
 
   useEffect(() => {
     if (user) {
@@ -276,8 +289,8 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
                   <div
                     key={workout.workoutId}
                     className={`p-3 rounded-lg border transition-all duration-200 hover:shadow-sm ${workout.isOwnWorkout
-                        ? "bg-primary/5 border-primary/20 dark:bg-primary/10 dark:border-primary/30"
-                        : "bg-muted/30 border-border"
+                      ? "bg-primary/5 border-primary/20 dark:bg-primary/10 dark:border-primary/30"
+                      : "bg-muted/30 border-border"
                       }`}
                   >
                     {/* Header: User + Time + Points */}

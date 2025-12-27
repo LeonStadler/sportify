@@ -16,13 +16,12 @@ import {
   UserPlus,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import LanguageSwitcher from "./LanguageSwitcher";
-import ThemeSwitcher from "./ThemeSwitcher";
 
-import { LogoFull } from "@/components/LogoFull";
+import { LogoFull } from "@/components/common/LogoFull";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -119,11 +118,10 @@ export function MobileBottomNav() {
             <Link
               key={item.title}
               to={item.url}
-              className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
-                isActive
-                  ? "text-primary bg-primary/10"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${isActive
+                ? "text-primary bg-primary/10"
+                : "text-muted-foreground hover:text-foreground"
+                }`}
             >
               <item.icon size={20} />
               <span className="text-xs font-medium">{item.title}</span>

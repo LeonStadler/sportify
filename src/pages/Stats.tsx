@@ -1,27 +1,30 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
 import { de, enUS } from "date-fns/locale";
-import { useTranslation } from "react-i18next";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DateRange } from "react-day-picker";
+import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router-dom";
 
-import { PageTemplate } from "@/components/PageTemplate";
+import { PageTemplate } from "@/components/common/PageTemplate";
 import { TimeRangeFilter } from "@/components/filters/TimeRangeFilter";
-import { useAnalytics } from "@/hooks/use-analytics";
-import { useToast } from "@/hooks/use-toast";
 import { AnalyticsDashboard } from "@/features/analytics/components/AnalyticsDashboard";
-import { createAnalyticsFormatters } from "@/features/analytics/utils/formatters";
-import { getNormalizedRange, getRangeForPeriod } from "@/utils/dateRanges";
 import type {
   ActivityMetricOption,
   RecoveryMetricOption,
 } from "@/features/analytics/types";
+import { createAnalyticsFormatters } from "@/features/analytics/utils/formatters";
+import { useAnalytics } from "@/hooks/use-analytics";
+import { useToast } from "@/hooks/use-toast";
+import { getNormalizedRange, getRangeForPeriod } from "@/utils/dateRanges";
 
 export function Stats() {
   const { t, i18n } = useTranslation();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   const locale = useMemo(() => (i18n.language === "en" ? enUS : de), [i18n.language]);
   const [period, setPeriod] = useState("week");
   const [customRange, setCustomRange] = useState<DateRange | undefined>();
   const [offset, setOffset] = useState(0);
+  const defaultTab = searchParams.get("tab") || "overview";
 
   // Berechne den aufgelösten Zeitraum basierend auf period und offset
   const resolvedRange = useMemo(
@@ -133,6 +136,7 @@ export function Stats() {
         formatters={formatters}
         activityMetrics={activityMetrics}
         recoveryMetrics={recoveryMetrics}
+        defaultTab={defaultTab}
         t={t}
       />
     </PageTemplate>

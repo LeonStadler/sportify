@@ -1,7 +1,7 @@
 import { Shield } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 
-import { ObfuscatedText } from '@/components/ObfuscatedText';
+import { ObfuscatedText } from '@/components/common/ObfuscatedText';
 import { LegalPageTemplate } from '@/components/LegalPageTemplate';
 import { contactInfo, formattedContactInfo } from '@/config/contactInfo';
 

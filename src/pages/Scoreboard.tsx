@@ -1,7 +1,7 @@
-import { GlobalRankingWarningDialog } from "@/components/GlobalRankingWarningDialog";
+import { PageTemplate } from "@/components/common/PageTemplate";
 import { TimeRangeFilter } from "@/components/filters/TimeRangeFilter";
-import { PageTemplate } from "@/components/PageTemplate";
-import { ScoreboardTable } from "@/components/ScoreboardTable";
+import { GlobalRankingWarningDialog } from "@/components/ranking/GlobalRankingWarningDialog";
+import { ScoreboardTable } from "@/components/ranking/ScoreboardTable";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -146,19 +146,19 @@ export function Scoreboard() {
     effectivePeriod === "custom" && resolvedRange?.from && resolvedRange?.to
       ? `${formatDate(resolvedRange.from)} → ${formatDate(resolvedRange.to)}`
       : (() => {
-          switch (period) {
-            case "all":
-              return t("filters.period.all");
-            case "week":
-              return t("filters.period.week");
-            case "month":
-              return t("filters.period.month");
-            case "year":
-              return t("filters.period.year");
-            default:
-              return t("filters.period.custom");
-          }
-        })();
+        switch (period) {
+          case "all":
+            return t("filters.period.all");
+          case "week":
+            return t("filters.period.week");
+          case "month":
+            return t("filters.period.month");
+          case "year":
+            return t("filters.period.year");
+          default:
+            return t("filters.period.custom");
+        }
+      })();
 
   if (!user) {
     return (

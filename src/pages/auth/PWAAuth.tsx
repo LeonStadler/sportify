@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { LegalFooter } from "@/components/LegalFooter";
-import { PublicHeader } from "@/components/PublicHeader";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { RegisterForm } from "@/components/auth/RegisterForm";
+import { PublicHeader } from "@/components/common/PublicHeader";
+import { LegalFooter } from "@/components/legal/LegalFooter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function PWAAuth() {

@@ -16,6 +16,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
@@ -28,7 +34,9 @@ import type {
 import { format } from "date-fns";
 import { de, enUS } from "date-fns/locale";
 import {
+  ArrowRight,
   CalendarIcon,
+  Info,
   NotebookPen,
   RefreshCcw,
   Save,
@@ -37,7 +45,8 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Calendar } from "./ui/calendar";
+import { useNavigate } from "react-router-dom";
+import { Calendar } from "../ui/calendar";
 
 interface TrainingDiarySectionProps {
   className?: string;
@@ -88,6 +97,7 @@ export function TrainingDiarySection({
   const { user } = useAuth();
   const { toast } = useToast();
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
 
   const locale = useMemo(
     () => (i18n.language === "en" ? enUS : de),
@@ -168,7 +178,7 @@ export function TrainingDiarySection({
   const filterMoodOptions = useMemo(
     () => [
       { value: "all", label: t("recoveryDiary.moods.all") },
-    ...moodOptions.map(({ value, label }) => ({ value, label })),
+      ...moodOptions.map(({ value, label }) => ({ value, label })),
     ],
     [moodOptions, t]
   );
@@ -302,50 +312,50 @@ export function TrainingDiarySection({
 
   const loadSummary = useCallback(
     async (period: string = "week") => {
-    if (!user) return;
-    try {
-      const token = localStorage.getItem("token");
+      if (!user) return;
+      try {
+        const token = localStorage.getItem("token");
         const response = await fetch(
           `${API_URL}/training-journal/summary?period=${period}`,
           {
-        headers: {
-          Authorization: `Bearer ${token ?? ""}`,
-        },
+            headers: {
+              Authorization: `Bearer ${token ?? ""}`,
+            },
           }
         );
 
-      if (!response.ok) {
+        if (!response.ok) {
           throw new Error(t("recoveryDiary.errors.loadError"));
-      }
+        }
 
-      const data = await response.json();
+        const data = await response.json();
 
-      // Konvertiere die Durchschnittswerte zu Zahlen, falls sie als Strings kommen
-      const parseNumber = (value: unknown): number | null => {
-        if (value === null || value === undefined) return null;
+        // Konvertiere die Durchschnittswerte zu Zahlen, falls sie als Strings kommen
+        const parseNumber = (value: unknown): number | null => {
+          if (value === null || value === undefined) return null;
           const num =
             typeof value === "string" ? parseFloat(value) : Number(value);
-        return !Number.isNaN(num) ? num : null;
-      };
+          return !Number.isNaN(num) ? num : null;
+        };
 
-      setSummary({
+        setSummary({
           moodDistribution: Array.isArray(data.moodDistribution)
             ? data.moodDistribution
             : [],
-        topTags: Array.isArray(data.topTags) ? data.topTags : [],
-        latestEntry: data.latestEntry ?? null,
-        totalEntries: data.totalEntries ?? 0,
-        avgEnergyLevel: parseNumber(data.avgEnergyLevel),
-        avgFocusLevel: parseNumber(data.avgFocusLevel),
-        avgSleepQuality: parseNumber(data.avgSleepQuality),
-        avgSorenessLevel: parseNumber(data.avgSorenessLevel),
-        avgPerceivedExertion: parseNumber(data.avgPerceivedExertion),
-        firstEntry: data.firstEntry ?? null,
-        lastEntry: data.lastEntry ?? null,
-      });
-    } catch (error) {
-      console.error("Training journal summary error:", error);
-    }
+          topTags: Array.isArray(data.topTags) ? data.topTags : [],
+          latestEntry: data.latestEntry ?? null,
+          totalEntries: data.totalEntries ?? 0,
+          avgEnergyLevel: parseNumber(data.avgEnergyLevel),
+          avgFocusLevel: parseNumber(data.avgFocusLevel),
+          avgSleepQuality: parseNumber(data.avgSleepQuality),
+          avgSorenessLevel: parseNumber(data.avgSorenessLevel),
+          avgPerceivedExertion: parseNumber(data.avgPerceivedExertion),
+          firstEntry: data.firstEntry ?? null,
+          lastEntry: data.lastEntry ?? null,
+        });
+      } catch (error) {
+        console.error("Training journal summary error:", error);
+      }
     },
     [user, t]
   );
@@ -377,9 +387,9 @@ export function TrainingDiarySection({
         const response = await fetch(
           `${API_URL}/training-journal?${params.toString()}`,
           {
-          headers: {
-            Authorization: `Bearer ${token ?? ""}`,
-          },
+            headers: {
+              Authorization: `Bearer ${token ?? ""}`,
+            },
           }
         );
 
@@ -433,9 +443,9 @@ export function TrainingDiarySection({
               const response = await fetch(
                 `${API_URL}/workouts/${preselectedWorkoutId}`,
                 {
-                headers: {
-                  Authorization: `Bearer ${token ?? ""}`,
-                },
+                  headers: {
+                    Authorization: `Bearer ${token ?? ""}`,
+                  },
                 }
               );
 
@@ -449,9 +459,9 @@ export function TrainingDiarySection({
                   }
                   return [
                     {
-                    id: workout.id,
-                    title: workout.title,
-                    workoutDate: workout.workoutDate || workout.createdAt,
+                      id: workout.id,
+                      title: workout.title,
+                      workoutDate: workout.workoutDate || workout.createdAt,
                     },
                     ...prev,
                   ];
@@ -702,9 +712,9 @@ export function TrainingDiarySection({
           const response = await fetch(
             `${API_URL}/workouts/${entry.workoutId}`,
             {
-            headers: {
-              Authorization: `Bearer ${token ?? ""}`,
-            },
+              headers: {
+                Authorization: `Bearer ${token ?? ""}`,
+              },
             }
           );
 
@@ -718,9 +728,9 @@ export function TrainingDiarySection({
               }
               return [
                 {
-                id: workout.id,
-                title: workout.title,
-                workoutDate: workout.workoutDate || workout.createdAt,
+                  id: workout.id,
+                  title: workout.title,
+                  workoutDate: workout.workoutDate || workout.createdAt,
                 },
                 ...prev,
               ];
@@ -812,56 +822,23 @@ export function TrainingDiarySection({
   }
 
   return (
-    <Card className={cn("shadow-sm", className)}>
-      <CardHeader className="flex flex-col gap-2 border-b pb-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
-              <NotebookPen className="h-5 w-5 text-primary" />
-              {t("recoveryDiary.title")}
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              {t("recoveryDiary.subtitle")}
-            </p>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleResetFilters}
-            title={t("recoveryDiary.resetFilters")}
-          >
-            <RefreshCcw className="h-4 w-4" />
-          </Button>
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-8 pt-4">
-        {/* Summary Statistics mit Zeitraum-Selector */}
-        <div className="space-y-4">
+    <div className={cn("grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-2", className)}>
+      {/* Stats full width */}
+      <Card className="shadow-sm xl:col-span-2">
+        <CardContent className="space-y-4 pt-4">
           <div className="flex items-center justify-between gap-4">
-            <h3 className="text-sm font-semibold text-foreground">
+            <h3 className="tracking-tight flex items-center gap-2 text-lg font-semibold text-foreground">
               {t("recoveryDiary.statistics")}
             </h3>
-            <Select
-              value={summaryPeriod}
-              onValueChange={(value) => setSummaryPeriod(value)}
-            >
+            <Select value={summaryPeriod} onValueChange={(value) => setSummaryPeriod(value)}>
               <SelectTrigger className="w-32">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="week">
-                  {t("recoveryDiary.period.week")}
-                </SelectItem>
-                <SelectItem value="month">
-                  {t("recoveryDiary.period.month")}
-                </SelectItem>
-                <SelectItem value="quarter">
-                  {t("recoveryDiary.period.quarter")}
-                </SelectItem>
-                <SelectItem value="year">
-                  {t("recoveryDiary.period.year")}
-                </SelectItem>
+                <SelectItem value="week">{t("recoveryDiary.period.week")}</SelectItem>
+                <SelectItem value="month">{t("recoveryDiary.period.month")}</SelectItem>
+                <SelectItem value="quarter">{t("recoveryDiary.period.quarter")}</SelectItem>
+                <SelectItem value="year">{t("recoveryDiary.period.year")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -871,41 +848,31 @@ export function TrainingDiarySection({
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                   {t("recoveryDiary.entries")}
                 </p>
-                <p className="text-lg font-semibold">
-                  {summary.totalEntries ?? 0}
-                </p>
+                <p className="text-lg font-semibold">{summary.totalEntries ?? 0}</p>
               </div>
               <div className="rounded-lg border bg-muted/50 p-3">
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                   {t("recoveryDiary.avgEnergy")}
                 </p>
-                <p className="text-lg font-semibold">
-                  {formatScaleValue(summary.avgEnergyLevel)}
-                </p>
+                <p className="text-lg font-semibold">{formatScaleValue(summary.avgEnergyLevel)}</p>
               </div>
               <div className="rounded-lg border bg-muted/50 p-3">
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                   {t("recoveryDiary.avgFocus")}
                 </p>
-                <p className="text-lg font-semibold">
-                  {formatScaleValue(summary.avgFocusLevel)}
-                </p>
+                <p className="text-lg font-semibold">{formatScaleValue(summary.avgFocusLevel)}</p>
               </div>
               <div className="rounded-lg border bg-muted/50 p-3">
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                   {t("recoveryDiary.avgSleep")}
                 </p>
-                <p className="text-lg font-semibold">
-                  {formatScaleValue(summary.avgSleepQuality)}
-                </p>
+                <p className="text-lg font-semibold">{formatScaleValue(summary.avgSleepQuality)}</p>
               </div>
               <div className="rounded-lg border bg-muted/50 p-3">
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                   {t("recoveryDiary.avgSoreness")}
                 </p>
-                <p className="text-lg font-semibold">
-                  {formatScaleValue(summary.avgSorenessLevel)}
-                </p>
+                <p className="text-lg font-semibold">{formatScaleValue(summary.avgSorenessLevel)}</p>
               </div>
               <div className="rounded-lg border bg-muted/50 p-3">
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -917,272 +884,343 @@ export function TrainingDiarySection({
               </div>
             </div>
           )}
-        </div>
-        <form onSubmit={onSubmit} className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="entry-date">{t("recoveryDiary.date")}</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    id="entry-date"
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !entryDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {entryDate
-                      ? format(entryDate, "PPP", { locale })
-                      : t("recoveryDiary.selectDate")}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={entryDate}
-                    onSelect={(date) => date && setEntryDate(date)}
-                    initialFocus
-                    locale={locale}
-                  />
-                </PopoverContent>
-              </Popover>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => navigate("/stats?tab=recovery")}
+          >
+            {t("recoveryDiary.viewDetailedStats", "Detaillierte Statistiken")}
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Neuer Eintrag */}
+      <Card className="shadow-sm xl:col-span-1">
+        <CardHeader className="flex flex-col gap-2 border-b pb-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <CardTitle className="tracking-tight flex items-center gap-2 text-lg font-semibold text-foreground">
+                  <NotebookPen className="h-5 w-5 text-primary" />
+                  {t("recoveryDiary.title")}
+                </CardTitle>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {t("recoveryDiary.subtitle")}
+              </p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="entry-mood">{t("recoveryDiary.mood")}</Label>
-              <Select
-                value={mood}
-                onValueChange={(value: TrainingJournalMood) => setMood(value)}
-              >
-                <SelectTrigger id="entry-mood">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {moodOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      <span className="flex flex-col text-sm">
-                        <span className="font-medium">
-                          {option.emoji} {option.label}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {option.helper}
-                        </span>
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="energy-level">
-                {t("recoveryDiary.energyLevel")}
-              </Label>
-              <Input
-                id="energy-level"
-                type="number"
-                min={1}
-                max={10}
-                value={energyLevel}
-                onChange={(event) => setEnergyLevel(event.target.value)}
-                placeholder={t("recoveryDiary.placeholders.energy")}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="focus-level">
-                {t("recoveryDiary.focusLevel")}
-              </Label>
-              <Input
-                id="focus-level"
-                type="number"
-                min={1}
-                max={10}
-                value={focusLevel}
-                onChange={(event) => setFocusLevel(event.target.value)}
-                placeholder={t("recoveryDiary.placeholders.focus")}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="sleep-quality">
-                {t("recoveryDiary.sleepQuality")}
-              </Label>
-              <Input
-                id="sleep-quality"
-                type="number"
-                min={1}
-                max={10}
-                value={sleepQuality}
-                onChange={(event) => setSleepQuality(event.target.value)}
-                placeholder={t("recoveryDiary.placeholders.sleep")}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="soreness-level">
-                {t("recoveryDiary.sorenessLevel")}
-              </Label>
-              <Input
-                id="soreness-level"
-                type="number"
-                min={0}
-                max={10}
-                value={sorenessLevel}
-                onChange={(event) => setSorenessLevel(event.target.value)}
-                placeholder={t("recoveryDiary.placeholders.soreness")}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="perceived-exertion">
-                {t("recoveryDiary.perceivedExertion")}
-              </Label>
-              <Input
-                id="perceived-exertion"
-                type="number"
-                min={1}
-                max={10}
-                value={perceivedExertion}
-                onChange={(event) => setPerceivedExertion(event.target.value)}
-                placeholder={t("recoveryDiary.placeholders.exertion")}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="workout-reference">
-                {t("recoveryDiary.workoutLink")}
-              </Label>
-              <Select
-                value={workoutId}
-                onValueChange={(value) => setWorkoutId(value)}
-              >
-                <SelectTrigger
-                  id="workout-reference"
-                  className="h-auto min-h-10 py-2 items-start [&>span]:line-clamp-none"
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-8 pt-4">
+          <form onSubmit={onSubmit} className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="entry-date">{t("recoveryDiary.date")}</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="entry-date"
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !entryDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {entryDate
+                        ? format(entryDate, "PPP", { locale })
+                        : t("recoveryDiary.selectDate")}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={entryDate}
+                      onSelect={(date) => date && setEntryDate(date)}
+                      initialFocus
+                      locale={locale}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="entry-mood">{t("recoveryDiary.mood")}</Label>
+                <Select
+                  value={mood}
+                  onValueChange={(value: TrainingJournalMood) => setMood(value)}
                 >
-                  <SelectValue
-                    placeholder={t("recoveryDiary.workoutLinkPlaceholder")}
-                  >
-                    {selectedWorkout ? (
-                      <div className="flex flex-col text-left w-full">
-                        <span className="font-medium break-words whitespace-normal">
-                          {selectedWorkout.title}
+                  <SelectTrigger id="entry-mood">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {moodOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        <span className="flex flex-col text-sm">
+                          <span className="font-medium">
+                            {option.emoji} {option.label}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {option.helper}
+                          </span>
                         </span>
-                        {selectedWorkout.workoutDate && (
-                          <span className="text-xs text-muted-foreground">
-                            {formatDate(selectedWorkout.workoutDate)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="energy-level">
+                  {t("recoveryDiary.energyLevel")}
+                </Label>
+                <Input
+                  id="energy-level"
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={energyLevel}
+                  onChange={(event) => setEnergyLevel(event.target.value)}
+                  placeholder={t("recoveryDiary.placeholders.energy")}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="focus-level">
+                  {t("recoveryDiary.focusLevel")}
+                </Label>
+                <Input
+                  id="focus-level"
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={focusLevel}
+                  onChange={(event) => setFocusLevel(event.target.value)}
+                  placeholder={t("recoveryDiary.placeholders.focus")}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sleep-quality">
+                  {t("recoveryDiary.sleepQuality")}
+                </Label>
+                <Input
+                  id="sleep-quality"
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={sleepQuality}
+                  onChange={(event) => setSleepQuality(event.target.value)}
+                  placeholder={t("recoveryDiary.placeholders.sleep")}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="soreness-level">
+                  {t("recoveryDiary.sorenessLevel")}
+                </Label>
+                <Input
+                  id="soreness-level"
+                  type="number"
+                  min={0}
+                  max={10}
+                  value={sorenessLevel}
+                  onChange={(event) => setSorenessLevel(event.target.value)}
+                  placeholder={t("recoveryDiary.placeholders.soreness")}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="perceived-exertion">
+                  {t("recoveryDiary.perceivedExertion")}
+                </Label>
+                <Input
+                  id="perceived-exertion"
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={perceivedExertion}
+                  onChange={(event) => setPerceivedExertion(event.target.value)}
+                  placeholder={t("recoveryDiary.placeholders.exertion")}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="workout-reference">
+                  {t("recoveryDiary.workoutLink")}
+                </Label>
+                <Select
+                  value={workoutId}
+                  onValueChange={(value) => setWorkoutId(value)}
+                >
+                  <SelectTrigger
+                    id="workout-reference"
+                    className="h-auto min-h-10 py-2 items-start [&>span]:line-clamp-none"
+                  >
+                    <SelectValue
+                      placeholder={t("recoveryDiary.workoutLinkPlaceholder")}
+                    >
+                      {selectedWorkout ? (
+                        <div className="flex flex-col text-left w-full">
+                          <span className="font-medium break-words whitespace-normal">
+                            {selectedWorkout.title}
                           </span>
-                        )}
-                      </div>
-                    ) : workoutId === "none" ? (
-                      <span>{t("recoveryDiary.noWorkout")}</span>
-                    ) : null}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">
-                    {t("recoveryDiary.noWorkout")}
-                  </SelectItem>
-                  {recentWorkouts.map((workout) => (
-                    <SelectItem key={workout.id} value={workout.id}>
-                      <div className="flex flex-col">
-                        <span>{workout.title}</span>
-                        {workout.workoutDate && (
-                          <span className="text-xs text-muted-foreground">
-                            {formatDate(workout.workoutDate)}
-                          </span>
-                        )}
-                      </div>
+                          {selectedWorkout.workoutDate && (
+                            <span className="text-xs text-muted-foreground">
+                              {formatDate(selectedWorkout.workoutDate)}
+                            </span>
+                          )}
+                        </div>
+                      ) : workoutId === "none" ? (
+                        <span>{t("recoveryDiary.noWorkout")}</span>
+                      ) : null}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">
+                      {t("recoveryDiary.noWorkout")}
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    {recentWorkouts.map((workout) => (
+                      <SelectItem key={workout.id} value={workout.id}>
+                        <div className="flex flex-col">
+                          <span>{workout.title}</span>
+                          {workout.workoutDate && (
+                            <span className="text-xs text-muted-foreground">
+                              {formatDate(workout.workoutDate)}
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sleep-duration">
+                  {t("recoveryDiary.sleepDuration")}
+                </Label>
+                <Input
+                  id="sleep-duration"
+                  type="number"
+                  min={0}
+                  step="0.25"
+                  value={sleepDuration}
+                  onChange={(event) => setSleepDuration(event.target.value)}
+                  placeholder={t("recoveryDiary.placeholders.sleepDuration")}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="resting-hr">
+                  {t("recoveryDiary.restingHeartRate")}
+                </Label>
+                <Input
+                  id="resting-hr"
+                  type="number"
+                  min={0}
+                  value={restingHeartRate}
+                  onChange={(event) => setRestingHeartRate(event.target.value)}
+                  placeholder={t("recoveryDiary.placeholders.heartRate")}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="hydration-level">
+                  {t("recoveryDiary.hydrationLevel")}
+                </Label>
+                <Input
+                  id="hydration-level"
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={hydrationLevel}
+                  onChange={(event) => setHydrationLevel(event.target.value)}
+                  placeholder={t("recoveryDiary.placeholders.hydration")}
+                />
+              </div>
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="sleep-duration">
-                {t("recoveryDiary.sleepDuration")}
-              </Label>
+              <Label htmlFor="entry-tags">{t("recoveryDiary.tags")}</Label>
               <Input
-                id="sleep-duration"
-                type="number"
-                min={0}
-                step="0.25"
-                value={sleepDuration}
-                onChange={(event) => setSleepDuration(event.target.value)}
-                placeholder={t("recoveryDiary.placeholders.sleepDuration")}
+                id="entry-tags"
+                value={tagsInput}
+                onChange={(event) => setTagsInput(event.target.value)}
+                placeholder={t("recoveryDiary.tagsPlaceholder")}
+              />
+              <p className="text-xs text-muted-foreground">
+                {t("recoveryDiary.tagsHint")}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="entry-notes">{t("recoveryDiary.notes")}</Label>
+              <Textarea
+                id="entry-notes"
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder={t("recoveryDiary.notesPlaceholder")}
+                rows={4}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="resting-hr">
-                {t("recoveryDiary.restingHeartRate")}
-              </Label>
-              <Input
-                id="resting-hr"
-                type="number"
-                min={0}
-                value={restingHeartRate}
-                onChange={(event) => setRestingHeartRate(event.target.value)}
-                placeholder={t("recoveryDiary.placeholders.heartRate")}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="hydration-level">
-                {t("recoveryDiary.hydrationLevel")}
-              </Label>
-              <Input
-                id="hydration-level"
-                type="number"
-                min={1}
-                max={10}
-                value={hydrationLevel}
-                onChange={(event) => setHydrationLevel(event.target.value)}
-                placeholder={t("recoveryDiary.placeholders.hydration")}
-              />
-            </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="entry-tags">{t("recoveryDiary.tags")}</Label>
-            <Input
-              id="entry-tags"
-              value={tagsInput}
-              onChange={(event) => setTagsInput(event.target.value)}
-              placeholder={t("recoveryDiary.tagsPlaceholder")}
-            />
-            <p className="text-xs text-muted-foreground">
-              {t("recoveryDiary.tagsHint")}
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="entry-notes">{t("recoveryDiary.notes")}</Label>
-            <Textarea
-              id="entry-notes"
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              placeholder={t("recoveryDiary.notesPlaceholder")}
-              rows={4}
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            {editingEntry && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={resetForm}
-                disabled={isSubmitting}
-              >
-                <X className="mr-2 h-4 w-4" />
-                {t("recoveryDiary.cancelEdit")}
+            <div className="flex flex-wrap items-center gap-3">
+              {editingEntry && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={resetForm}
+                  disabled={isSubmitting}
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  {t("recoveryDiary.cancelEdit")}
+                </Button>
+              )}
+              <Button type="submit" disabled={isSubmitting}>
+                <Save className="mr-2 h-4 w-4" />
+                {editingEntry
+                  ? t("recoveryDiary.update")
+                  : t("recoveryDiary.save")}
               </Button>
-            )}
-            <Button type="submit" disabled={isSubmitting}>
-              <Save className="mr-2 h-4 w-4" />
-              {editingEntry
-                ? t("recoveryDiary.update")
-                : t("recoveryDiary.save")}
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Vergangene Einträge */}
+      <Card className="shadow-sm">
+        <CardHeader className="flex flex-col gap-2 border-b pb-4">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <CardTitle className="tracking-tight flex items-center gap-2 text-lg font-semibold text-foreground">
+                {t("recoveryDiary.pastEntries")}
+              </CardTitle>
+              <TooltipProvider delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 p-0 text-muted-foreground"
+                      title={t("recoveryDiary.editWindowInfo")}
+                    >
+                      <Info className="h-4 w-4" />
+                      <span className="sr-only">
+                        {t("recoveryDiary.editWindowInfo")}
+                      </span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" align="start" className="max-w-xs text-sm">
+                    {t("recoveryDiary.editWindowInfo")}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleResetFilters}
+              title={t("recoveryDiary.resetFilters")}
+            >
+              <RefreshCcw className="h-4 w-4" />
             </Button>
           </div>
-        </form>
+        </CardHeader>
 
-        <div className="space-y-4">
+        <CardContent className="space-y-4 pt-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-2">
               <Label htmlFor="filter-mood">
@@ -1237,22 +1275,22 @@ export function TrainingDiarySection({
           {summary &&
             (summary.moodDistribution.length > 0 ||
               summary.topTags.length > 0) && (
-            <div className="rounded-lg border bg-muted/30 p-4">
-              <div className="mb-3 flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <TrendingUp className="h-4 w-4" />
+              <div className="rounded-lg border bg-muted/30 p-4">
+                <div className="mb-3 flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <TrendingUp className="h-4 w-4" />
                   {t("recoveryDiary.trends")}
-              </div>
-              <div className="grid gap-3 md:grid-cols-2">
-                <div>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div>
                     <p className="text-xs font-semibold uppercase text-muted-foreground">
                       {t("recoveryDiary.moodDistribution")}
                     </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {summary.moodDistribution.map((item) => {
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {summary.moodDistribution.map((item) => {
                         const option = moodOptions.find(
                           (m) => m.value === item.mood
                         );
-                      return (
+                        return (
                           <Badge
                             key={item.mood}
                             variant="secondary"
@@ -1260,30 +1298,30 @@ export function TrainingDiarySection({
                           >
                             {option?.emoji ?? ""} {option?.label ?? item.mood} (
                             {item.count})
-                        </Badge>
-                      );
-                    })}
+                          </Badge>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-                <div>
+                  <div>
                     <p className="text-xs font-semibold uppercase text-muted-foreground">
                       {t("recoveryDiary.popularTags")}
                     </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {summary.topTags.map((tag) => (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {summary.topTags.map((tag) => (
                         <Badge
                           key={tag.tag}
                           variant="outline"
                           className="text-xs"
                         >
-                        #{tag.tag} ({tag.count})
-                      </Badge>
-                    ))}
+                          #{tag.tag} ({tag.count})
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
           {isLoading ? (
             <div className="space-y-3">
@@ -1372,25 +1410,25 @@ export function TrainingDiarySection({
                           </span>
                           {typeof entry.metrics?.sleepDurationHours ===
                             "number" && (
-                            <span>
-                              {t("recoveryDiary.metrics.sleepDuration")}:{" "}
-                              {formatNumber(entry.metrics.sleepDurationHours)} h
-                            </span>
-                          )}
+                              <span>
+                                {t("recoveryDiary.metrics.sleepDuration")}:{" "}
+                                {formatNumber(entry.metrics.sleepDurationHours)} h
+                              </span>
+                            )}
                           {typeof entry.metrics?.restingHeartRate ===
                             "number" && (
-                            <span>
-                              {t("recoveryDiary.metrics.heartRate")}:{" "}
-                              {Math.round(entry.metrics.restingHeartRate)} bpm
-                            </span>
-                          )}
+                              <span>
+                                {t("recoveryDiary.metrics.heartRate")}:{" "}
+                                {Math.round(entry.metrics.restingHeartRate)} bpm
+                              </span>
+                            )}
                           {typeof entry.metrics?.hydrationLevel ===
                             "number" && (
-                            <span>
-                              {t("recoveryDiary.metrics.hydration")}:{" "}
-                              {formatScaleValue(entry.metrics.hydrationLevel)}
-                            </span>
-                          )}
+                              <span>
+                                {t("recoveryDiary.metrics.hydration")}:{" "}
+                                {formatScaleValue(entry.metrics.hydrationLevel)}
+                              </span>
+                            )}
                         </div>
                         {entry.notes && (
                           <p className="text-sm text-muted-foreground">
@@ -1442,10 +1480,6 @@ export function TrainingDiarySection({
                   >
                     {t("recoveryDiary.previous")}
                   </Button>
-                  <span className="text-xs text-muted-foreground">
-                    {t("recoveryDiary.page")} {pagination.currentPage}{" "}
-                    {t("recoveryDiary.of")} {pagination.totalPages}
-                  </span>
                   <Button
                     variant="outline"
                     size="sm"
@@ -1458,8 +1492,8 @@ export function TrainingDiarySection({
               )}
             </div>
           )}
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

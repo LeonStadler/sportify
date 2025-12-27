@@ -1,19 +1,19 @@
-import { AppSidebar } from "@/components/AppSidebar";
-import { InstallPrompt } from "@/components/InstallPrompt";
-import { InviteLinkHandler } from "@/components/InviteLinkHandler";
-import { MobileBottomNav } from "@/components/MobileBottomNav";
-import { OfflineBanner } from "@/components/OfflineBanner";
+import { AppSidebar } from "@/components/common/AppSidebar";
+import { InstallPrompt } from "@/components/common/InstallPrompt";
+import { MobileBottomNav } from "@/components/common/MobileBottomNav";
+import { OfflineBanner } from "@/components/common/OfflineBanner";
+import { InviteLinkHandler } from "@/components/settings/InviteLinkHandler";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { ToastAction } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { usePWA } from "@/hooks/usePWA";
-import { ToastAction } from "@/components/ui/toast";
-import { useToast } from "@/hooks/use-toast";
 import { APP_VERSION } from "@/version";
 import { lazy, Suspense, useEffect } from "react";
-import { Route, Routes } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { Route, Routes } from "react-router-dom";
 
 // Lazy load pages for code splitting
 const Admin = lazy(() =>
@@ -53,6 +53,9 @@ const Scoreboard = lazy(() =>
 );
 const Stats = lazy(() =>
   import("@/pages/Stats").then((m) => ({ default: m.Stats }))
+);
+const MyWorkouts = lazy(() =>
+  import("@/pages/MyWorkouts").then((m) => ({ default: m.MyWorkouts }))
 );
 const Terms = lazy(() => import("@/pages/Terms"));
 const Training = lazy(() =>
@@ -204,6 +207,7 @@ const App = () => {
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/scoreboard" element={<Scoreboard />} />
                 <Route path="/training" element={<Training />} />
+                <Route path="/my-workouts" element={<MyWorkouts />} />
                 <Route path="/stats" element={<Stats />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/friends" element={<Friends />} />

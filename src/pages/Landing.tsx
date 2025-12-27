@@ -30,8 +30,8 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
-import { PublicFooter } from "@/components/PublicFooter";
-import { PublicHeader } from "@/components/PublicHeader";
+import { PublicFooter } from "@/components/common/PublicFooter";
+import { PublicHeader } from "@/components/common/PublicHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";

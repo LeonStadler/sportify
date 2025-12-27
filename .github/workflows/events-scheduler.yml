@@ -106,9 +106,17 @@ jobs:
           echo "Generated matrix: $matrix_json"
           echo "Matrix empty: $matrix_empty"
 
+      - name: Warn if required secrets are missing
+        if: ${{ secrets.EVENTS_CRON_SECRET == '' || (secrets.EVENTS_BASE_URL == '' && secrets.FRONTEND_URL == '') }}
+        shell: bash
+        run: |
+          echo "::warning::trigger-events job will be skipped because required secrets are missing."
+          echo "Required: EVENTS_CRON_SECRET and either EVENTS_BASE_URL or FRONTEND_URL."
+
   trigger-events:
     needs: setup-matrix
-    if: ${{ needs.setup-matrix.outputs.matrix_empty == 'false' }}
+  # Run only when we have work (matrix not empty) AND required secrets are present.
+  if: ${{ needs.setup-matrix.outputs.matrix_empty == 'false' && secrets.EVENTS_CRON_SECRET != '' && (secrets.EVENTS_BASE_URL != '' || secrets.FRONTEND_URL != '') }}
     # Concurrency control: prevent overlapping runs for the same endpoint
     # This is especially important for the frequent email dispatch job (every 15 minutes)
     concurrency:

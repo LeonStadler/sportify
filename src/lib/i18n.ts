@@ -624,7 +624,6 @@ const resources = {
         deleteWorkoutError: "Workout konnte nicht gelöscht werden.",
         edit: "Bearbeiten",
         delete: "Löschen",
-        viewAllWorkouts: "Alle anzeigen",
         previous: "Vorherige",
         next: "Nächste",
         unknownDate: "Unbekanntes Datum",

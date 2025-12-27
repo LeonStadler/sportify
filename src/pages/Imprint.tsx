@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { ObfuscatedText } from '@/components/common/ObfuscatedText';
-import { LegalPageTemplate } from '@/components/LegalPageTemplate';
+import { LegalPageTemplate } from '@/components/legal/LegalPageTemplate';
 import { contactInfo } from '@/config/contactInfo';
 
 export default function Imprint() {

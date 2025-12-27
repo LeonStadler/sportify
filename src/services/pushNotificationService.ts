@@ -166,9 +166,13 @@ export async function subscribeToPush(): Promise<{
 
   try {
     // Erstelle Subscription
+    // applicationServerKey expects BufferSource; Uint8Array is valid but TS needs a narrowed type.
+    const applicationServerKey = urlBase64ToUint8Array(
+      config.publicKey
+    ) as BufferSource;
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(config.publicKey),
+      applicationServerKey,
     });
 
     // Sende Subscription an Backend

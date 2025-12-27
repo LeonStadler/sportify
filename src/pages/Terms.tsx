@@ -2,7 +2,7 @@ import { Scale } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { ObfuscatedText } from '@/components/common/ObfuscatedText';
-import { LegalPageTemplate } from '@/components/LegalPageTemplate';
+import { LegalPageTemplate } from '@/components/legal/LegalPageTemplate';
 import { contactInfo } from '@/config/contactInfo';
 
 export default function Terms() {

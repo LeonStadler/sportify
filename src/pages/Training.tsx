@@ -1,8 +1,8 @@
-import { PageTemplate } from "@/components/PageTemplate";
-import { TrainingDiarySection } from "@/components/TrainingDiarySection";
-import { WorkoutForm } from "@/components/WorkoutForm";
+import { PageTemplate } from "@/components/common/PageTemplate";
+import { PaginationControls } from "@/components/common/pagination/PaginationControls";
 import { TimeRangeFilter } from "@/components/filters/TimeRangeFilter";
-import { PaginationControls } from "@/components/pagination/PaginationControls";
+import { TrainingDiarySection } from "@/components/training/TrainingDiarySection";
+import { WorkoutForm } from "@/components/training/WorkoutForm";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,14 +24,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
-import { getNormalizedRange, getRangeForPeriod, toDateParam } from "@/utils/dateRanges";
 import type { Workout } from "@/types/workout";
+import { getNormalizedRange, getRangeForPeriod, toDateParam } from "@/utils/dateRanges";
+import { ArrowRight, Info } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useTranslation } from "react-i18next";
 import type { DateRange } from "react-day-picker";
+import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 
 interface WorkoutResponse {
   workouts: Workout[];
@@ -48,6 +56,7 @@ const WORKOUTS_PER_PAGE = 10;
 
 export function Training() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filterType, setFilterType] = useState<string>("all");
@@ -286,6 +295,36 @@ export function Training() {
     return exercise?.name || exerciseType;
   };
 
+  const getActivityName = (activityType: string) => {
+    const translationKey = `activityFeed.activityTypes.${activityType.toLowerCase()}`;
+    const translation = t(translationKey);
+    return translation !== translationKey
+      ? translation
+      : t("activityFeed.activityTypes.unknown");
+  };
+
+  const translateUnit = (unit: string) => {
+    // Normalisiere die Unit für den Vergleich
+    const normalizedUnit = unit.toLowerCase();
+
+    // Prüfe auf bekannte Units und übersetze sie
+    if (normalizedUnit === "wiederholungen" || normalizedUnit === "repetitions") {
+      return t("training.form.units.repetitions");
+    }
+    if (normalizedUnit === "km" || normalizedUnit === "kilometer" || normalizedUnit === "kilometers") {
+      return t("training.form.units.kilometers");
+    }
+    if (normalizedUnit === "m" || normalizedUnit === "meter" || normalizedUnit === "meters") {
+      return t("training.form.units.meters");
+    }
+    if (normalizedUnit === "meilen" || normalizedUnit === "miles") {
+      return t("training.form.units.miles");
+    }
+
+    // Fallback: Unit unverändert zurückgeben
+    return unit;
+  };
+
   const formatWorkoutDateTime = (workout: Workout) => {
     if (!workout.startTimeTimestamp) {
       return t("training.unknownDate");
@@ -363,9 +402,31 @@ export function Training() {
             <Card>
               <CardHeader className="pb-4 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <CardTitle className="text-lg md:text-xl">
-                    {t("training.yourWorkouts")}
-                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-lg md:text-xl">
+                      {t("training.yourWorkouts")}
+                    </CardTitle>
+                    <TooltipProvider delayDuration={150}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 p-0 text-muted-foreground"
+                            title={t("training.editWindowInfo")}
+                          >
+                            <Info className="h-4 w-4" />
+                            <span className="sr-only">
+                              {t("training.editWindowInfo")}
+                            </span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" align="start" className="max-w-xs text-sm">
+                          {t("training.editWindowInfo")}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                   <Select value={filterType} onValueChange={handleFilterChange}>
                     <SelectTrigger className="w-full sm:w-48">
                       <SelectValue />
@@ -420,8 +481,8 @@ export function Training() {
                       {filterType === "all"
                         ? t("training.noWorkouts")
                         : t("training.noWorkoutsForType", {
-                            type: getExerciseName(filterType),
-                          })}
+                          type: getExerciseName(filterType),
+                        })}
                     </p>
                     <p className="text-xs md:text-sm text-muted-foreground">
                       {t("training.createFirstWorkout", {
@@ -493,7 +554,7 @@ export function Training() {
                                         variant="secondary"
                                       >
                                         {getExerciseIcon(activity.activityType)}{" "}
-                                        {activity.amount} {activity.unit}
+                                        {getActivityName(activity.activityType)}: {activity.amount} {translateUnit(activity.unit)}
                                       </Badge>
                                       {setsDisplay && (
                                         <span className="text-xs text-muted-foreground">
@@ -562,6 +623,16 @@ export function Training() {
                         }}
                       />
                     )}
+
+                    {/* Show More Button */}
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => navigate("/my-workouts")}
+                    >
+                      {t("training.viewAllWorkouts", "Alle anzeigen")}
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
                   </div>
                 )}
               </CardContent>

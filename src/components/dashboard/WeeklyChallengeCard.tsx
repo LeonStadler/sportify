@@ -15,7 +15,7 @@ import { Flame, ShieldCheck, Target } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Skeleton } from "./ui/skeleton";
+import { Skeleton } from "../ui/skeleton";
 
 import { Button } from "@/components/ui/button";
 import { Settings } from "lucide-react";

@@ -6,8 +6,8 @@ import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { z } from "zod";
 
-import { LegalFooter } from "@/components/LegalFooter";
-import { PublicHeader } from "@/components/PublicHeader";
+import { PublicHeader } from "@/components/common/PublicHeader";
+import { LegalFooter } from "@/components/legal/LegalFooter";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {

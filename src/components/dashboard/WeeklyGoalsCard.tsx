@@ -1,9 +1,9 @@
+import { WeeklyGoals } from "@/components/settings/WeeklyGoalsForm";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Button } from "@/components/ui/button";
 import { Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { WeeklyGoals } from "@/components/WeeklyGoalsForm";
 
 export interface WeeklyProgress {
   pullups: number;

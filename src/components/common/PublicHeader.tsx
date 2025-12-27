@@ -1,5 +1,4 @@
 import {
-  ArrowRight,
   Globe,
   Monitor,
   Moon,
@@ -12,10 +11,10 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
 
-import LanguageSwitcher from "@/components/LanguageSwitcher";
-import { Logo } from "@/components/Logo";
-import { LogoFull } from "@/components/LogoFull";
-import ThemeSwitcher from "@/components/ThemeSwitcher";
+import LanguageSwitcher from "@/components/common/LanguageSwitcher";
+import { Logo } from "@/components/common/Logo";
+import { LogoFull } from "@/components/common/LogoFull";
+import ThemeSwitcher from "@/components/common/ThemeSwitcher";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -162,15 +161,15 @@ export function PublicHeader({
             {/* Auth Buttons - auf nicht-Auth-Seiten immer Login/Register, Kontakt bei Platz */}
             {shouldShowAuthButtons && (
               <div className="flex gap-2">
-                {/* Kontakt-Button: nur bei genug Platz (sm+), nicht auf Contact-Seite */}
+                {/* Kontakt-Button: nur bei genug Platz (md+), nicht auf Contact-Seite */}
                 {showContactButtonDisplay && (
-                  <Button variant="ghost" asChild className="hidden sm:flex">
+                  <Button variant="outline" asChild className="hidden md:flex hover:bg-accent/80">
                     <Link to="/contact">{t("landing.contact")}</Link>
                   </Button>
                 )}
                 {/* Login-Button: auf allen nicht-Auth-Seiten außer Login-Seite, oder auf Auth-Seiten (Register oder andere) */}
                 {showLoginButton && (
-                  <Button variant="outline" asChild>
+                  <Button variant="outline" asChild className="hover:bg-primary hover:text-primary-foreground">
                     <Link to="/auth/login">{t("auth.login")}</Link>
                   </Button>
                 )}
@@ -185,14 +184,9 @@ export function PublicHeader({
                     }
                   >
                     <Link to="/auth/register">
-                      {showContactButtonDisplay ? (
-                        <>
-                          {t("landing.register")}
-                          <ArrowRight className="ml-2 h-4 w-4" />
-                        </>
-                      ) : (
-                        t("auth.register")
-                      )}
+                      {showContactButtonDisplay
+                        ? t("landing.register")
+                        : t("auth.register")}
                     </Link>
                   </Button>
                 )}

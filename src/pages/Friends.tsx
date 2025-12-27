@@ -1,5 +1,5 @@
-import { InviteFriendForm } from "@/components/InviteFriendForm";
-import { PageTemplate } from "@/components/PageTemplate";
+import { PageTemplate } from "@/components/common/PageTemplate";
+import { InviteFriendForm } from "@/components/settings/InviteFriendForm";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -511,7 +511,7 @@ function FriendRequestsList({
                   <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
                     <Avatar className="w-10 h-10 md:w-12 md:h-12">
                       {req.user.avatarUrl &&
-                      parseAvatarConfig(req.user.avatarUrl) ? (
+                        parseAvatarConfig(req.user.avatarUrl) ? (
                         <NiceAvatar
                           style={{ width: "48px", height: "48px" }}
                           {...parseAvatarConfig(req.user.avatarUrl)!}
@@ -578,7 +578,7 @@ function FriendRequestsList({
                   <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
                     <Avatar className="w-10 h-10 md:w-12 md:h-12">
                       {req.user.avatarUrl &&
-                      parseAvatarConfig(req.user.avatarUrl) ? (
+                        parseAvatarConfig(req.user.avatarUrl) ? (
                         <NiceAvatar
                           style={{ width: "48px", height: "48px" }}
                           {...parseAvatarConfig(req.user.avatarUrl)!}

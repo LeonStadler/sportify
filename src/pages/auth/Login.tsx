@@ -2,8 +2,8 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 
 import { LoginForm } from '@/components/auth/LoginForm';
-import { LegalFooter } from '@/components/LegalFooter';
-import { PublicHeader } from '@/components/PublicHeader';
+import { PublicHeader } from '@/components/common/PublicHeader';
+import { LegalFooter } from '@/components/legal/LegalFooter';
 
 export default function Login() {
   const { t } = useTranslation();

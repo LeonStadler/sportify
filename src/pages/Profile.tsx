@@ -1,13 +1,14 @@
-import { AvatarEditor } from "@/components/AvatarEditor";
-import { DeleteAccountConfirmationDialog } from "@/components/DeleteAccountConfirmationDialog";
-import { DeleteAccountPasswordDialog } from "@/components/DeleteAccountPasswordDialog";
-import { GlobalRankingWarningDialog } from "@/components/GlobalRankingWarningDialog";
-import { InviteFriendForm } from "@/components/InviteFriendForm";
-import { PageTemplate } from "@/components/PageTemplate";
-import { PasswordDialog } from "@/components/PasswordDialog";
-import { PushNotificationSettings } from "@/components/PushNotificationSettings";
-import { RecoveryCodesDialog } from "@/components/RecoveryCodesDialog";
-import { TwoFactorSetupDialog } from "@/components/TwoFactorSetupDialog";
+import { PasswordDialog } from "@/components/auth/PasswordDialog";
+import { RecoveryCodesDialog } from "@/components/auth/RecoveryCodesDialog";
+import { TwoFactorSetupDialog } from "@/components/auth/TwoFactorSetupDialog";
+import { PageTemplate } from "@/components/common/PageTemplate";
+import { GlobalRankingWarningDialog } from "@/components/ranking/GlobalRankingWarningDialog";
+import { AvatarEditor } from "@/components/settings/AvatarEditor";
+import { DeleteAccountConfirmationDialog } from "@/components/settings/DeleteAccountConfirmationDialog";
+import { DeleteAccountPasswordDialog } from "@/components/settings/DeleteAccountPasswordDialog";
+import { InviteFriendForm } from "@/components/settings/InviteFriendForm";
+import { PushNotificationSettings } from "@/components/settings/PushNotificationSettings";
+import { WeeklyGoals, WeeklyGoalsForm } from "@/components/settings/WeeklyGoalsForm";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,8 +25,6 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { WeeklyGoalsDialog } from "@/components/WeeklyGoalsDialog";
-import { WeeklyGoalsForm, WeeklyGoals } from "@/components/WeeklyGoalsForm";
 import { DEFAULT_WEEKLY_POINTS_GOAL } from "@/config/events";
 import { Invitation } from "@/contexts/AuthContext";
 import { useAuth } from "@/hooks/use-auth";
@@ -354,7 +353,7 @@ export function Profile() {
           .catch(() => ({ error: "Fehler beim Speichern" }));
         throw new Error(
           errorData.error ||
-            t("goals.saveError", "Fehler beim Speichern der Ziele")
+          t("goals.saveError", "Fehler beim Speichern der Ziele")
         );
       }
 
@@ -1389,19 +1388,19 @@ export function Profile() {
                         <p className="text-muted-foreground">
                           Aktiviert am:{" "}
                           {user.twoFactorEnabledAt &&
-                          user.twoFactorEnabledAt !== null &&
-                          user.twoFactorEnabledAt !== undefined &&
-                          user.twoFactorEnabledAt !== "" &&
-                          !isNaN(new Date(user.twoFactorEnabledAt).getTime())
+                            user.twoFactorEnabledAt !== null &&
+                            user.twoFactorEnabledAt !== undefined &&
+                            user.twoFactorEnabledAt !== "" &&
+                            !isNaN(new Date(user.twoFactorEnabledAt).getTime())
                             ? new Date(
-                                user.twoFactorEnabledAt
-                              ).toLocaleDateString("de-DE", {
-                                day: "2-digit",
-                                month: "2-digit",
-                                year: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })
+                              user.twoFactorEnabledAt
+                            ).toLocaleDateString("de-DE", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
                             : "Nicht verfügbar"}
                         </p>
                       </div>
@@ -1454,20 +1453,20 @@ export function Profile() {
                     <p className="text-sm font-medium">Letzter Login</p>
                     <p className="text-sm text-muted-foreground">
                       {user.lastLoginAt &&
-                      user.lastLoginAt !== null &&
-                      user.lastLoginAt !== undefined &&
-                      user.lastLoginAt !== "" &&
-                      !isNaN(new Date(user.lastLoginAt).getTime())
+                        user.lastLoginAt !== null &&
+                        user.lastLoginAt !== undefined &&
+                        user.lastLoginAt !== "" &&
+                        !isNaN(new Date(user.lastLoginAt).getTime())
                         ? new Date(user.lastLoginAt).toLocaleDateString(
-                            "de-DE",
-                            {
-                              day: "2-digit",
-                              month: "2-digit",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            }
-                          )
+                          "de-DE",
+                          {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          }
+                        )
                         : "Nie"}
                     </p>
                   </div>
@@ -1477,20 +1476,20 @@ export function Profile() {
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {user.passwordChangedAt &&
-                      user.passwordChangedAt !== null &&
-                      user.passwordChangedAt !== undefined &&
-                      user.passwordChangedAt !== "" &&
-                      !isNaN(new Date(user.passwordChangedAt).getTime())
+                        user.passwordChangedAt !== null &&
+                        user.passwordChangedAt !== undefined &&
+                        user.passwordChangedAt !== "" &&
+                        !isNaN(new Date(user.passwordChangedAt).getTime())
                         ? new Date(user.passwordChangedAt).toLocaleDateString(
-                            "de-DE",
-                            {
-                              day: "2-digit",
-                              month: "2-digit",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            }
-                          )
+                          "de-DE",
+                          {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          }
+                        )
                         : "Nie geändert"}
                     </p>
                   </div>
@@ -1905,10 +1904,10 @@ export function Profile() {
                               ? `${format(new Date(award.periodStart), "dd.MM.yyyy", { locale: de })} – ${format(new Date(award.periodEnd), "dd.MM.yyyy", { locale: de })}`
                               : award.periodStart
                                 ? format(
-                                    new Date(award.periodStart),
-                                    "dd.MM.yyyy",
-                                    { locale: de }
-                                  )
+                                  new Date(award.periodStart),
+                                  "dd.MM.yyyy",
+                                  { locale: de }
+                                )
                                 : ""}
                           </p>
                         )}

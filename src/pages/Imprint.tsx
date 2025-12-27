@@ -2,7 +2,7 @@ import { Building2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
-import { ObfuscatedText } from '@/components/ObfuscatedText';
+import { ObfuscatedText } from '@/components/common/ObfuscatedText';
 import { LegalPageTemplate } from '@/components/LegalPageTemplate';
 import { contactInfo } from '@/config/contactInfo';
 

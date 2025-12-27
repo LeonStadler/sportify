@@ -389,6 +389,16 @@ const resources = {
         noWorkoutsDescription:
           "Im ausgewählten Zeitraum wurden keine Trainings aufgezeichnet.",
       },
+      myWorkouts: {
+        title: "Meine Workouts",
+        subtitle: "Alle deine Trainings im Überblick",
+        itemsPerPage: "Pro Seite:",
+        totalWorkouts: "{{count}} Trainings gefunden",
+        noWorkouts: "Keine Trainings gefunden",
+        noWorkoutsDescription:
+          "Im ausgewählten Zeitraum wurden keine Trainings aufgezeichnet.",
+        errorLoading: "Fehler beim Laden der Workouts",
+      },
       friendProfile: {
         recentWorkouts: "Letzte Aktivitäten",
         noWorkouts: "Noch keine Trainings aufgezeichnet.",
@@ -591,6 +601,7 @@ const resources = {
         trainingsDiary: "Trainingsstagebuch",
         recoveryDiary: "Erholungstagebuch",
         yourWorkouts: "Deine Workouts",
+        viewAllWorkouts: "Alle anzeigen",
         noWorkouts: "Noch keine Workouts vorhanden.",
         noWorkoutsForType: "Keine Workouts für {{type}} gefunden.",
         createFirstWorkout:
@@ -602,6 +613,8 @@ const resources = {
         running: "Laufen",
         cycling: "Radfahren",
         mustBeLoggedIn: "Du musst angemeldet sein, um Workouts zu sehen.",
+        editWindowInfo:
+          "Workouts können nur innerhalb von 7 Tagen nach dem Datum bearbeitet werden.",
         loadError: "Fehler beim Laden der Workouts",
         workoutsLoadError: "Workouts konnten nicht geladen werden.",
         deleteConfirm: "Möchtest du dieses Workout wirklich löschen?",
@@ -611,6 +624,7 @@ const resources = {
         deleteWorkoutError: "Workout konnte nicht gelöscht werden.",
         edit: "Bearbeiten",
         delete: "Löschen",
+        viewAllWorkouts: "Alle anzeigen",
         previous: "Vorherige",
         next: "Nächste",
         unknownDate: "Unbekanntes Datum",
@@ -695,6 +709,8 @@ const resources = {
         subtitle:
           "Dokumentiere deine Erholung, Regeneration, Tagesform und persönliche Notizen.",
         entries: "Einträge",
+        editWindowInfo:
+          "Erholungstagebuch-Einträge können nur innerhalb von 7 Tagen bearbeitet werden.",
         avgEnergy: "Ø Energie",
         avgFocus: "Ø Fokus",
         avgSleep: "Ø Schlafqualität",
@@ -727,7 +743,9 @@ const resources = {
         filterSearch: "Suche",
         filterSearchPlaceholder: "Tags oder Notizen durchsuchen",
         resetFilters: "Filter zurücksetzen",
+        pastEntries: "Vergangene Einträge",
         statistics: "Statistiken",
+        viewDetailedStats: "Detaillierte Statistiken",
         trends: "Trends",
         moodDistribution: "Stimmungsverteilung",
         popularTags: "Beliebte Tags",
@@ -2342,6 +2360,16 @@ const resources = {
         noWorkoutsDescription:
           "No workouts were recorded in the selected time period.",
       },
+      myWorkouts: {
+        title: "My Workouts",
+        subtitle: "All your training sessions at a glance",
+        itemsPerPage: "Per page:",
+        totalWorkouts: "{{count}} workouts found",
+        noWorkouts: "No workouts found",
+        noWorkoutsDescription:
+          "No workouts were recorded in the selected time period.",
+        errorLoading: "Error loading workouts",
+      },
       friendProfile: {
         recentWorkouts: "Recent Activities",
         noWorkouts: "No workouts recorded yet.",
@@ -2552,6 +2580,8 @@ const resources = {
         running: "Running",
         cycling: "Cycling",
         mustBeLoggedIn: "You must be logged in to view workouts.",
+        editWindowInfo:
+          "Workouts can only be edited within 7 days of their workout date.",
         loadError: "Error loading workouts",
         workoutsLoadError: "Workouts could not be loaded.",
         deleteConfirm: "Do you really want to delete this workout?",
@@ -2561,6 +2591,7 @@ const resources = {
         deleteWorkoutError: "Workout could not be deleted.",
         edit: "Edit",
         delete: "Delete",
+        viewAllWorkouts: "View All",
         previous: "Previous",
         next: "Next",
         unknownDate: "Unknown date",
@@ -2644,6 +2675,7 @@ const resources = {
         subtitle:
           "Document your recovery, regeneration, daily form and personal notes.",
         entries: "Entries",
+        editWindowInfo: "Recovery diary entries can only be edited within 7 days.",
         avgEnergy: "Ø Energy",
         avgFocus: "Ø Focus",
         avgSleep: "Ø Sleep Quality",
@@ -2675,7 +2707,9 @@ const resources = {
         filterSearch: "Search",
         filterSearchPlaceholder: "Search tags or notes",
         resetFilters: "Reset Filters",
+        pastEntries: "Past entries",
         statistics: "Statistics",
+        viewDetailedStats: "Detailed Statistics",
         trends: "Trends",
         moodDistribution: "Mood Distribution",
         popularTags: "Popular Tags",

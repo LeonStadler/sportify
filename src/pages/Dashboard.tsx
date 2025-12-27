@@ -1,18 +1,18 @@
 import { ActivityFeed } from "@/components/ActivityFeed";
-import { DashboardLeaderboardCard } from "@/components/DashboardLeaderboardCard";
+import { PageTemplate } from "@/components/common/PageTemplate";
+import { DashboardLeaderboardCard } from "@/components/dashboard/DashboardLeaderboardCard";
 import {
   DashboardSettingsDialog,
   StatCardConfig,
-} from "@/components/DashboardSettingsDialog";
-import { MonthlyGoalCard } from "@/components/MonthlyGoalCard";
-import { PageTemplate } from "@/components/PageTemplate";
-import { RecoveryJournalCard } from "@/components/RecoveryJournalCard";
-import { StatCard } from "@/components/StatCard";
-import { WeeklyChallengeCard } from "@/components/WeeklyChallengeCard";
-import { WeeklyGoalsCard, WeeklyProgress } from "@/components/WeeklyGoalsCard";
-import { WeeklyGoalsDialog } from "@/components/WeeklyGoalsDialog";
-import { WeeklyGoals } from "@/components/WeeklyGoalsForm";
-import { WeeklyPointsGoalDialog } from "@/components/WeeklyPointsGoalDialog";
+} from "@/components/dashboard/DashboardSettingsDialog";
+import { MonthlyGoalCard } from "@/components/dashboard/MonthlyGoalCard";
+import { RecoveryJournalCard } from "@/components/dashboard/RecoveryJournalCard";
+import { StatCard } from "@/components/dashboard/StatCard";
+import { WeeklyChallengeCard } from "@/components/dashboard/WeeklyChallengeCard";
+import { WeeklyGoalsCard, WeeklyProgress } from "@/components/dashboard/WeeklyGoalsCard";
+import { WeeklyGoalsDialog } from "@/components/settings/WeeklyGoalsDialog";
+import { WeeklyGoals } from "@/components/settings/WeeklyGoalsForm";
+import { WeeklyPointsGoalDialog } from "@/components/settings/WeeklyPointsGoalDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DEFAULT_WEEKLY_POINTS_GOAL } from "@/config/events";

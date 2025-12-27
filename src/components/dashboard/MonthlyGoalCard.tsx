@@ -5,7 +5,7 @@ import { API_URL } from "@/lib/api";
 import { Calendar } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Skeleton } from "./ui/skeleton";
+import { Skeleton } from "../ui/skeleton";
 
 interface MonthlyGoalCardProps {
   className?: string;

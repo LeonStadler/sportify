@@ -23,7 +23,7 @@ import {
 import LanguageSwitcher from "./LanguageSwitcher";
 import ThemeSwitcher from "./ThemeSwitcher";
 
-import { LogoFull } from "@/components/LogoFull";
+import { LogoFull } from "@/components/common/LogoFull";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -76,42 +76,42 @@ export function AppSidebar() {
     isActive?: (loc: Location) => boolean;
     onClick?: () => void;
   }> = [
-    {
-      title: t("navigation.dashboard"),
-      url: "/",
-      icon: Home,
-    },
-    {
-      title: t("navigation.scoreboard"),
-      url: "/scoreboard",
-      icon: Trophy,
-    },
-    {
-      title: t("navigation.training"),
-      url: "/training",
-      icon: Dumbbell,
-    },
-    {
-      title: t("navigation.stats"),
-      url: "/stats",
-      icon: BarChart,
-    },
-    {
-      title: "Freunde",
-      url: "/friends",
-      icon: Users,
-    },
-    {
-      title: t("navigation.profile"),
-      url: "/profile",
-      icon: User,
-    },
-    {
-      title: t("changelog.title", "Changelog"),
-      url: "/changelog",
-      icon: History,
-    },
-  ];
+      {
+        title: t("navigation.dashboard"),
+        url: "/",
+        icon: Home,
+      },
+      {
+        title: t("navigation.scoreboard"),
+        url: "/scoreboard",
+        icon: Trophy,
+      },
+      {
+        title: t("navigation.training"),
+        url: "/training",
+        icon: Dumbbell,
+      },
+      {
+        title: t("navigation.stats"),
+        url: "/stats",
+        icon: BarChart,
+      },
+      {
+        title: "Freunde",
+        url: "/friends",
+        icon: Users,
+      },
+      {
+        title: t("navigation.profile"),
+        url: "/profile",
+        icon: User,
+      },
+      {
+        title: t("changelog.title", "Changelog"),
+        url: "/changelog",
+        icon: History,
+      },
+    ];
 
   const adminItems = [
     {

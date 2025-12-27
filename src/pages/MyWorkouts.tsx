@@ -5,48 +5,22 @@ import {
   PaginationMeta,
 } from "@/components/common/pagination/PaginationControls";
 import { TimeRangeFilter } from "@/components/filters/TimeRangeFilter";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
-import { parseAvatarConfig } from "@/lib/avatar";
+import type { Workout } from "@/types/workout";
 import {
   getNormalizedRange,
   getRangeForPeriod,
   toDateParam,
 } from "@/utils/dateRanges";
-import { Dumbbell, Users } from "lucide-react";
+import { Dumbbell } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { useTranslation } from "react-i18next";
-import NiceAvatar from "react-nice-avatar";
-import { Link, useNavigate } from "react-router-dom";
-
-interface WorkoutActivity {
-  id: string;
-  activityType: string;
-  amount: number;
-  points: number;
-}
-
-interface FeedWorkout {
-  workoutId: string;
-  workoutTitle: string;
-  workoutNotes?: string;
-  startTimeTimestamp: string | null;
-  userId: string;
-  userName: string;
-  userAvatar?: string | null;
-  userFirstName: string;
-  userLastName: string;
-  isOwnWorkout: boolean;
-  activities: WorkoutActivity[];
-  totalPoints: number;
-}
 
 const getActivityIcon = (activityType: string) => {
   switch (activityType) {
@@ -90,14 +64,31 @@ const getActivityColor = (activityType: string) => {
   }
 };
 
-const formatAmount = (activityType: string, amount: number) => {
-  switch (activityType) {
-    case "running":
-    case "cycling":
-      return `${amount} km`;
-    default:
-      return `${amount}×`;
+const translateUnit = (unit: string, t: (key: string) => string) => {
+  // Normalisiere die Unit für den Vergleich
+  const normalizedUnit = unit.toLowerCase();
+
+  // Prüfe auf bekannte Units und übersetze sie
+  if (normalizedUnit === "wiederholungen" || normalizedUnit === "repetitions") {
+    return t("training.form.units.repetitions");
   }
+  if (normalizedUnit === "km" || normalizedUnit === "kilometer" || normalizedUnit === "kilometers") {
+    return t("training.form.units.kilometers");
+  }
+  if (normalizedUnit === "m" || normalizedUnit === "meter" || normalizedUnit === "meters") {
+    return t("training.form.units.meters");
+  }
+  if (normalizedUnit === "meilen" || normalizedUnit === "miles") {
+    return t("training.form.units.miles");
+  }
+
+  // Fallback: Unit unverändert zurückgeben
+  return unit;
+};
+
+const formatAmount = (activityType: string, amount: number, unit: string, t: (key: string) => string) => {
+  const translatedUnit = translateUnit(unit, t);
+  return `${amount} ${translatedUnit}`;
 };
 
 const formatTimeAgo = (
@@ -125,21 +116,36 @@ const formatTimeAgo = (
   });
 };
 
-const getUserInitials = (firstName: string, lastName: string) => {
-  const first = firstName && firstName.length > 0 ? firstName.charAt(0) : "?";
-  const last = lastName && lastName.length > 0 ? lastName.charAt(0) : "?";
-  return `${first}${last}`.toUpperCase();
+const formatDuration = (minutes?: number, t?: (key: string, params?: Record<string, unknown>) => string) => {
+  if (!minutes) return null;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (t) {
+    if (hours > 0) {
+      return t("training.duration.hours", { hours, minutes: remainingMinutes });
+    }
+    return t("training.duration.minutes", { minutes });
+  }
+
+  if (hours > 0) {
+    return `${hours}h ${remainingMinutes}min`;
+  }
+  return `${minutes}min`;
 };
 
-export function FriendsActivities() {
+interface WorkoutResponse {
+  workouts: Workout[];
+  pagination: PaginationMeta;
+}
+
+export function MyWorkouts() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { t, i18n } = useTranslation();
-  const navigate = useNavigate();
 
-  const [workouts, setWorkouts] = useState<FeedWorkout[]>([]);
+  const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [hasFriends, setHasFriends] = useState<boolean | null>(null);
   const [period, setPeriod] = useState("all");
   const [customRange, setCustomRange] = useState<DateRange | undefined>();
   const [offset, setOffset] = useState(0);
@@ -161,7 +167,7 @@ export function FriendsActivities() {
     [customRange, period, offset]
   );
 
-  const loadFeed = useCallback(async () => {
+  const loadWorkouts = useCallback(async () => {
     if (!user) return;
 
     setIsLoading(true);
@@ -175,22 +181,20 @@ export function FriendsActivities() {
       const params = new URLSearchParams({
         page: currentPage.toString(),
         limit: pageSize.toString(),
-        period,
       });
 
       if (resolvedRange?.from && resolvedRange?.to) {
-        params.set("start", toDateParam(resolvedRange.from));
-        params.set("end", toDateParam(resolvedRange.to));
+        params.set("startDate", toDateParam(resolvedRange.from));
+        params.set("endDate", toDateParam(resolvedRange.to));
       }
 
-      const response = await fetch(`${API_URL}/feed?${params.toString()}`, {
+      const response = await fetch(`${API_URL}/workouts?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const data: WorkoutResponse = await response.json();
         setWorkouts(Array.isArray(data.workouts) ? data.workouts : []);
-        setHasFriends(data.hasFriends ?? false);
         setPagination({
           currentPage: data.pagination?.currentPage ?? 1,
           totalPages: data.pagination?.totalPages ?? 1,
@@ -202,26 +206,26 @@ export function FriendsActivities() {
         setWorkouts([]);
         toast({
           title: t("dashboard.error"),
-          description: t("activityFeed.errorLoading"),
+          description: t("myWorkouts.errorLoading"),
           variant: "destructive",
         });
       }
     } catch (error) {
-      console.error("Error loading activity feed:", error);
+      console.error("Error loading workouts:", error);
       setWorkouts([]);
       toast({
         title: t("dashboard.error"),
-        description: t("activityFeed.errorLoading"),
+        description: t("myWorkouts.errorLoading"),
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
-  }, [user, currentPage, pageSize, period, resolvedRange, t, toast]);
+  }, [user, currentPage, pageSize, resolvedRange, t, toast]);
 
   useEffect(() => {
-    loadFeed();
-  }, [loadFeed]);
+    loadWorkouts();
+  }, [loadWorkouts]);
 
   const handlePeriodChange = (value: string) => {
     setPeriod(value);
@@ -253,10 +257,10 @@ export function FriendsActivities() {
   if (!user) {
     return (
       <PageTemplate
-        title={t("friendsActivities.title", "Aktivitäten")}
+        title={t("myWorkouts.title", "Meine Workouts")}
         subtitle={t(
-          "friendsActivities.subtitle",
-          "Alle Trainings deiner Freunde"
+          "myWorkouts.subtitle",
+          "Alle deine Trainings im Überblick"
         )}
       >
         <div className="flex items-center justify-center h-96">
@@ -270,10 +274,10 @@ export function FriendsActivities() {
 
   return (
     <PageTemplate
-      title={t("friendsActivities.title", "Aktivitäten")}
+      title={t("myWorkouts.title", "Meine Workouts")}
       subtitle={t(
-        "friendsActivities.subtitle",
-        "Alle Trainings deiner Freunde"
+        "myWorkouts.subtitle",
+        "Alle deine Trainings im Überblick"
       )}
       headerActions={
         <TimeRangeFilter
@@ -300,7 +304,7 @@ export function FriendsActivities() {
       <div className="flex items-center justify-between mb-6">
         <div className="text-sm text-muted-foreground">
           {pagination.totalItems > 0 &&
-            t("friendsActivities.totalWorkouts", {
+            t("myWorkouts.totalWorkouts", {
               count: pagination.totalItems,
               defaultValue: `${pagination.totalItems} Trainings gefunden`,
             })}
@@ -308,7 +312,7 @@ export function FriendsActivities() {
         <PageSizeSelector
           pageSize={pageSize}
           onPageSizeChange={handlePageSizeChange}
-          label={t("friendsActivities.itemsPerPage", "Pro Seite:")}
+          label={t("myWorkouts.itemsPerPage", "Pro Seite:")}
           options={[5, 10, 20, 50]}
         />
       </div>
@@ -341,38 +345,19 @@ export function FriendsActivities() {
         <Card>
           <CardContent className="py-16">
             <div className="text-center">
-              <Users className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
-              {hasFriends === false ? (
-                <>
-                  <h3 className="text-lg font-medium mb-2">
-                    {t("activityFeed.noFriends", "Du hast noch keine Freunde")}
-                  </h3>
-                  <p className="text-muted-foreground mb-4">
-                    {t(
-                      "activityFeed.addFriendsToSeeActivities",
-                      "Füge Freunde hinzu, um deren Aktivitäten hier zu sehen."
-                    )}
-                  </p>
-                  <Button onClick={() => navigate("/friends")}>
-                    {t("activityFeed.goToFriends", "Zu Freunden")}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <h3 className="text-lg font-medium mb-2">
-                    {t(
-                      "friendsActivities.noWorkouts",
-                      "Keine Trainings gefunden"
-                    )}
-                  </h3>
-                  <p className="text-muted-foreground">
-                    {t(
-                      "friendsActivities.noWorkoutsDescription",
-                      "Im ausgewählten Zeitraum wurden keine Trainings aufgezeichnet."
-                    )}
-                  </p>
-                </>
-              )}
+              <Dumbbell className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
+              <h3 className="text-lg font-medium mb-2">
+                {t(
+                  "myWorkouts.noWorkouts",
+                  "Keine Trainings gefunden"
+                )}
+              </h3>
+              <p className="text-muted-foreground">
+                {t(
+                  "myWorkouts.noWorkoutsDescription",
+                  "Im ausgewählten Zeitraum wurden keine Trainings aufgezeichnet."
+                )}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -383,94 +368,30 @@ export function FriendsActivities() {
         <div className="space-y-3">
           {workouts.map((workout) => (
             <Card
-              key={workout.workoutId}
-              className={
-                workout.isOwnWorkout
-                  ? "border-primary/30 bg-primary/5 dark:bg-primary/10"
-                  : ""
-              }
+              key={workout.id}
+              className="border-primary/30 bg-primary/5 dark:bg-primary/10"
             >
               <CardContent className="p-3 md:p-4">
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-2">
-                  {workout.isOwnWorkout ? (
-                    <Avatar className="w-10 h-10 shrink-0">
-                      {workout.userAvatar &&
-                        parseAvatarConfig(workout.userAvatar) ? (
-                        <NiceAvatar
-                          style={{ width: "40px", height: "40px" }}
-                          {...parseAvatarConfig(workout.userAvatar)!}
-                        />
-                      ) : (
-                        <AvatarFallback className="text-sm">
-                          {getUserInitials(
-                            workout.userFirstName,
-                            workout.userLastName
-                          )}
-                        </AvatarFallback>
-                      )}
-                    </Avatar>
-                  ) : (
-                    <Link
-                      to={`/friends/${workout.userId}`}
-                      className="hover:opacity-80 transition-opacity shrink-0"
-                    >
-                      <Avatar className="w-10 h-10 cursor-pointer">
-                        {workout.userAvatar &&
-                          parseAvatarConfig(workout.userAvatar) ? (
-                          <NiceAvatar
-                            style={{ width: "40px", height: "40px" }}
-                            {...parseAvatarConfig(workout.userAvatar)!}
-                          />
-                        ) : (
-                          <AvatarFallback className="text-sm">
-                            {getUserInitials(
-                              workout.userFirstName,
-                              workout.userLastName
-                            )}
-                          </AvatarFallback>
-                        )}
-                      </Avatar>
-                    </Link>
-                  )}
-
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        {workout.isOwnWorkout ? (
-                          <span className="font-semibold text-sm truncate text-foreground">
-                            {workout.userName}
-                            <span className="ml-1 text-xs text-muted-foreground">
-                              ({t("activityFeed.you", "Du")})
-                            </span>
-                          </span>
-                        ) : (
-                          <Link
-                            to={`/friends/${workout.userId}`}
-                            className="font-semibold text-sm truncate text-foreground hover:text-primary transition-colors"
-                          >
-                            {workout.userName}
-                          </Link>
+                        <Dumbbell className="h-4 w-4 text-primary flex-shrink-0" />
+                        <span className="font-semibold text-sm truncate text-foreground">
+                          {workout.title}
+                        </span>
+                        {workout.duration && (
+                          <Badge variant="outline" className="text-xs ml-2">
+                            ⏱️ {formatDuration(workout.duration, t)}
+                          </Badge>
                         )}
-                        <span className="text-muted-foreground hidden sm:inline">
-                          ·
-                        </span>
-                        <span className="text-sm text-muted-foreground truncate hidden sm:inline">
-                          {workout.workoutTitle}
-                        </span>
                       </div>
-                      <span className="text-sm font-bold text-primary whitespace-nowrap">
-                        +{workout.totalPoints} {t("activityFeed.points")}
-                      </span>
                     </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Dumbbell className="h-3.5 w-3.5 sm:hidden" />
-                      <span className="text-xs sm:hidden truncate">
-                        {workout.workoutTitle}
-                      </span>
+                    <div className="flex items-center gap-2 text-muted-foreground mt-1">
                       <span className="text-xs">
                         {formatTimeAgo(
-                          workout.startTimeTimestamp,
+                          workout.startTimeTimestamp || null,
                           t,
                           i18n.language
                         )}
@@ -479,31 +400,56 @@ export function FriendsActivities() {
                   </div>
                 </div>
 
+                {/* Description */}
+                {workout.description && (
+                  <p className="text-xs text-muted-foreground italic mb-2">
+                    "{workout.description}"
+                  </p>
+                )}
+
                 {/* Activities */}
                 {workout.activities.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
-                    {workout.activities.map((activity) => (
-                      <Badge
-                        key={activity.id}
-                        variant="secondary"
-                        className={`text-xs py-0.5 px-2 ${getActivityColor(activity.activityType)}`}
-                      >
-                        {getActivityIcon(activity.activityType)}{" "}
-                        {getActivityName(activity.activityType, t)}:{" "}
-                        {formatAmount(activity.activityType, activity.amount)}
-                        <span className="ml-1 opacity-75">
-                          ({activity.points})
-                        </span>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
+                    {workout.activities.map((activity) => {
+                      const formatSets = (
+                        sets: Array<{ reps: number; weight?: number }>
+                      ) => {
+                        if (!sets || sets.length === 0) return null;
+                        return sets
+                          .map((set) => {
+                            const reps = set.reps || 0;
+                            const weight = set.weight;
+                            if (weight) {
+                              return `${reps}x${weight}kg`;
+                            }
+                            return `${reps}`;
+                          })
+                          .join(", ");
+                      };
 
-                {/* Notes */}
-                {workout.workoutNotes && (
-                  <p className="mt-2 text-xs text-muted-foreground italic">
-                    "{workout.workoutNotes}"
-                  </p>
+                      const setsDisplay =
+                        activity.sets && activity.sets.length > 0
+                          ? formatSets(activity.sets)
+                          : null;
+
+                      return (
+                        <Badge
+                          key={activity.id}
+                          variant="secondary"
+                          className={`text-xs py-0.5 px-2 ${getActivityColor(activity.activityType)}`}
+                        >
+                          {getActivityIcon(activity.activityType)}{" "}
+                          {getActivityName(activity.activityType, t)}:{" "}
+                          {formatAmount(activity.activityType, activity.amount, activity.unit, t)}
+                          {setsDisplay && (
+                            <span className="ml-1 opacity-75">
+                              ({setsDisplay})
+                            </span>
+                          )}
+                        </Badge>
+                      );
+                    })}
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -530,3 +476,4 @@ export function FriendsActivities() {
     </PageTemplate>
   );
 }
+

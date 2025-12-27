@@ -1,8 +1,8 @@
 import { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { LegalFooter } from "@/components/LegalFooter";
-import { PublicHeader } from "@/components/PublicHeader";
+import { PublicHeader } from "@/components/common/PublicHeader";
+import { LegalFooter } from "@/components/legal/LegalFooter";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/use-auth";
 

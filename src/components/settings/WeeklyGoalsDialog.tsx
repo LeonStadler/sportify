@@ -7,8 +7,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
 import { DEFAULT_WEEKLY_POINTS_GOAL } from "@/config/events";
+import { useToast } from "@/hooks/use-toast";
 import { Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -81,9 +81,9 @@ export function WeeklyGoalsDialog({
           error instanceof Error
             ? error.message
             : t(
-                "weeklyGoals.saveError",
-                "Fehler beim Speichern der Wochenziele"
-              ),
+              "weeklyGoals.saveError",
+              "Fehler beim Speichern der Wochenziele"
+            ),
         variant: "destructive",
       });
     } finally {

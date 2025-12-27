@@ -28,6 +28,7 @@ interface AnalyticsDashboardProps {
   formatters: AnalyticsFormatters;
   activityMetrics: ActivityMetricOption[];
   recoveryMetrics: RecoveryMetricOption[];
+  defaultTab?: string;
   t: TFunction;
 }
 
@@ -45,6 +46,7 @@ export function AnalyticsDashboard({
   formatters,
   activityMetrics,
   recoveryMetrics,
+  defaultTab = "overview",
   t,
 }: AnalyticsDashboardProps) {
   const safeAnalyticsData = data ?? null;
@@ -149,7 +151,7 @@ export function AnalyticsDashboard({
       ) : null}
 
           {safeAnalyticsData ? (
-            <Tabs defaultValue="overview" className="w-full">
+            <Tabs defaultValue={defaultTab} className="w-full">
               <TabsList className="flex-wrap">
                 <TabsTrigger value="overview">{t("stats.overview", "Übersicht")}</TabsTrigger>
                 <TabsTrigger value="training">{t("stats.training", "Training")}</TabsTrigger>

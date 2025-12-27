@@ -1,5 +1,5 @@
-import { PageTemplate } from "@/components/PageTemplate";
-import { PublicHeader } from "@/components/PublicHeader";
+import { PageTemplate } from "@/components/common/PageTemplate";
+import { PublicHeader } from "@/components/common/PublicHeader";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";

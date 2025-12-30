@@ -34,6 +34,7 @@ jobs:
     outputs:
       matrix: ${{ steps.generate-matrix.outputs.matrix }}
       matrix_empty: ${{ steps.generate-matrix.outputs.matrix_empty }}
+      secrets_ok: ${{ steps.check-secrets.outputs.secrets_ok }}
     steps:
       - name: Generate matrix
         id: generate-matrix
@@ -106,17 +107,22 @@ jobs:
           echo "Generated matrix: $matrix_json"
           echo "Matrix empty: $matrix_empty"
 
-      - name: Warn if required secrets are missing
-        if: ${{ secrets.EVENTS_CRON_SECRET == '' || (secrets.EVENTS_BASE_URL == '' && secrets.FRONTEND_URL == '') }}
+      - name: Check required secrets
+        id: check-secrets
         shell: bash
         run: |
-          echo "::warning::trigger-events job will be skipped because required secrets are missing."
-          echo "Required: EVENTS_CRON_SECRET and either EVENTS_BASE_URL or FRONTEND_URL."
+          if [ -z "${{ secrets.EVENTS_CRON_SECRET }}" ] || [ -z "${{ secrets.EVENTS_BASE_URL }}" ]; then
+            echo "secrets_ok=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::trigger-events job will be skipped because required secrets are missing."
+            echo "Required: EVENTS_CRON_SECRET and EVENTS_BASE_URL."
+          else
+            echo "secrets_ok=true" >> "$GITHUB_OUTPUT"
+          fi
 
   trigger-events:
     needs: setup-matrix
     # Run only when we have work (matrix not empty) AND required secrets are present.
-    if: ${{ needs.setup-matrix.outputs.matrix_empty == 'false' && secrets.EVENTS_CRON_SECRET != '' && (secrets.EVENTS_BASE_URL != '' || secrets.FRONTEND_URL != '') }}
+    if: ${{ needs.setup-matrix.outputs.matrix_empty == 'false' && needs.setup-matrix.outputs.secrets_ok == 'true' }}
     # Concurrency control: prevent overlapping runs for the same endpoint
     # This is especially important for the frequent email dispatch job (every 15 minutes)
     concurrency:
@@ -131,23 +137,17 @@ jobs:
       - name: Set environment variables
         shell: bash
         run: |
-          # Set EVENTS_BASE_URL from secrets (fallback to FRONTEND_URL)
-          if [ -n "${{ secrets.EVENTS_BASE_URL }}" ]; then
-            echo "EVENTS_BASE_URL=${{ secrets.EVENTS_BASE_URL }}" >> "$GITHUB_ENV"
-          elif [ -n "${{ secrets.FRONTEND_URL }}" ]; then
-            echo "EVENTS_BASE_URL=${{ secrets.FRONTEND_URL }}" >> "$GITHUB_ENV"
-          fi
+          # Set EVENTS_BASE_URL from secrets
+          echo "EVENTS_BASE_URL=${{ secrets.EVENTS_BASE_URL }}" >> "$GITHUB_ENV"
           
           # Set EVENTS_CRON_SECRET from secrets
-          if [ -n "${{ secrets.EVENTS_CRON_SECRET }}" ]; then
-            echo "EVENTS_CRON_SECRET=${{ secrets.EVENTS_CRON_SECRET }}" >> "$GITHUB_ENV"
-          fi
+          echo "EVENTS_CRON_SECRET=${{ secrets.EVENTS_CRON_SECRET }}" >> "$GITHUB_ENV"
       
       - name: Validate base URL
         shell: bash
         run: |
           if [ -z "${EVENTS_BASE_URL}" ]; then
-            echo "::error::Set either EVENTS_BASE_URL or FRONTEND_URL secret to your deployed host (e.g. https://vertic-id.com)." >&2
+            echo "::error::Set EVENTS_BASE_URL secret to your deployed host (e.g. https://vertic-id.com)." >&2
             exit 1
           fi
           if [ -z "${EVENTS_CRON_SECRET}" ]; then
@@ -198,15 +198,20 @@ jobs:
           set +e
           response=$(curl ${CURL_OPTS} -X POST \
             -H "Authorization: Bearer ${EVENTS_CRON_SECRET}" \
+            -H "Content-Type: application/json" \
             -w "\nHTTP_CODE:%{http_code}\n" \
             "${EVENTS_BASE_URL}${{ matrix.path }}" 2>&1)
           exit_code=$?
           set -e
+          
+          # Extract HTTP status code from response
+          http_code=$(echo "$response" | grep -o "HTTP_CODE:[0-9]*" | cut -d: -f2 || echo "")
+          
           if [ "$exit_code" -ne 0 ]; then
             echo "::error::curl failed with exit code $exit_code"
             echo "Response: $response"
             # Additional debug info for 401 errors
-            if echo "$response" | grep -q "401"; then
+            if [ "$http_code" = "401" ] || echo "$response" | grep -q "401"; then
               echo "::error::Authentication failed (401). Please verify:"
               echo "  1. EVENTS_CRON_SECRET in GitHub Actions matches EVENTS_CRON_SECRET in Vercel"
               echo "  2. The secret is set in all Vercel environments (Production, Preview, Development)"
@@ -214,4 +219,19 @@ jobs:
             fi
             exit $exit_code
           fi
-          echo "$response"
+          
+          # Check HTTP status code even if curl succeeded
+          if [ -n "$http_code" ] && [ "$http_code" -ge 400 ]; then
+            echo "::error::API returned HTTP $http_code"
+            echo "Response: $response"
+            if [ "$http_code" = "401" ]; then
+              echo "::error::Authentication failed (401). Please verify:"
+              echo "  1. EVENTS_CRON_SECRET in GitHub Actions matches EVENTS_CRON_SECRET in Vercel"
+              echo "  2. The secret is set in all Vercel environments (Production, Preview, Development)"
+              echo "  3. No extra whitespace or newlines in the secret value"
+            fi
+            exit 1
+          fi
+          
+          # Success - remove HTTP_CODE line from output for cleaner logs
+          echo "$response" | grep -v "HTTP_CODE:"

@@ -115,8 +115,8 @@ jobs:
 
   trigger-events:
     needs: setup-matrix
-  # Run only when we have work (matrix not empty) AND required secrets are present.
-  if: ${{ needs.setup-matrix.outputs.matrix_empty == 'false' && secrets.EVENTS_CRON_SECRET != '' && (secrets.EVENTS_BASE_URL != '' || secrets.FRONTEND_URL != '') }}
+    # Run only when we have work (matrix not empty) AND required secrets are present.
+    if: ${{ needs.setup-matrix.outputs.matrix_empty == 'false' && secrets.EVENTS_CRON_SECRET != '' && (secrets.EVENTS_BASE_URL != '' || secrets.FRONTEND_URL != '') }}
     # Concurrency control: prevent overlapping runs for the same endpoint
     # This is especially important for the frequent email dispatch job (every 15 minutes)
     concurrency:

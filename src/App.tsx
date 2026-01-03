@@ -193,14 +193,12 @@ const App = () => {
           aria-label="Sportify App"
         >
           <AppSidebar />
+          <SidebarTrigger className="lg:hidden fixed top-3 right-3 z-[60]" />
           <main
-            className="flex-1 p-3 md:p-6 bg-background pb-20 md:pb-6"
+            className="flex-1 p-3 md:p-6 bg-background pb-20 md:pb-6 overflow-y-auto h-screen"
             role="main"
             aria-label="Hauptinhalt"
           >
-            <div className="mb-4">
-              <SidebarTrigger className="lg:hidden" />
-            </div>
             <Suspense fallback={<PageLoader />}>
               <Routes>
                 <Route path="/" element={<Dashboard />} />

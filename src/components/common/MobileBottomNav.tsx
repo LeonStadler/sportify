@@ -4,22 +4,19 @@ import {
   Globe,
   Home,
   LogOut,
-  Monitor,
-  Moon,
   Palette,
   Settings,
   Shield,
-  Sun,
   Trophy,
   User,
   UserCircle,
   UserPlus,
 } from "lucide-react";
-import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import LanguageSwitcher from "./LanguageSwitcher";
+import ThemeSwitcher from "./ThemeSwitcher";
 
 import { LogoFull } from "@/components/common/LogoFull";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -43,18 +40,7 @@ export function MobileBottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, getDisplayName, isAuthenticated } = useAuth();
-  const { theme, setTheme } = useTheme();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
-
-  const currentTheme = theme || "system";
-  const themes = [
-    { value: "light", icon: Sun, label: t("settings.themeLight") },
-    { value: "dark", icon: Moon, label: t("settings.themeDark") },
-    { value: "system", icon: Monitor, label: t("settings.themeSystem") },
-  ];
 
   // Verwende role vom User-Objekt
   const isAdmin = user?.role === "admin";
@@ -110,7 +96,7 @@ export function MobileBottomNav() {
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t border-border px-2 py-2 md:hidden z-50">
+    <div className="fixed bottom-0 left-0 bg-background/95 backdrop-blur-sm border-t border-border px-2 py-2 md:hidden z-50" style={{ width: '100vw' }}>
       <div className="flex justify-around items-center">
         {navItems.map((item) => {
           const isActive = location.pathname === item.url;
@@ -168,7 +154,6 @@ export function MobileBottomNav() {
                     </SheetDescription>
                   </div>
                 </div>
-                <LogoFull className="h-12 scale-75" />
               </SheetHeader>
 
               <div className="px-6 space-y-6">
@@ -217,32 +202,19 @@ export function MobileBottomNav() {
                       <Globe className="h-4 w-4" />
                       <span className="text-sm">{t("settings.language")}</span>
                     </div>
-                    <LanguageSwitcher />
+                    <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
+                      <LanguageSwitcher />
+                    </div>
                   </div>
 
                   {/* Theme Setting */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
                       <Palette className="h-4 w-4" />
-                      <span className="text-sm font-medium">{t("settings.theme")}</span>
+                      <span className="text-sm">{t("settings.theme")}</span>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      {mounted && themes.map((themeOption) => {
-                        const Icon = themeOption.icon;
-                        const isSelected = currentTheme === themeOption.value;
-                        return (
-                          <Button
-                            key={themeOption.value}
-                            variant={isSelected ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setTheme(themeOption.value)}
-                            className="flex flex-col items-center gap-1 h-auto py-2"
-                          >
-                            <Icon className="h-4 w-4" />
-                            <span className="text-xs">{themeOption.label}</span>
-                          </Button>
-                        );
-                      })}
+                    <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
+                      <ThemeSwitcher variant="toggle" />
                     </div>
                   </div>
                 </div>

@@ -1,11 +1,10 @@
 import { AppSidebar } from "@/components/common/AppSidebar";
 import { InstallPrompt } from "@/components/common/InstallPrompt";
 import { MobileBottomNav } from "@/components/common/MobileBottomNav";
-import { MobileBurgerMenu } from "@/components/common/MobileBurgerMenu";
 import { OfflineBanner } from "@/components/common/OfflineBanner";
 import { ScrollHeader } from "@/components/common/ScrollHeader";
 import { InviteLinkHandler } from "@/components/settings/InviteLinkHandler";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { ToastAction } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
@@ -190,20 +189,29 @@ const App = () => {
         <OfflineBanner />
         <InviteLinkHandler />
         <InstallPrompt />
+        {/* Skip to main content - Accessibility */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+        >
+          {t("common.skipToContent", "Zum Hauptinhalt springen")}
+        </a>
         <div
           className="min-h-screen flex w-full"
           role="application"
           aria-label="Sportify App"
         >
           <AppSidebar />
-          <MobileBurgerMenu />
+          <SidebarTrigger />
           <div className="flex-1 flex flex-col relative h-screen">
             <ScrollHeader scrollContainerRef={mainRef} />
             <main
+              id="main-content"
               ref={mainRef}
               className="flex-1 p-3 md:p-6 bg-background pb-20 md:pb-6 overflow-y-auto pt-16 lg:pt-6"
               role="main"
               aria-label="Hauptinhalt"
+              tabIndex={-1}
             >
               <Suspense fallback={<PageLoader />}>
                 <Routes>

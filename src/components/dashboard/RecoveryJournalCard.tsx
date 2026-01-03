@@ -392,9 +392,10 @@ export function RecoveryJournalCard({ className }: { className?: string }) {
               variant="outline"
               className="w-full justify-center gap-2"
               onClick={() => navigate("/training?tab=recovery")}
+              aria-label={t("recoveryDiary.openRecoveryDiary", "Zum Erholungstagebuch")}
             >
               {t("recoveryDiary.openRecoveryDiary", "Zum Erholungstagebuch")}
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Button>
           </>
         )}

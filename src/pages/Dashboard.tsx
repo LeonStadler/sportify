@@ -629,12 +629,16 @@ export function Dashboard() {
           size="icon"
           className="absolute top-0 right-0"
           onClick={() => setSettingsOpen(true)}
+          aria-label={t(
+            "dashboard.settings.title",
+            "Dashboard-Kacheln konfigurieren"
+          )}
           title={t(
             "dashboard.settings.title",
             "Dashboard-Kacheln konfigurieren"
           )}
         >
-          <Settings className="h-4 w-4" />
+          <Settings className="h-4 w-4" aria-hidden="true" />
         </Button>
       </div>
 

@@ -194,11 +194,17 @@ export function DashboardLeaderboardCard({
           <div className="flex flex-wrap items-center gap-2 justify-start sm:justify-end w-full sm:w-auto">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="gap-2"
+                  aria-label={t("filters.periodLabel", "Zeitraum")}
+                  aria-expanded={false}
+                >
                   {period === "week" ? (
-                    <CalendarDays className="h-4 w-4" />
+                    <CalendarDays className="h-4 w-4" aria-hidden="true" />
                   ) : (
-                    <Calendar className="h-4 w-4" />
+                    <Calendar className="h-4 w-4" aria-hidden="true" />
                   )}
                   {period === "week"
                     ? t("common.week", "Woche")
@@ -219,11 +225,17 @@ export function DashboardLeaderboardCard({
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="gap-2"
+                  aria-label={t("scoreboard.scope", "Bereich")}
+                  aria-expanded={false}
+                >
                   {scope === "friends" ? (
-                    <Users className="h-4 w-4" />
+                    <Users className="h-4 w-4" aria-hidden="true" />
                   ) : (
-                    <Globe className="h-4 w-4" />
+                    <Globe className="h-4 w-4" aria-hidden="true" />
                   )}
                   {scope === "friends"
                     ? t("scoreboard.friends", "Freunde")
@@ -267,9 +279,12 @@ export function DashboardLeaderboardCard({
           variant="outline"
           className="w-full justify-center gap-2"
         >
-          <Link to="/scoreboard">
+          <Link 
+            to="/scoreboard"
+            aria-label={t("scoreboard.showMore", "Mehr anzeigen")}
+          >
             {t("scoreboard.showMore", "Mehr anzeigen")}
-            <ArrowRight className="h-4 w-4" />
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </Button>
         </div>

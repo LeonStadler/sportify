@@ -136,7 +136,7 @@ export function AppSidebar() {
   }
 
   return (
-    <Sidebar className="border-r border-border bg-background">
+    <Sidebar id="app-sidebar" className="border-r border-border bg-background">
       <SidebarHeader className="border-b border-border bg-background">
         <div className="p-6">
           <LogoFull className="h-12" />

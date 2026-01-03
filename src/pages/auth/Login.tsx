@@ -14,11 +14,11 @@ export default function Login() {
   const redirectTo = redirectFromUrl || (pendingInvite ? `/invite/${pendingInvite}` : '/dashboard');
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex flex-col">
+    <div className="min-h-screen h-screen bg-gradient-to-br from-background via-background to-muted/20 flex flex-col overflow-y-auto">
       <PublicHeader variant="minimal" />
 
       {/* Main Content */}
-      <div className="flex-1 flex items-center justify-center p-4">
+      <div className="flex-1 flex items-center justify-center p-4 py-8">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-foreground mb-2">

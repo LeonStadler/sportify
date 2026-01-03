@@ -6,6 +6,7 @@ import {
   Home,
   LogOut,
   LucideIcon,
+  Palette,
   Settings,
   Shield,
   Trophy,
@@ -235,13 +236,23 @@ export function AppSidebar() {
                     <Globe size={20} />
                     <span>{t("settings.language")}</span>
                   </div>
-                  <LanguageSwitcher />
+                  <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
+                    <LanguageSwitcher />
+                  </div>
                 </div>
               </SidebarMenuItem>
 
               {/* Theme Switch */}
               <SidebarMenuItem>
-                <ThemeSwitcher variant="sidebar" />
+                <div className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200">
+                  <div className="flex items-center gap-3">
+                    <Palette size={20} />
+                    <span>{t("settings.theme")}</span>
+                  </div>
+                  <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
+                    <ThemeSwitcher variant="toggle" />
+                  </div>
+                </div>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>

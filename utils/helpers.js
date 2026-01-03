@@ -470,11 +470,11 @@ export const normalizeStatsPeriod = (value) => {
 };
 
 const PERIOD_WINDOWS = {
-    // rolling last 7 days (incl. today)
+    // current calendar week (Monday to Sunday, ISO 8601)
     week: {
-        start: "NOW() - INTERVAL '7 days'",
-        end: "NOW()",
-        interval: "INTERVAL '7 days'"
+        start: "date_trunc('week', CURRENT_DATE)",
+        end: "date_trunc('week', CURRENT_DATE) + INTERVAL '1 week'",
+        interval: "INTERVAL '1 week'"
     },
     month: {
         start: "date_trunc('month', CURRENT_DATE)",
@@ -556,8 +556,8 @@ export const buildPeriodCondition = (columnExpression, period = 'week', { isTime
 // PostgreSQL's date_trunc('week', ...) startet standardmäßig am Montag gemäß ISO 8601
 // Verwendet nur start_time (TIMESTAMPTZ) - KEIN Fallback
 export const WEEK_WINDOW_CONDITION = `
-    w.start_time >= NOW() - INTERVAL '7 days'
-    AND w.start_time < NOW()
+    w.start_time >= date_trunc('week', CURRENT_DATE)
+    AND w.start_time < date_trunc('week', CURRENT_DATE) + INTERVAL '1 week'
 `;
 
 export const weeklyChallengeTargets = {

@@ -124,13 +124,17 @@
     @apply border-border;
   }
 
+  html {
+    @apply bg-background;
+    height: 100%;
+    overflow: hidden;
+  }
+
   body {
     @apply bg-background text-foreground;
     @apply font-sans antialiased;
-  }
-
-  html {
-    @apply bg-background;
+    height: 100vh;
+    overflow: hidden;
   }
 
   /* Optimierte Theme-Übergänge */

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { SidebarContext, type SidebarContext as SidebarContextType } from "@/components/ui/sidebar-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
@@ -17,7 +18,6 @@ import {
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { cn } from "@/lib/utils";
-import { SidebarContext, type SidebarContext as SidebarContextType } from "@/components/ui/sidebar-context";
 
 const SIDEBAR_COOKIE_NAME = "sidebar:state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
@@ -251,7 +251,7 @@ const SidebarTrigger = React.forwardRef<
       variant="ghost"
       size="icon"
       className={cn(
-        "h-9 w-9 rounded-md border border-border/50 dark:border-border hover:border-border dark:hover:border-border/80 hover:bg-accent dark:hover:bg-accent/80 transition-all duration-200",
+        "h-9 w-9 rounded-md border border-border/50 dark:border-border hover:border-border dark:hover:border-border/80 hover:bg-accent dark:hover:bg-accent/80 transition-all duration-200 bg-transparent shadow-none",
         className
       )}
       onClick={(event) => {
@@ -740,5 +740,6 @@ export {
   SidebarProvider,
   SidebarRail,
   SidebarSeparator,
-  SidebarTrigger,
+  SidebarTrigger
 };
+

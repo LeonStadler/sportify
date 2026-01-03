@@ -1,9 +1,11 @@
 import { AppSidebar } from "@/components/common/AppSidebar";
 import { InstallPrompt } from "@/components/common/InstallPrompt";
 import { MobileBottomNav } from "@/components/common/MobileBottomNav";
+import { MobileBurgerMenu } from "@/components/common/MobileBurgerMenu";
 import { OfflineBanner } from "@/components/common/OfflineBanner";
+import { ScrollHeader } from "@/components/common/ScrollHeader";
 import { InviteLinkHandler } from "@/components/settings/InviteLinkHandler";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { ToastAction } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
@@ -11,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { usePWA } from "@/hooks/usePWA";
 import { APP_VERSION } from "@/version";
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Route, Routes } from "react-router-dom";
 
@@ -82,6 +84,7 @@ const App = () => {
   const { isMobilePWA } = usePWA();
   const { toast } = useToast();
   const { t } = useTranslation();
+  const mainRef = useRef<HTMLElement>(null);
 
   // Offline-Synchronisation aktivieren
   useOfflineSync();
@@ -193,39 +196,43 @@ const App = () => {
           aria-label="Sportify App"
         >
           <AppSidebar />
-          <SidebarTrigger className="lg:hidden fixed top-3 right-3 z-[60]" />
-          <main
-            className="flex-1 p-3 md:p-6 bg-background pb-20 md:pb-6 overflow-y-auto h-screen"
-            role="main"
-            aria-label="Hauptinhalt"
-          >
-            <Suspense fallback={<PageLoader />}>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/scoreboard" element={<Scoreboard />} />
-                <Route path="/training" element={<Training />} />
-                <Route path="/my-workouts" element={<MyWorkouts />} />
-                <Route path="/stats" element={<Stats />} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/friends" element={<Friends />} />
-                <Route
-                  path="/friends/activities"
-                  element={<FriendsActivities />}
-                />
-                <Route path="/friends/:friendId" element={<FriendProfile />} />
-                <Route path="/invite/:userId" element={<Invite />} />
-                <Route path="/admin" element={<Admin />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/privacy" element={<Privacy />} />
-                <Route path="/terms" element={<Terms />} />
-                <Route path="/imprint" element={<Imprint />} />
-                <Route path="/share" element={<Share />} />
-                <Route path="/changelog" element={<Changelog />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
-          </main>
+          <MobileBurgerMenu />
+          <div className="flex-1 flex flex-col relative h-screen">
+            <ScrollHeader scrollContainerRef={mainRef} />
+            <main
+              ref={mainRef}
+              className="flex-1 p-3 md:p-6 bg-background pb-20 md:pb-6 overflow-y-auto pt-16 lg:pt-6"
+              role="main"
+              aria-label="Hauptinhalt"
+            >
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/scoreboard" element={<Scoreboard />} />
+                  <Route path="/training" element={<Training />} />
+                  <Route path="/my-workouts" element={<MyWorkouts />} />
+                  <Route path="/stats" element={<Stats />} />
+                  <Route path="/profile" element={<Profile />} />
+                  <Route path="/friends" element={<Friends />} />
+                  <Route
+                    path="/friends/activities"
+                    element={<FriendsActivities />}
+                  />
+                  <Route path="/friends/:friendId" element={<FriendProfile />} />
+                  <Route path="/invite/:userId" element={<Invite />} />
+                  <Route path="/admin" element={<Admin />} />
+                  <Route path="/contact" element={<Contact />} />
+                  <Route path="/privacy" element={<Privacy />} />
+                  <Route path="/terms" element={<Terms />} />
+                  <Route path="/imprint" element={<Imprint />} />
+                  <Route path="/share" element={<Share />} />
+                  <Route path="/changelog" element={<Changelog />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
+            </main>
+          </div>
           <MobileBottomNav />
         </div>
       </SidebarProvider>

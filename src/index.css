@@ -200,25 +200,14 @@
     @apply bg-popover/95 backdrop-blur-sm;
   }
 
-  /* Improved scrollbars */
-  ::-webkit-scrollbar {
-    @apply w-2 h-2;
+  /* Hide scrollbars - using custom scroll indicator in header */
+  * {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 
-  ::-webkit-scrollbar-track {
-    @apply bg-transparent;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    @apply bg-border rounded-full;
-  }
-
-  .dark ::-webkit-scrollbar-thumb {
-    @apply bg-border/50;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-border/80;
+  *::-webkit-scrollbar {
+    display: none;
   }
 
   /* Hide scrollbar for horizontal tabs */
@@ -275,12 +264,11 @@
     body {
       /* Smooth transition beim App-Start für beide Plattformen */
       animation: fadeIn 0.3s ease-in;
+      /* Stelle sicher dass Hintergrundfarbe korrekt ist (für Android) */
+      background-color: hsl(var(--background));
     }
-    
-    /* Stelle sicher dass Hintergrundfarbe korrekt ist (für Android) */
-    background-color: hsl(var(--background));
   }
-  
+
   /* Android: Stelle sicher dass HTML-Element auch die richtige Hintergrundfarbe hat */
   @media all and (display-mode: standalone) {
     html {
@@ -292,6 +280,7 @@
     from {
       opacity: 0;
     }
+
     to {
       opacity: 1;
     }

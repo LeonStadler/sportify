@@ -137,12 +137,12 @@ export default function ResetPassword() {
   // Wenn Token vorhanden ist, zeige Passwort-Reset-Formular
   if (token && !isReset) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex flex-col">
+      <div className="min-h-screen h-screen bg-gradient-to-br from-background via-background to-muted/20 flex flex-col overflow-y-auto">
         {/* Header */}
         <PublicHeader variant="minimal" />
 
         {/* Main Content */}
-        <div className="flex-1 flex items-center justify-center p-4">
+        <div className="flex-1 flex items-center justify-center p-4 py-8">
           <div className="w-full max-w-md">
             <div className="text-center mb-8">
               <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -269,10 +269,10 @@ export default function ResetPassword() {
   // Erfolg beim Passwort-Reset
   if (isReset) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex flex-col">
+      <div className="min-h-screen h-screen bg-gradient-to-br from-background via-background to-muted/20 flex flex-col overflow-y-auto">
         <PublicHeader variant="minimal" />
 
-        <div className="flex-1 flex items-center justify-center p-4">
+        <div className="flex-1 flex items-center justify-center p-4 py-8">
           <div className="w-full max-w-md">
             <div className="text-center">
               <div className="w-20 h-20 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -315,11 +315,11 @@ export default function ResetPassword() {
 
   // Modus 1: E-Mail anfordern (Standard)
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex flex-col">
+    <div className="min-h-screen h-screen bg-gradient-to-br from-background via-background to-muted/20 flex flex-col overflow-y-auto">
       <PublicHeader variant="minimal" />
 
       {/* Main Content */}
-      <div className="flex-1 flex items-center justify-center p-4">
+      <div className="flex-1 flex items-center justify-center p-4 py-8">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">

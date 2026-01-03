@@ -28,8 +28,8 @@ export function MobileBurgerMenu() {
         "transition-all duration-200",
         "flex items-center justify-center",
         "touch-manipulation", // Verbessert Touch-Interaktion auf Mobile
-        isOpen 
-          ? "text-white hover:!bg-transparent hover:!text-primary" 
+        isOpen
+          ? "text-white hover:!bg-transparent hover:!text-primary"
           : "text-foreground hover:bg-accent/40 dark:hover:bg-accent/30 hover:!text-primary"
       )}
       onClick={handleClick}

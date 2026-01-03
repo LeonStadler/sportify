@@ -180,13 +180,19 @@ const Sidebar = React.forwardRef<
     }
 
     if (isMobile) {
-      // Handler für onOpenChange, der verhindert, dass es ausgelöst wird, wenn der Button geklickt wird
+      // Handler für onOpenChange
       const handleOpenChange = React.useCallback((open: boolean) => {
-        // Ignoriere onOpenChange, wenn der Button geklickt wurde
+        // Wenn Button geklickt wurde, ignoriere onOpenChange komplett
+        // Der State wird direkt durch setOpenMobile in toggleSidebar gesetzt
         if (buttonClickedRef.current) {
           return;
         }
-        // Nur setzen, wenn sich der State tatsächlich ändert
+        // Wenn geschlossen werden soll (Overlay-Klick), immer erlauben
+        if (!open) {
+          setOpenMobile(false);
+          return;
+        }
+        // Wenn geöffnet werden soll, nur setzen wenn sich der State ändert
         if (open !== openMobile) {
           setOpenMobile(open);
         }

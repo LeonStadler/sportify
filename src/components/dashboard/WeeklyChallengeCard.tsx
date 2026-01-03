@@ -212,9 +212,10 @@ export function WeeklyChallengeCard({
             size="icon"
             className="absolute -top-2 right-0"
             onClick={onOpenSettings}
+            aria-label={t("weeklyGoals.pointsTitle", "Wochenziel festlegen")}
             title={t("weeklyGoals.pointsTitle", "Wochenziel festlegen")}
           >
-            <Settings className="h-4 w-4" />
+            <Settings className="h-4 w-4" aria-hidden="true" />
           </Button>
         )}
         <p className="text-sm text-muted-foreground">{formattedRange}</p>
@@ -255,6 +256,11 @@ export function WeeklyChallengeCard({
               100
             )}
             className="h-2"
+            aria-label={`${t("weeklyChallenge.pointsTarget")}: ${data.progress.totalPoints.toLocaleString()} von ${normalizedPointsTarget.toLocaleString()} ${t("weeklyChallenge.points")} erreicht`}
+            role="progressbar"
+            aria-valuenow={data.progress.totalPoints}
+            aria-valuemin={0}
+            aria-valuemax={normalizedPointsTarget}
           />
         </div>
 

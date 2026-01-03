@@ -588,22 +588,24 @@ export function Training() {
                                   size="sm"
                                   onClick={() => handleEditClick(workout)}
                                   className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 flex-shrink-0"
+                                  aria-label={t("training.edit")}
                                 >
                                   <span className="hidden sm:inline">
                                     {t("training.edit")}
                                   </span>
-                                  <span className="sm:hidden">✏️</span>
+                                  <span className="sm:hidden" aria-hidden="true">✏️</span>
                                 </Button>
                                 <Button
                                   variant="outline"
                                   size="sm"
                                   onClick={() => deleteWorkout(workout.id)}
                                   className="text-destructive hover:text-destructive-foreground hover:bg-destructive flex-shrink-0"
+                                  aria-label={t("training.delete")}
                                 >
                                   <span className="hidden sm:inline">
                                     {t("training.delete")}
                                   </span>
-                                  <span className="sm:hidden">×</span>
+                                  <span className="sm:hidden" aria-hidden="true">×</span>
                                 </Button>
                               </>
                             )}

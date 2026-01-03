@@ -269,9 +269,10 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
               size="sm"
               onClick={() => navigate("/friends/activities")}
               className="text-primary hover:text-primary/80"
+              aria-label={t("activityFeed.showAll", "Alle anzeigen")}
             >
               {t("activityFeed.showAll", "Alle anzeigen")}
-              <ArrowRight className="ml-1 h-4 w-4" />
+              <ArrowRight className="ml-1 h-4 w-4" aria-hidden="true" />
             </Button>
           )}
         </div>
@@ -316,6 +317,7 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
                         <Link
                           to={`/friends/${workout.userId}`}
                           className="hover:opacity-80 transition-opacity shrink-0"
+                          aria-label={`Profil von ${workout.userName} öffnen`}
                         >
                           <Avatar className="w-8 h-8 cursor-pointer">
                             {workout.userAvatar &&
@@ -349,6 +351,7 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
                             <Link
                               to={`/friends/${workout.userId}`}
                               className="font-medium text-sm truncate text-foreground hover:text-primary transition-colors"
+                              aria-label={`Profil von ${workout.userName} öffnen`}
                             >
                               {workout.userName}
                             </Link>
@@ -395,9 +398,10 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
                     variant="outline"
                     className="w-full justify-between"
                     onClick={() => navigate("/friends/activities")}
+                    aria-label={t("activityFeed.showMore", "Mehr anzeigen")}
                   >
                     {t("activityFeed.showMore", "Mehr anzeigen")}
-                    <ArrowRight className="ml-2 h-4 w-4" />
+                    <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
                   </Button>
                 )}
               </>

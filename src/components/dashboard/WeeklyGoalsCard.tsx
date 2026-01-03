@@ -72,9 +72,10 @@ export function WeeklyGoalsCard({
           size="icon"
           className="absolute -top-2 right-0"
           onClick={onOpenSettings}
+          aria-label={t("weeklyGoals.dialog.title", "Wochenziele einstellen")}
           title={t("weeklyGoals.dialog.title", "Wochenziele einstellen")}
         >
-          <Settings className="h-4 w-4" />
+          <Settings className="h-4 w-4" aria-hidden="true" />
         </Button>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -96,6 +97,11 @@ export function WeeklyGoalsCard({
                 100
               )}
               className="h-2"
+              aria-label={`${entry.label}: ${entry.current} von ${entry.goal}${entry.unit ? ` ${entry.unit}` : ""} erreicht`}
+              role="progressbar"
+              aria-valuenow={entry.current}
+              aria-valuemin={0}
+              aria-valuemax={entry.goal}
             />
           </div>
         ))}

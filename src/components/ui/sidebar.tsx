@@ -48,6 +48,7 @@ const SidebarProvider = React.forwardRef<
     const isMobile = useIsMobile();
     const [openMobile, setOpenMobile] = React.useState(false);
     const buttonClickedRef = React.useRef(false);
+    const expectedStateRef = React.useRef<boolean | null>(null);
 
     // This is the internal state of the sidebar.
     // We use openProp and setOpenProp for control from outside the component.
@@ -72,19 +73,24 @@ const SidebarProvider = React.forwardRef<
     const toggleSidebar = React.useCallback(() => {
       if (isMobile) {
         buttonClickedRef.current = true;
-        setOpenMobile((open) => !open);
-        // Reset nach kurzer Verzögerung
+        const newState = !openMobile;
+        expectedStateRef.current = newState;
+        setOpenMobile(newState);
+        // Reset nach längerer Verzögerung, damit onOpenChange die Änderung nicht überschreibt
+        // Sheet-Animationen können bis zu 500ms dauern, daher 1000ms Timeout
         setTimeout(() => {
           buttonClickedRef.current = false;
-        }, 100);
+          expectedStateRef.current = null;
+        }, 1000);
       } else {
         setOpen((open) => !open);
       }
-    }, [isMobile, setOpen, setOpenMobile]);
+    }, [isMobile, setOpen, setOpenMobile, openMobile]);
 
     // Adds a keyboard shortcut to toggle the sidebar.
     React.useEffect(() => {
       const handleKeyDown = (event: KeyboardEvent) => {
+        // Cmd/Ctrl + B zum Togglen
         if (
           event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
           (event.metaKey || event.ctrlKey)
@@ -92,11 +98,21 @@ const SidebarProvider = React.forwardRef<
           event.preventDefault();
           toggleSidebar();
         }
+        // ESC zum Schließen (nur wenn offen)
+        if (event.key === "Escape") {
+          if (isMobile && openMobile) {
+            event.preventDefault();
+            setOpenMobile(false);
+          } else if (!isMobile && open) {
+            event.preventDefault();
+            setOpen(false);
+          }
+        }
       };
 
       window.addEventListener("keydown", handleKeyDown);
       return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [toggleSidebar]);
+    }, [toggleSidebar, isMobile, openMobile, setOpenMobile, open, setOpen]);
 
     // We add a state so that we can do data-state="expanded" or "collapsed".
     // This makes it easier to style the sidebar with Tailwind classes.
@@ -111,6 +127,8 @@ const SidebarProvider = React.forwardRef<
         openMobile,
         setOpenMobile,
         toggleSidebar,
+        buttonClickedRef,
+        expectedStateRef,
       }),
       [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
     );
@@ -161,7 +179,7 @@ const Sidebar = React.forwardRef<
     },
     ref
   ) => {
-    const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
+    const { isMobile, state, openMobile, setOpenMobile, buttonClickedRef, expectedStateRef } = useSidebar();
     const isFloatingLike = variant === "floating" || variant === "inset";
 
     if (collapsible === "none") {
@@ -183,23 +201,21 @@ const Sidebar = React.forwardRef<
       // Handler für onOpenChange
       const handleOpenChange = React.useCallback((open: boolean) => {
         // Wenn Button geklickt wurde, ignoriere onOpenChange komplett
-        // Der State wird direkt durch setOpenMobile in toggleSidebar gesetzt
+        // (der State wurde bereits durch toggleSidebar gesetzt)
         if (buttonClickedRef.current) {
           return;
         }
-        // Wenn geschlossen werden soll (Overlay-Klick), immer erlauben
-        if (!open) {
-          setOpenMobile(false);
-          return;
-        }
-        // Wenn geöffnet werden soll, nur setzen wenn sich der State ändert
-        if (open !== openMobile) {
-          setOpenMobile(open);
-        }
-      }, [openMobile, setOpenMobile]);
+        // Erlaube alle Änderungen (Overlay-Klick zum Schließen, etc.)
+        setOpenMobile(open);
+      }, [setOpenMobile]);
 
       return (
-        <Sheet open={openMobile} onOpenChange={handleOpenChange} {...props}>
+        <Sheet
+          open={openMobile}
+          onOpenChange={handleOpenChange}
+          modal={true}
+          {...props}
+        >
           <SheetContent
             data-sidebar="sidebar"
             data-mobile="true"
@@ -210,6 +226,15 @@ const Sidebar = React.forwardRef<
               } as React.CSSProperties
             }
             side={side}
+            onInteractOutside={(e) => {
+              const target = e.target as HTMLElement;
+              const isTriggerButton = target?.closest('[data-sidebar="trigger"]');
+              // Verhindere Schließen, wenn Button geklickt wurde oder wenn der Toggle-Button das Target ist
+              if (buttonClickedRef.current || isTriggerButton) {
+                e.preventDefault();
+                return;
+              }
+            }}
           >
             <div className="flex h-full w-full flex-col">{children}</div>
           </SheetContent>
@@ -273,10 +298,10 @@ const SidebarRail = React.forwardRef<
     <button
       ref={ref}
       data-sidebar="rail"
-      aria-label="Toggle Sidebar"
+      aria-label="Navigation umschalten"
       tabIndex={-1}
       onClick={toggleSidebar}
-      title="Toggle Sidebar"
+      title="Navigation umschalten"
       className={cn(
         "absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-all ease-linear after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-sidebar-border group-data-[side=left]:-right-4 group-data-[side=right]:left-0 sm:flex",
         "[[data-side=left]_&]:cursor-w-resize [[data-side=right]_&]:cursor-e-resize",
@@ -299,6 +324,12 @@ const SidebarTrigger = React.forwardRef<
   const { toggleSidebar, isMobile, openMobile, open } = useSidebar();
   const isOpen = isMobile ? openMobile : open;
 
+  const handleClick = React.useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    event.preventDefault();
+    toggleSidebar();
+  }, [toggleSidebar]);
+
   return (
     <Button
       ref={ref}
@@ -309,66 +340,110 @@ const SidebarTrigger = React.forwardRef<
         "relative z-[100] pointer-events-auto",
         "h-12 w-12 rounded-md",
         "transition-all duration-200",
+        // Mobile-spezifisches Styling
+        isMobile && cn(
+          "lg:hidden fixed top-3 right-3",
+          "bg-transparent shadow-none border-none",
+          "flex items-center justify-center",
+          "touch-manipulation",
+          isOpen
+            ? "text-white hover:!bg-transparent hover:!text-primary"
+            : "text-foreground hover:bg-accent/40 dark:hover:bg-accent/30 hover:!text-primary"
+        ),
         className
       )}
-      onClick={(event) => {
-        event.stopPropagation();
-        toggleSidebar();
+      onClick={handleClick}
+      onTouchStart={(event) => {
+        if (isMobile) {
+          event.stopPropagation();
+        }
       }}
-      aria-label="Toggle Sidebar"
+      onTouchEnd={(event) => {
+        if (isMobile) {
+          event.stopPropagation();
+        }
+      }}
+      aria-label="Navigation umschalten"
       aria-expanded={isOpen}
+      aria-pressed={isOpen}
+      aria-controls="app-sidebar"
       {...props}
     >
-      <span className="sr-only">Toggle Sidebar</span>
-      <svg
-        viewBox="0 0 48 48"
-        className="h-7 w-9"
-        aria-hidden="true"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <line
-          x1="11"
-          y1="12.5"
-          x2="37"
-          y2="12.5"
-          style={{
-            transformOrigin: "24px 24px",
-            transform: isOpen
-              ? "translateY(11px) rotate(45deg)"
-              : "translateY(0px) rotate(0deg)",
-            transition: "transform 260ms cubic-bezier(.4,0,.2,1)",
-          }}
-        />
-        <line
-          x1="11"
-          y1="24"
-          x2="37"
-          y2="24"
-          style={{
-            transformOrigin: "24px 24px",
-            transform: isOpen ? "scaleX(0.12)" : "scaleX(1)",
-            opacity: isOpen ? 0 : 1,
-            transition:
-              "transform 200ms cubic-bezier(.4,0,.2,1), opacity 160ms ease",
-          }}
-        />
-        <line
-          x1="11"
-          y1="35.5"
-          x2="37"
-          y2="35.5"
-          style={{
-            transformOrigin: "24px 24px",
-            transform: isOpen
-              ? "translateY(-11px) rotate(-45deg)"
-              : "translateY(0px) rotate(0deg)",
-            transition: "transform 260ms cubic-bezier(.4,0,.2,1)",
-          }}
-        />
-      </svg>
+      <span className="sr-only">Navigation umschalten</span>
+      {isMobile ? (
+        // Mobile: Hamburger-Icon mit 3 Linien
+        <span className="relative flex h-6 w-7 items-center justify-center">
+          <span
+            className={cn(
+              "absolute left-1/2 h-[1.5px] w-full -translate-x-1/2 rounded-full bg-current transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)]",
+              isOpen ? "translate-y-0 rotate-45" : "-translate-y-[8px] rotate-0"
+            )}
+          />
+          <span
+            className={cn(
+              "absolute left-1/2 h-[1.5px] w-full -translate-x-1/2 rounded-full bg-current transition-all duration-200 ease-[cubic-bezier(.4,0,.2,1)]",
+              isOpen ? "scale-x-0 opacity-0" : "scale-x-100 opacity-100"
+            )}
+          />
+          <span
+            className={cn(
+              "absolute left-1/2 h-[1.5px] w-full -translate-x-1/2 rounded-full bg-current transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)]",
+              isOpen ? "translate-y-0 -rotate-45" : "translate-y-[8px] rotate-0"
+            )}
+          />
+        </span>
+      ) : (
+        // Desktop: SVG-Icon
+        <svg
+          viewBox="0 0 48 48"
+          className="h-7 w-9"
+          aria-hidden="true"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <line
+            x1="11"
+            y1="12.5"
+            x2="37"
+            y2="12.5"
+            style={{
+              transformOrigin: "24px 24px",
+              transform: isOpen
+                ? "translateY(11px) rotate(45deg)"
+                : "translateY(0px) rotate(0deg)",
+              transition: "transform 260ms cubic-bezier(.4,0,.2,1)",
+            }}
+          />
+          <line
+            x1="11"
+            y1="24"
+            x2="37"
+            y2="24"
+            style={{
+              transformOrigin: "24px 24px",
+              transform: isOpen ? "scaleX(0.12)" : "scaleX(1)",
+              opacity: isOpen ? 0 : 1,
+              transition:
+                "transform 200ms cubic-bezier(.4,0,.2,1), opacity 160ms ease",
+            }}
+          />
+          <line
+            x1="11"
+            y1="35.5"
+            x2="37"
+            y2="35.5"
+            style={{
+              transformOrigin: "24px 24px",
+              transform: isOpen
+                ? "translateY(-11px) rotate(-45deg)"
+                : "translateY(0px) rotate(0deg)",
+              transition: "transform 260ms cubic-bezier(.4,0,.2,1)",
+            }}
+          />
+        </svg>
+      )}
     </Button>
   );
 });

@@ -18,7 +18,6 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import LanguageSwitcher from "./LanguageSwitcher";
 import ThemeSwitcher from "./ThemeSwitcher";
 
-import { LogoFull } from "@/components/common/LogoFull";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -96,7 +95,12 @@ export function MobileBottomNav() {
   }
 
   return (
-    <div className="fixed bottom-0 left-0 bg-background/95 backdrop-blur-sm border-t border-border px-2 py-2 md:hidden z-50" style={{ width: '100vw' }}>
+    <nav 
+      className="fixed bottom-0 left-0 bg-background/95 backdrop-blur-sm border-t border-border px-2 py-2 md:hidden z-50" 
+      style={{ width: '100vw' }}
+      role="navigation"
+      aria-label={t("navigation.mobileNavigation", "Mobile Navigation")}
+    >
       <div className="flex justify-around items-center">
         {navItems.map((item) => {
           const isActive = location.pathname === item.url;
@@ -122,8 +126,10 @@ export function MobileBottomNav() {
               variant="ghost"
               size="sm"
               className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg h-auto"
+              aria-label={t("account.title", "Account")}
+              aria-expanded={isMenuOpen}
             >
-              <UserCircle size={20} />
+              <UserCircle size={20} aria-hidden="true" />
               <span className="text-xs font-medium">
                 {t("account.title", "Account")}
               </span>
@@ -263,6 +269,6 @@ export function MobileBottomNav() {
           </SheetContent>
         </Sheet>
       </div>
-    </div>
+    </nav>
   );
 }

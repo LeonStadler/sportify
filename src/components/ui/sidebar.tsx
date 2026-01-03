@@ -2,6 +2,7 @@ import { Slot } from "@radix-ui/react-slot";
 import { VariantProps, cva } from "class-variance-authority";
 import * as React from "react";
 
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -46,6 +47,7 @@ const SidebarProvider = React.forwardRef<
   ) => {
     const isMobile = useIsMobile();
     const [openMobile, setOpenMobile] = React.useState(false);
+    const buttonClickedRef = React.useRef(false);
 
     // This is the internal state of the sidebar.
     // We use openProp and setOpenProp for control from outside the component.
@@ -68,9 +70,16 @@ const SidebarProvider = React.forwardRef<
 
     // Helper to toggle the sidebar.
     const toggleSidebar = React.useCallback(() => {
-      return isMobile
-        ? setOpenMobile((open) => !open)
-        : setOpen((open) => !open);
+      if (isMobile) {
+        buttonClickedRef.current = true;
+        setOpenMobile((open) => !open);
+        // Reset nach kurzer Verzögerung
+        setTimeout(() => {
+          buttonClickedRef.current = false;
+        }, 100);
+      } else {
+        setOpen((open) => !open);
+      }
     }, [isMobile, setOpen, setOpenMobile]);
 
     // Adds a keyboard shortcut to toggle the sidebar.
@@ -171,8 +180,20 @@ const Sidebar = React.forwardRef<
     }
 
     if (isMobile) {
+      // Handler für onOpenChange, der verhindert, dass es ausgelöst wird, wenn der Button geklickt wird
+      const handleOpenChange = React.useCallback((open: boolean) => {
+        // Ignoriere onOpenChange, wenn der Button geklickt wurde
+        if (buttonClickedRef.current) {
+          return;
+        }
+        // Nur setzen, wenn sich der State tatsächlich ändert
+        if (open !== openMobile) {
+          setOpenMobile(open);
+        }
+      }, [openMobile, setOpenMobile]);
+
       return (
-        <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
+        <Sheet open={openMobile} onOpenChange={handleOpenChange} {...props}>
           <SheetContent
             data-sidebar="sidebar"
             data-mobile="true"
@@ -264,6 +285,88 @@ const SidebarRail = React.forwardRef<
   );
 });
 SidebarRail.displayName = "SidebarRail";
+
+const SidebarTrigger = React.forwardRef<
+  HTMLButtonElement,
+  React.ComponentProps<"button">
+>(({ className, ...props }, ref) => {
+  const { toggleSidebar, isMobile, openMobile, open } = useSidebar();
+  const isOpen = isMobile ? openMobile : open;
+
+  return (
+    <Button
+      ref={ref}
+      data-sidebar="trigger"
+      variant="ghost"
+      size="icon"
+      className={cn(
+        "relative z-[100] pointer-events-auto",
+        "h-12 w-12 rounded-md",
+        "transition-all duration-200",
+        className
+      )}
+      onClick={(event) => {
+        event.stopPropagation();
+        toggleSidebar();
+      }}
+      aria-label="Toggle Sidebar"
+      aria-expanded={isOpen}
+      {...props}
+    >
+      <span className="sr-only">Toggle Sidebar</span>
+      <svg
+        viewBox="0 0 48 48"
+        className="h-7 w-9"
+        aria-hidden="true"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <line
+          x1="11"
+          y1="12.5"
+          x2="37"
+          y2="12.5"
+          style={{
+            transformOrigin: "24px 24px",
+            transform: isOpen
+              ? "translateY(11px) rotate(45deg)"
+              : "translateY(0px) rotate(0deg)",
+            transition: "transform 260ms cubic-bezier(.4,0,.2,1)",
+          }}
+        />
+        <line
+          x1="11"
+          y1="24"
+          x2="37"
+          y2="24"
+          style={{
+            transformOrigin: "24px 24px",
+            transform: isOpen ? "scaleX(0.12)" : "scaleX(1)",
+            opacity: isOpen ? 0 : 1,
+            transition:
+              "transform 200ms cubic-bezier(.4,0,.2,1), opacity 160ms ease",
+          }}
+        />
+        <line
+          x1="11"
+          y1="35.5"
+          x2="37"
+          y2="35.5"
+          style={{
+            transformOrigin: "24px 24px",
+            transform: isOpen
+              ? "translateY(-11px) rotate(-45deg)"
+              : "translateY(0px) rotate(0deg)",
+            transition: "transform 260ms cubic-bezier(.4,0,.2,1)",
+          }}
+        />
+      </svg>
+    </Button>
+  );
+});
+SidebarTrigger.displayName = "SidebarTrigger";
 
 const SidebarInset = React.forwardRef<
   HTMLDivElement,
@@ -708,5 +811,6 @@ export {
   SidebarMenuSubItem,
   SidebarProvider,
   SidebarRail,
-  SidebarSeparator
+  SidebarSeparator,
+  SidebarTrigger
 };

@@ -349,7 +349,7 @@ const SidebarTrigger = React.forwardRef<
           "flex items-center justify-center",
           "touch-manipulation",
           // Safe area für Notch/Statusleiste berücksichtigen
-          "top-[max(0.75rem,env(safe-area-inset-top))]",
+          "top-[max(0.75rem,var(--safe-area-top))]",
           isOpen
             ? "text-white hover:!bg-transparent hover:!text-primary"
             : "text-foreground hover:bg-accent/40 dark:hover:bg-accent/30 hover:!text-primary"

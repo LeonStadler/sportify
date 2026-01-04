@@ -208,11 +208,7 @@ const App = () => {
             <main
               id="main-content"
               ref={mainRef}
-              className="flex-1 p-3 md:p-6 bg-background pb-20 md:pb-6 overflow-y-auto pt-16 lg:pt-6"
-              style={{
-                // Safe area für mobile Geräte berücksichtigen - zusätzliches Padding oben
-                paddingTop: 'max(4rem, calc(4rem + env(safe-area-inset-top)))',
-              }}
+              className="flex-1 p-3 md:p-6 bg-background pb-20 md:pb-6 overflow-y-auto pt-16 lg:pt-6 safe-area-main"
               role="main"
               aria-label="Hauptinhalt"
               tabIndex={-1}

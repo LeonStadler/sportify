@@ -43,7 +43,8 @@ export function ScrollHeader({ scrollContainerRef }: ScrollHeaderProps) {
   return (
     <div
       className={cn(
-        "absolute top-0 left-0 right-0 z-50 h-16 transition-all duration-300",
+        "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+        "h-[calc(4rem+var(--safe-area-top))] pt-[var(--safe-area-top)]",
         "bg-background/80 backdrop-blur-sm border-b border-border/50",
         "shadow-lg shadow-black/5 dark:shadow-black/20",
         isScrolled

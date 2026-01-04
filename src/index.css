@@ -266,16 +266,6 @@
     }
   }
 
-  .safe-area-main {
-    padding-top: calc(4rem + var(--safe-area-top) + var(--browser-top-offset));
-  }
-
-  @media (min-width: 1024px) {
-    .safe-area-main {
-      padding-top: 2rem;
-    }
-  }
-
   /* PWA Splash Screen - CSS-basierte Lösung für iOS & Android */
   /* 
    * iOS: Nutzt automatisch theme-color Meta Tag und apple-touch-icon
@@ -318,6 +308,18 @@
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  .safe-area-main {
+    padding-top: calc(4rem + var(--safe-area-top) + var(--browser-top-offset));
+  }
+
+  @media (min-width: 1024px) {
+    .safe-area-main {
+      padding-top: 2rem;
     }
   }
 }

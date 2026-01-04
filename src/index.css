@@ -251,6 +251,13 @@
     }
   }
 
+  /* iOS Safari fallback: adds minimal status-bar padding even if env() reports 0 */
+  @supports (-webkit-touch-callout: none) {
+    :root {
+      --safe-area-top: env(safe-area-inset-top, 20px);
+    }
+  }
+
   @media all and (display-mode: standalone) {
     :root {
       --safe-area-top: env(safe-area-inset-top);
@@ -263,7 +270,7 @@
 
   @media (min-width: 1024px) {
     .safe-area-main {
-      padding-top: 1.5rem;
+      padding-top: 2rem;
     }
   }
 
@@ -301,6 +308,7 @@
 
   /* Reduced Motion Support - respektiere System-Präferenzen */
   @media (prefers-reduced-motion: reduce) {
+
     *,
     *::before,
     *::after {

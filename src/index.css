@@ -255,7 +255,7 @@
   /* iOS Safari browser UI offset (PWA will override to 0) */
   @supports (-webkit-touch-callout: none) {
     :root {
-      --browser-top-offset: 32px;
+      --browser-top-offset: 64px;
     }
   }
 

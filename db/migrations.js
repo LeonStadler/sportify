@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const MIGRATIONS_DIR = path.join(__dirname, '../migrations');
+const MIGRATION_LOCK_KEY = 942783472; // Stable lock key to serialize migrations across instances
 
 const ensureExtension = async (pool) => {
     try {
@@ -321,7 +322,11 @@ export const createMigrationRunner = (pool) => {
     return async () => {
         if (!migrationPromise) {
             migrationPromise = (async () => {
+                let lockAcquired = false;
                 try {
+                    await pool.query('SELECT pg_advisory_lock($1)', [MIGRATION_LOCK_KEY]);
+                    lockAcquired = true;
+
                     // Stelle sicher, dass benötigte Extensions vorhanden sind, bevor Migrationen laufen
                     await ensureExtension(pool);
 
@@ -351,6 +356,14 @@ export const createMigrationRunner = (pool) => {
                 } catch (error) {
                     console.error('[Migration] ❌ Fehler beim Ausführen der Migrationen:', error);
                     throw error;
+                } finally {
+                    if (lockAcquired) {
+                        try {
+                            await pool.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]);
+                        } catch (unlockError) {
+                            console.warn('[Migration] Konnte Advisory Lock nicht freigeben:', unlockError.message);
+                        }
+                    }
                 }
             })();
         }

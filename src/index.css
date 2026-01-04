@@ -240,17 +240,21 @@
     @apply bg-background text-foreground;
   }
 
-  /* PWA Status-Bar Support für iOS */
+  /* PWA Status-Bar Support für iOS - nur für Nicht-Mobile-Layouts */
   @supports (padding: env(safe-area-inset-top)) {
-    body {
-      padding-top: env(safe-area-inset-top);
+    @media (min-width: 1024px) {
+      body {
+        padding-top: env(safe-area-inset-top);
+      }
     }
   }
 
-  /* Für Standalone-Modus auf iOS */
+  /* Für Standalone-Modus auf iOS - nur für Nicht-Mobile-Layouts */
   @media all and (display-mode: standalone) {
-    body {
-      padding-top: env(safe-area-inset-top);
+    @media (min-width: 1024px) {
+      body {
+        padding-top: env(safe-area-inset-top);
+      }
     }
   }
 

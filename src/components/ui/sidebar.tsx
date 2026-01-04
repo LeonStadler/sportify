@@ -223,6 +223,8 @@ const Sidebar = React.forwardRef<
             style={
               {
                 "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
+                // Safe area für mobile Geräte mit Notch/Statusleiste
+                paddingTop: 'max(0px, env(safe-area-inset-top))',
               } as React.CSSProperties
             }
             side={side}
@@ -342,10 +344,12 @@ const SidebarTrigger = React.forwardRef<
         "transition-all duration-200",
         // Mobile-spezifisches Styling
         isMobile && cn(
-          "lg:hidden fixed top-3 right-3",
+          "lg:hidden fixed right-3 z-[100]",
           "bg-transparent shadow-none border-none",
           "flex items-center justify-center",
           "touch-manipulation",
+          // Safe area für Notch/Statusleiste berücksichtigen
+          "top-[max(0.75rem,env(safe-area-inset-top))]",
           isOpen
             ? "text-white hover:!bg-transparent hover:!text-primary"
             : "text-foreground hover:bg-accent/40 dark:hover:bg-accent/30 hover:!text-primary"

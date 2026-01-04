@@ -16,6 +16,7 @@ import { createGoalsRouter } from "./routes/goals.routes.js";
 import { createNotificationsRouter } from "./routes/notifications.routes.js";
 import { createProfileRouter } from "./routes/profile.routes.js";
 import { createRecentWorkoutsRouter } from "./routes/recent-workouts.routes.js";
+import { createReactionsRouter } from "./routes/reactions.routes.js";
 import { createScoreboardRouter } from "./routes/scoreboard.routes.js";
 import { createStatsRouter } from "./routes/stats.routes.js";
 import { createTrainingJournalRouter } from "./routes/training-journal.routes.js";
@@ -179,6 +180,7 @@ app.use("/api/feed", createFeedRouter(pool, ensureFriendInfrastructure));
 app.use("/api/challenges", createChallengesRouter(pool));
 app.use("/api/events", createEventsRouter(pool));
 app.use("/api/notifications", createNotificationsRouter(pool));
+app.use("/api/reactions", createReactionsRouter(pool));
 app.use("/api/contact", createContactRouter(pool));
 
 // Health check endpoint

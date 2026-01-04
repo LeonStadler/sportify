@@ -35,6 +35,10 @@ export interface User {
     privacy: {
       publicProfile: boolean;
     };
+    reactions: {
+      friendsCanSee: boolean;
+      showNames: boolean;
+    };
     theme: "light" | "dark" | "system";
   };
 }

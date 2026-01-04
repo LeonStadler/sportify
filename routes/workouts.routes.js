@@ -1,7 +1,7 @@
 import express from "express";
 import authMiddleware from "../middleware/authMiddleware.js";
 import { badgeService } from "../services/badgeService.js";
-import { toCamelCase } from "../utils/helpers.js";
+import { applyDisplayName, toCamelCase } from "../utils/helpers.js";
 
 export const createWorkoutsRouter = (pool) => {
   const router = express.Router();
@@ -88,11 +88,43 @@ export const createWorkoutsRouter = (pool) => {
                             ) ORDER BY wa.order_index, wa.id
                         ) FILTER (WHERE wa.id IS NOT NULL),
                         '[]'::json
-                    ) as activities
+                    ) as activities,
+                    reactions.reactions as reactions
                 FROM workouts w
                 LEFT JOIN workout_activities wa ON w.id = wa.workout_id
+                LEFT JOIN LATERAL (
+                  SELECT COALESCE(
+                    jsonb_agg(
+                      jsonb_build_object(
+                        'emoji', reaction_data.emoji,
+                        'count', reaction_data.count,
+                        'users', reaction_data.users
+                      ) ORDER BY reaction_data.emoji
+                    ),
+                    '[]'::jsonb
+                  ) AS reactions
+                  FROM (
+                    SELECT
+                      wr.emoji,
+                      COUNT(*)::int AS count,
+                      jsonb_agg(
+                        jsonb_build_object(
+                          'id', ru.id,
+                          'first_name', ru.first_name,
+                          'last_name', ru.last_name,
+                          'nickname', ru.nickname,
+                          'display_preference', ru.display_preference,
+                          'avatar_url', ru.avatar_url
+                        )
+                      ) AS users
+                    FROM workout_reactions wr
+                    JOIN users ru ON ru.id = wr.user_id
+                    WHERE wr.workout_id = w.id
+                    GROUP BY wr.emoji
+                  ) reaction_data
+                ) reactions ON true
                 ${filterClause}
-                GROUP BY w.id, w.title, w.description, w.start_time, w.duration, w.use_end_time, w.created_at, w.updated_at
+                GROUP BY w.id, w.title, w.description, w.start_time, w.duration, w.use_end_time, w.created_at, w.updated_at, reactions.reactions
                 ORDER BY w.start_time DESC, w.created_at DESC
                 LIMIT $${params.length + 1} OFFSET $${params.length + 2};
             `;
@@ -107,6 +139,10 @@ export const createWorkoutsRouter = (pool) => {
             `;
       const { rows: countRows } = await pool.query(countQuery, params);
       const totalCount = Number(countRows[0].total) || 0;
+
+      // For own workouts, always show all reactions with names
+      // Settings only apply to friends viewing the workouts
+      const isOwnWorkout = true; // This is always own workouts in this route
 
       const workouts = rows.map((row) => {
         const activities = Array.isArray(row.activities)
@@ -141,6 +177,41 @@ export const createWorkoutsRouter = (pool) => {
           : [];
 
         const workout = toCamelCase(row);
+
+        // Process reactions
+        const rawReactions = Array.isArray(row.reactions) ? row.reactions : [];
+        const mapReactionUsers = (users) => {
+          if (!Array.isArray(users)) {
+            return [];
+          }
+          return users.map((user) => {
+            const mapped = applyDisplayName(toCamelCase(user));
+            return {
+              id: mapped.id,
+              name: mapped.displayName || mapped.firstName || "Athlet",
+              avatar: mapped.avatarUrl || null,
+            };
+          });
+        };
+
+        const reactions = rawReactions.map((reaction) => {
+          const allUsers = mapReactionUsers(reaction.users);
+          const currentUserReaction = allUsers.some(
+            (user) => user.id === req.user.id
+          )
+            ? reaction.emoji
+            : undefined;
+
+          // For own workouts, always show all user names
+          const users = allUsers;
+
+          return {
+            emoji: reaction.emoji,
+            count: Number(reaction.count) || allUsers.length,
+            users,
+            ...(currentUserReaction ? { currentUserReaction } : {}),
+          };
+        });
 
         // Extrahiere workoutDate und startTime aus start_time (TIMESTAMPTZ)
         // start_time ist NOT NULL, daher sollte es immer vorhanden sein
@@ -204,6 +275,7 @@ export const createWorkoutsRouter = (pool) => {
         return {
           ...workout,
           activities,
+          reactions,
         };
       });
 

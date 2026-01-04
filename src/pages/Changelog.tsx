@@ -12,6 +12,7 @@ import {
   Camera,
   Heart,
   History,
+  Keyboard,
   LucideIcon,
   Mail,
   Rocket,
@@ -36,6 +37,39 @@ interface ChangelogEntry {
 
 // Changelog-Daten mit i18n-Keys
 const changelogEntries: ChangelogEntry[] = [
+  {
+    version: "1.9.0",
+    date: "2026-01-04",
+    titleKey: "changelog.entries.v190.title",
+    descriptionKey: "changelog.entries.v190.description",
+    icon: Heart,
+    type: "feature",
+    highlightKeys: [
+      "changelog.entries.v190.highlights.0",
+      "changelog.entries.v190.highlights.1",
+      "changelog.entries.v190.highlights.2",
+      "changelog.entries.v190.highlights.3",
+      "changelog.entries.v190.highlights.4",
+      "changelog.entries.v190.highlights.5",
+    ],
+  },
+  {
+    version: "1.8.5",
+    date: "2026-01-04",
+    titleKey: "changelog.entries.v185.title",
+    descriptionKey: "changelog.entries.v185.description",
+    icon: Keyboard,
+    type: "improvement",
+    highlightKeys: [
+      "changelog.entries.v185.highlights.0",
+      "changelog.entries.v185.highlights.1",
+      "changelog.entries.v185.highlights.2",
+      "changelog.entries.v185.highlights.3",
+      "changelog.entries.v185.highlights.4",
+      "changelog.entries.v185.highlights.5",
+      "changelog.entries.v185.highlights.6",
+    ],
+  },
   {
     version: "1.8.0",
     date: "2025-12-26",

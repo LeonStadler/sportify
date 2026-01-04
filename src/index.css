@@ -242,6 +242,7 @@
 
   :root {
     --safe-area-top: 0px;
+    --browser-top-offset: 0px;
   }
 
   /* PWA Status-Bar Support für iOS */
@@ -251,21 +252,22 @@
     }
   }
 
-  /* iOS Safari fallback: adds minimal status-bar padding even if env() reports 0 */
+  /* iOS Safari browser UI offset (PWA will override to 0) */
   @supports (-webkit-touch-callout: none) {
     :root {
-      --safe-area-top: env(safe-area-inset-top, 20px);
+      --browser-top-offset: 32px;
     }
   }
 
   @media all and (display-mode: standalone) {
     :root {
       --safe-area-top: env(safe-area-inset-top);
+      --browser-top-offset: 0px;
     }
   }
 
   .safe-area-main {
-    padding-top: calc(4rem + var(--safe-area-top));
+    padding-top: calc(4rem + var(--safe-area-top) + var(--browser-top-offset));
   }
 
   @media (min-width: 1024px) {

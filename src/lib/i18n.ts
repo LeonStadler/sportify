@@ -380,6 +380,15 @@ const resources = {
           unknown: "Unbekannte Aktivität",
         },
       },
+      reactions: {
+        errorTitle: "Fehler",
+        loginRequired: "Bitte melde dich an.",
+        errorMessage: "Aktion fehlgeschlagen.",
+        noReactions: "Noch keine Reaktionen",
+        countOnly: "{{count}} Reaktionen",
+        openPicker: "Reaktion auswählen",
+        reactWith: "Mit {{emoji}} reagieren",
+      },
       friendsActivities: {
         title: "Freundes Aktivitäten",
         subtitle: "Alle Trainings von dir und deinen Freunden",
@@ -846,6 +855,12 @@ const resources = {
         saved: "Gespeichert",
         settingSaved: "{{setting}} wurde aktualisiert.",
         saveError: "Fehler beim Speichern",
+        reactions: {
+          friendsCanSee: "Freunde können Reaktionen sehen",
+          friendsCanSeeDescription: "Erlaube deinen Freunden, Reaktionen auf deine Workouts zu sehen",
+          showNames: "Namen bei Reaktionen anzeigen",
+          showNamesDescription: "Zeige die Namen der Nutzer, die auf deine Workouts reagiert haben",
+        },
       },
       // Push Notifications
       pushNotifications: {
@@ -887,6 +902,33 @@ const resources = {
           fix: "Bugfix",
         },
         entries: {
+          v190: {
+            title: "Reaktionen auf Workouts",
+            description:
+              "Reagiere auf die Trainings deiner Freunde mit Emojis und erhalte Benachrichtigungen über Reaktionen auf deine eigenen Workouts.",
+            highlights: {
+              0: "Emoji-Reaktionen: Reagiere mit 👍, ❤️, 🔥, 💪, 🎉 oder 😊 auf Workouts von Freunden",
+              1: "Benachrichtigungen: Erhalte Push-Benachrichtigungen wenn jemand auf dein Training reagiert",
+              2: "Reaktionen anzeigen: Sieh alle Reaktionen auf deine Workouts in der My-Workouts-Ansicht",
+              3: "Privacy-Settings: Kontrolliere ob Freunde Reaktionen sehen können und ob Namen angezeigt werden",
+              4: "Hover-Info: Zeige beim Hover über Reaktionen die Namen aller reagierenden Nutzer",
+              5: "Eigene Workouts: Immer alle Reaktionen mit Namen sichtbar, unabhängig von den Settings",
+            },
+          },
+          v185: {
+            title: "Keyboard Shortcuts & UX-Verbesserungen",
+            description:
+              "Neue Keyboard Shortcuts für schnelleres Navigieren, verbesserte Mobile-Navigation, Scroll-Indikator und umfassende Accessibility-Verbesserungen.",
+            highlights: {
+              0: "Keyboard Shortcuts: Cmd/Ctrl+B zum Togglen der Sidebar, ESC zum Schließen",
+              1: "Scroll-Indikator: Visueller Fortschrittsbalken im Header beim Scrollen",
+              2: "Mobile Navigation: Verbesserte Bottom-Navigation mit erweitertem Account-Menü",
+              3: "Accessibility: Umfassende aria-label Verbesserungen für Screenreader",
+              4: "Design: Versteckte Scrollbars mit modernem Scroll-Indikator",
+              5: "Wochenberechnung: ISO 8601 Woche (Montag-Sonntag) statt rolling 7 days",
+              6: "Reduced Motion: Respektiert System-Präferenzen für reduzierte Animationen",
+            },
+          },
           v180: {
             title: "Rangliste, Ziele & Erholung aufgebohrt",
             description:
@@ -2350,6 +2392,15 @@ const resources = {
           unknown: "Unknown Activity",
         },
       },
+      reactions: {
+        errorTitle: "Error",
+        loginRequired: "Please sign in.",
+        errorMessage: "Action failed.",
+        noReactions: "No reactions yet",
+        countOnly: "{{count}} reactions",
+        openPicker: "Choose reaction",
+        reactWith: "React with {{emoji}}",
+      },
       friendsActivities: {
         title: "Friend's activities",
         subtitle: "All training sessions by you and your friends",
@@ -2806,6 +2857,12 @@ const resources = {
         saved: "Saved",
         settingSaved: "{{setting}} has been updated.",
         saveError: "Failed to save",
+        reactions: {
+          friendsCanSee: "Friends can see reactions",
+          friendsCanSeeDescription: "Allow your friends to see reactions on your workouts",
+          showNames: "Show names in reactions",
+          showNamesDescription: "Show the names of users who reacted to your workouts",
+        },
       },
       // Push Notifications
       pushNotifications: {
@@ -2846,6 +2903,33 @@ const resources = {
           fix: "Bugfix",
         },
         entries: {
+          v190: {
+            title: "Workout Reactions",
+            description:
+              "React to your friends' workouts with emojis and receive notifications about reactions on your own workouts.",
+            highlights: {
+              0: "Emoji reactions: React with 👍, ❤️, 🔥, 💪, 🎉 or 😊 on friend workouts",
+              1: "Notifications: Receive push notifications when someone reacts to your workout",
+              2: "View reactions: See all reactions on your workouts in the My-Workouts view",
+              3: "Privacy settings: Control whether friends can see reactions and if names are displayed",
+              4: "Hover info: Show names of all reacting users when hovering over reactions",
+              5: "Own workouts: Always show all reactions with names, regardless of settings",
+            },
+          },
+          v185: {
+            title: "Keyboard Shortcuts & UX Improvements",
+            description:
+              "New keyboard shortcuts for faster navigation, improved mobile navigation, scroll indicator and comprehensive accessibility improvements.",
+            highlights: {
+              0: "Keyboard shortcuts: Cmd/Ctrl+B to toggle sidebar, ESC to close",
+              1: "Scroll indicator: Visual progress bar in header when scrolling",
+              2: "Mobile navigation: Improved bottom navigation with expanded account menu",
+              3: "Accessibility: Comprehensive aria-label improvements for screen readers",
+              4: "Design: Hidden scrollbars with modern scroll indicator",
+              5: "Week calculation: ISO 8601 week (Monday-Sunday) instead of rolling 7 days",
+              6: "Reduced motion: Respects system preferences for reduced animations",
+            },
+          },
           v180: {
             title: "Rankings, goals & recovery upgraded",
             description:

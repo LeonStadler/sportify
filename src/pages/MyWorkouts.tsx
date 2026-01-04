@@ -4,6 +4,7 @@ import {
   PaginationControls,
   PaginationMeta,
 } from "@/components/common/pagination/PaginationControls";
+import { WorkoutReactions } from "@/components/workout/WorkoutReactions";
 import { TimeRangeFilter } from "@/components/filters/TimeRangeFilter";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
-import type { Workout } from "@/types/workout";
+import type { Workout, WorkoutReaction } from "@/types/workout";
 import {
   getNormalizedRange,
   getRangeForPeriod,
@@ -254,6 +255,14 @@ export function MyWorkouts() {
     setCurrentPage(1);
   };
 
+  const handleReactionChange = (workoutId: string, reactions: WorkoutReaction[]) => {
+    setWorkouts((prevWorkouts) =>
+      prevWorkouts.map((workout) =>
+        workout.id === workoutId ? { ...workout, reactions } : workout
+      )
+    );
+  };
+
   if (!user) {
     return (
       <PageTemplate
@@ -451,6 +460,18 @@ export function MyWorkouts() {
                     })}
                   </div>
                 )}
+
+                {/* Reactions */}
+                <div className="mt-2">
+                  <WorkoutReactions
+                    workoutId={workout.id}
+                    reactions={workout.reactions || []}
+                    isOwnWorkout={true}
+                    onReactionChange={(nextReactions) =>
+                      handleReactionChange(workout.id, nextReactions)
+                    }
+                  />
+                </div>
               </CardContent>
             </Card>
           ))}

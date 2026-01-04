@@ -172,6 +172,10 @@ export function Profile() {
     privacy: {
       publicProfile: boolean;
     };
+    reactions: {
+      friendsCanSee: boolean;
+      showNames: boolean;
+    };
     theme: "light" | "dark" | "system";
   }>({
     languagePreference: user?.languagePreference || "de",
@@ -187,6 +191,10 @@ export function Profile() {
     },
     privacy: {
       publicProfile: user?.preferences?.privacy?.publicProfile ?? true,
+    },
+    reactions: {
+      friendsCanSee: user?.preferences?.reactions?.friendsCanSee ?? true,
+      showNames: user?.preferences?.reactions?.showNames ?? true,
     },
     theme:
       (theme && (theme === "light" || theme === "dark" || theme === "system")
@@ -1770,6 +1778,63 @@ export function Profile() {
                     checked={showInGlobalRankings}
                     onCheckedChange={handleGlobalRankingToggle}
                   />
+                </div>
+
+                <Separator />
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm font-medium">
+                        {t("settings.reactions.friendsCanSee", "Freunde können Reaktionen sehen")}
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        {t("settings.reactions.friendsCanSeeDescription", "Erlaube deinen Freunden, Reaktionen auf deine Workouts zu sehen")}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={preferencesForm.reactions.friendsCanSee}
+                      onCheckedChange={(checked) =>
+                        savePreference(
+                          {
+                            reactions: {
+                              ...preferencesForm.reactions,
+                              friendsCanSee: checked,
+                              // Wenn friendsCanSee deaktiviert wird, auch showNames deaktivieren
+                              showNames: checked ? preferencesForm.reactions.showNames : false,
+                            },
+                          },
+                          t("settings.reactions.friendsCanSee", "Freunde können Reaktionen sehen")
+                        )
+                      }
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm font-medium">
+                        {t("settings.reactions.showNames", "Namen bei Reaktionen anzeigen")}
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        {t("settings.reactions.showNamesDescription", "Zeige die Namen der Nutzer, die auf deine Workouts reagiert haben")}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={preferencesForm.reactions.showNames}
+                      disabled={!preferencesForm.reactions.friendsCanSee}
+                      onCheckedChange={(checked) =>
+                        savePreference(
+                          {
+                            reactions: {
+                              ...preferencesForm.reactions,
+                              showNames: checked,
+                            },
+                          },
+                          t("settings.reactions.showNames", "Namen bei Reaktionen anzeigen")
+                        )
+                      }
+                    />
+                  </div>
                 </div>
               </CardContent>
             </Card>

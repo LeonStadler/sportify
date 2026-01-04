@@ -4,6 +4,7 @@ import {
   PaginationControls,
   PaginationMeta,
 } from "@/components/common/pagination/PaginationControls";
+import { WorkoutReactions } from "@/components/workout/WorkoutReactions";
 import { TimeRangeFilter } from "@/components/filters/TimeRangeFilter";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +15,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
 import { parseAvatarConfig } from "@/lib/avatar";
+import type { FeedWorkout } from "@/types/workout";
 import {
   getNormalizedRange,
   getRangeForPeriod,
@@ -25,28 +27,6 @@ import type { DateRange } from "react-day-picker";
 import { useTranslation } from "react-i18next";
 import NiceAvatar from "react-nice-avatar";
 import { Link, useNavigate } from "react-router-dom";
-
-interface WorkoutActivity {
-  id: string;
-  activityType: string;
-  amount: number;
-  points: number;
-}
-
-interface FeedWorkout {
-  workoutId: string;
-  workoutTitle: string;
-  workoutNotes?: string;
-  startTimeTimestamp: string | null;
-  userId: string;
-  userName: string;
-  userAvatar?: string | null;
-  userFirstName: string;
-  userLastName: string;
-  isOwnWorkout: boolean;
-  activities: WorkoutActivity[];
-  totalPoints: number;
-}
 
 const getActivityIcon = (activityType: string) => {
   switch (activityType) {
@@ -152,6 +132,22 @@ export function FriendsActivities() {
     hasNext: false,
     hasPrev: false,
   });
+  const handleReactionChange = useCallback(
+    (workoutId: string, reactions: FeedWorkout["reactions"]) => {
+      if (!reactions) {
+        return;
+      }
+
+      setWorkouts((prev) =>
+        prev.map((workout) =>
+          workout.workoutId === workoutId
+            ? { ...workout, reactions }
+            : workout
+        )
+      );
+    },
+    []
+  );
 
   const formatDate = (date: Date) =>
     date.toLocaleDateString(i18n.language === "en" ? "en-US" : "de-DE");
@@ -498,6 +494,17 @@ export function FriendsActivities() {
                     ))}
                   </div>
                 )}
+
+                <div className="mt-2">
+                  <WorkoutReactions
+                    workoutId={workout.workoutId}
+                    reactions={workout.reactions}
+                    isOwnWorkout={workout.isOwnWorkout}
+                    onReactionChange={(nextReactions) =>
+                      handleReactionChange(workout.workoutId, nextReactions)
+                    }
+                  />
+                </div>
 
                 {/* Notes */}
                 {workout.workoutNotes && (

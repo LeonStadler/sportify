@@ -10,6 +10,42 @@ export interface WorkoutActivity {
   }>;
 }
 
+export interface WorkoutReactionUser {
+  id: string;
+  name: string;
+  avatar?: string | null;
+}
+
+export interface WorkoutReaction {
+  emoji: string;
+  count: number;
+  users: WorkoutReactionUser[];
+  currentUserReaction?: string;
+}
+
+export interface FeedWorkoutActivity {
+  id: string;
+  activityType: string;
+  amount: number;
+  points: number;
+}
+
+export interface FeedWorkout {
+  workoutId: string;
+  workoutTitle: string;
+  workoutNotes?: string;
+  startTimeTimestamp: string | null;
+  userId: string;
+  userName: string;
+  userAvatar?: string | null;
+  userFirstName: string;
+  userLastName: string;
+  isOwnWorkout: boolean;
+  activities: FeedWorkoutActivity[];
+  reactions?: WorkoutReaction[];
+  totalPoints: number;
+}
+
 export interface Workout {
   id: string;
   title: string;
@@ -22,4 +58,5 @@ export interface Workout {
   createdAt: string;
   updatedAt: string;
   activities: WorkoutActivity[];
+  reactions?: WorkoutReaction[];
 }

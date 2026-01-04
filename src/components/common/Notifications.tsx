@@ -18,11 +18,13 @@ import {
   Bell,
   CheckCircle,
   Clock,
+  Smile,
   Trophy,
   UserMinus,
   UserPlus,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 interface Notification {
@@ -48,12 +50,14 @@ const notificationIcons: Record<string, JSX.Element> = {
   "award-earned": <Trophy className="w-5 h-5 text-amber-500" />,
   // Invitation types
   "invitation-expired": <Clock className="w-5 h-5 text-orange-500" />,
+  "workout-reaction": <Smile className="w-5 h-5 text-pink-500" />,
 };
 
 export function Notifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
   const { isSupported, permission, isRegistering, requestPermission } =
     usePushNotifications();
 
@@ -142,6 +146,23 @@ export function Notifications() {
     }
   };
 
+  const handleNotificationClick = (notification: Notification) => {
+    if (notification.type !== "workout-reaction") {
+      return;
+    }
+
+    const workoutId =
+      typeof notification.payload?.workoutId === "string"
+        ? notification.payload.workoutId
+        : null;
+
+    if (workoutId) {
+      navigate(`/friends/activities?workoutId=${workoutId}`);
+    } else {
+      navigate("/friends/activities");
+    }
+  };
+
   return (
     <DropdownMenu open={isOpen} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>
@@ -214,6 +235,12 @@ export function Notifications() {
                 <DropdownMenuItem
                   key={notification.id}
                   className={`flex items-start gap-3 p-2.5 ${!notification.isRead ? "bg-muted/50" : ""}`}
+                  onSelect={(event) => {
+                    if (notification.type === "workout-reaction") {
+                      event.preventDefault();
+                      handleNotificationClick(notification);
+                    }
+                  }}
                 >
                   {icon}
                   <div className="flex-1">

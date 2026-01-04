@@ -8,33 +8,13 @@ import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
 import { parseAvatarConfig } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
+import { WorkoutReactions } from "@/components/workout/WorkoutReactions";
+import type { FeedWorkout } from "@/types/workout";
 import { ArrowRight } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import NiceAvatar from "react-nice-avatar";
 import { Link, useNavigate } from "react-router-dom";
-
-interface WorkoutActivity {
-  id: string;
-  activityType: string;
-  amount: number;
-  points: number;
-}
-
-interface FeedWorkout {
-  workoutId: string;
-  workoutTitle: string;
-  workoutNotes?: string;
-  startTimeTimestamp: string | null;
-  userId: string;
-  userName: string;
-  userAvatar?: string | null;
-  userFirstName: string;
-  userLastName: string;
-  isOwnWorkout: boolean;
-  activities: WorkoutActivity[];
-  totalPoints: number;
-}
 
 const getActivityIcon = (activityType: string) => {
   switch (activityType) {
@@ -161,6 +141,22 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
   const [error, setError] = useState<string | null>(null);
   const [hasFriends, setHasFriends] = useState<boolean | null>(null);
   const [hasMore, setHasMore] = useState(false);
+  const handleReactionChange = useCallback(
+    (workoutId: string, reactions: FeedWorkout["reactions"]) => {
+      if (!reactions) {
+        return;
+      }
+
+      setWorkouts((prev) =>
+        prev.map((workout) =>
+          workout.workoutId === workoutId
+            ? { ...workout, reactions }
+            : workout
+        )
+      );
+    },
+    []
+  );
 
   const loadActivityFeed = useCallback(async () => {
     setIsLoading(true);
@@ -389,6 +385,20 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
                         ))}
                       </div>
                     )}
+
+                    <div className="mt-2">
+                      <WorkoutReactions
+                        workoutId={workout.workoutId}
+                        reactions={workout.reactions}
+                        isOwnWorkout={workout.isOwnWorkout}
+                        onReactionChange={(nextReactions) =>
+                          handleReactionChange(
+                            workout.workoutId,
+                            nextReactions
+                          )
+                        }
+                      />
+                    </div>
                   </div>
                 ))}
 
@@ -447,4 +457,3 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
     </Card>
   );
 }
-

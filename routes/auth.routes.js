@@ -82,6 +82,22 @@ export const createAuthRouter = (pool) => {
       } else if (!user.preferences) {
         user.preferences = {};
       }
+      
+      // Ensure reactions settings have defaults if not present
+      if (!user.preferences.reactions) {
+        user.preferences.reactions = {
+          friendsCanSee: true,
+          showNames: true,
+        };
+      } else {
+        // Ensure both fields exist with defaults
+        if (user.preferences.reactions.friendsCanSee === undefined) {
+          user.preferences.reactions.friendsCanSee = true;
+        }
+        if (user.preferences.reactions.showNames === undefined) {
+          user.preferences.reactions.showNames = true;
+        }
+      }
 
       // Ensure avatar field is correctly mapped (avatar_url -> avatarUrl -> avatar)
       if (user.avatarUrl !== undefined) {

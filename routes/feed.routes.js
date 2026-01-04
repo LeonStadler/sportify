@@ -1,6 +1,6 @@
 import express from "express";
 import authMiddleware from "../middleware/authMiddleware.js";
-import { toCamelCase } from "../utils/helpers.js";
+import { applyDisplayName, toCamelCase } from "../utils/helpers.js";
 
 export const createFeedRouter = (pool, ensureFriendInfrastructure) => {
   const router = express.Router();
@@ -41,6 +41,21 @@ export const createFeedRouter = (pool, ensureFriendInfrastructure) => {
       displayName = fullName || displayName;
     }
     return displayName;
+  };
+
+  const mapReactionUsers = (users) => {
+    if (!Array.isArray(users)) {
+      return [];
+    }
+
+    return users.map((user) => {
+      const mapped = applyDisplayName(toCamelCase(user));
+      return {
+        id: mapped.id,
+        name: mapped.displayName || mapped.firstName || "Athlet",
+        avatar: mapped.avatarUrl || null,
+      };
+    });
   };
 
   // Helper: Get friend IDs
@@ -144,6 +159,7 @@ export const createFeedRouter = (pool, ensureFriendInfrastructure) => {
           u.nickname,
           u.display_preference,
           u.avatar_url,
+          u.preferences as owner_preferences,
           json_agg(
             json_build_object(
               'id', wa.id,
@@ -152,12 +168,44 @@ export const createFeedRouter = (pool, ensureFriendInfrastructure) => {
               'points', COALESCE(wa.points_earned, 0)
             ) ORDER BY wa.activity_type
           ) as activities,
+          reactions.reactions as reactions,
           COALESCE(SUM(wa.points_earned), 0) as total_points
         FROM workouts w
         JOIN users u ON w.user_id = u.id
         LEFT JOIN workout_activities wa ON wa.workout_id = w.id
+        LEFT JOIN LATERAL (
+          SELECT COALESCE(
+            jsonb_agg(
+              jsonb_build_object(
+                'emoji', reaction_data.emoji,
+                'count', reaction_data.count,
+                'users', reaction_data.users
+              ) ORDER BY reaction_data.emoji
+            ),
+            '[]'::jsonb
+          ) AS reactions
+          FROM (
+            SELECT
+              wr.emoji,
+              COUNT(*)::int AS count,
+              jsonb_agg(
+                jsonb_build_object(
+                  'id', ru.id,
+                  'first_name', ru.first_name,
+                  'last_name', ru.last_name,
+                  'nickname', ru.nickname,
+                  'display_preference', ru.display_preference,
+                  'avatar_url', ru.avatar_url
+                )
+              ) AS users
+            FROM workout_reactions wr
+            JOIN users ru ON ru.id = wr.user_id
+            WHERE wr.workout_id = w.id
+            GROUP BY wr.emoji
+          ) reaction_data
+        ) reactions ON true
         WHERE w.user_id = ANY($1::uuid[])${dateFilter}
-        GROUP BY w.id, w.title, w.start_time, w.notes, u.id, u.first_name, u.last_name, u.nickname, u.display_preference, u.avatar_url
+        GROUP BY w.id, w.title, w.start_time, w.notes, u.id, u.first_name, u.last_name, u.nickname, u.display_preference, u.avatar_url, u.preferences, reactions.reactions
         ORDER BY w.start_time DESC
         LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
       `;
@@ -179,6 +227,41 @@ export const createFeedRouter = (pool, ensureFriendInfrastructure) => {
 
         // Filter out null activities (from LEFT JOIN when no activities exist)
         const activities = (row.activities || []).filter((a) => a.id !== null);
+        
+        // Get owner preferences for reaction visibility
+        let ownerPreferences = {};
+        try {
+          ownerPreferences = typeof row.owner_preferences === 'string' 
+            ? JSON.parse(row.owner_preferences) 
+            : (row.owner_preferences || {});
+        } catch (e) {
+          ownerPreferences = {};
+        }
+        
+        const friendsCanSee = ownerPreferences?.reactions?.friendsCanSee !== false; // default true
+        const showNames = ownerPreferences?.reactions?.showNames !== false; // default true
+        const isOwnWorkout = row.user_id === req.user.id;
+        
+        // Only show reactions if owner allows it (or if it's own workout)
+        const rawReactions = (isOwnWorkout || friendsCanSee) && Array.isArray(row.reactions) ? row.reactions : [];
+        const reactions = rawReactions.map((reaction) => {
+          const allUsers = mapReactionUsers(reaction.users);
+          const currentUserReaction = allUsers.some(
+            (user) => user.id === req.user.id
+          )
+            ? reaction.emoji
+            : undefined;
+
+          // Only include user names if owner allows it (or if it's own workout)
+          const users = (isOwnWorkout || showNames) ? allUsers : [];
+
+          return {
+            emoji: reaction.emoji,
+            count: Number(reaction.count) || allUsers.length,
+            users,
+            ...(currentUserReaction ? { currentUserReaction } : {}),
+          };
+        });
 
         return {
           workoutId: row.workout_id,
@@ -192,6 +275,7 @@ export const createFeedRouter = (pool, ensureFriendInfrastructure) => {
           userLastName: userData.lastName,
           isOwnWorkout: row.user_id === req.user.id,
           activities,
+          reactions,
           totalPoints: parseInt(row.total_points, 10) || 0,
         };
       });

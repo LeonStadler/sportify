@@ -108,6 +108,16 @@ const corsOptions = {
 // Middlewares
 app.use(cors(corsOptions));
 app.use(express.json());
+if (process.env.VERCEL) {
+  app.use(async (req, res, next) => {
+    try {
+      await runMigrations();
+      next();
+    } catch (error) {
+      next(error);
+    }
+  });
+}
 
 const ensureFriendInfrastructure = async () => {
   try {

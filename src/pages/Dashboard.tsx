@@ -621,9 +621,6 @@ export function Dashboard() {
 
       {/* Stats Grid - Mobile optimiert */}
       <div className="relative">
-        <div className="grid grid-cols-1 2xs:grid-cols-2 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
-          {cardConfigs.map((config) => renderStatCard(config))}
-        </div>
         <Button
           variant="ghost"
           size="icon"
@@ -640,6 +637,9 @@ export function Dashboard() {
         >
           <Settings className="h-4 w-4" aria-hidden="true" />
         </Button>
+        <div className="grid grid-cols-1 2xs:grid-cols-2 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+          {cardConfigs.map((config) => renderStatCard(config))}
+        </div>
       </div>
 
       <DashboardSettingsDialog
@@ -681,10 +681,10 @@ export function Dashboard() {
         />
 
         {/* Monthly Goal unterhalb der Weekly Challenge, ebenfalls 2/3 Breite */}
-        <MonthlyGoalCard className="col-span-1 md:col-span-1 lg:col-span-2" />
+        <MonthlyGoalCard className="col-span-1 md:col-span-2 lg:col-span-2" />
 
         {/* Aktivitäten von dir und Freunden: links, 2/3 Breite, doppelte Höhe */}
-        <ActivityFeed className="col-span-1 md:col-span-1 lg:col-span-2 lg:row-span-2 order-last lg:order-none" />
+        <ActivityFeed className="col-span-1 md:col-span-2 lg:col-span-2 lg:row-span-2 order-last lg:order-none" />
 
         {/* Scoreboard rechts oben, 1/3 Breite */}
         <DashboardLeaderboardCard className="col-span-1 md:col-span-1 lg:col-span-1" />

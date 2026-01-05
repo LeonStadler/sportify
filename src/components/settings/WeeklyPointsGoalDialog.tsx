@@ -52,12 +52,12 @@ export function WeeklyPointsGoalDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
+        <DialogHeader className="text-left">
           <DialogTitle className="flex items-center gap-2">
             <Trophy className="h-5 w-5 text-yellow-500" />
             {t("weeklyGoals.pointsTitle", "Set weekly points goal")}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-left">
             {t(
               "weeklyGoals.pointsDescription",
               "Set your personal points goal for this week."
@@ -68,7 +68,11 @@ export function WeeklyPointsGoalDialog({
         <div className="grid gap-6 py-4">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <Label htmlFor="points-goal" className="text-base font-medium">
+              <Label
+                htmlFor="points-goal"
+                id="points-goal-label"
+                className="text-base font-medium"
+              >
                 {t("weeklyGoals.pointsLabel", "Punkte")}
               </Label>
               <div className="w-20">
@@ -87,8 +91,13 @@ export function WeeklyPointsGoalDialog({
               max={3000}
               step={50}
               className="py-2"
+              aria-labelledby="points-goal-label"
+              aria-describedby="points-goal-hint"
             />
-            <p className="text-xs text-muted-foreground text-center">
+            <p
+              className="text-xs text-muted-foreground text-center"
+              id="points-goal-hint"
+            >
               {t(
                 "weeklyGoals.pointsHint",
                 "Standard-Challenge ist meist 1500 Punkte."
@@ -115,4 +124,3 @@ export function WeeklyPointsGoalDialog({
     </Dialog>
   );
 }
-

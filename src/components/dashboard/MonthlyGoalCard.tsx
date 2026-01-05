@@ -3,7 +3,7 @@ import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/hooks/use-auth";
 import { API_URL } from "@/lib/api";
 import { Calendar } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Skeleton } from "../ui/skeleton";
 
@@ -21,6 +21,7 @@ const MONTHLY_POINTS_TARGET = 6000;
 export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
   const { user } = useAuth();
   const { t } = useTranslation();
+  const titleId = useId();
   const [stats, setStats] = useState<MonthlyStats>({
     totalPoints: 0,
     periodPoints: 0,
@@ -71,9 +72,17 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
 
   if (isLoading) {
     return (
-      <Card className={className}>
+      <Card
+        className={className}
+        role="region"
+        aria-labelledby={titleId}
+        tabIndex={0}
+      >
         <CardHeader className="pb-4">
-          <CardTitle className="text-lg md:text-xl flex items-center gap-2">
+          <CardTitle
+            className="text-lg md:text-xl flex items-center gap-2"
+            id={titleId}
+          >
             <Calendar className="h-5 w-5" />
             {t("dashboard.monthlyGoal", "Monthly goal")}
           </CardTitle>
@@ -89,9 +98,17 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
   }
 
   return (
-    <Card className={className}>
+    <Card
+      className={className}
+      role="region"
+      aria-labelledby={titleId}
+      tabIndex={0}
+    >
       <CardHeader className="pb-4">
-        <CardTitle className="text-lg md:text-xl flex items-center gap-2">
+        <CardTitle
+          className="text-lg md:text-xl flex items-center gap-2"
+          id={titleId}
+        >
           <Calendar className="h-5 w-5" />
           {t("dashboard.monthlyGoal", "Monthly goal")}
         </CardTitle>
@@ -108,7 +125,15 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
               {MONTHLY_POINTS_TARGET.toLocaleString()}
             </span>
           </div>
-          <Progress value={progressPercentage} className="h-2" />
+          <Progress
+            value={progressPercentage}
+            className="h-2"
+            aria-label={`${t("dashboard.points", "Punkte")}: ${(stats.periodPoints ?? 0).toLocaleString()} von ${MONTHLY_POINTS_TARGET.toLocaleString()} ${t("dashboard.goal", "Ziel")} erreicht`}
+            role="progressbar"
+            aria-valuenow={stats.periodPoints ?? 0}
+            aria-valuemin={0}
+            aria-valuemax={MONTHLY_POINTS_TARGET}
+          />
           <p className="text-xs text-muted-foreground mt-2">
             +{(stats.periodPoints ?? 0).toLocaleString()}{" "}
             {t("dashboard.thisMonth", "diesen Monat")}

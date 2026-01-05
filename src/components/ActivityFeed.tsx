@@ -15,6 +15,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import NiceAvatar from "react-nice-avatar";
 import { Link, useNavigate } from "react-router-dom";
+import { WidgetFooterButton } from "@/components/dashboard/WidgetFooterButton";
 
 const getActivityIcon = (activityType: string) => {
   switch (activityType) {
@@ -171,7 +172,7 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
     }
 
     const fetchOnce = async () => {
-      const response = await fetch(`${API_URL}/feed?page=1&limit=5`, {
+      const response = await fetch(`${API_URL}/feed?page=1&limit=4`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -187,9 +188,9 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
 
       const data = await response.json();
       const payload = Array.isArray(data.workouts) ? data.workouts : [];
-      setWorkouts(payload);
+      setWorkouts(payload.slice(0, 4));
       setHasFriends(data.hasFriends ?? payload.length > 0);
-      setHasMore(data.pagination?.hasNext ?? false);
+      setHasMore(data.pagination?.hasNext ?? payload.length > 4);
     };
 
     try {
@@ -255,23 +256,15 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
   return (
     <Card className={cn("h-full flex flex-col min-h-0", className)}>
       <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg md:text-xl">
-            {t("activityFeed.title")}
-          </CardTitle>
-          {workouts.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/friends/activities")}
-              className="text-primary hover:text-primary/80"
-              aria-label={t("activityFeed.showAll", "Alle anzeigen")}
-            >
-              {t("activityFeed.showAll", "Alle anzeigen")}
-              <ArrowRight className="ml-1 h-4 w-4" aria-hidden="true" />
-            </Button>
+        <CardTitle className="text-lg md:text-xl">
+          {t("activityFeed.widgetTitle", "Aktivitäten")}
+        </CardTitle>
+        <p className="text-sm text-muted-foreground">
+          {t(
+            "activityFeed.widgetSubtitle",
+            "Alle Aktivitäten von dir und deinen Freunden"
           )}
-        </div>
+        </p>
       </CardHeader>
       <CardContent className="flex-1 min-h-0 overflow-auto">
         {error ? (
@@ -404,15 +397,19 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
 
                 {/* Show More Button */}
                 {hasMore && (
-                  <Button
-                    variant="outline"
-                    className="w-full justify-between"
+                  <WidgetFooterButton
                     onClick={() => navigate("/friends/activities")}
-                    aria-label={t("activityFeed.showMore", "Mehr anzeigen")}
+                    ariaLabel={t(
+                      "activityFeed.showAllActivities",
+                      "Alle Aktivitäten anzeigen"
+                    )}
                   >
-                    {t("activityFeed.showMore", "Mehr anzeigen")}
+                    {t(
+                      "activityFeed.showAllActivities",
+                      "Alle Aktivitäten anzeigen"
+                    )}
                     <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
-                  </Button>
+                  </WidgetFooterButton>
                 )}
               </>
             ) : (

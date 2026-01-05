@@ -1,31 +1,4 @@
-import app, { runMigrations } from '../server.js';
-
-// Run migrations when the serverless function is first invoked
-// This ensures migrations run on Vercel deployment
-let migrationsRun = false;
-let migrationPromise = null;
-
-const runMigrationsOnce = async () => {
-    if (!migrationsRun && !migrationPromise) {
-        migrationPromise = (async () => {
-            try {
-                await runMigrations();
-                migrationsRun = true;
-                console.log('Migrations completed successfully on Vercel');
-            } catch (error) {
-                console.error('Failed to run migrations on Vercel:', error);
-                migrationsRun = false;
-                throw error;
-            } finally {
-                migrationPromise = null;
-            }
-        })();
-    }
-    return migrationPromise;
-};
-
-// Run migrations on module load (async, non-blocking)
-runMigrationsOnce().catch(console.error);
+import app from '../server.js';
 
 // Export für Vercel Serverless Functions
 // Vercel kann Express-Apps direkt als Handler verwenden

@@ -268,7 +268,11 @@ export function AppSidebar() {
         <div className="flex items-center justify-between gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <div className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-accent transition-colors min-w-0 flex-1 overflow-hidden">
+              <button
+                type="button"
+                className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-accent transition-colors min-w-0 flex-1 overflow-hidden text-left"
+                aria-label={t("navigation.profile", "Mein Account")}
+              >
                 <Avatar className="h-9 w-9 shrink-0">
                   {user?.avatar && parseAvatarConfig(user.avatar) ? (
                     <NiceAvatar
@@ -287,7 +291,7 @@ export function AppSidebar() {
                     {user?.email}
                   </p>
                 </div>
-              </div>
+              </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56 mb-2" side="top" align="start">
               <DropdownMenuLabel>

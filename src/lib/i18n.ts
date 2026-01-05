@@ -338,10 +338,17 @@ const resources = {
           pointsLabel: "Punkte-Ziel",
           pointsUnit: "Punkte",
         },
+        pointsTitle: "Wöchentliches Punkte-Ziel",
+        pointsDescription:
+          "Lege dein persönliches Punkte-Ziel für diese Woche fest.",
+        pointsLabel: "Punkte",
+        pointsHint: "Standard-Challenge ist meist 1500 Punkte.",
       },
       // Activity Feed
       activityFeed: {
         title: "Aktivitäten von dir und deinen Freunden",
+        widgetTitle: "Aktivitäten",
+        widgetSubtitle: "Alle Aktivitäten von dir und deinen Freunden",
         pleaseLogin: "Bitte melde dich an, um Aktivitäten zu sehen.",
         unexpectedFormat: "Unerwartetes Datenformat vom Server.",
         couldNotLoad: "Aktivitäten konnten nicht geladen werden.",
@@ -358,6 +365,7 @@ const resources = {
         inWorkout: 'in "{{title}}"',
         showAll: "Alle anzeigen",
         showMore: "Mehr anzeigen",
+        showAllActivities: "Alle Aktivitäten anzeigen",
         you: "Du",
         timeAgoShort: {
           justNow: "gerade eben",
@@ -2351,10 +2359,16 @@ const resources = {
           pointsLabel: "Points goal",
           pointsUnit: "Points",
         },
+        pointsTitle: "Weekly points goal",
+        pointsDescription: "Set your personal points goal for this week.",
+        pointsLabel: "Points",
+        pointsHint: "Default challenge is usually 1500 points.",
       },
       // Activity Feed
       activityFeed: {
         title: "All training sessions by you and your friends",
+        widgetTitle: "Activities",
+        widgetSubtitle: "All activities from you and your friends",
         pleaseLogin: "Please log in to see activities.",
         unexpectedFormat: "Unexpected data format from server.",
         couldNotLoad: "Activities could not be loaded.",
@@ -2370,6 +2384,7 @@ const resources = {
         inWorkout: 'in "{{title}}"',
         showAll: "Show all",
         showMore: "Show more",
+        showAllActivities: "Show all activities",
         you: "You",
         timeAgoShort: {
           justNow: "just now",

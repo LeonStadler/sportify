@@ -8,17 +8,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/hooks/use-auth";
 import { API_URL } from "@/lib/api";
 import { parseAvatarConfig } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
+import { WidgetFooterButton } from "@/components/dashboard/WidgetFooterButton";
 import {
   Calendar,
   CalendarDays,
   Globe,
-  MoreVertical,
   Trophy,
   Users,
   ArrowRight,
@@ -199,7 +198,6 @@ export function DashboardLeaderboardCard({
                   size="sm" 
                   className="gap-2"
                   aria-label={t("filters.periodLabel", "Zeitraum")}
-                  aria-expanded={false}
                 >
                   {period === "week" ? (
                     <CalendarDays className="h-4 w-4" aria-hidden="true" />
@@ -230,7 +228,6 @@ export function DashboardLeaderboardCard({
                   size="sm" 
                   className="gap-2"
                   aria-label={t("scoreboard.scope", "Bereich")}
-                  aria-expanded={false}
                 >
                   {scope === "friends" ? (
                     <Users className="h-4 w-4" aria-hidden="true" />
@@ -256,40 +253,34 @@ export function DashboardLeaderboardCard({
           </div>
       </CardHeader>
       <CardContent className="flex-1 min-h-0 pt-4">
-        <ScrollArea className="h-[300px] pr-4">
-          <div className="space-y-3">
-            {isLoading ? (
-              <div className="flex justify-center p-4">
-                <span className="loading loading-spinner loading-sm"></span>
-              </div>
-            ) : entriesToShow.length === 0 ? (
-              <p className="text-center text-sm text-muted-foreground py-8">
-                {t("scoreboard.noData", "Keine Daten verfügbar")}
-              </p>
-            ) : (
-              <>
-                {entriesToShow.map(renderEntry)}
-              </>
-            )}
-          </div>
-        </ScrollArea>
+        <div className="space-y-3">
+          {isLoading ? (
+            <div className="flex justify-center p-4" role="status" aria-live="polite">
+              <span className="loading loading-spinner loading-sm" aria-hidden="true"></span>
+              <span className="sr-only">{t("common.loading", "Lädt...")}</span>
+            </div>
+          ) : entriesToShow.length === 0 ? (
+            <p className="text-center text-sm text-muted-foreground py-8">
+              {t("scoreboard.noData", "Keine Daten verfügbar")}
+            </p>
+          ) : (
+            <>
+              {entriesToShow.map(renderEntry)}
+            </>
+          )}
+        </div>
         <div className="mt-4">
-        <Button
+        <WidgetFooterButton
+          ariaLabel={t("scoreboard.showMore", "Mehr anzeigen")}
           asChild
-          variant="outline"
-          className="w-full justify-center gap-2"
         >
-          <Link 
-            to="/scoreboard"
-            aria-label={t("scoreboard.showMore", "Mehr anzeigen")}
-          >
+          <Link to="/scoreboard" className="inline-flex items-center gap-2">
             {t("scoreboard.showMore", "Mehr anzeigen")}
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
-        </Button>
+        </WidgetFooterButton>
         </div>
       </CardContent>
     </Card>
   );
 }
-

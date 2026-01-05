@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { BurgerIcon } from "@/components/common/BurgerIcon";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_COOKIE_NAME = "sidebar:state";
@@ -113,6 +114,14 @@ const SidebarProvider = React.forwardRef<
       window.addEventListener("keydown", handleKeyDown);
       return () => window.removeEventListener("keydown", handleKeyDown);
     }, [toggleSidebar, isMobile, openMobile, setOpenMobile, open, setOpen]);
+
+    React.useEffect(() => {
+      if (!isMobile && openMobile) {
+        setOpenMobile(false);
+        buttonClickedRef.current = false;
+        expectedStateRef.current = null;
+      }
+    }, [isMobile, openMobile, setOpenMobile]);
 
     // We add a state so that we can do data-state="expanded" or "collapsed".
     // This makes it easier to style the sidebar with Tailwind classes.
@@ -323,7 +332,7 @@ const SidebarTrigger = React.forwardRef<
   HTMLButtonElement,
   React.ComponentProps<"button">
 >(({ className, ...props }, ref) => {
-  const { toggleSidebar, isMobile, openMobile, open } = useSidebar();
+  const { toggleSidebar, openMobile, open, isMobile } = useSidebar();
   const isOpen = isMobile ? openMobile : open;
 
   const handleClick = React.useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
@@ -339,33 +348,28 @@ const SidebarTrigger = React.forwardRef<
       variant="ghost"
       size="icon"
       className={cn(
-        "relative z-[100] pointer-events-auto",
+        "fixed right-3 z-[100] pointer-events-auto",
         "h-12 w-12 rounded-md",
         "transition-all duration-200",
-        // Mobile-spezifisches Styling
-        isMobile && cn(
-          "lg:hidden fixed right-3 z-[100]",
-          "bg-transparent shadow-none border-none",
-          "flex items-center justify-center",
-          "touch-manipulation",
-          // Safe area für Notch/Statusleiste berücksichtigen
-          "top-[max(0.75rem,var(--safe-area-top))]",
-          isOpen
-            ? "text-white hover:!bg-transparent hover:!text-primary"
-            : "text-foreground hover:bg-accent/40 dark:hover:bg-accent/30 hover:!text-primary"
-        ),
+        "bg-transparent shadow-none border-none",
+        "flex items-center justify-center",
+        "touch-manipulation",
+        // Safe area für Notch/Statusleiste berücksichtigen
+        "top-[max(0.75rem,var(--safe-area-top))]",
+        "right-[max(0.75rem,var(--safe-area-right))]",
+        isMobile
+          ? (openMobile
+              ? "text-white hover:!bg-transparent hover:!text-white"
+              : "text-foreground hover:bg-accent/40 dark:hover:bg-accent/30 hover:!text-primary")
+          : "text-foreground hover:bg-accent/40 dark:hover:bg-accent/30 hover:!text-primary",
         className
       )}
       onClick={handleClick}
       onTouchStart={(event) => {
-        if (isMobile) {
-          event.stopPropagation();
-        }
+        event.stopPropagation();
       }}
       onTouchEnd={(event) => {
-        if (isMobile) {
-          event.stopPropagation();
-        }
+        event.stopPropagation();
       }}
       aria-label="Navigation umschalten"
       aria-expanded={isOpen}
@@ -374,80 +378,7 @@ const SidebarTrigger = React.forwardRef<
       {...props}
     >
       <span className="sr-only">Navigation umschalten</span>
-      {isMobile ? (
-        // Mobile: Hamburger-Icon mit 3 Linien
-        <span className="relative flex h-6 w-7 items-center justify-center">
-          <span
-            className={cn(
-              "absolute left-1/2 h-[1.5px] w-full -translate-x-1/2 rounded-full bg-current transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)]",
-              isOpen ? "translate-y-0 rotate-45" : "-translate-y-[8px] rotate-0"
-            )}
-          />
-          <span
-            className={cn(
-              "absolute left-1/2 h-[1.5px] w-full -translate-x-1/2 rounded-full bg-current transition-all duration-200 ease-[cubic-bezier(.4,0,.2,1)]",
-              isOpen ? "scale-x-0 opacity-0" : "scale-x-100 opacity-100"
-            )}
-          />
-          <span
-            className={cn(
-              "absolute left-1/2 h-[1.5px] w-full -translate-x-1/2 rounded-full bg-current transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)]",
-              isOpen ? "translate-y-0 -rotate-45" : "translate-y-[8px] rotate-0"
-            )}
-          />
-        </span>
-      ) : (
-        // Desktop: SVG-Icon
-        <svg
-          viewBox="0 0 48 48"
-          className="h-7 w-9"
-          aria-hidden="true"
-          stroke="currentColor"
-          strokeWidth="1.75"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <line
-            x1="11"
-            y1="12.5"
-            x2="37"
-            y2="12.5"
-            style={{
-              transformOrigin: "24px 24px",
-              transform: isOpen
-                ? "translateY(11px) rotate(45deg)"
-                : "translateY(0px) rotate(0deg)",
-              transition: "transform 260ms cubic-bezier(.4,0,.2,1)",
-            }}
-          />
-          <line
-            x1="11"
-            y1="24"
-            x2="37"
-            y2="24"
-            style={{
-              transformOrigin: "24px 24px",
-              transform: isOpen ? "scaleX(0.12)" : "scaleX(1)",
-              opacity: isOpen ? 0 : 1,
-              transition:
-                "transform 200ms cubic-bezier(.4,0,.2,1), opacity 160ms ease",
-            }}
-          />
-          <line
-            x1="11"
-            y1="35.5"
-            x2="37"
-            y2="35.5"
-            style={{
-              transformOrigin: "24px 24px",
-              transform: isOpen
-                ? "translateY(-11px) rotate(-45deg)"
-                : "translateY(0px) rotate(0deg)",
-              transition: "transform 260ms cubic-bezier(.4,0,.2,1)",
-            }}
-          />
-        </svg>
-      )}
+      <BurgerIcon isOpen={isOpen} />
     </Button>
   );
 });

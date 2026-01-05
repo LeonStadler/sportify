@@ -102,7 +102,9 @@ export function DashboardSettingsDialog({
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {localCards.map((card, index) => (
+          {localCards.map((card, index) => {
+            const baseId = `dashboard-card-${card.id}`;
+            return (
             <div
               key={card.id}
               className="p-4 border rounded-lg space-y-4 bg-muted/30"
@@ -115,7 +117,9 @@ export function DashboardSettingsDialog({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>{t('dashboard.settings.type', 'Typ')}</Label>
+                  <Label htmlFor={`${baseId}-type`}>
+                    {t('dashboard.settings.type', 'Typ')}
+                  </Label>
                   <Select
                     value={card.type}
                     onValueChange={(value) =>
@@ -125,7 +129,7 @@ export function DashboardSettingsDialog({
                       })
                     }
                   >
-                    <SelectTrigger>
+                    <SelectTrigger id={`${baseId}-type`}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -147,7 +151,9 @@ export function DashboardSettingsDialog({
 
                 {card.type === 'activity' && (
                   <div className="space-y-2">
-                    <Label>{t('dashboard.settings.activityType', 'Übung')}</Label>
+                    <Label htmlFor={`${baseId}-activity`}>
+                      {t('dashboard.settings.activityType', 'Übung')}
+                    </Label>
                     <Select
                       value={card.activityType || 'pullups'}
                       onValueChange={(value) =>
@@ -156,7 +162,7 @@ export function DashboardSettingsDialog({
                         })
                       }
                     >
-                      <SelectTrigger>
+                      <SelectTrigger id={`${baseId}-activity`}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -181,7 +187,9 @@ export function DashboardSettingsDialog({
                 )}
 
                 <div className="space-y-2">
-                  <Label>{t('dashboard.settings.period', 'Zeitraum')}</Label>
+                  <Label htmlFor={`${baseId}-period`}>
+                    {t('dashboard.settings.period', 'Zeitraum')}
+                  </Label>
                   <Select
                     value={card.period}
                     onValueChange={(value) =>
@@ -190,7 +198,7 @@ export function DashboardSettingsDialog({
                       })
                     }
                   >
-                    <SelectTrigger>
+                    <SelectTrigger id={`${baseId}-period`}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -211,7 +219,9 @@ export function DashboardSettingsDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label>{t('dashboard.settings.color', 'Farbe')}</Label>
+                  <Label htmlFor={`${baseId}-color`}>
+                    {t('dashboard.settings.color', 'Farbe')}
+                  </Label>
                   <Select
                     value={card.color}
                     onValueChange={(value) =>
@@ -220,7 +230,7 @@ export function DashboardSettingsDialog({
                       })
                     }
                   >
-                    <SelectTrigger>
+                    <SelectTrigger id={`${baseId}-color`}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -241,7 +251,7 @@ export function DashboardSettingsDialog({
                 </div>
               </div>
             </div>
-          ))}
+          )})}
         </div>
 
         <DialogFooter>
@@ -256,4 +266,3 @@ export function DashboardSettingsDialog({
     </Dialog>
   );
 }
-

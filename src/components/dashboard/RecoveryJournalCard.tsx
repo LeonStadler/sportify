@@ -23,6 +23,7 @@ import { format } from "date-fns";
 import { de, enUS } from "date-fns/locale";
 import type { TrainingJournalEntry } from "@/types/training-journal";
 import { useNavigate } from "react-router-dom";
+import { WidgetFooterButton } from "@/components/dashboard/WidgetFooterButton";
 
 type PeriodOption = "week" | "month" | "quarter" | "year";
 
@@ -388,19 +389,16 @@ export function RecoveryJournalCard({ className }: { className?: string }) {
               </div>
             ) : null}
 
-            <Button
-              variant="outline"
-              className="w-full justify-center gap-2"
+            <WidgetFooterButton
               onClick={() => navigate("/training?tab=recovery")}
-              aria-label={t("recoveryDiary.openRecoveryDiary", "Zum Erholungstagebuch")}
+              ariaLabel={t("recoveryDiary.openRecoveryDiary", "Zum Erholungstagebuch")}
             >
               {t("recoveryDiary.openRecoveryDiary", "Zum Erholungstagebuch")}
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </Button>
+            </WidgetFooterButton>
           </>
         )}
       </CardContent>
     </Card>
   );
 }
-

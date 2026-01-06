@@ -108,7 +108,7 @@ const corsOptions = {
 // Middlewares
 app.use(cors(corsOptions));
 app.use(express.json());
-if (process.env.VERCEL) {
+if (process.env.VERCEL && parseBoolean(process.env.RUN_MIGRATIONS_ON_REQUEST, false)) {
   app.use(async (req, res, next) => {
     try {
       await runMigrations();

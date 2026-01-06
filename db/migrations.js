@@ -324,8 +324,15 @@ export const createMigrationRunner = (pool) => {
             migrationPromise = (async () => {
                 let lockAcquired = false;
                 try {
-                    await pool.query('SELECT pg_advisory_lock($1)', [MIGRATION_LOCK_KEY]);
-                    lockAcquired = true;
+                    const lockResult = await pool.query(
+                        'SELECT pg_try_advisory_lock($1) AS locked',
+                        [MIGRATION_LOCK_KEY]
+                    );
+                    lockAcquired = Boolean(lockResult?.rows?.[0]?.locked);
+                    if (!lockAcquired) {
+                        console.log('[Migration] Übersprungen: Lock nicht verfügbar');
+                        return;
+                    }
 
                     // Stelle sicher, dass benötigte Extensions vorhanden sind, bevor Migrationen laufen
                     await ensureExtension(pool);

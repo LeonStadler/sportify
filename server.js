@@ -50,7 +50,45 @@ if (sslEnabled) {
 }
 
 const pool = new Pool(poolConfig);
-const runMigrations = createMigrationRunner(pool);
+const baseRunMigrations = createMigrationRunner(pool);
+
+let migrationsRan = false;
+let migrationsInFlight = false;
+let migrationsLastError = null;
+let migrationsPromise = null;
+
+const runMigrations = async () => {
+  // avoid parallel runs by sharing the same promise
+  if (migrationsPromise) return migrationsPromise;
+
+  migrationsInFlight = true;
+  migrationsPromise = (async () => {
+    try {
+      const result = await baseRunMigrations();
+      migrationsRan = true;
+      migrationsLastError = null;
+      return result;
+    } catch (error) {
+      migrationsLastError = error;
+      throw error;
+    } finally {
+      migrationsInFlight = false;
+      migrationsPromise = null;
+    }
+  })();
+  try {
+    return await migrationsPromise;
+  } catch (error) {
+    // ensure callers see the original error
+    throw error;
+  }
+};
+
+const getMigrationStatus = () => ({
+  ran: migrationsRan,
+  inFlight: migrationsInFlight,
+  error: migrationsLastError ? String(migrationsLastError?.message ?? migrationsLastError) : null,
+});
 
 const adminMiddleware = createAdminMiddleware(pool);
 
@@ -195,7 +233,11 @@ app.use("/api/contact", createContactRouter(pool));
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", message: "Sportify API is running!" });
+  res.json({
+    status: "ok",
+    message: "Sportify API is running!",
+    migrations: getMigrationStatus(),
+  });
 });
 
 // Serve static files from dist directory in production (only if not on Vercel)

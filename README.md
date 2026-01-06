@@ -581,8 +581,11 @@ Make sure all required environment variables are set in the Vercel project setti
 
 ### Datenbank-Migrationen / Database Migrations
 
-Migrationen werden automatisch beim Serverstart ausgeführt. Auf Vercel werden sie beim ersten Request ausgeführt.  
-Migrations are automatically executed on server start. On Vercel, they are executed on the first request.
+Migrationen sollen beim Deploy durch die Pipeline laufen. Cold-Start-Migrationen sind standardmäßig AUS; bei Bedarf aktivieren mit `RUN_MIGRATIONS_ON_LOAD=true`.  
+Migrations are expected to run during deploy. Cold-start migrations are OFF by default; enable with `RUN_MIGRATIONS_ON_LOAD=true` if needed.
+
+Status kann fuer die aktuelle Serverless-Instanz ueber `GET /api/health/migrations` geprueft werden (zeigt `ok`/`pending`).  
+Status for the current serverless instance can be checked via `GET /api/health/migrations` (shows `ok`/`pending`).
 
 Siehe [`docs/deployment.md`](docs/deployment.md) für detaillierte Anleitung.  
 See [`docs/deployment.md`](docs/deployment.md) for detailed instructions.

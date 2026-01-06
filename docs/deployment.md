@@ -99,11 +99,16 @@ Da der Vercel-Hobby-Plan nur zwei einfache Cron-Jobs zulässt, werden die Event-
 
 ## Datenbank-Migrationen
 
-Migrationen werden automatisch beim ersten Serverless Function Call ausgeführt.
+Standard: Migrationen laufen in der CI/CD-Pipeline beim Deploy.  
+Cold-Start-Migrationen sind AUS; aktiviere sie nur bei Bedarf mit `RUN_MIGRATIONS_ON_LOAD=true`.
 
 Die Migration-Logik befindet sich in:
 - `db/migrations.js`: Migration-Runner
 - `migrations/`: SQL-Migrationsdateien
+
+Status prüfen (Serverless):
+- `GET /api/health/migrations` zeigt `ran/inFlight/error/enabled`
+- `GET /api/health` enthält das gleiche Feld unter `migrations`
 
 ### Manuelle Migrationen
 
@@ -277,4 +282,3 @@ CMD ["node", "server.js"]
 - **AWS/GCP/Azure**: Mit Container-Services
 
 Siehe jeweilige Plattform-Dokumentation für Details.
-

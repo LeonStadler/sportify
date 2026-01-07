@@ -10,66 +10,66 @@
  * Default: Deutsch
  */
 const emailTranslations = {
-  de: {
-    footerCopyright:
-      "© 2025 Sportify. Alle Rechte vorbehalten. Entwickelt von Leon Stadler.",
-    footerPrivacy: "Datenschutz",
-    footerTerms: "AGB",
-    footerImprint: "Impressum",
-    footerContact: "Kontakt",
-    buttonFallback:
-      "Falls der Button nicht funktioniert, kopiere folgenden Link in deinen Browser:",
-    alternativeCode: "Alternativ kannst du diesen Code verwenden:",
-    alternativeCodeLabel: "Alternativ kannst du diesen Code manuell eingeben:",
-    goToHomepage: "Sportify - Zur Startseite",
-    passwordResetTitle: "Passwort zurücksetzen",
-    passwordResetMessage:
-      "Du hast eine Passwort-Zurücksetzung für dein Sportify-Konto angefordert.",
-    passwordResetButton: "Passwort zurücksetzen",
-    passwordResetValidity:
-      "Dieser Link ist eine Stunde lang gültig. Wenn du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren.",
-    emailVerificationTitle: "E-Mail-Adresse bestätigen",
-    emailVerificationMessage:
-      "Bitte bestätige deine E-Mail-Adresse, um dein Sportify-Konto zu aktivieren.",
-    emailVerificationButton: "E-Mail-Adresse bestätigen",
-    emailVerificationValidity: "Dieser Link ist 24 Stunden lang gültig.",
-    invitationTitle: "Du wurdest zu Sportify eingeladen",
-    invitationMessage:
-      "Jemand hat dich eingeladen, Teil der Sportify-Community zu werden. Registriere dich jetzt und starte dein Training!",
-    invitationButton: "Jetzt registrieren",
-    invitationCodeLabel: "Oder verwende diesen Code bei der Registrierung:",
-    invitationExpires: "Die Einladung läuft am",
-  },
-  en: {
-    footerCopyright:
-      "© 2025 Sportify. All rights reserved. Developed by Leon Stadler.",
-    footerPrivacy: "Privacy",
-    footerTerms: "Terms",
-    footerImprint: "Imprint",
-    footerContact: "Contact",
-    buttonFallback:
-      "If the button doesn't work, copy the following link into your browser:",
-    alternativeCode: "Alternatively, you can use this code:",
-    alternativeCodeLabel: "Alternatively, you can manually enter this code:",
-    goToHomepage: "Sportify - Go to homepage",
-    passwordResetTitle: "Reset Password",
-    passwordResetMessage:
-      "You have requested a password reset for your Sportify account.",
-    passwordResetButton: "Reset Password",
-    passwordResetValidity:
-      "This link is valid for one hour. If you did not make this request, you can ignore this email.",
-    emailVerificationTitle: "Verify Email Address",
-    emailVerificationMessage:
-      "Please verify your email address to activate your Sportify account.",
-    emailVerificationButton: "Verify Email Address",
-    emailVerificationValidity: "This link is valid for 24 hours.",
-    invitationTitle: "You have been invited to Sportify",
-    invitationMessage:
-      "Someone has invited you to become part of the Sportify community. Register now and start your training!",
-    invitationButton: "Register Now",
-    invitationCodeLabel: "Or use this code for registration:",
-    invitationExpires: "The invitation expires on",
-  },
+    de: {
+        footerCopyright:
+            "© 2025 Sportify. Alle Rechte vorbehalten. Entwickelt von Leon Stadler.",
+        footerPrivacy: "Datenschutz",
+        footerTerms: "AGB",
+        footerImprint: "Impressum",
+        footerContact: "Kontakt",
+        buttonFallback:
+            "Falls der Button nicht funktioniert, kopiere folgenden Link in deinen Browser:",
+        alternativeCode: "Alternativ kannst du diesen Code verwenden:",
+        alternativeCodeLabel: "Alternativ kannst du diesen Code manuell eingeben:",
+        goToHomepage: "Sportify - Zur Startseite",
+        passwordResetTitle: "Passwort zurücksetzen",
+        passwordResetMessage:
+            "Du hast eine Passwort-Zurücksetzung für dein Sportify-Konto angefordert.",
+        passwordResetButton: "Passwort zurücksetzen",
+        passwordResetValidity:
+            "Dieser Link ist eine Stunde lang gültig. Wenn du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren.",
+        emailVerificationTitle: "E-Mail-Adresse bestätigen",
+        emailVerificationMessage:
+            "Bitte bestätige deine E-Mail-Adresse, um dein Sportify-Konto zu aktivieren.",
+        emailVerificationButton: "E-Mail-Adresse bestätigen",
+        emailVerificationValidity: "Dieser Link ist 24 Stunden lang gültig.",
+        invitationTitle: "Du wurdest zu Sportify eingeladen",
+        invitationMessage:
+            "Jemand hat dich eingeladen, Teil der Sportify-Community zu werden. Registriere dich jetzt und starte dein Training!",
+        invitationButton: "Jetzt registrieren",
+        invitationCodeLabel: "Oder verwende diesen Code bei der Registrierung:",
+        invitationExpires: "Die Einladung läuft am",
+    },
+    en: {
+        footerCopyright:
+            "© 2025 Sportify. All rights reserved. Developed by Leon Stadler.",
+        footerPrivacy: "Privacy",
+        footerTerms: "Terms",
+        footerImprint: "Imprint",
+        footerContact: "Contact",
+        buttonFallback:
+            "If the button doesn't work, copy the following link into your browser:",
+        alternativeCode: "Alternatively, you can use this code:",
+        alternativeCodeLabel: "Alternatively, you can manually enter this code:",
+        goToHomepage: "Sportify - Go to homepage",
+        passwordResetTitle: "Reset Password",
+        passwordResetMessage:
+            "You have requested a password reset for your Sportify account.",
+        passwordResetButton: "Reset Password",
+        passwordResetValidity:
+            "This link is valid for one hour. If you did not make this request, you can ignore this email.",
+        emailVerificationTitle: "Verify Email Address",
+        emailVerificationMessage:
+            "Please verify your email address to activate your Sportify account.",
+        emailVerificationButton: "Verify Email Address",
+        emailVerificationValidity: "This link is valid for 24 hours.",
+        invitationTitle: "You have been invited to Sportify",
+        invitationMessage:
+            "Someone has invited you to become part of the Sportify community. Register now and start your training!",
+        invitationButton: "Register Now",
+        invitationCodeLabel: "Or use this code for registration:",
+        invitationExpires: "The invitation expires on",
+    },
 };
 
 /**
@@ -83,24 +83,24 @@ const emailTranslations = {
  * @returns {string} Komplettes HTML-E-Mail-Template
  */
 export const createEmailTemplate = ({
-  content,
-  preheader = "",
-  frontendUrl = "",
-  language = "de",
+    content,
+    preheader = "",
+    frontendUrl = "",
+    language = "de",
 }) => {
-  const t = emailTranslations[language] || emailTranslations.de;
-  const langAttr = language === "en" ? "en" : "de";
-  // Orange Primary Color: hsl(24.6 95% 53.1%) = ca. #F97316
-  const primaryOrange = "#F97316";
-  const primaryOrangeDark = "#EA580C";
+    const t = emailTranslations[language] || emailTranslations.de;
+    const langAttr = language === "en" ? "en" : "de";
+    // Orange Primary Color: hsl(24.6 95% 53.1%) = ca. #F97316
+    const primaryOrange = "#F97316";
+    const primaryOrangeDark = "#EA580C";
 
-  // Frontend URL mit Fallback
-  const baseUrl =
-    frontendUrl || process.env.FRONTEND_URL || "https://sportify.app";
+    // Frontend URL mit Fallback
+    const baseUrl =
+        frontendUrl || process.env.FRONTEND_URL || "https://sportify.app";
 
-  // Logo als E-Mail-kompatibles Design (Trophy Icon + Text)
-  // Verwendet feste Farben statt Gradienten für bessere E-Mail-Client-Kompatibilität
-  const logoSvg = `
+    // Logo als E-Mail-kompatibles Design (Trophy Icon + Text)
+    // Verwendet feste Farben statt Gradienten für bessere E-Mail-Client-Kompatibilität
+    const logoSvg = `
         <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 220px;">
             <tr>
                 <td align="left" style="padding: 0;">
@@ -136,8 +136,8 @@ export const createEmailTemplate = ({
         </table>
     `;
 
-  // Footer-Links HTML
-  const footerLinksHtml = `
+    // Footer-Links HTML
+    const footerLinksHtml = `
         <div class="footer-links-wrapper">
             <a href="${baseUrl}/privacy" class="footer-link">Privacy</a>
             <a href="${baseUrl}/terms" class="footer-link">Terms</a>
@@ -146,7 +146,7 @@ export const createEmailTemplate = ({
         </div>
     `;
 
-  return `
+    return `
 <!DOCTYPE html>
 <html lang="${langAttr}" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
@@ -230,16 +230,16 @@ export const createEmailTemplate = ({
             }
             .button {
                 background-color: #f97316 !important;
-                color: #0a0e27 !important;
+                color: #ffffff !important;
             }
             .button-link {
-                color: #0a0e27 !important;
+                color: #ffffff !important;
             }
             .button:hover {
                 background-color: #ea580c !important;
             }
             .button:hover .button-link {
-                color: #0a0e27 !important;
+                color: #ffffff !important;
             }
             .greeting,
             .additional-text {
@@ -302,10 +302,10 @@ export const createEmailTemplate = ({
         }
         [data-theme="dark"] .button {
             background-color: #f97316 !important;
-            color: #0a0e27 !important;
+            color: #ffffff !important;
         }
         [data-theme="dark"] .button-link {
-            color: #0a0e27 !important;
+            color: #ffffff !important;
         }
         [data-theme="dark"] .greeting,
         [data-theme="dark"] .additional-text {
@@ -640,65 +640,67 @@ export const createEmailTemplate = ({
  * @returns {string} HTML-E-Mail
  */
 export const createActionEmail = ({
-  greeting,
-  title,
-  message,
-  buttonText,
-  buttonUrl,
-  additionalText,
-  frontendUrl = "",
-  preheader = "",
-  language = "de",
+    greeting,
+    title,
+    message,
+    buttonText,
+    buttonUrl,
+    additionalText,
+    frontendUrl = "",
+    preheader = "",
+    language = "de",
 }) => {
-  const t = emailTranslations[language] || emailTranslations.de;
-  let content = "";
+    const t = emailTranslations[language] || emailTranslations.de;
+    let content = "";
 
-  // Greeting
-  if (greeting) {
-    content += `<p class="greeting">${greeting}</p>`;
-  }
+    // Greeting
+    if (greeting) {
+        content += `<p class="greeting">${greeting}</p>`;
+    }
 
-  // Title
-  if (title) {
-    content += `<h1>${title}</h1>`;
-  }
+    // Title
+    if (title) {
+        content += `<h1>${title}</h1>`;
+    }
 
-  // Message
-  if (message) {
-    content += `<p>${message}</p>`;
-  }
+    // Message
+    if (message) {
+        content += `<p>${message}</p>`;
+    }
 
-  // Button
-  if (buttonText && buttonUrl) {
-    const fullUrl = buttonUrl.startsWith("http")
-      ? buttonUrl
-      : `${frontendUrl || process.env.FRONTEND_URL || "https://sportify.app"}${buttonUrl}`;
-    content += `
-            <div class="button-container">
-                <a href="${fullUrl}" class="button button-link">
+    // Button mit Inline-Styles für bessere E-Mail-Client-Kompatibilität
+    if (buttonText && buttonUrl) {
+        const fullUrl = buttonUrl.startsWith("http")
+            ? buttonUrl
+            : `${frontendUrl || process.env.FRONTEND_URL || "https://sportify.app"}${buttonUrl}`;
+
+        // Button mit Inline-Styles (funktioniert in allen E-Mail-Clients)
+        content += `
+            <div style="text-align: center; margin: 24px 0;">
+                <a href="${fullUrl}" style="display: inline-block; padding: 14px 32px; background-color: #F97316; color: #ffffff !important; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; line-height: 1.5; font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;">
                     ${buttonText}
                 </a>
             </div>
         `;
 
-    // Alternative Link-Text (nur Link, kein Token)
-    content += `<p class="text-muted fallback-link">
+        // Alternative Link-Text (nur Link, kein Token)
+        content += `<p style="text-muted fallback-link">
             ${t.buttonFallback}<br>
-            <a href="${fullUrl}">${fullUrl}</a>
+            <a href="${fullUrl}" style="color: #F97316; text-decoration: underline;">${fullUrl}</a>
         </p>`;
-  }
+    }
 
-  // Additional Text
-  if (additionalText) {
-    content += `<p class="additional-text">${additionalText}</p>`;
-  }
+    // Additional Text
+    if (additionalText) {
+        content += `<p class="additional-text">${additionalText}</p>`;
+    }
 
-  return createEmailTemplate({
-    content,
-    preheader: preheader || title || "Sportify",
-    frontendUrl,
-    language,
-  });
+    return createEmailTemplate({
+        content,
+        preheader: preheader || title || "Sportify",
+        frontendUrl,
+        language,
+    });
 };
 
 /**
@@ -713,34 +715,34 @@ export const createActionEmail = ({
  * @returns {string} HTML-E-Mail
  */
 export const createSimpleEmail = ({
-  greeting,
-  title,
-  message,
-  frontendUrl = "",
-  preheader = "",
-  language = "de",
+    greeting,
+    title,
+    message,
+    frontendUrl = "",
+    preheader = "",
+    language = "de",
 }) => {
-  let content = "";
+    let content = "";
 
-  if (greeting) {
-    content += `<p class="greeting">${greeting}</p>`;
-  }
+    if (greeting) {
+        content += `<p class="greeting">${greeting}</p>`;
+    }
 
-  if (title) {
-    content += `<h1>${title}</h1>`;
-  }
+    if (title) {
+        content += `<h1>${title}</h1>`;
+    }
 
-  if (message) {
-    // Erlaube einfaches HTML im Message
-    content += `<div>${message}</div>`;
-  }
+    if (message) {
+        // Erlaube einfaches HTML im Message
+        content += `<div>${message}</div>`;
+    }
 
-  return createEmailTemplate({
-    content,
-    preheader: preheader || title || "Sportify",
-    frontendUrl,
-    language,
-  });
+    return createEmailTemplate({
+        content,
+        preheader: preheader || title || "Sportify",
+        frontendUrl,
+        language,
+    });
 };
 
 /**
@@ -757,46 +759,46 @@ export const createSimpleEmail = ({
  * @returns {string} HTML-E-Mail
  */
 export const createSuccessEmail = ({
-  greeting,
-  title,
-  message,
-  actionText,
-  actionUrl,
-  frontendUrl = "",
-  preheader = "",
-  language = "de",
+    greeting,
+    title,
+    message,
+    actionText,
+    actionUrl,
+    frontendUrl = "",
+    preheader = "",
+    language = "de",
 }) => {
-  let content = "";
+    let content = "";
 
-  if (greeting) {
-    content += `<p class="greeting">${greeting}</p>`;
-  }
+    if (greeting) {
+        content += `<p class="greeting">${greeting}</p>`;
+    }
 
-  if (title) {
-    content += `<h1 class="text-primary">${title}</h1>`;
-  }
+    if (title) {
+        content += `<h1 class="text-primary">${title}</h1>`;
+    }
 
-  if (message) {
-    content += `<p class="success-message">${message}</p>`;
-  }
+    if (message) {
+        content += `<p class="success-message">${message}</p>`;
+    }
 
-  if (actionText && actionUrl) {
-    const fullUrl = actionUrl.startsWith("http")
-      ? actionUrl
-      : `${frontendUrl || process.env.FRONTEND_URL || "https://sportify.app"}${actionUrl}`;
-    content += `
-            <div class="button-container success-button-container">
-                <a href="${fullUrl}" class="button button-link">
+    if (actionText && actionUrl) {
+        const fullUrl = actionUrl.startsWith("http")
+            ? actionUrl
+            : `${frontendUrl || process.env.FRONTEND_URL || "https://sportify.app"}${actionUrl}`;
+        content += `
+            <div style="text-align: center; margin: 32px 0;">
+                <a href="${fullUrl}" style="display: inline-block; padding: 14px 32px; background-color: #F97316; color: #ffffff !important; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; line-height: 1.5; font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;">
                     ${actionText}
                 </a>
             </div>
         `;
-  }
+    }
 
-  return createEmailTemplate({
-    content,
-    preheader: preheader || title || "Sportify",
-    frontendUrl,
-    language,
-  });
+    return createEmailTemplate({
+        content,
+        preheader: preheader || title || "Sportify",
+        frontendUrl,
+        language,
+    });
 };

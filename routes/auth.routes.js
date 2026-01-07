@@ -283,8 +283,6 @@ Dein Sportify-Team`;
             "Bitte bestätige deine E-Mail-Adresse, um dein Sportify-Konto zu aktivieren.",
           buttonText: "E-Mail-Adresse bestätigen",
           buttonUrl: verificationUrl,
-          token: verificationToken,
-          tokenLabel: "Alternativ kannst du diesen Code manuell eingeben:",
           additionalText: "Dieser Link ist 24 Stunden lang gültig.",
           frontendUrl,
           preheader: "E-Mail-Adresse bestätigen",

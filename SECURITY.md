@@ -21,7 +21,7 @@ Please include:
 - Potential impact
 - Suggested fix (if any)
 
-We will respond within 48 hours and work with you to address the issue before making it public.
+I will respond as soon as possible and work with you to address the issue before making it public.
 
 ## Security Best Practices
 
@@ -35,10 +35,10 @@ When using this software:
 
 ## Disclosure Policy
 
-- We will acknowledge receipt of your vulnerability report within 48 hours
-- We will provide an initial assessment within 7 days
-- We will keep you informed of our progress
-- We will notify you when the vulnerability is fixed
-- We will credit you for the discovery (unless you prefer to remain anonymous)
+- I will acknowledge receipt of your vulnerability report within 48 hours
+- I will provide an initial assessment within 7 days
+- I will keep you informed of my progress
+- I will notify you when the vulnerability is fixed
+- I will credit you for the discovery (unless you prefer to remain anonymous)
 
 Thank you for helping keep Sportify secure!

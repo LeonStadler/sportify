@@ -18,6 +18,7 @@ Willkommen zur Sportify-Dokumentation! Diese Dokumentation bietet eine umfassend
 
 ### Features & Implementierung
 
+- **[E-Mail-System](email/README.md)** - Komplettes E-Mail-System mit Templates, Tests und Konfiguration
 - **[PWA](pwa.md)** - Progressive Web App Features und Implementierung
 - **[PWA Implementation](pwa-implementation.md)** - Implementierungsdetails für PWA-Features
 - **[PWA Testing](pwa-testing.md)** - Testing-Guide für PWA-Features

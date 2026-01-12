@@ -2,43 +2,43 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <!-- Sportify - Öffentliche Seiten -->
   <!-- Hinweis: Seite ist auf noindex gesetzt, Sitemap dient nur als Referenz -->
-  
+
   <!-- Startseite -->
   <url>
-    <loc>%FRONTEND_URL%/</loc>
-    <lastmod>2024-01-01</lastmod>
+    <loc>https://www.vertic-id.com/</loc>
+    <lastmod>2026-01-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
-  
+
   <!-- Kontakt -->
   <url>
-    <loc>%FRONTEND_URL%/contact</loc>
-    <lastmod>2024-01-01</lastmod>
+    <loc>https://www.vertic-id.com/contact</loc>
+    <lastmod>2026-01-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
-  
+
   <!-- Datenschutz -->
   <url>
-    <loc>%FRONTEND_URL%/privacy</loc>
-    <lastmod>2024-01-01</lastmod>
+    <loc>https://www.vertic-id.com/privacy</loc>
+    <lastmod>2026-01-06</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
   </url>
-  
+
   <!-- Nutzungsbedingungen -->
   <url>
-    <loc>%FRONTEND_URL%/terms</loc>
-    <lastmod>2024-01-01</lastmod>
+    <loc>https://www.vertic-id.com/terms</loc>
+    <lastmod>2026-01-06</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
   </url>
-  
+
   <!-- Impressum -->
   <url>
-    <loc>%FRONTEND_URL%/imprint</loc>
-    <lastmod>2024-01-01</lastmod>
+    <loc>https://www.vertic-id.com/imprint</loc>
+    <lastmod>2026-01-06</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
   </url>

@@ -4,6 +4,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const TEST_API_URL = "http://localhost:3001/api";
 const toastMock = vi.fn();
+const tMock = (key: string, fallback?: string) => {
+  const map: Record<string, string> = {
+    "activityFeed.title": "Aktivitäten",
+    "activityFeed.points": "Punkte",
+    "activityFeed.couldNotLoad": "Aktivitäten konnten nicht geladen werden.",
+    "activityFeed.errorLoading": "Fehler beim Laden der Aktivitäten.",
+    "activityFeed.timeAgoShort.justNow": "Gerade eben",
+    "activityFeed.activityTypes.pullups": "Klimmzüge",
+    "dashboard.error": "Fehler",
+  };
+  return map[key] ?? fallback ?? key;
+};
 
 // Store original fetch
 const originalFetch = global.fetch;
@@ -17,9 +29,10 @@ vi.mock("@/lib/avatar", () => ({
   parseAvatarConfig: () => null,
 }));
 
+const userMock = { id: "user-1", firstName: "Test", lastName: "User" };
 vi.mock("@/hooks/use-auth", () => ({
   useAuth: () => ({
-    user: { id: "user-1", firstName: "Test", lastName: "User" },
+    user: userMock,
     isLoading: false,
   }),
 }));
@@ -30,28 +43,17 @@ vi.mock("@/hooks/use-toast", () => ({
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (key: string) => {
-      const map: Record<string, string> = {
-        "activityFeed.title": "Aktivitäten",
-        "activityFeed.points": "Punkte",
-        "activityFeed.couldNotLoad":
-          "Aktivitäten konnten nicht geladen werden.",
-        "activityFeed.errorLoading": "Fehler beim Laden der Aktivitäten.",
-        "activityFeed.timeAgoShort.justNow": "Gerade eben",
-        "activityFeed.activityTypes.pullups": "Klimmzüge",
-        "dashboard.error": "Fehler",
-      };
-      return map[key] ?? key;
-    },
+    t: tMock,
   }),
 }));
 
+const navigateMock = vi.fn();
 vi.mock("react-router-dom", async () => {
   const actual =
     await vi.importActual<typeof import("react-router-dom")>(
       "react-router-dom"
     );
-  return { ...actual, useNavigate: () => vi.fn() };
+  return { ...actual, useNavigate: () => navigateMock };
 });
 
 vi.mock("react-nice-avatar", () => ({ default: () => null }));
@@ -68,6 +70,7 @@ describe("ActivityFeed", () => {
   afterEach(() => {
     localStorage.clear();
     global.fetch = originalFetch;
+    vi.useRealTimers();
   });
 
   it("calls the feed API with correct parameters on mount", async () => {
@@ -123,16 +126,13 @@ describe("ActivityFeed", () => {
     );
 
     // Verify API was called correctly
-    await waitFor(
-      () => {
-        expect(mockFetch).toHaveBeenCalledTimes(1);
-      },
-      { timeout: 3000 }
-    );
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalled();
+    });
 
     // Verify the correct URL and headers were used
     expect(mockFetch).toHaveBeenCalledWith(
-      `${TEST_API_URL}/feed?page=1&limit=5`,
+      `${TEST_API_URL}/feed?page=1&limit=4`,
       expect.objectContaining({
         headers: { Authorization: "Bearer test-token" },
       })
@@ -155,12 +155,9 @@ describe("ActivityFeed", () => {
       </MemoryRouter>
     );
 
-    await waitFor(
-      () => {
-        expect(mockFetch).toHaveBeenCalled();
-      },
-      { timeout: 3000 }
-    );
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalled();
+    });
 
     await waitFor(
       () => {

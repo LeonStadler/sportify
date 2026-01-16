@@ -17,6 +17,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -35,6 +44,7 @@ import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
 import type { Workout } from "@/types/workout";
 import { getNormalizedRange, getRangeForPeriod, toDateParam } from "@/utils/dateRanges";
+import { convertDistance, convertWeightFromKg } from "@/utils/units";
 import { ArrowRight, Info } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DateRange } from "react-day-picker";
@@ -52,7 +62,33 @@ interface WorkoutResponse {
   };
 }
 
+interface TemplateResponse {
+  templates: Workout[];
+}
+
 const WORKOUTS_PER_PAGE = 10;
+
+const getVisibilityLabel = (value?: string) => {
+  switch (value) {
+    case "public":
+      return "Public";
+    case "friends":
+      return "Friends";
+    default:
+      return "Private";
+  }
+};
+
+const getVisibilityBadgeClass = (value?: string) => {
+  switch (value) {
+    case "public":
+      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+    case "friends":
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+    default:
+      return "bg-muted text-muted-foreground";
+  }
+};
 
 export function Training() {
   const { t } = useTranslation();
@@ -82,17 +118,43 @@ export function Training() {
     undefined
   );
   const [activeTab, setActiveTab] = useState("trainings");
+  const [templates, setTemplates] = useState<Workout[]>([]);
+  const [prefillWorkout, setPrefillWorkout] = useState<Workout | null>(null);
+  const [templateSearch, setTemplateSearch] = useState("");
+  const [templateScope, setTemplateScope] = useState("all");
+  const [templateCreateOpen, setTemplateCreateOpen] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+  const weightUnit = user?.preferences?.units?.weight || "kg";
+  const distanceUnit = user?.preferences?.units?.distance || "km";
 
-  const exerciseTypes = [
+  const [exerciseTypes, setExerciseTypes] = useState<Array<{ id: string; name: string }>>([
     { id: "all", name: t("training.allExercises") },
-    { id: "pullups", name: t("training.pullups") },
-    { id: "pushups", name: t("training.pushups") },
-    { id: "running", name: t("training.running") },
-    { id: "cycling", name: t("training.cycling") },
-    { id: "situps", name: t("training.situps") },
-  ];
+  ]);
+
+  const loadExerciseTypes = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/exercises?limit=500`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error("Exercise list failed");
+      }
+      const data = await response.json();
+      const items = Array.isArray(data.exercises)
+        ? data.exercises.map((exercise: { id: string; name: string }) => ({
+          id: exercise.id,
+          name: exercise.name,
+        }))
+        : [];
+      setExerciseTypes([{ id: "all", name: t("training.allExercises") }, ...items]);
+    } catch (error) {
+      console.error("Load exercise types error:", error);
+    }
+  }, [t]);
 
   const loadWorkouts = useCallback(
     async (page = 1, type = "all") => {
@@ -140,13 +202,41 @@ export function Training() {
     [resolvedRange?.from, resolvedRange?.to, t, toast, user]
   );
 
+  const loadTemplates = useCallback(async () => {
+    if (!user) return;
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/workouts/templates`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        throw new Error("Template load failed");
+      }
+      const data: TemplateResponse = await response.json();
+      setTemplates(Array.isArray(data.templates) ? data.templates : []);
+    } catch (error) {
+      console.error("Load templates error:", error);
+    }
+  }, [user]);
+
   useEffect(() => {
     loadWorkouts(1, filterType);
   }, [loadWorkouts, filterType]);
 
+  useEffect(() => {
+    loadTemplates();
+  }, [loadTemplates]);
+
+  useEffect(() => {
+    if (user) {
+      loadExerciseTypes();
+    }
+  }, [loadExerciseTypes, user]);
+
   const handleWorkoutCreated = (workoutId?: string) => {
     // Lade die erste Seite neu um das neue Workout zu zeigen
     loadWorkouts(1, filterType);
+    loadTemplates();
 
     // Zeige Dialog an, wenn ein neues Workout erstellt wurde
     if (workoutId) {
@@ -154,6 +244,59 @@ export function Training() {
       setShowRecoveryDialog(true);
     }
   };
+
+  const handleTemplateCreated = () => {
+    loadTemplates();
+    setTemplateCreateOpen(false);
+  };
+
+  const handleUseTemplate = (template: Workout) => {
+    setEditingWorkout(null);
+    setPrefillWorkout(template);
+    setActiveTab("trainings");
+  };
+
+  const scopedTemplates = useMemo(() => {
+    const query = templateSearch.trim().toLowerCase();
+    return templates.filter((template) => {
+      if (templateScope === "own" && template.owner?.id !== user?.id) {
+        return false;
+      }
+      if (templateScope === "friends" && template.visibility !== "friends") {
+        return false;
+      }
+      if (templateScope === "public" && template.visibility !== "public") {
+        return false;
+      }
+      if (!query) return true;
+      const ownerName = [
+        template.owner?.firstName,
+        template.owner?.lastName,
+        template.owner?.nickname,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return (
+        template.title.toLowerCase().includes(query) ||
+        (template.description || "").toLowerCase().includes(query) ||
+        ownerName.includes(query)
+      );
+    });
+  }, [templateScope, templateSearch, templates, user?.id]);
+
+  const ownTemplates = useMemo(
+    () => templates.filter((template) => template.owner?.id === user?.id),
+    [templates, user?.id]
+  );
+  const friendTemplates = useMemo(
+    () => templates.filter((template) => template.visibility === "friends"),
+    [templates]
+  );
+  const publicTemplates = useMemo(
+    () => templates.filter((template) => template.visibility === "public"),
+    [templates]
+  );
 
   const handleRecoveryDialogConfirm = () => {
     setShowRecoveryDialog(false);
@@ -246,6 +389,7 @@ export function Training() {
   const handleWorkoutUpdated = () => {
     setEditingWorkout(null);
     loadWorkouts(currentPage, filterType);
+    loadTemplates();
   };
 
   const handleCancelEdit = () => setEditingWorkout(null);
@@ -305,6 +449,8 @@ export function Training() {
   };
 
   const getActivityName = (activityType: string) => {
+    const exercise = exerciseTypes.find((ex) => ex.id === activityType);
+    if (exercise?.name) return exercise.name;
     const translationKey = `activityFeed.activityTypes.${activityType.toLowerCase()}`;
     const translation = t(translationKey);
     return translation !== translationKey
@@ -326,12 +472,21 @@ export function Training() {
     if (normalizedUnit === "m" || normalizedUnit === "meter" || normalizedUnit === "meters") {
       return t("training.form.units.meters");
     }
-    if (normalizedUnit === "meilen" || normalizedUnit === "miles") {
+    if (normalizedUnit === "meilen" || normalizedUnit === "miles" || normalizedUnit === "mi") {
       return t("training.form.units.miles");
     }
 
     // Fallback: Unit unverändert zurückgeben
     return unit;
+  };
+
+  const formatActivityAmount = (amount: number, unit: string) => {
+    const normalized = unit.toLowerCase();
+    if (normalized === "km" || normalized === "m" || normalized === "miles" || normalized === "meilen") {
+      const converted = convertDistance(amount, unit, distanceUnit);
+      return `${converted} ${translateUnit(distanceUnit)}`;
+    }
+    return `${amount} ${translateUnit(unit)}`;
   };
 
   const formatWorkoutDateTime = (workout: Workout) => {
@@ -390,9 +545,12 @@ export function Training() {
       )}
     >
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-6">
+        <TabsList className="grid w-full grid-cols-3 mb-6">
           <TabsTrigger value="trainings">
             {t("training.trainingsDiary")}
+          </TabsTrigger>
+          <TabsTrigger value="templates">
+            {t("training.templates", "Vorlagen")}
           </TabsTrigger>
           <TabsTrigger value="recovery">
             {t("training.recoveryDiary")}
@@ -400,9 +558,119 @@ export function Training() {
         </TabsList>
 
         <TabsContent value="trainings" className="space-y-4 md:space-y-6">
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
+          <div className="space-y-4 md:space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h2 className="text-lg font-semibold">
+                  {t("training.newWorkout", "Neues Workout")}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {t("training.newWorkoutHint", "Füge dein Training hinzu oder nutze eine Vorlage.")}
+                </p>
+              </div>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    {t("training.useTemplate", "Vorlage nutzen")}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[720px] max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>{t("training.templates", "Workout Vorlagen")}</DialogTitle>
+                  </DialogHeader>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <Label>{t("exerciseLibrary.searchLabel", "Suche")}</Label>
+                      <Input
+                        value={templateSearch}
+                        onChange={(e) => setTemplateSearch(e.target.value)}
+                        placeholder={t("training.searchTemplates", "Vorlagen durchsuchen")}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label>{t("filters.filter", "Filter")}</Label>
+                      <Select value={templateScope} onValueChange={setTemplateScope}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">{t("filters.all", "Alle")}</SelectItem>
+                          <SelectItem value="own">Eigene</SelectItem>
+                          <SelectItem value="friends">Friends</SelectItem>
+                          <SelectItem value="public">Public</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  {scopedTemplates.length === 0 ? (
+                    <Card className="border-dashed mt-4">
+                      <CardContent className="p-4 text-sm text-muted-foreground text-center">
+                        {t("training.noTemplates", "Keine Vorlagen gefunden.")}
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-2 mt-4">
+                      {scopedTemplates.map((template) => (
+                        <div
+                          key={template.id}
+                          className="border rounded-lg p-3 flex flex-col gap-2"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-sm">
+                                {template.title}
+                              </span>
+                              <Badge
+                                variant="secondary"
+                                className={`text-xs ${getVisibilityBadgeClass(
+                                  template.visibility
+                                )}`}
+                              >
+                                {getVisibilityLabel(template.visibility)}
+                              </Badge>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleUseTemplate(template)}
+                            >
+                              {t("training.useTemplate", "Vorlage nutzen")}
+                            </Button>
+                          </div>
+                          {template.description && (
+                            <p className="text-xs text-muted-foreground line-clamp-2">
+                              {template.description}
+                            </p>
+                          )}
+                          <div className="flex flex-wrap gap-1">
+                            {template.activities.slice(0, 4).map((activity) => (
+                              <Badge
+                                key={activity.id}
+                                variant="outline"
+                                className="text-xs"
+                              >
+                                {getActivityName(activity.activityType)}
+                              </Badge>
+                            ))}
+                            {template.activities.length > 4 && (
+                              <span className="text-xs text-muted-foreground">
+                                +{template.activities.length - 4}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
+            </div>
+
             <WorkoutForm
               workout={editingWorkout ?? undefined}
+              prefillWorkout={prefillWorkout}
+              onPrefillConsumed={() => setPrefillWorkout(null)}
               onWorkoutCreated={handleWorkoutCreated}
               onWorkoutUpdated={handleWorkoutUpdated}
               onCancelEdit={handleCancelEdit}
@@ -540,7 +808,8 @@ export function Training() {
                                       const reps = set.reps || 0;
                                       const weight = set.weight;
                                       if (weight) {
-                                        return `${reps}x${weight}kg`;
+                                        const displayWeight = convertWeightFromKg(weight, weightUnit);
+                                        return `${reps}x${displayWeight}${weightUnit}`;
                                       }
                                       return `${reps}`;
                                     })
@@ -563,7 +832,8 @@ export function Training() {
                                         variant="secondary"
                                       >
                                         {getExerciseIcon(activity.activityType)}{" "}
-                                        {getActivityName(activity.activityType)}: {activity.amount} {translateUnit(activity.unit)}
+                                        {getActivityName(activity.activityType)}:{" "}
+                                        {formatActivityAmount(activity.amount, activity.unit)}
                                       </Badge>
                                       {setsDisplay && (
                                         <span className="text-xs text-muted-foreground">
@@ -649,6 +919,165 @@ export function Training() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="templates" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <CardTitle>{t("training.templates", "Workout Vorlagen")}</CardTitle>
+              <Dialog open={templateCreateOpen} onOpenChange={setTemplateCreateOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    {t("training.createTemplate", "Vorlage erstellen")}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>{t("training.createTemplate", "Vorlage erstellen")}</DialogTitle>
+                  </DialogHeader>
+                  <WorkoutForm
+                    defaultIsTemplate
+                    forceTemplate
+                    hideTemplateToggle
+                    onWorkoutCreated={handleTemplateCreated}
+                  />
+                </DialogContent>
+              </Dialog>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label>{t("exerciseLibrary.searchLabel", "Suche")}</Label>
+                  <Input
+                    value={templateSearch}
+                    onChange={(e) => setTemplateSearch(e.target.value)}
+                    placeholder={t("training.searchTemplates", "Vorlagen durchsuchen")}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label>{t("filters.filter", "Filter")}</Label>
+                  <Select value={templateScope} onValueChange={setTemplateScope}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t("filters.all", "Alle")}</SelectItem>
+                      <SelectItem value="own">Eigene</SelectItem>
+                      <SelectItem value="friends">Friends</SelectItem>
+                      <SelectItem value="public">Public</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold mb-2">
+                    {t("training.templatesOwn", "Deine Vorlagen")}
+                  </h3>
+                  {ownTemplates.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t("training.noTemplates", "Keine Vorlagen gefunden.")}
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {ownTemplates.map((template) => (
+                        <Card key={template.id}>
+                          <CardContent className="p-4 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium">{template.title}</span>
+                              <Badge
+                                variant="secondary"
+                                className={`text-xs ${getVisibilityBadgeClass(
+                                  template.visibility
+                                )}`}
+                              >
+                                {getVisibilityLabel(template.visibility)}
+                              </Badge>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleUseTemplate(template)}
+                            >
+                              {t("training.useTemplate", "Vorlage nutzen")}
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold mb-2">
+                    {t("training.templatesFriends", "Vorlagen von Freunden")}
+                  </h3>
+                  {friendTemplates.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t("training.noTemplates", "Keine Vorlagen gefunden.")}
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {friendTemplates.map((template) => (
+                        <Card key={template.id}>
+                          <CardContent className="p-4 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium">{template.title}</span>
+                              <Badge variant="outline" className="text-xs">
+                                Friends
+                              </Badge>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleUseTemplate(template)}
+                            >
+                              {t("training.useTemplate", "Vorlage nutzen")}
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold mb-2">
+                    {t("training.templatesPublic", "Öffentliche Vorlagen")}
+                  </h3>
+                  {publicTemplates.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t("training.noTemplates", "Keine Vorlagen gefunden.")}
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {publicTemplates.map((template) => (
+                        <Card key={template.id}>
+                          <CardContent className="p-4 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium">{template.title}</span>
+                              <Badge variant="outline" className="text-xs">
+                                Public
+                              </Badge>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleUseTemplate(template)}
+                            >
+                              {t("training.useTemplate", "Vorlage nutzen")}
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="recovery" className="space-y-4 md:space-y-6">

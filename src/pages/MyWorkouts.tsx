@@ -18,6 +18,7 @@ import {
   getRangeForPeriod,
   toDateParam,
 } from "@/utils/dateRanges";
+import { convertDistance, convertWeightFromKg } from "@/utils/units";
 import { Dumbbell } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DateRange } from "react-day-picker";
@@ -87,8 +88,19 @@ const translateUnit = (unit: string, t: (key: string) => string) => {
   return unit;
 };
 
-const formatAmount = (activityType: string, amount: number, unit: string, t: (key: string) => string) => {
+const formatAmount = (
+  activityType: string,
+  amount: number,
+  unit: string,
+  t: (key: string) => string,
+  distanceUnit: string
+) => {
   const translatedUnit = translateUnit(unit, t);
+  const normalized = unit.toLowerCase();
+  if (normalized === "km" || normalized === "m" || normalized === "miles" || normalized === "meilen") {
+    const converted = convertDistance(amount, unit, distanceUnit);
+    return `${converted} ${translateUnit(distanceUnit, t)}`;
+  }
   return `${amount} ${translatedUnit}`;
 };
 
@@ -135,6 +147,28 @@ const formatDuration = (minutes?: number, t?: (key: string, params?: Record<stri
   return `${minutes}min`;
 };
 
+const getVisibilityLabel = (value?: string) => {
+  switch (value) {
+    case "public":
+      return "Public";
+    case "friends":
+      return "Friends";
+    default:
+      return "Private";
+  }
+};
+
+const getVisibilityBadgeClass = (value?: string) => {
+  switch (value) {
+    case "public":
+      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+    case "friends":
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+    default:
+      return "bg-muted text-muted-foreground";
+  }
+};
+
 interface WorkoutResponse {
   workouts: Workout[];
   pagination: PaginationMeta;
@@ -144,6 +178,8 @@ export function MyWorkouts() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { t, i18n } = useTranslation();
+  const weightUnit = user?.preferences?.units?.weight || "kg";
+  const distanceUnit = user?.preferences?.units?.distance || "km";
 
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -390,6 +426,17 @@ export function MyWorkouts() {
                         <span className="font-semibold text-sm truncate text-foreground">
                           {workout.title}
                         </span>
+                        <Badge
+                          variant="secondary"
+                          className={`text-xs ${getVisibilityBadgeClass(workout.visibility)}`}
+                        >
+                          {getVisibilityLabel(workout.visibility)}
+                        </Badge>
+                        {workout.isTemplate && (
+                          <Badge variant="outline" className="text-xs">
+                            Vorlage
+                          </Badge>
+                        )}
                         {workout.duration && (
                           <Badge variant="outline" className="text-xs ml-2">
                             ⏱️ {formatDuration(workout.duration, t)}
@@ -429,7 +476,8 @@ export function MyWorkouts() {
                             const reps = set.reps || 0;
                             const weight = set.weight;
                             if (weight) {
-                              return `${reps}x${weight}kg`;
+                              const displayWeight = convertWeightFromKg(weight, weightUnit);
+                              return `${reps}x${displayWeight}${weightUnit}`;
                             }
                             return `${reps}`;
                           })
@@ -449,7 +497,7 @@ export function MyWorkouts() {
                         >
                           {getActivityIcon(activity.activityType)}{" "}
                           {getActivityName(activity.activityType, t)}:{" "}
-                          {formatAmount(activity.activityType, activity.amount, activity.unit, t)}
+                          {formatAmount(activity.activityType, activity.amount, activity.unit, t, distanceUnit)}
                           {setsDisplay && (
                             <span className="ml-1 opacity-75">
                               ({setsDisplay})
@@ -497,4 +545,3 @@ export function MyWorkouts() {
     </PageTemplate>
   );
 }
-

@@ -26,6 +26,10 @@ dist-ssr
 *.sln
 *.sw?
 
+# AI/IDE tool directories
+.cursor/
+.kiro/
+
 # Environment variables (but keep .env.example)
 .env
 .env.local

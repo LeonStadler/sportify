@@ -1,6 +1,8 @@
 import jwt from "jsonwebtoken";
 import assert from "node:assert/strict";
-import { after, before, beforeEach, describe, it } from "node:test";
+import { before, beforeEach, describe, it } from "node:test";
+import { IncomingMessage, ServerResponse } from "node:http";
+import { Socket } from "node:net";
 import { TestDatabase } from "./helpers/test-database.js";
 
 process.env.JWT_SECRET = "test-secret";
@@ -12,68 +14,106 @@ const db = new TestDatabase();
 let app;
 let pool;
 let ensureFriendInfrastructure;
-let server;
-let baseUrl;
+const createMockRequest = ({ method, path, headers, body }) => {
+  const socket = new Socket();
+  const req = new IncomingMessage(socket);
+  req.method = method;
+  req.url = path;
+  req.headers = Object.fromEntries(
+    Object.entries(headers || {}).map(([key, value]) => [
+      key.toLowerCase(),
+      value,
+    ])
+  );
+  req.connection = { remoteAddress: "127.0.0.1" };
+  if (body && req.headers["content-type"] === "application/json") {
+    try {
+      req.body = JSON.parse(body);
+    } catch {
+      req.body = undefined;
+    }
+  }
+  process.nextTick(() => {
+    if (body) {
+      req.push(body);
+    }
+    req.push(null);
+  });
+  return req;
+};
 
-const authFetch = async (
+const createMockResponse = (req) => {
+  const socket = new Socket();
+  const chunks = [];
+  socket.write = (chunk, _encoding, callback) => {
+    chunks.push(Buffer.from(chunk));
+    if (callback) callback();
+    return true;
+  };
+  socket.end = (chunk, _encoding, callback) => {
+    if (chunk) chunks.push(Buffer.from(chunk));
+    if (callback) callback();
+    socket.emit("finish");
+    return socket;
+  };
+  const res = new ServerResponse(req);
+  res.assignSocket(socket);
+  res.getBody = () => Buffer.concat(chunks).toString("utf-8");
+  return res;
+};
+
+const appFetch = async (
   path,
   { method = "GET", token, body, headers = {} } = {}
 ) => {
   const requestHeaders = { ...headers };
+  let payload = null;
   if (token) {
-    requestHeaders.Authorization = `Bearer ${token}`;
+    requestHeaders.authorization = `Bearer ${token}`;
   }
   if (body !== undefined) {
-    requestHeaders["Content-Type"] = "application/json";
+    payload = JSON.stringify(body);
+    requestHeaders["content-type"] = "application/json";
+    requestHeaders["content-length"] = Buffer.byteLength(payload).toString();
   }
-  const response = await fetch(`${baseUrl}${path}`, {
+
+  const req = createMockRequest({
     method,
+    path,
     headers: requestHeaders,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body: payload,
   });
-  return response;
+  const res = createMockResponse(req);
+
+  await new Promise((resolve) => {
+    res.on("finish", resolve);
+    app.handle(req, res);
+  });
+
+  const rawBody = res.getBody();
+  const responseBody = rawBody.includes("\r\n\r\n")
+    ? rawBody.split("\r\n\r\n").slice(1).join("\r\n\r\n")
+    : rawBody;
+
+  return {
+    status: res.statusCode,
+    json: async () => {
+      return responseBody ? JSON.parse(responseBody) : {};
+    },
+    text: async () => responseBody,
+  };
 };
 
 const signToken = (userId) => jwt.sign({ userId }, process.env.JWT_SECRET);
 
 before(async () => {
-  try {
-    ({ app, pool, ensureFriendInfrastructure } = await serverModulePromise);
-    pool.query = (sql, params) => db.query(sql, params);
-    pool.connect = async () => ({
-      query: (sql, params) => db.query(sql, params),
-      release: () => { },
-    });
-    await ensureFriendInfrastructure();
-
-    await new Promise((resolve, reject) => {
-      server = app.listen(0, "127.0.0.1", () => {
-        const address = server.address();
-        if (!address) {
-          reject(
-            new Error("Server address is null - server may have failed to start")
-          );
-          return;
-        }
-        if (typeof address === "string") {
-          reject(new Error(`Unexpected server address type: ${address}`));
-          return;
-        }
-        baseUrl = `http://127.0.0.1:${address.port}`;
-        resolve();
-      });
-      server.on("error", reject);
-    });
-  } catch (error) {
-    console.error("Failed to start test server:", error);
-    throw error;
-  }
-});
-
-after(async () => {
-  if (server) {
-    await new Promise((resolve) => server.close(resolve));
-  }
+  ({ app, pool, ensureFriendInfrastructure } = await serverModulePromise);
+  pool.query = (sql, params) => db.query(sql, params);
+  pool.connect = async () => ({
+    query: (sql, params) => db.query(sql, params),
+    release: () => {},
+  });
+  await ensureFriendInfrastructure();
 });
 
 beforeEach(() => {
@@ -95,7 +135,7 @@ describe("Friends API", () => {
     const aliceToken = signToken(alice.id);
     const bobToken = signToken(bob.id);
 
-    const createResponse = await authFetch("/api/friends/requests", {
+    const createResponse = await appFetch("/api/friends/requests", {
       method: "POST",
       token: aliceToken,
       body: { targetUserId: bob.id },
@@ -104,7 +144,7 @@ describe("Friends API", () => {
     const { requestId } = await createResponse.json();
     assert.ok(requestId);
 
-    const bobRequestsResponse = await authFetch("/api/friends/requests", {
+    const bobRequestsResponse = await appFetch("/api/friends/requests", {
       token: bobToken,
     });
     assert.equal(bobRequestsResponse.status, 200);
@@ -112,14 +152,14 @@ describe("Friends API", () => {
     assert.equal(bobRequests.incoming.length, 1);
     assert.equal(bobRequests.incoming[0].user.id, alice.id);
 
-    const aliceRequestsResponse = await authFetch("/api/friends/requests", {
+    const aliceRequestsResponse = await appFetch("/api/friends/requests", {
       token: aliceToken,
     });
     const aliceRequests = await aliceRequestsResponse.json();
     assert.equal(aliceRequests.outgoing.length, 1);
     assert.equal(aliceRequests.outgoing[0].user.id, bob.id);
 
-    const acceptResponse = await authFetch(
+    const acceptResponse = await appFetch(
       `/api/friends/requests/${requestId}`,
       {
         method: "PUT",
@@ -131,7 +171,7 @@ describe("Friends API", () => {
     const acceptPayload = await acceptResponse.json();
     assert.equal(acceptPayload.status, "accepted");
 
-    const friendsResponse = await authFetch("/api/friends", {
+    const friendsResponse = await appFetch("/api/friends", {
       token: aliceToken,
     });
     assert.equal(friendsResponse.status, 200);
@@ -140,7 +180,7 @@ describe("Friends API", () => {
     assert.equal(friends[0].id, bob.id);
     assert.ok(friends[0].friendshipId);
 
-    const bobFriendsResponse = await authFetch("/api/friends", {
+    const bobFriendsResponse = await appFetch("/api/friends", {
       token: bobToken,
     });
     const bobFriends = await bobFriendsResponse.json();
@@ -162,14 +202,14 @@ describe("Friends API", () => {
     const charlieToken = signToken(charlie.id);
     const dianaToken = signToken(diana.id);
 
-    const createResponse = await authFetch("/api/friends/requests", {
+    const createResponse = await appFetch("/api/friends/requests", {
       method: "POST",
       token: charlieToken,
       body: { targetUserId: diana.id },
     });
     const { requestId } = await createResponse.json();
 
-    const invalidAccept = await authFetch(
+    const invalidAccept = await appFetch(
       `/api/friends/requests/${requestId}`,
       {
         method: "PUT",
@@ -179,7 +219,7 @@ describe("Friends API", () => {
     );
     assert.equal(invalidAccept.status, 403);
 
-    const declineResponse = await authFetch(
+    const declineResponse = await appFetch(
       `/api/friends/requests/${requestId}`,
       {
         method: "PUT",
@@ -191,7 +231,7 @@ describe("Friends API", () => {
     const declinePayload = await declineResponse.json();
     assert.equal(declinePayload.status, "declined");
 
-    const friendsResponse = await authFetch("/api/friends", {
+    const friendsResponse = await appFetch("/api/friends", {
       token: charlieToken,
     });
     const friends = await friendsResponse.json();
@@ -220,7 +260,7 @@ describe("User search API", () => {
 
     const token = signToken(alpha.id);
 
-    const searchResponse = await authFetch("/api/users/search?query=bo", {
+    const searchResponse = await appFetch("/api/users/search?query=bo", {
       token,
     });
     assert.equal(searchResponse.status, 200);
@@ -229,7 +269,7 @@ describe("User search API", () => {
     assert.equal(results[0].id, bravo.id);
     assert(!results.some((user) => user.id === alpha.id));
 
-    const caseInsensitiveResponse = await authFetch(
+    const caseInsensitiveResponse = await appFetch(
       "/api/users/search?query=STO",
       { token }
     );
@@ -239,7 +279,7 @@ describe("User search API", () => {
   });
 
   it("requires authentication for search", async () => {
-    const response = await fetch(`${baseUrl}/api/users/search?query=test`);
+    const response = await appFetch("/api/users/search?query=test");
     assert.equal(response.status, 401);
   });
 });
@@ -265,14 +305,14 @@ describe("Activity feed", () => {
     const userToken = signToken(user.id);
     const friendToken = signToken(friend.id);
 
-    const requestResponse = await authFetch("/api/friends/requests", {
+    const requestResponse = await appFetch("/api/friends/requests", {
       method: "POST",
       token: userToken,
       body: { targetUserId: friend.id },
     });
     const { requestId } = await requestResponse.json();
 
-    await authFetch(`/api/friends/requests/${requestId}`, {
+    await appFetch(`/api/friends/requests/${requestId}`, {
       method: "PUT",
       token: friendToken,
       body: { action: "accept" },
@@ -314,7 +354,7 @@ describe("Activity feed", () => {
       createdAt: new Date("2024-03-01T09:00:00Z"),
     });
 
-    const feedResponse = await authFetch("/api/feed", { token: userToken });
+    const feedResponse = await appFetch("/api/feed", { token: userToken });
     assert.equal(feedResponse.status, 200);
     const feed = await feedResponse.json();
 

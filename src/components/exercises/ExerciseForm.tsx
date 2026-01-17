@@ -9,6 +9,21 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Info } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  categoryOptions,
+  disciplineOptions,
+  measurementOptions,
+  movementPatternOptions,
+  muscleGroupOptions,
+} from "@/components/exercises/exerciseOptions";
 import { Check, ChevronDown } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -38,50 +53,12 @@ interface ExerciseFormProps {
   descriptionOpen?: boolean;
   onDescriptionToggle?: (open: boolean) => void;
   hideSubmit?: boolean;
+  nameSuggestions?: string[];
+  nameCheckLoading?: boolean;
+  nameExactMatch?: boolean;
+  confirmSimilar?: boolean;
+  onConfirmSimilarChange?: (value: boolean) => void;
 }
-
-const measurementOptions = [
-  { value: "reps", labelKey: "training.form.measurementReps" },
-  { value: "time", labelKey: "training.form.measurementTime" },
-  { value: "distance", labelKey: "training.form.measurementDistance" },
-];
-
-const muscleGroupOptions = [
-  "Brust",
-  "Rücken",
-  "Schultern",
-  "Bizeps",
-  "Trizeps",
-  "Unterarme",
-  "Core",
-  "Gluteus",
-  "Quadrizeps",
-  "Hamstrings",
-  "Waden",
-];
-
-const disciplineOptions = [
-  "Calisthenics",
-  "Kraft",
-  "Ausdauer",
-  "Functional",
-  "Mobility",
-];
-
-const categoryOptions = [
-  "Kraft",
-  "Ausdauer",
-  "Mobility",
-  "Skills",
-];
-
-const movementPatternOptions = [
-  { value: "push", labelKey: "training.form.patternPush" },
-  { value: "pull", labelKey: "training.form.patternPull" },
-  { value: "legs", labelKey: "training.form.patternLegs" },
-  { value: "core", labelKey: "training.form.patternCore" },
-  { value: "full", labelKey: "training.form.patternFull" },
-];
 
 export function ExerciseForm({
   value,
@@ -93,6 +70,11 @@ export function ExerciseForm({
   descriptionOpen,
   onDescriptionToggle,
   hideSubmit,
+  nameSuggestions,
+  nameCheckLoading,
+  nameExactMatch,
+  confirmSimilar,
+  onConfirmSimilarChange,
 }: ExerciseFormProps) {
   const { t } = useTranslation();
 
@@ -100,6 +82,92 @@ export function ExerciseForm({
 
   const setField = (field: keyof ExerciseFormValue, fieldValue: ExerciseFormValue[keyof ExerciseFormValue]) => {
     onChange({ ...value, [field]: fieldValue });
+  };
+
+  const categoryOptionsWithValue = useMemo(() => {
+    if (value.category && !categoryOptions.includes(value.category)) {
+      return [value.category, ...categoryOptions];
+    }
+    return categoryOptions;
+  }, [value.category]);
+
+  const disciplineOptionsWithValue = useMemo(() => {
+    if (value.discipline && !disciplineOptions.includes(value.discipline)) {
+      return [value.discipline, ...disciplineOptions];
+    }
+    return disciplineOptions;
+  }, [value.discipline]);
+
+  const movementOptionsWithValue = useMemo(() => {
+    if (value.movementPattern && !movementPatternOptions.some((item) => item.value === value.movementPattern)) {
+      return [
+        { value: value.movementPattern, labelKey: "", fallback: value.movementPattern },
+        ...movementPatternOptions,
+      ];
+    }
+    return movementPatternOptions;
+  }, [value.movementPattern]);
+
+  const muscleOptionsWithValue = useMemo(() => {
+    const combined = new Set([...muscleGroupOptions, ...(value.muscleGroups || [])]);
+    return Array.from(combined);
+  }, [value.muscleGroups]);
+
+  const nameStatus = nameCheckLoading
+    ? "loading"
+    : nameExactMatch
+      ? "exact"
+      : nameSuggestions && nameSuggestions.length > 0
+        ? "similar"
+        : "ok";
+
+  const normalizeMeasurementTypes = (prev: string[], next: string[]) => {
+    const added = next.find((item) => !prev.includes(item));
+    let result = [...next];
+
+    if (result.includes("reps") && result.includes("distance")) {
+      result =
+        added === "reps"
+          ? result.filter((item) => item !== "distance")
+          : result.filter((item) => item !== "reps");
+    }
+
+    if (result.length === 0) {
+      return prev.length ? prev : ["reps"];
+    }
+
+    return result;
+  };
+
+  const handleMeasurementChange = (next: string[]) => {
+    const normalized = normalizeMeasurementTypes(value.measurementTypes, next);
+    const nextValue: ExerciseFormValue = { ...value, measurementTypes: normalized };
+
+    if (normalized.includes("reps")) {
+      nextValue.supportsSets = true;
+    } else if (normalized.includes("distance")) {
+      nextValue.supportsSets = false;
+    } else if (normalized.includes("time")) {
+      nextValue.supportsSets = true;
+    }
+
+    onChange(nextValue);
+  };
+
+  const handleRequiresWeightChange = (next: boolean) => {
+    onChange({
+      ...value,
+      requiresWeight: next,
+      allowsWeight: next ? false : value.allowsWeight,
+    });
+  };
+
+  const handleAllowsWeightChange = (next: boolean) => {
+    onChange({
+      ...value,
+      allowsWeight: next,
+      requiresWeight: next ? false : value.requiresWeight,
+    });
   };
 
   const difficultyPlaceholder = useMemo(
@@ -111,12 +179,81 @@ export function ExerciseForm({
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label>{t("exerciseLibrary.name")}</Label>
+          <div className="flex items-center gap-2">
+            <Label>{t("exerciseLibrary.name")}</Label>
+            <TooltipProvider delayDuration={150}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground">
+                    <Info className="h-4 w-4" />
+                    <span className="sr-only">Info</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs text-sm">
+                  {t(
+                    "exerciseLibrary.nameHint",
+                    "Nutze möglichst etablierte Namen (z.B. 'Pull-Ups', 'Bench Press') und halte die Schreibweise konsistent."
+                  )}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
           <Input
             value={value.name}
             onChange={(e) => setField("name", e.target.value)}
             placeholder={t("exerciseLibrary.namePlaceholder", "z.B. Pull-Ups")}
           />
+          <div className="mt-2 min-h-[32px] space-y-2">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  nameStatus === "exact"
+                    ? "bg-destructive"
+                    : nameStatus === "similar"
+                      ? "bg-amber-500"
+                      : nameStatus === "loading"
+                        ? "bg-muted-foreground"
+                        : "bg-emerald-500"
+                }`}
+              />
+              <span>
+                {nameStatus === "loading" &&
+                  t("exerciseLibrary.nameChecking", "Prüfe ähnliche Übungen...")}
+                {nameStatus === "exact" &&
+                  t("exerciseLibrary.nameExists", "Name existiert bereits.")}
+                {nameStatus === "similar" &&
+                  t("exerciseLibrary.similarNames", "Ähnliche Übungen gefunden")}
+                {nameStatus === "ok" &&
+                  t("exerciseLibrary.nameOk", "Name verfügbar")}
+              </span>
+            </div>
+            {nameStatus === "similar" && nameSuggestions && nameSuggestions.length > 0 && (
+              <div className="space-y-1 text-xs text-muted-foreground">
+                <div className="flex flex-wrap gap-1">
+                  {nameSuggestions.map((name) => (
+                    <span
+                      key={name}
+                      className="rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground"
+                    >
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {nameStatus === "similar" && onConfirmSimilarChange && (
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Checkbox
+                  checked={Boolean(confirmSimilar)}
+                  onCheckedChange={(checked) => onConfirmSimilarChange(Boolean(checked))}
+                />
+                {t(
+                  "exerciseLibrary.similarConfirm",
+                  "Ich bestätige, dass es sich um eine andere Übung handelt."
+                )}
+              </label>
+            )}
+          </div>
         </div>
         <div>
           <Label>{t("exerciseLibrary.category")}</Label>
@@ -125,7 +262,7 @@ export function ExerciseForm({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {categoryOptions.map((item) => (
+              {categoryOptionsWithValue.map((item) => (
                 <SelectItem key={item} value={item}>
                   {item}
                 </SelectItem>
@@ -140,7 +277,7 @@ export function ExerciseForm({
               <SelectValue placeholder={t("exerciseLibrary.discipline", "Disziplin")} />
             </SelectTrigger>
             <SelectContent>
-              {disciplineOptions.map((item) => (
+              {disciplineOptionsWithValue.map((item) => (
                 <SelectItem key={item} value={item}>
                   {item}
                 </SelectItem>
@@ -155,9 +292,9 @@ export function ExerciseForm({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {movementPatternOptions.map((item) => (
+              {movementOptionsWithValue.map((item) => (
                 <SelectItem key={item.value} value={item.value}>
-                  {t(item.labelKey)}
+                  {item.labelKey ? t(item.labelKey, item.fallback) : item.fallback}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -171,11 +308,11 @@ export function ExerciseForm({
           type="multiple"
           className="flex flex-wrap justify-start gap-2"
           value={value.measurementTypes}
-          onValueChange={(values) => setField("measurementTypes", values)}
+          onValueChange={handleMeasurementChange}
         >
           {measurementOptions.map((item) => (
             <ToggleGroupItem key={item.value} value={item.value}>
-              {t(item.labelKey)}
+              {t(item.labelKey, item.fallback)}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
@@ -229,7 +366,7 @@ export function ExerciseForm({
                     >
                       {t("exerciseLibrary.clearMuscles", "Alle abwählen")}
                     </CommandItem>
-                    {muscleGroupOptions.map((group) => (
+                    {muscleOptionsWithValue.map((group) => (
                       <CommandItem
                         key={group}
                         value={group}
@@ -292,11 +429,11 @@ export function ExerciseForm({
 
       <div className="flex flex-wrap gap-3">
         <div className="flex items-center gap-2">
-          <Switch checked={value.requiresWeight} onCheckedChange={(next) => setField("requiresWeight", next)} />
+          <Switch checked={value.requiresWeight} onCheckedChange={handleRequiresWeightChange} />
           <span className="text-sm">{t("exerciseLibrary.requiresWeight", "Gewicht erforderlich")}</span>
         </div>
         <div className="flex items-center gap-2">
-          <Switch checked={value.allowsWeight} onCheckedChange={(next) => setField("allowsWeight", next)} />
+          <Switch checked={value.allowsWeight} onCheckedChange={handleAllowsWeightChange} />
           <span className="text-sm">{t("exerciseLibrary.allowsWeight", "Gewicht optional")}</span>
         </div>
         <div className="flex items-center gap-2">

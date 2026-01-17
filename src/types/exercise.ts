@@ -41,4 +41,11 @@ export interface ExerciseListResponse {
     muscleGroups: string[];
     equipment: string[];
   };
+  pagination?: {
+    currentPage: number;
+    totalPages: number;
+    totalItems?: number;
+    hasNext?: boolean;
+    hasPrev?: boolean;
+  };
 }

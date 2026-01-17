@@ -1,5 +1,11 @@
 import { PageTemplate } from "@/components/common/PageTemplate";
+import {
+  PaginationControls,
+  PaginationMeta,
+} from "@/components/common/pagination/PaginationControls";
+import { ExerciseFiltersPanel } from "@/components/exercises/ExerciseFiltersPanel";
 import { ExerciseForm } from "@/components/exercises/ExerciseForm";
+import { SearchFilterToolbar } from "@/components/common/SearchFilterToolbar";
 import type { ExerciseFormValue } from "@/components/exercises/ExerciseForm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,11 +19,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Slider } from "@/components/ui/slider";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -26,6 +27,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  categoryOptions as defaultCategoryOptions,
+  disciplineOptions,
+  measurementOptions,
+  movementPatternOptions,
+  muscleGroupOptions,
+} from "@/components/exercises/exerciseOptions";
 import {
   Tooltip,
   TooltipContent,
@@ -36,7 +50,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
 import type { Exercise, ExerciseListResponse } from "@/types/exercise";
-import { ArrowDown, ArrowUp, Check, ChevronDown, Info, LayoutGrid, List, SlidersHorizontal } from "lucide-react";
+import { ArrowDown, ArrowUp, Info, MoreHorizontal } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -97,7 +111,16 @@ export function Exercises() {
   const [difficultyRange, setDifficultyRange] = useState<[number, number]>([1, 10]);
   const [sortBy, setSortBy] = useState("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<PaginationMeta>({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    hasNext: false,
+    hasPrev: false,
+  });
+  const pageSize = 12;
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
   const [formValue, setFormValue] = useState<ExerciseFormValue>({
@@ -121,22 +144,10 @@ export function Exercises() {
   const [reportReason, setReportReason] = useState("");
   const [reportDetails, setReportDetails] = useState("");
   const [editDraft, setEditDraft] = useState<ExerciseFormValue | null>(null);
-
-  const movementPatternOptions = [
-    { value: "push", label: t("exerciseLibrary.movement.push", "Push") },
-    { value: "pull", label: t("exerciseLibrary.movement.pull", "Pull") },
-    { value: "squat", label: t("exerciseLibrary.movement.squat", "Squat") },
-    { value: "hinge", label: t("exerciseLibrary.movement.hinge", "Hinge") },
-    { value: "carry", label: t("exerciseLibrary.movement.carry", "Carry") },
-    { value: "rotation", label: t("exerciseLibrary.movement.rotation", "Rotation") },
-    { value: "isometric", label: t("exerciseLibrary.movement.isometric", "Isometrisch") },
-  ];
-
-  const measurementOptions = [
-    { value: "reps", label: t("training.form.measurementReps") },
-    { value: "time", label: t("training.form.measurementTime") },
-    { value: "distance", label: t("training.form.measurementDistance") },
-  ];
+  const [nameSuggestions, setNameSuggestions] = useState<string[]>([]);
+  const [nameCheckLoading, setNameCheckLoading] = useState(false);
+  const [nameExactMatch, setNameExactMatch] = useState(false);
+  const [confirmSimilar, setConfirmSimilar] = useState(false);
 
   const sortOptions = [
     { value: "none", label: t("filters.sortNone", "Keine") },
@@ -148,6 +159,29 @@ export function Exercises() {
     { value: "difficulty", label: t("filters.sortDifficulty", "Schwierigkeit") },
     { value: "newest", label: t("filters.sortNewest", "Neueste") },
   ];
+
+  const categoryFilterOptions = useMemo(() => {
+    const combined = new Set([...defaultCategoryOptions, ...(facets.categories || [])]);
+    return Array.from(combined).filter(Boolean);
+  }, [facets.categories]);
+
+  const muscleFilterOptions = useMemo(() => {
+    const combined = new Set([...(facets.muscleGroups || []), ...muscleGroupOptions]);
+    return Array.from(combined).filter(Boolean);
+  }, [facets.muscleGroups]);
+
+  const normalizeMeasurementFilters = (next: string[]) => {
+    const added = next.find((item) => !measurementFilters.includes(item));
+    let result = [...next];
+    if (result.includes("reps") && result.includes("distance")) {
+      result =
+        added === "reps"
+          ? result.filter((item) => item !== "distance")
+          : result.filter((item) => item !== "reps");
+    }
+    return result;
+  };
+
 
   const handleSortClick = (next: string) => {
     if (sortBy !== next) {
@@ -163,20 +197,76 @@ export function Exercises() {
     setSortDirection("asc");
   };
 
+  const normalizeCategory = (value?: string | null) => {
+    if (!value) return value;
+    const lower = value.toLowerCase();
+    if (lower === "strength") return "Kraft";
+    if (lower === "endurance") return "Ausdauer";
+    return value;
+  };
+
+  const normalizeDiscipline = (value?: string | null) => {
+    if (!value) return value;
+    const lower = value.toLowerCase();
+    if (lower === "strength") return "Kraft";
+    if (lower === "endurance") return "Ausdauer";
+    return value;
+  };
+
+  const buildExercisesParams = (page = 1) => {
+    const params = new URLSearchParams({
+      limit: pageSize.toString(),
+      offset: ((page - 1) * pageSize).toString(),
+    });
+    if (query.trim()) params.set("query", query.trim());
+    if (categoryFilter !== "all") params.set("category", categoryFilter);
+    if (disciplineFilter !== "all") params.set("discipline", disciplineFilter);
+    if (movementPatternFilter !== "all") params.set("movementPattern", movementPatternFilter);
+    if (measurementFilters.length > 0) {
+      params.set("measurementTypes", measurementFilters.join(","));
+    }
+    if (muscleFilters.length > 0) {
+      params.set("muscleGroups", muscleFilters.join(","));
+    }
+    if (requiresWeightFilter !== "all") params.set("requiresWeight", requiresWeightFilter);
+    params.set("difficultyMin", difficultyRange[0].toString());
+    params.set("difficultyMax", difficultyRange[1].toString());
+    if (sortBy !== "none") {
+      params.set("sortBy", sortBy);
+      params.set("sortDirection", sortDirection);
+    }
+    return params;
+  };
+
   const loadExercises = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
-      const params = new URLSearchParams({ limit: "500" });
+      const params = buildExercisesParams(currentPage);
       const response = await fetch(`${API_URL}/exercises?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) throw new Error("Load failed");
       const data: ExerciseListResponse = await response.json();
-      setExercises(Array.isArray(data.exercises) ? data.exercises : []);
+      const normalized = (Array.isArray(data.exercises) ? data.exercises : []).map((exercise) => ({
+        ...exercise,
+        category: normalizeCategory(exercise.category),
+        discipline: normalizeDiscipline(exercise.discipline),
+      }));
+      setExercises(normalized);
+      const nextPagination =
+        data.pagination ?? {
+          currentPage,
+          totalPages: 1,
+          totalItems: normalized.length,
+          hasNext: false,
+          hasPrev: false,
+        };
+      setPagination(nextPagination);
+      setCurrentPage(nextPagination.currentPage);
       setFacets({
-        categories: data.facets?.categories || [],
+        categories: (data.facets?.categories || []).map(normalizeCategory).filter(Boolean),
         muscleGroups: data.facets?.muscleGroups || [],
         equipment: data.facets?.equipment || [],
       });
@@ -185,69 +275,85 @@ export function Exercises() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [
+    user,
+    currentPage,
+    pageSize,
+    query,
+    categoryFilter,
+    disciplineFilter,
+    movementPatternFilter,
+    measurementFilters,
+    muscleFilters,
+    requiresWeightFilter,
+    difficultyRange,
+    sortBy,
+    sortDirection,
+  ]);
 
   useEffect(() => {
     loadExercises();
   }, [loadExercises]);
 
-  const filteredExercises = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const filtered = exercises.filter((exercise) => {
-      if (categoryFilter !== "all" && exercise.category !== categoryFilter) return false;
-      if (disciplineFilter !== "all" && exercise.discipline !== disciplineFilter) return false;
-      if (movementPatternFilter !== "all" && exercise.movementPattern !== movementPatternFilter) return false;
-      if (measurementFilters.length > 0) {
-        const supportsReps =
-          exercise.measurementType === "reps" || exercise.supportsSets || false;
-        const supportsTime = exercise.supportsTime || exercise.measurementType === "time";
-        const supportsDistance =
-          exercise.supportsDistance || exercise.measurementType === "distance";
-        const matches = measurementFilters.some((filter) => {
-          if (filter === "reps") return supportsReps;
-          if (filter === "time") return supportsTime;
-          if (filter === "distance") return supportsDistance;
-          return false;
+  useEffect(() => {
+    if (!user) return;
+    const value = formValue.name.trim();
+    if (value.length < 3) {
+      setNameSuggestions([]);
+      setNameCheckLoading(false);
+      setNameExactMatch(false);
+      setConfirmSimilar(false);
+      return;
+    }
+    let isActive = true;
+    const handle = setTimeout(async () => {
+      try {
+        setNameCheckLoading(true);
+        const token = localStorage.getItem("token");
+        const params = new URLSearchParams({
+          query: value,
+          limit: "5",
+          offset: "0",
         });
-        if (!matches) return false;
+        const response = await fetch(`${API_URL}/exercises?${params}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) throw new Error("Name check failed");
+        const data: ExerciseListResponse = await response.json();
+        if (!isActive) return;
+        const normalizeName = (name: string) =>
+          name
+            .toLowerCase()
+            .replace(/[\s\-_/]+/g, "")
+            .replace(/[^a-z0-9]/g, "");
+        const names = (data.exercises || [])
+          .map((exercise) => exercise.name)
+          .filter(Boolean);
+        const normalizedValue = normalizeName(value);
+        const exact = names.some((name) => normalizeName(name) === normalizedValue);
+        setNameExactMatch(exact);
+        setNameSuggestions(
+          names.filter((name) => normalizeName(name) !== normalizedValue)
+        );
+        setConfirmSimilar(false);
+      } catch (error) {
+        if (isActive) setNameSuggestions([]);
+      } finally {
+        if (isActive) setNameCheckLoading(false);
       }
-      if (muscleFilters.length > 0) {
-        const groups = exercise.muscleGroups || [];
-        if (!muscleFilters.some((item) => groups.includes(item))) return false;
-      }
-      if (requiresWeightFilter !== "all") {
-        const required = exercise.requiresWeight === true;
-        if (requiresWeightFilter === "yes" && !required) return false;
-        if (requiresWeightFilter === "no" && required) return false;
-      }
-      const difficulty = exercise.difficultyTier ?? 5;
-      if (difficulty < difficultyRange[0] || difficulty > difficultyRange[1]) return false;
-      if (!q) return true;
-      return (
-        exercise.name?.toLowerCase().includes(q) ||
-        exercise.slug?.toLowerCase().includes(q)
-      );
-    });
-    if (sortBy === "none") return filtered;
-    const sorted = [...filtered];
-    sorted.sort((a, b) => {
-      let base = 0;
-      if (sortBy === "name") base = (a.name || "").localeCompare(b.name || "");
-      if (sortBy === "difficulty") base = (a.difficultyTier ?? 0) - (b.difficultyTier ?? 0);
-      if (sortBy === "category") base = (a.category || "").localeCompare(b.category || "");
-      if (sortBy === "discipline") base = (a.discipline || "").localeCompare(b.discipline || "");
-      if (sortBy === "measurement") base = (a.measurementType || "").localeCompare(b.measurementType || "");
-      if (sortBy === "weight") base = (a.requiresWeight ? 1 : 0) - (b.requiresWeight ? 1 : 0);
-      if (sortBy === "newest") {
-        const aTime = a.createdAt ? Date.parse(a.createdAt) : 0;
-        const bTime = b.createdAt ? Date.parse(b.createdAt) : 0;
-        base = aTime - bTime;
-      }
-      return sortDirection === "asc" ? base : -base;
-    });
-    return sorted;
+    }, 300);
+    return () => {
+      isActive = false;
+      clearTimeout(handle);
+    };
+  }, [formValue.name, user]);
+
+  const filteredExercises = exercises;
+  const paginatedExercises = exercises;
+
+  useEffect(() => {
+    setCurrentPage(1);
   }, [
-    exercises,
     query,
     categoryFilter,
     disciplineFilter,
@@ -270,15 +376,34 @@ export function Exercises() {
       });
       return;
     }
+    if (nameExactMatch) {
+      toast({
+        title: t("common.error"),
+        description: t("exerciseLibrary.nameExists", "Eine Übung mit diesem Namen existiert bereits."),
+        variant: "destructive",
+      });
+      return;
+    }
+    if (nameSuggestions.length > 0 && !confirmSimilar) {
+      toast({
+        title: t("exerciseLibrary.similarNamesTitle", "Ähnliche Übung gefunden"),
+        description: t(
+          "exerciseLibrary.similarNamesConfirm",
+          "Bitte bestätige, dass es sich um eine andere Übung handelt."
+        ),
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem("token");
-      const measurementType = formValue.measurementTypes.includes("time")
-        ? "time"
-        : formValue.measurementTypes.includes("distance")
-          ? "distance"
-          : "reps";
+      const measurementType = formValue.measurementTypes.includes("distance")
+        ? "distance"
+        : formValue.measurementTypes.includes("reps")
+          ? "reps"
+          : "time";
 
       const payload = {
         name: formValue.name.trim(),
@@ -299,6 +424,7 @@ export function Exercises() {
           .split(",")
           .map((item) => item.trim())
           .filter(Boolean),
+        confirmSimilar,
       };
 
       const response = await fetch(`${API_URL}/exercises`, {
@@ -310,6 +436,18 @@ export function Exercises() {
         body: JSON.stringify(payload),
       });
       if (!response.ok) {
+        if (response.status === 409) {
+          const data = await response.json().catch(() => ({}));
+          setNameSuggestions(Array.isArray(data?.similarNames) ? data.similarNames : []);
+          setNameExactMatch(data?.exactMatch === true);
+          setConfirmSimilar(false);
+          toast({
+            title: t("common.error"),
+            description: data?.error || t("exerciseLibrary.nameExists", "Übung existiert bereits."),
+            variant: "destructive",
+          });
+          return;
+        }
         throw new Error("Create failed");
       }
       await loadExercises();
@@ -327,6 +465,9 @@ export function Exercises() {
         muscleGroups: [],
         equipment: "",
       });
+      setNameSuggestions([]);
+      setNameExactMatch(false);
+      setConfirmSimilar(false);
       toast({
         title: t("exerciseLibrary.exerciseCreated", "Übung erstellt"),
         description: t(
@@ -390,11 +531,11 @@ export function Exercises() {
       category: editDraft.category,
       discipline: editDraft.discipline,
       movementPattern: editDraft.movementPattern,
-      measurementType: editDraft.measurementTypes.includes("time")
-        ? "time"
-        : editDraft.measurementTypes.includes("distance")
-          ? "distance"
-          : "reps",
+      measurementType: editDraft.measurementTypes.includes("distance")
+        ? "distance"
+        : editDraft.measurementTypes.includes("reps")
+          ? "reps"
+          : "time",
       difficultyTier: editDraft.difficulty,
       requiresWeight: editDraft.requiresWeight,
       allowsWeight: editDraft.allowsWeight,
@@ -451,17 +592,18 @@ export function Exercises() {
   };
 
   const setEditDefaults = (exercise: Exercise) => {
+    const measurementSet = new Set<string>();
+    if (exercise.measurementType) measurementSet.add(exercise.measurementType);
+    if (exercise.supportsTime && exercise.measurementType !== "time") measurementSet.add("time");
+    if (exercise.supportsDistance && exercise.measurementType !== "distance") measurementSet.add("distance");
+    if (exercise.supportsSets || exercise.measurementType === "reps") measurementSet.add("reps");
     setEditDraft({
       name: exercise.name,
       description: exercise.description || "",
       category: exercise.category || "Kraft",
       discipline: exercise.discipline || "",
       movementPattern: exercise.movementPattern || "push",
-      measurementTypes: [
-        exercise.supportsTime ? "time" : null,
-        exercise.supportsDistance ? "distance" : null,
-        "reps",
-      ].filter(Boolean) as string[],
+      measurementTypes: Array.from(measurementSet),
       difficulty: exercise.difficultyTier || 5,
       requiresWeight: exercise.requiresWeight || false,
       allowsWeight: exercise.allowsWeight || false,
@@ -506,6 +648,11 @@ export function Exercises() {
               descriptionOpen={descriptionOpen}
               onDescriptionToggle={setDescriptionOpen}
               submitDisabled={isSubmitting}
+              nameSuggestions={nameSuggestions}
+              nameCheckLoading={nameCheckLoading}
+              nameExactMatch={nameExactMatch}
+              confirmSimilar={confirmSimilar}
+              onConfirmSimilarChange={setConfirmSimilar}
             />
           </CardContent>
         </Card>
@@ -516,339 +663,183 @@ export function Exercises() {
               <CardTitle>{t("exerciseLibrary.search", "Übungen durchsuchen")}</CardTitle>
             </div>
 
-            <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={t("exerciseLibrary.searchPlaceholder", "Suche")}
-                className="md:flex-1"
-              />
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant={viewMode === "grid" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setViewMode("grid")}
-                >
-                  <LayoutGrid className="h-4 w-4 mr-2" />
-                  Grid
-                </Button>
-                <Button
-                  variant={viewMode === "table" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setViewMode("table")}
-                >
-                  <List className="h-4 w-4 mr-2" />
-                  Tabelle
-                </Button>
-                <Button
-                  variant={filtersOpen ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setFiltersOpen((open) => !open)}
-                >
-                  <SlidersHorizontal className="h-4 w-4 mr-2" />
-                  {filtersOpen ? t("filters.hide", "Filter ausblenden") : t("filters.show", "Filter")}
-                </Button>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-muted-foreground">{t("filters.sort", "Sortieren")}</span>
-              <Select value={sortBy} onValueChange={(next) => setSortBy(next)}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {sortOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-9 w-9"
-                onClick={() =>
-                  setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"))
-                }
-                disabled={sortBy === "none"}
-              >
-                {sortDirection === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-              </Button>
-            </div>
+            <SearchFilterToolbar
+              query={query}
+              onQueryChange={setQuery}
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+              filtersOpen={filtersOpen}
+              onToggleFilters={() => setFiltersOpen((open) => !open)}
+              sortBy={sortBy}
+              sortDirection={sortDirection}
+              onSortByChange={setSortBy}
+              onSortDirectionToggle={() =>
+                setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"))
+              }
+              sortOptions={sortOptions}
+            />
 
             {filtersOpen && (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <div className="text-xs font-medium text-muted-foreground">
-                    {t("exerciseLibrary.category")}
-                  </div>
-                  <ToggleGroup
-                    type="single"
-                    value={categoryFilter}
-                    onValueChange={(next) => setCategoryFilter(next || "all")}
-                    className="flex flex-wrap justify-start"
-                  >
-                    <ToggleGroupItem value="all">{t("filters.all", "Alle")}</ToggleGroupItem>
-                    {facets.categories.map((item) => (
-                      <ToggleGroupItem key={item} value={item}>
-                        {item}
-                      </ToggleGroupItem>
-                    ))}
-                  </ToggleGroup>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="text-xs font-medium text-muted-foreground">
-                    {t("exerciseLibrary.discipline")}
-                  </div>
-                  <ToggleGroup
-                    type="single"
-                    value={disciplineFilter}
-                    onValueChange={(next) => setDisciplineFilter(next || "all")}
-                    className="flex flex-wrap justify-start"
-                  >
-                    <ToggleGroupItem value="all">{t("filters.all", "Alle")}</ToggleGroupItem>
-                    {["Calisthenics", "Kraft", "Ausdauer", "Functional", "Mobility"].map((item) => (
-                      <ToggleGroupItem key={item} value={item}>
-                        {item}
-                      </ToggleGroupItem>
-                    ))}
-                  </ToggleGroup>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="text-xs font-medium text-muted-foreground">
-                    {t("exerciseLibrary.movementPattern", "Bewegungsmuster")}
-                  </div>
-                  <ToggleGroup
-                    type="single"
-                    value={movementPatternFilter}
-                    onValueChange={(next) => setMovementPatternFilter(next || "all")}
-                    className="flex flex-wrap justify-start"
-                  >
-                    <ToggleGroupItem value="all">{t("filters.all", "Alle")}</ToggleGroupItem>
-                    {movementPatternOptions.map((item) => (
-                      <ToggleGroupItem key={item.value} value={item.value}>
-                        {item.label}
-                      </ToggleGroupItem>
-                    ))}
-                  </ToggleGroup>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="text-xs font-medium text-muted-foreground">
-                    {t("exerciseLibrary.measurement")}
-                  </div>
-                  <ToggleGroup
-                    type="multiple"
-                    value={measurementFilters}
-                    onValueChange={(next) => setMeasurementFilters(next)}
-                    className="flex flex-wrap justify-start"
-                  >
-                    {measurementOptions.map((item) => (
-                      <ToggleGroupItem key={item.value} value={item.value}>
-                        {item.label}
-                      </ToggleGroupItem>
-                    ))}
-                  </ToggleGroup>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="text-xs font-medium text-muted-foreground">
-                    {t("exerciseLibrary.difficulty", "Schwierigkeit")}
-                  </div>
-                  <div className="flex flex-col gap-2 md:flex-row md:items-center">
-                    <Slider
-                      value={difficultyRange}
-                      min={1}
-                      max={10}
-                      step={1}
-                      onValueChange={(next) =>
-                        setDifficultyRange([next[0], next[1] ?? next[0]])
-                      }
-                      className="flex-1"
-                    />
-                    <div className="text-sm text-muted-foreground">
-                      {difficultyRange[0]}–{difficultyRange[1]}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="text-xs font-medium text-muted-foreground">
-                    {t("exerciseLibrary.muscleGroups")}
-                  </div>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full justify-between md:w-auto">
-                        {muscleFilters.length
-                          ? muscleFilters.join(", ")
-                          : t("exerciseLibrary.muscleGroupsPlaceholder", "Muskelgruppen auswählen")}
-                        <ChevronDown className="h-4 w-4 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[260px] p-0">
-                      <Command>
-                        <CommandInput placeholder={t("exerciseLibrary.searchMuscle", "Suchen")} />
-                        <CommandList>
-                          <CommandEmpty>{t("exerciseLibrary.noMatches", "Keine Treffer")}</CommandEmpty>
-                          <CommandGroup>
-                            <CommandItem
-                              value="__clear__"
-                              onSelect={() => setMuscleFilters([])}
-                              className="text-muted-foreground"
-                            >
-                              {t("exerciseLibrary.clearMuscles", "Alle abwählen")}
-                            </CommandItem>
-                            {facets.muscleGroups.map((group) => (
-                              <CommandItem
-                                key={group}
-                                value={group}
-                                onSelect={() => {
-                                  setMuscleFilters((prev) =>
-                                    prev.includes(group)
-                                      ? prev.filter((item) => item !== group)
-                                      : [...prev, group]
-                                  );
-                                }}
-                              >
-                                <span className="mr-2">
-                                  {muscleFilters.includes(group) ? <Check className="h-4 w-4" /> : null}
-                                </span>
-                                {group}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="text-xs font-medium text-muted-foreground">
-                    {t("exerciseLibrary.requiresWeight", "Gewicht")}
-                  </div>
-                  <ToggleGroup
-                    type="single"
-                    value={requiresWeightFilter}
-                    onValueChange={(next) => setRequiresWeightFilter(next || "all")}
-                    className="flex flex-wrap justify-start"
-                  >
-                    <ToggleGroupItem value="all">{t("filters.all", "Alle")}</ToggleGroupItem>
-                    <ToggleGroupItem value="yes">
-                      {t("exerciseLibrary.requiresWeight", "Gewicht erforderlich")}
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="no">
-                      {t("exerciseLibrary.noWeight", "Kein Gewicht")}
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                </div>
-              </div>
+              <ExerciseFiltersPanel
+                categoryOptions={categoryFilterOptions}
+                disciplineOptions={disciplineOptions}
+                movementPatternOptions={movementPatternOptions}
+                measurementOptions={measurementOptions}
+                muscleOptions={muscleFilterOptions}
+                categoryFilter={categoryFilter}
+                onCategoryFilterChange={setCategoryFilter}
+                disciplineFilter={disciplineFilter}
+                onDisciplineFilterChange={setDisciplineFilter}
+                movementPatternFilter={movementPatternFilter}
+                onMovementPatternFilterChange={setMovementPatternFilter}
+                measurementFilters={measurementFilters}
+                onMeasurementFiltersChange={(next) =>
+                  setMeasurementFilters(normalizeMeasurementFilters(next))
+                }
+                muscleFilters={muscleFilters}
+                onMuscleFiltersChange={setMuscleFilters}
+                requiresWeightFilter={requiresWeightFilter}
+                onRequiresWeightFilterChange={setRequiresWeightFilter}
+                difficultyRange={difficultyRange}
+                onDifficultyRangeChange={setDifficultyRange}
+                onReset={() => {
+                  setQuery("");
+                  setCategoryFilter("all");
+                  setDisciplineFilter("all");
+                  setMovementPatternFilter("all");
+                  setMeasurementFilters([]);
+                  setMuscleFilters([]);
+                  setRequiresWeightFilter("all");
+                  setDifficultyRange([1, 10]);
+                  setCurrentPage(1);
+                }}
+              />
             )}
           </CardHeader>
           <CardContent>
             {loading ? (
               <div className="text-sm text-muted-foreground">{t("common.loading", "Lade...")}</div>
-            ) : filteredExercises.length === 0 ? (
+            ) : pagination.totalItems === 0 ? (
               <div className="text-sm text-muted-foreground">{t("exerciseLibrary.empty", "Keine Übungen gefunden.")}</div>
             ) : viewMode === "grid" ? (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {filteredExercises.map((exercise) => (
-                  <div key={exercise.id} className="border rounded-lg p-4 flex flex-col h-full">
-                    <div className="flex-1 space-y-3">
-                      <div>
-                        <div className="font-medium">{exercise.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {exercise.category || "-"} · {exercise.discipline || "-"}
+              <>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {paginatedExercises.map((exercise) => (
+                    <div key={exercise.id} className="border rounded-lg p-4 flex flex-col h-full">
+                      <div className="flex-1 space-y-3">
+                        <div>
+                          <div className="font-medium">{exercise.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {exercise.category || "-"} · {exercise.discipline || "-"}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {exercise.measurementType && (
+                            <Badge variant="secondary">{exercise.measurementType}</Badge>
+                          )}
+                          {exercise.requiresWeight && (
+                            <Badge variant="outline">Gewicht erforderlich</Badge>
+                          )}
+                          {exercise.supportsTime && (
+                            <Badge variant="outline">Zeit</Badge>
+                          )}
+                          {exercise.supportsDistance && (
+                            <Badge variant="outline">Distanz</Badge>
+                          )}
                         </div>
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        {exercise.measurementType && (
-                          <Badge variant="secondary">{exercise.measurementType}</Badge>
-                        )}
-                        {exercise.requiresWeight && (
-                          <Badge variant="outline">Gewicht erforderlich</Badge>
-                        )}
-                        {exercise.supportsTime && (
-                          <Badge variant="outline">Zeit</Badge>
-                        )}
-                        {exercise.supportsDistance && (
-                          <Badge variant="outline">Distanz</Badge>
-                        )}
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setActiveExercise(exercise);
+                                setEditDefaults(exercise);
+                              }}
+                            >
+                              {t("exerciseLibrary.suggestChange", "Änderung vorschlagen")}
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-3xl overflow-y-auto max-h-[85vh]">
+                            <DialogHeader>
+                              <DialogTitle>{t("exerciseLibrary.suggestChangeTitle", "Änderung vorschlagen")}</DialogTitle>
+                            </DialogHeader>
+                            {editDraft && (
+                              <ExerciseForm
+                                value={editDraft}
+                                onChange={setEditDraft}
+                                onSubmit={handleEditRequest}
+                                submitLabel={t("exerciseLibrary.sendRequest", "Anfrage senden")}
+                                showDescriptionToggle
+                              />
+                            )}
+                          </DialogContent>
+                        </Dialog>
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setActiveExercise(exercise)}
+                            >
+                              {t("exerciseLibrary.report", "Melden")}
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>{t("exerciseLibrary.reportTitle", "Übung melden")}</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-3">
+                              <Input
+                                value={reportReason}
+                                onChange={(e) => setReportReason(e.target.value)}
+                                placeholder={t("exerciseLibrary.reportReason", "Grund")}
+                              />
+                              <Textarea
+                                value={reportDetails}
+                                onChange={(e) => setReportDetails(e.target.value)}
+                                placeholder={t("exerciseLibrary.reportDetails", "Details")}
+                              />
+                              <Button onClick={handleReport}>
+                                {t("exerciseLibrary.sendReport", "Report senden")}
+                              </Button>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
                       </div>
                     </div>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setActiveExercise(exercise);
-                              setEditDefaults(exercise);
-                            }}
-                          >
-                            {t("exerciseLibrary.suggestChange", "Änderung vorschlagen")}
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-3xl overflow-visible">
-                          <DialogHeader>
-                            <DialogTitle>{t("exerciseLibrary.suggestChangeTitle", "Änderung vorschlagen")}</DialogTitle>
-                          </DialogHeader>
-                          {editDraft && (
-                            <ExerciseForm
-                              value={editDraft}
-                              onChange={setEditDraft}
-                              onSubmit={handleEditRequest}
-                              submitLabel={t("exerciseLibrary.sendRequest", "Anfrage senden")}
-                              showDescriptionToggle
-                            />
-                          )}
-                        </DialogContent>
-                      </Dialog>
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setActiveExercise(exercise)}
-                          >
-                            {t("exerciseLibrary.report", "Melden")}
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>{t("exerciseLibrary.reportTitle", "Übung melden")}</DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-3">
-                            <Input
-                              value={reportReason}
-                              onChange={(e) => setReportReason(e.target.value)}
-                              placeholder={t("exerciseLibrary.reportReason", "Grund")}
-                            />
-                            <Textarea
-                              value={reportDetails}
-                              onChange={(e) => setReportDetails(e.target.value)}
-                              placeholder={t("exerciseLibrary.reportDetails", "Details")}
-                            />
-                            <Button onClick={handleReport}>
-                              {t("exerciseLibrary.sendReport", "Report senden")}
-                            </Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+                {pagination.totalPages > 1 && (
+                  <PaginationControls
+                    pagination={pagination}
+                    onPageChange={setCurrentPage}
+                    pageSize={pageSize}
+                    labels={{
+                      page: (current, total) =>
+                        t("filters.pageLabel", { current, total, defaultValue: `${current}/${total}` }),
+                      summary: (start, end, total) =>
+                        t("filters.pageSummary", {
+                          start,
+                          end,
+                          total,
+                          defaultValue: `${start}–${end} / ${total}`,
+                        }),
+                      previous: t("filters.prev", "Zurück"),
+                      next: t("filters.next", "Weiter"),
+                    }}
+                  />
+                )}
+              </>
             ) : (
-              <Table>
+              <>
+              <div className="overflow-x-auto">
+              <Table className="min-w-[720px]">
                 <TableHeader>
                   <TableRow>
-                  <TableHead>
+                  <TableHead className="sticky left-0 z-10 bg-background">
                     <button
                       className="inline-flex items-center gap-1 text-left"
                       onClick={() => handleSortClick("name")}
@@ -897,9 +888,11 @@ export function Exercises() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredExercises.map((exercise) => (
+                  {paginatedExercises.map((exercise) => (
                     <TableRow key={exercise.id}>
-                      <TableCell className="font-medium">{exercise.name}</TableCell>
+                      <TableCell className="font-medium sticky left-0 bg-background z-10">
+                        {exercise.name}
+                      </TableCell>
                       <TableCell>{exercise.category || "-"}</TableCell>
                       <TableCell>{exercise.discipline || "-"}</TableCell>
                       <TableCell>{exercise.measurementType || "-"}</TableCell>
@@ -907,72 +900,95 @@ export function Exercises() {
                         {exercise.requiresWeight ? t("exerciseLibrary.requiresWeight", "Gewicht erforderlich") : "-"}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setActiveExercise(exercise);
-                                setEditDefaults(exercise);
-                              }}
-                            >
-                              {t("exerciseLibrary.suggestChange", "Änderung vorschlagen")}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
                             </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-3xl overflow-visible">
-                            <DialogHeader>
-                              <DialogTitle>{t("exerciseLibrary.suggestChangeTitle", "Änderung vorschlagen")}</DialogTitle>
-                            </DialogHeader>
-                            {editDraft && (
-                              <ExerciseForm
-                                value={editDraft}
-                                onChange={setEditDraft}
-                                onSubmit={handleEditRequest}
-                                submitLabel={t("exerciseLibrary.sendRequest", "Anfrage senden")}
-                                showDescriptionToggle
-                              />
-                            )}
-                          </DialogContent>
-                        </Dialog>
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setActiveExercise(exercise)}
-                            >
-                              {t("exerciseLibrary.report", "Melden")}
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>{t("exerciseLibrary.reportTitle", "Übung melden")}</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-3">
-                              <Input
-                                value={reportReason}
-                                onChange={(e) => setReportReason(e.target.value)}
-                                placeholder={t("exerciseLibrary.reportReason", "Grund")}
-                              />
-                              <Textarea
-                                value={reportDetails}
-                                onChange={(e) => setReportDetails(e.target.value)}
-                                placeholder={t("exerciseLibrary.reportDetails", "Details")}
-                              />
-                              <Button onClick={handleReport}>
-                                {t("exerciseLibrary.sendReport", "Report senden")}
-                              </Button>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-                        </div>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <DropdownMenuItem
+                                  onSelect={() => {
+                                    setActiveExercise(exercise);
+                                    setEditDefaults(exercise);
+                                  }}
+                                >
+                                  {t("exerciseLibrary.suggestChange", "Änderung vorschlagen")}
+                                </DropdownMenuItem>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-3xl overflow-y-auto max-h-[85vh]">
+                                <DialogHeader>
+                                  <DialogTitle>{t("exerciseLibrary.suggestChangeTitle", "Änderung vorschlagen")}</DialogTitle>
+                                </DialogHeader>
+                                {editDraft && (
+                                  <ExerciseForm
+                                    value={editDraft}
+                                    onChange={setEditDraft}
+                                    onSubmit={handleEditRequest}
+                                    submitLabel={t("exerciseLibrary.sendRequest", "Anfrage senden")}
+                                    showDescriptionToggle
+                                  />
+                                )}
+                              </DialogContent>
+                            </Dialog>
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <DropdownMenuItem onSelect={() => setActiveExercise(exercise)}>
+                                  {t("exerciseLibrary.report", "Melden")}
+                                </DropdownMenuItem>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>{t("exerciseLibrary.reportTitle", "Übung melden")}</DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-3">
+                                  <Input
+                                    value={reportReason}
+                                    onChange={(e) => setReportReason(e.target.value)}
+                                    placeholder={t("exerciseLibrary.reportReason", "Grund")}
+                                  />
+                                  <Textarea
+                                    value={reportDetails}
+                                    onChange={(e) => setReportDetails(e.target.value)}
+                                    placeholder={t("exerciseLibrary.reportDetails", "Details")}
+                                  />
+                                  <Button onClick={handleReport}>
+                                    {t("exerciseLibrary.sendReport", "Report senden")}
+                                  </Button>
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
+              </div>
+              {pagination.totalPages > 1 && (
+                <PaginationControls
+                  pagination={pagination}
+                  onPageChange={setCurrentPage}
+                  pageSize={pageSize}
+                  labels={{
+                    page: (current, total) =>
+                      t("filters.pageLabel", { current, total, defaultValue: `${current}/${total}` }),
+                    summary: (start, end, total) =>
+                      t("filters.pageSummary", {
+                        start,
+                        end,
+                        total,
+                        defaultValue: `${start}–${end} / ${total}`,
+                      }),
+                    previous: t("filters.prev", "Zurück"),
+                    next: t("filters.next", "Weiter"),
+                  }}
+                />
+              )}
+              </>
             )}
           </CardContent>
         </Card>

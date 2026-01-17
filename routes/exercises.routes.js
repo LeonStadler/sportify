@@ -39,10 +39,16 @@ export const createExercisesRouter = (pool) => {
         discipline,
         movementPattern,
         measurementType,
+        measurementTypes,
         muscleGroup,
+        muscleGroups,
         equipment,
         requiresWeight,
         status,
+        difficultyMin,
+        difficultyMax,
+        sortBy = "name",
+        sortDirection = "asc",
       } = req.query || {};
 
       const filters = ["is_active = true", "merged_into IS NULL"];
@@ -50,7 +56,7 @@ export const createExercisesRouter = (pool) => {
       let idx = 1;
 
       const addFilter = (sql, value) => {
-        filters.push(sql.replace("$", `$${idx}`));
+        filters.push(sql.split("$").join(`$${idx}`));
         params.push(value);
         idx += 1;
       };
@@ -67,11 +73,44 @@ export const createExercisesRouter = (pool) => {
       if (measurementType && measurementType !== "all") {
         addFilter("measurement_type = $", measurementType);
       }
+      if (measurementTypes) {
+        const allowed = new Set(["reps", "time", "distance"]);
+        const list = String(measurementTypes)
+          .split(",")
+          .map((item) => item.trim().toLowerCase())
+          .filter((item) => allowed.has(item));
+        if (list.length > 0) {
+          const clauses = [];
+          if (list.includes("reps")) {
+            clauses.push("(measurement_type = 'reps' OR supports_sets = true)");
+          }
+          if (list.includes("time")) {
+            clauses.push("(measurement_type = 'time' OR supports_time = true)");
+          }
+          if (list.includes("distance")) {
+            clauses.push("(measurement_type = 'distance' OR supports_distance = true)");
+          }
+          if (clauses.length > 0) {
+            filters.push(`(${clauses.join(" OR ")})`);
+          }
+        }
+      }
       if (status && status !== "all") {
         addFilter("status = $", status);
       }
       if (muscleGroup && muscleGroup !== "all") {
         addFilter("$ = ANY(muscle_groups)", muscleGroup);
+      }
+      if (muscleGroups) {
+        const list = String(muscleGroups)
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean);
+        if (list.length > 0) {
+          filters.push(`muscle_groups && $${idx}`);
+          params.push(list);
+          idx += 1;
+        }
       }
       if (equipment && equipment !== "all") {
         addFilter("$ = ANY(equipment)", equipment);
@@ -79,15 +118,52 @@ export const createExercisesRouter = (pool) => {
       if (requiresWeight && requiresWeight !== "all") {
         addFilter("requires_weight = $", requiresWeight === "yes");
       }
+      const minValue = Number(difficultyMin);
+      const maxValue = Number(difficultyMax);
+      if (!Number.isNaN(minValue)) {
+        addFilter("difficulty_tier >= $", minValue);
+      }
+      if (!Number.isNaN(maxValue)) {
+        addFilter("difficulty_tier <= $", maxValue);
+      }
       if (query && String(query).trim()) {
         addFilter("(LOWER(name) LIKE $ OR LOWER(slug) LIKE $)", `%${String(query).toLowerCase()}%`);
       }
 
+      const sortMap = {
+        name: "name",
+        category: "category",
+        discipline: "discipline",
+        measurement: "measurement_type",
+        weight: "requires_weight",
+        difficulty: "difficulty_tier",
+        newest: "created_at",
+      };
+      const sortColumn = sortMap[String(sortBy)] || "name";
+      const sortDir = String(sortDirection).toLowerCase() === "desc" ? "DESC" : "ASC";
+
+      const whereClause = filters.join(" AND ");
+
+      const countQuery = `
+        SELECT COUNT(*) AS total
+        FROM exercises
+        WHERE ${whereClause}
+      `;
+      const countResult = await pool.query(countQuery, params);
+      const totalItems = Number(countResult.rows[0]?.total || 0);
+
+      const facetsQuery = `
+        SELECT category, muscle_groups, equipment
+        FROM exercises
+        WHERE ${whereClause}
+      `;
+      const facetsResult = await pool.query(facetsQuery, params);
+
       const sql = `
         SELECT *
         FROM exercises
-        WHERE ${filters.join(" AND ")}
-        ORDER BY name ASC
+        WHERE ${whereClause}
+        ORDER BY ${sortColumn} ${sortDir}
         LIMIT $${idx} OFFSET $${idx + 1}
       `;
       params.push(Number(limit));
@@ -100,7 +176,20 @@ export const createExercisesRouter = (pool) => {
         return exercise;
       });
 
-      res.json({ exercises, facets: buildFacets(rows) });
+      const currentPage = Number(limit) > 0 ? Math.floor(Number(offset) / Number(limit)) + 1 : 1;
+      const totalPages = Number(limit) > 0 ? Math.max(1, Math.ceil(totalItems / Number(limit))) : 1;
+
+      res.json({
+        exercises,
+        facets: buildFacets(facetsResult.rows),
+        pagination: {
+          currentPage,
+          totalPages,
+          totalItems,
+          hasNext: currentPage < totalPages,
+          hasPrev: currentPage > 1,
+        },
+      });
     } catch (error) {
       console.error("Exercises list error:", error);
       res.status(500).json({ error: "Serverfehler beim Laden der Übungen." });
@@ -147,6 +236,7 @@ export const createExercisesRouter = (pool) => {
         unitOptions,
         pointsPerUnit,
         unit,
+        confirmSimilar,
       } = req.body || {};
 
       if (!name || !String(name).trim()) {
@@ -159,13 +249,27 @@ export const createExercisesRouter = (pool) => {
         return res.status(400).json({ error: "Ungültiger Name." });
       }
 
-      const { rows: existing } = await pool.query(
-        "SELECT id FROM exercises WHERE slug = $1",
-        [slug]
+      const { rows: exact } = await pool.query(
+        "SELECT id, name FROM exercises WHERE LOWER(name) = LOWER($1) OR slug = $2 LIMIT 1",
+        [name, slug]
       );
-      if (existing.length > 0) {
-        const suffix = randomUUID().slice(0, 8);
-        slug = `${slug}-${suffix}`;
+      if (exact.length > 0) {
+        return res.status(409).json({ error: "Übung existiert bereits.", exactMatch: true });
+      }
+
+      if (!confirmSimilar) {
+        const pattern = `%${slug}%`;
+        const { rows: similar } = await pool.query(
+          "SELECT name FROM exercises WHERE (LOWER(name) LIKE LOWER($1) OR slug LIKE $2) LIMIT 5",
+          [`%${name}%`, pattern]
+        );
+        if (similar.length > 0) {
+          return res.status(409).json({
+            error: "Ähnliche Übung vorhanden.",
+            similarNames: similar.map((row) => row.name),
+            exactMatch: false,
+          });
+        }
       }
 
       const exerciseId = randomUUID();
@@ -196,9 +300,17 @@ export const createExercisesRouter = (pool) => {
           created_by,
           is_active
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb,$20,$21,$22)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20::jsonb,$21,$22,$23)
         RETURNING *
       `;
+
+      const resolvedUnit =
+        unit ||
+        (measurementType === "time"
+          ? "Sekunden"
+          : measurementType === "distance"
+            ? "Kilometer"
+            : "Wiederholungen");
 
       const { rows } = await pool.query(insertQuery, [
         exerciseId,
@@ -210,7 +322,7 @@ export const createExercisesRouter = (pool) => {
         movementPattern || null,
         measurementType || null,
         pointsPerUnit ?? 1,
-        unit || null,
+        resolvedUnit,
         Boolean(requiresWeight),
         Boolean(allowsWeight),
         supportsSets !== undefined ? Boolean(supportsSets) : true,

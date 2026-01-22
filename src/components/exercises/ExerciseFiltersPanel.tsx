@@ -1,10 +1,8 @@
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Check, ChevronDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { MuscleGroupSelector } from "@/components/exercises/MuscleGroupSelector";
 
 interface OptionItem {
   value: string;
@@ -17,7 +15,7 @@ interface ExerciseFiltersPanelProps {
   disciplineOptions: string[];
   movementPatternOptions: OptionItem[];
   measurementOptions: OptionItem[];
-  muscleOptions: string[];
+  muscleGroups: Array<{ label: string; children: string[] }>;
   categoryFilter: string;
   onCategoryFilterChange: (value: string) => void;
   disciplineFilter: string;
@@ -40,7 +38,7 @@ export function ExerciseFiltersPanel({
   disciplineOptions,
   movementPatternOptions,
   measurementOptions,
-  muscleOptions,
+  muscleGroups,
   categoryFilter,
   onCategoryFilterChange,
   disciplineFilter,
@@ -176,51 +174,12 @@ export function ExerciseFiltersPanel({
           <div className="text-xs font-medium text-muted-foreground">
             {t("exerciseLibrary.muscleGroups")}
           </div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="w-full justify-between md:w-auto">
-                {muscleFilters.length
-                  ? muscleFilters.join(", ")
-                  : t("exerciseLibrary.muscleGroupsPlaceholder", "Muskelgruppen auswählen")}
-                <ChevronDown className="h-4 w-4 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[260px] p-0">
-              <Command>
-                <CommandInput placeholder={t("exerciseLibrary.searchMuscle", "Suchen")} />
-                <CommandList>
-                  <CommandEmpty>{t("exerciseLibrary.noMatches", "Keine Treffer")}</CommandEmpty>
-                  <CommandGroup>
-                    <CommandItem
-                      value="__clear__"
-                      onSelect={() => onMuscleFiltersChange([])}
-                      className="text-muted-foreground"
-                    >
-                      {t("exerciseLibrary.clearMuscles", "Alle abwählen")}
-                    </CommandItem>
-                    {muscleOptions.map((group) => (
-                      <CommandItem
-                        key={group}
-                        value={group}
-                        onSelect={() => {
-                          onMuscleFiltersChange(
-                            muscleFilters.includes(group)
-                              ? muscleFilters.filter((item) => item !== group)
-                              : [...muscleFilters, group]
-                          );
-                        }}
-                      >
-                        <span className="mr-2">
-                          {muscleFilters.includes(group) ? <Check className="h-4 w-4" /> : null}
-                        </span>
-                        {group}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+          <MuscleGroupSelector
+            value={muscleFilters}
+            onChange={onMuscleFiltersChange}
+            groups={muscleGroups}
+            placeholder={t("exerciseLibrary.muscleGroupsPlaceholder", "Muskelgruppen auswählen")}
+          />
         </div>
 
         <div className="space-y-2">

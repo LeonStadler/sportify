@@ -4,35 +4,54 @@ export const measurementOptions = [
   { value: "distance", labelKey: "training.form.measurementDistance", fallback: "Distanz" },
 ];
 
-export const muscleGroupOptions = [
-  "Brust",
-  "Rücken",
-  "Schultern",
-  "Bizeps",
-  "Trizeps",
-  "Unterarme",
-  "Core",
-  "Gluteus",
-  "Quadrizeps",
-  "Hamstrings",
-  "Waden",
+export const muscleGroupTree = [
+  {
+    label: "Brust",
+    children: ["Brust"],
+  },
+  {
+    label: "Rücken",
+    children: ["Latissimus", "Oberer Rücken", "Unterer Rücken", "Trapez", "Rhomboiden"],
+  },
+  {
+    label: "Schultern",
+    children: ["Vordere Schulter", "Seitliche Schulter", "Hintere Schulter"],
+  },
+  {
+    label: "Arme",
+    children: ["Bizeps", "Trizeps", "Unterarme"],
+  },
+  {
+    label: "Core",
+    children: ["Bauch", "Schräger Bauch", "Tiefe Bauchmuskeln"],
+  },
+  {
+    label: "Beine",
+    children: ["Quadrizeps", "Hamstrings", "Waden", "Gluteus", "Adduktoren", "Abduktoren", "Hüftbeuger"],
+  },
+  {
+    label: "Nacken",
+    children: ["Nacken"],
+  },
 ];
 
+export const muscleGroupOptions = muscleGroupTree.flatMap((group) => group.children);
+
 export const disciplineOptions = [
-  "Calisthenics",
-  "Kraft",
-  "Ausdauer",
-  "Functional",
-  "Mobility",
+  "Calisthenics/Bodyweight",
+  "Yoga/Stretching",
+  "Weights/Gym",
+  "Running",
+  "Cycling",
+  "Swimming",
 ];
 
 export const categoryOptions = [
   "Kraft",
-  "Calisthenics",
   "Ausdauer",
-  "Functional",
   "Mobility",
   "Skills",
+  "Functional",
 ];
 
 export const movementPatternOptions = [
@@ -43,7 +62,4 @@ export const movementPatternOptions = [
   { value: "carry", labelKey: "exerciseLibrary.movement.carry", fallback: "Carry" },
   { value: "rotation", labelKey: "exerciseLibrary.movement.rotation", fallback: "Rotation" },
   { value: "isometric", labelKey: "exerciseLibrary.movement.isometric", fallback: "Isometrisch" },
-  { value: "legs", labelKey: "training.form.patternLegs", fallback: "Beine" },
-  { value: "core", labelKey: "training.form.patternCore", fallback: "Core" },
-  { value: "full", labelKey: "training.form.patternFull", fallback: "Ganzkörper" },
 ];

@@ -897,7 +897,7 @@ export function Exercises() {
                       {sortBy === "weight" && (sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
                     </button>
                   </TableHead>
-                  <TableHead></TableHead>
+                    <TableHead className="sticky right-0 z-10 bg-background text-right"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -916,26 +916,34 @@ export function Exercises() {
                       <TableCell>
                         {exercise.requiresWeight ? t("exerciseLibrary.requiresWeight", "Gewicht erforderlich") : "-"}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell
+                        className="text-right sticky right-0 z-10 bg-background"
+                        onClick={(event) => event.stopPropagation()}
+                      >
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8"
-                              onClick={(event) => event.stopPropagation()}
                             >
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "view")}>
+                            <DropdownMenuItem
+                              onSelect={() => openExerciseDetails(exercise, "view")}
+                            >
                               {t("exerciseLibrary.details", "Details anzeigen")}
                             </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "edit")}>
+                            <DropdownMenuItem
+                              onSelect={() => openExerciseDetails(exercise, "edit")}
+                            >
                               {t("exerciseLibrary.suggestChange", "Änderung vorschlagen")}
                             </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "report")}>
+                            <DropdownMenuItem
+                              onSelect={() => openExerciseDetails(exercise, "report")}
+                            >
                               {t("exerciseLibrary.report", "Melden")}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -972,11 +980,22 @@ export function Exercises() {
         </Card>
         <Dialog open={Boolean(detailExerciseId)} onOpenChange={(open) => (open ? null : closeExerciseDetails())}>
           <DialogContent className="max-w-4xl overflow-y-auto max-h-[85vh]">
-            <DialogHeader>
-              <div className="flex items-center justify-between">
-                <DialogTitle>
-                  {detailExercise?.name || t("exerciseLibrary.details", "Übung")}
-                </DialogTitle>
+            <DialogHeader className="pr-10">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <DialogTitle className="text-xl">
+                    {detailExercise?.name || t("exerciseLibrary.details", "Übung")}
+                  </DialogTitle>
+                  {detailMode === "view" && (
+                    <div className="mt-1 flex flex-wrap gap-2 text-sm text-muted-foreground">
+                      <span>{detailExercise?.category || "-"}</span>
+                      <span>·</span>
+                      <span>{detailExercise?.discipline || "-"}</span>
+                      <span>·</span>
+                      <span>{detailExercise?.measurementType || "-"}</span>
+                    </div>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="icon" onClick={() => navigateExercise("prev")}>
                     <ArrowUp className="h-4 w-4 rotate-[-90deg]" />
@@ -988,24 +1007,55 @@ export function Exercises() {
               </div>
             </DialogHeader>
             {detailExercise && (
-              <div className="space-y-4">
-                <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-                  <span>{detailExercise.category || "-"}</span>
-                  <span>·</span>
-                  <span>{detailExercise.discipline || "-"}</span>
-                  <span>·</span>
-                  <span>{detailExercise.measurementType || "-"}</span>
-                </div>
-                {detailExercise.description && (
-                  <p className="text-sm text-muted-foreground">{detailExercise.description}</p>
+              <div className="space-y-6">
+                {detailMode === "view" && (
+                  <>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2 rounded-lg border p-4">
+                        <div className="text-xs font-medium text-muted-foreground">
+                          {t("exerciseLibrary.details", "Details")}
+                        </div>
+                        <div className="space-y-1 text-sm">
+                          <div><strong>{t("exerciseLibrary.discipline", "Disziplin")}:</strong> {detailExercise.discipline || "-"}</div>
+                          <div><strong>{t("exerciseLibrary.pattern", "Bewegungsmuster")}:</strong> {detailExercise.movementPattern || "-"}</div>
+                          <div><strong>{t("exerciseLibrary.difficulty", "Schwierigkeit")}:</strong> {detailExercise.difficultyTier ?? "-"}</div>
+                          <div><strong>{t("exerciseLibrary.unit", "Einheit")}:</strong> {detailExercise.unit || "-"}</div>
+                          <div><strong>{t("exerciseLibrary.supportsSets", "Sets/Reps")}:</strong> {detailExercise.supportsSets ? "Ja" : "Nein"}</div>
+                          <div><strong>{t("exerciseLibrary.requiresWeight", "Gewicht erforderlich")}:</strong> {detailExercise.requiresWeight ? "Ja" : "Nein"}</div>
+                          <div><strong>{t("exerciseLibrary.allowsWeight", "Gewicht optional")}:</strong> {detailExercise.allowsWeight ? "Ja" : "Nein"}</div>
+                        </div>
+                      </div>
+                      <div className="space-y-2 rounded-lg border p-4">
+                        <div className="text-xs font-medium text-muted-foreground">
+                          {t("exerciseLibrary.muscleGroups", "Muskelgruppen")}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {(detailExercise.muscleGroups || []).length > 0
+                            ? detailExercise.muscleGroups?.map((group) => (
+                              <Badge key={group} variant="secondary">{group}</Badge>
+                            ))
+                            : <span className="text-sm text-muted-foreground">-</span>}
+                        </div>
+                        <div className="mt-3 text-xs font-medium text-muted-foreground">
+                          {t("exerciseLibrary.equipment", "Equipment")}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {(detailExercise.equipment || []).length > 0
+                            ? detailExercise.equipment?.map((item) => (
+                              <Badge key={item} variant="outline">{item}</Badge>
+                            ))
+                            : <span className="text-sm text-muted-foreground">-</span>}
+                        </div>
+                      </div>
+                    </div>
+
+                    {detailExercise.description && (
+                      <div className="rounded-lg border p-4 text-sm text-muted-foreground">
+                        {detailExercise.description}
+                      </div>
+                    )}
+                  </>
                 )}
-                <div className="flex flex-wrap gap-2">
-                  {detailExercise.requiresWeight && (
-                    <Badge variant="outline">{t("exerciseLibrary.requiresWeight", "Gewicht erforderlich")}</Badge>
-                  )}
-                  {detailExercise.supportsTime && <Badge variant="outline">Zeit</Badge>}
-                  {detailExercise.supportsDistance && <Badge variant="outline">Distanz</Badge>}
-                </div>
 
                 <div className="flex flex-wrap gap-2">
                   <Button variant={detailMode === "view" ? "default" : "outline"} onClick={() => setDetailMode("view")}>

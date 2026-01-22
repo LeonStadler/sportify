@@ -1,30 +1,28 @@
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Info } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { MuscleGroupSelector } from "@/components/exercises/MuscleGroupSelector";
 import {
   categoryOptions,
   disciplineOptions,
   measurementOptions,
   movementPatternOptions,
-  muscleGroupOptions,
+  muscleGroupTree,
 } from "@/components/exercises/exerciseOptions";
-import { Check, ChevronDown } from "lucide-react";
+import { Info } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -108,10 +106,6 @@ export function ExerciseForm({
     return movementPatternOptions;
   }, [value.movementPattern]);
 
-  const muscleOptionsWithValue = useMemo(() => {
-    const combined = new Set([...muscleGroupOptions, ...(value.muscleGroups || [])]);
-    return Array.from(combined);
-  }, [value.muscleGroups]);
 
   const nameStatus = nameCheckLoading
     ? "loading"
@@ -189,7 +183,7 @@ export function ExerciseForm({
                     <span className="sr-only">Info</span>
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent className="max-w-xs text-sm">
+                <TooltipContent className="max-w-xs text-sm" side="right" align="center" collisionPadding={16}>
                   {t(
                     "exerciseLibrary.nameHint",
                     "Nutze möglichst etablierte Namen (z.B. 'Pull-Ups', 'Bench Press') und halte die Schreibweise konsistent."
@@ -261,7 +255,7 @@ export function ExerciseForm({
             <SelectTrigger className="mt-1">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="z-[300]">
               {categoryOptionsWithValue.map((item) => (
                 <SelectItem key={item} value={item}>
                   {item}
@@ -276,7 +270,7 @@ export function ExerciseForm({
             <SelectTrigger className="mt-1">
               <SelectValue placeholder={t("exerciseLibrary.discipline", "Disziplin")} />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="z-[300]">
               {disciplineOptionsWithValue.map((item) => (
                 <SelectItem key={item} value={item}>
                   {item}
@@ -291,7 +285,7 @@ export function ExerciseForm({
             <SelectTrigger className="mt-1">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="z-[300]">
               {movementOptionsWithValue.map((item) => (
                 <SelectItem key={item.value} value={item.value}>
                   {item.labelKey ? t(item.labelKey, item.fallback) : item.fallback}
@@ -344,52 +338,14 @@ export function ExerciseForm({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <Label>{t("exerciseLibrary.muscleGroups")}</Label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="w-full justify-between mt-1">
-                {value.muscleGroups.length
-                  ? value.muscleGroups.join(", ")
-                  : t("exerciseLibrary.muscleGroupsPlaceholder", "Muskelgruppen auswählen")}
-                <ChevronDown className="h-4 w-4 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[260px] p-0">
-              <Command>
-                <CommandInput placeholder={t("exerciseLibrary.searchMuscle", "Suchen")} />
-                <CommandList>
-                  <CommandEmpty>{t("exerciseLibrary.noMatches", "Keine Treffer")}</CommandEmpty>
-                  <CommandGroup>
-                    <CommandItem
-                      value="__clear__"
-                      onSelect={() => setField("muscleGroups", [])}
-                      className="text-muted-foreground"
-                    >
-                      {t("exerciseLibrary.clearMuscles", "Alle abwählen")}
-                    </CommandItem>
-                    {muscleOptionsWithValue.map((group) => (
-                      <CommandItem
-                        key={group}
-                        value={group}
-                        onSelect={() => {
-                          setField(
-                            "muscleGroups",
-                            value.muscleGroups.includes(group)
-                              ? value.muscleGroups.filter((g) => g !== group)
-                              : [...value.muscleGroups, group]
-                          );
-                        }}
-                      >
-                        <span className="mr-2">
-                          {value.muscleGroups.includes(group) ? <Check className="h-4 w-4" /> : null}
-                        </span>
-                        {group}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+          <div className="mt-1">
+            <MuscleGroupSelector
+              value={value.muscleGroups}
+              onChange={(next) => setField("muscleGroups", next)}
+              groups={muscleGroupTree}
+              placeholder={t("exerciseLibrary.muscleGroupsPlaceholder", "Muskelgruppen auswählen")}
+            />
+          </div>
         </div>
         <div>
           <Label>{t("exerciseLibrary.equipment")}</Label>

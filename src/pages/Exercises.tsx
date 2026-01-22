@@ -38,7 +38,7 @@ import {
   disciplineOptions,
   measurementOptions,
   movementPatternOptions,
-  muscleGroupOptions,
+  muscleGroupTree,
 } from "@/components/exercises/exerciseOptions";
 import {
   Tooltip,
@@ -141,9 +141,11 @@ export function Exercises() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [activeExercise, setActiveExercise] = useState<Exercise | null>(null);
+  const [detailExerciseId, setDetailExerciseId] = useState<string | null>(null);
   const [reportReason, setReportReason] = useState("");
   const [reportDetails, setReportDetails] = useState("");
   const [editDraft, setEditDraft] = useState<ExerciseFormValue | null>(null);
+  const [detailMode, setDetailMode] = useState<"view" | "edit" | "report">("view");
   const [nameSuggestions, setNameSuggestions] = useState<string[]>([]);
   const [nameCheckLoading, setNameCheckLoading] = useState(false);
   const [nameExactMatch, setNameExactMatch] = useState(false);
@@ -165,10 +167,6 @@ export function Exercises() {
     return Array.from(combined).filter(Boolean);
   }, [facets.categories]);
 
-  const muscleFilterOptions = useMemo(() => {
-    const combined = new Set([...(facets.muscleGroups || []), ...muscleGroupOptions]);
-    return Array.from(combined).filter(Boolean);
-  }, [facets.muscleGroups]);
 
   const normalizeMeasurementFilters = (next: string[]) => {
     const added = next.find((item) => !measurementFilters.includes(item));
@@ -581,6 +579,8 @@ export function Exercises() {
       });
       setEditDraft(null);
       setActiveExercise(null);
+      setDetailExerciseId(null);
+      setDetailMode("view");
     } catch (error) {
       console.error("Edit request error:", error);
       toast({
@@ -590,6 +590,60 @@ export function Exercises() {
       });
     }
   };
+
+  const openExerciseDetails = (exercise: Exercise, mode: "view" | "edit" | "report" = "view") => {
+    setActiveExercise(exercise);
+    setDetailExerciseId(exercise.id);
+    setDetailMode(mode);
+    if (mode === "edit") {
+      setEditDefaults(exercise);
+    } else {
+      setEditDraft(null);
+    }
+    if (mode !== "report") {
+      setReportReason("");
+      setReportDetails("");
+    }
+  };
+
+  const closeExerciseDetails = () => {
+    setDetailExerciseId(null);
+    setDetailMode("view");
+    setEditDraft(null);
+    setActiveExercise(null);
+    setReportReason("");
+    setReportDetails("");
+  };
+
+  const navigateExercise = (direction: "prev" | "next") => {
+    if (!detailExerciseId) return;
+    const index = exercises.findIndex((item) => item.id === detailExerciseId);
+    if (index === -1) return;
+    const nextIndex =
+      direction === "prev"
+        ? (index - 1 + exercises.length) % exercises.length
+        : (index + 1) % exercises.length;
+    const nextExercise = exercises[nextIndex];
+    if (nextExercise) {
+      openExerciseDetails(nextExercise);
+    }
+  };
+
+  useEffect(() => {
+    if (!detailExerciseId) return;
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === "ArrowLeft") navigateExercise("prev");
+      if (event.key === "ArrowRight") navigateExercise("next");
+      if (event.key === "Escape") closeExerciseDetails();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [detailExerciseId, exercises]);
+
+  const detailExercise = useMemo(
+    () => exercises.find((item) => item.id === detailExerciseId) || null,
+    [detailExerciseId, exercises]
+  );
 
   const setEditDefaults = (exercise: Exercise) => {
     const measurementSet = new Set<string>();
@@ -685,7 +739,7 @@ export function Exercises() {
                 disciplineOptions={disciplineOptions}
                 movementPatternOptions={movementPatternOptions}
                 measurementOptions={measurementOptions}
-                muscleOptions={muscleFilterOptions}
+                muscleGroups={muscleGroupTree}
                 categoryFilter={categoryFilter}
                 onCategoryFilterChange={setCategoryFilter}
                 disciplineFilter={disciplineFilter}
@@ -749,65 +803,24 @@ export function Exercises() {
                         </div>
                       </div>
                       <div className="mt-4 flex flex-wrap gap-2">
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setActiveExercise(exercise);
-                                setEditDefaults(exercise);
-                              }}
-                            >
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "view")}>
+                              {t("exerciseLibrary.details", "Details anzeigen")}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "edit")}>
                               {t("exerciseLibrary.suggestChange", "Änderung vorschlagen")}
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-3xl overflow-y-auto max-h-[85vh]">
-                            <DialogHeader>
-                              <DialogTitle>{t("exerciseLibrary.suggestChangeTitle", "Änderung vorschlagen")}</DialogTitle>
-                            </DialogHeader>
-                            {editDraft && (
-                              <ExerciseForm
-                                value={editDraft}
-                                onChange={setEditDraft}
-                                onSubmit={handleEditRequest}
-                                submitLabel={t("exerciseLibrary.sendRequest", "Anfrage senden")}
-                                showDescriptionToggle
-                              />
-                            )}
-                          </DialogContent>
-                        </Dialog>
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setActiveExercise(exercise)}
-                            >
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "report")}>
                               {t("exerciseLibrary.report", "Melden")}
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>{t("exerciseLibrary.reportTitle", "Übung melden")}</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-3">
-                              <Input
-                                value={reportReason}
-                                onChange={(e) => setReportReason(e.target.value)}
-                                placeholder={t("exerciseLibrary.reportReason", "Grund")}
-                              />
-                              <Textarea
-                                value={reportDetails}
-                                onChange={(e) => setReportDetails(e.target.value)}
-                                placeholder={t("exerciseLibrary.reportDetails", "Details")}
-                              />
-                              <Button onClick={handleReport}>
-                                {t("exerciseLibrary.sendReport", "Report senden")}
-                              </Button>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   ))}
@@ -889,7 +902,11 @@ export function Exercises() {
                 </TableHeader>
                 <TableBody>
                   {paginatedExercises.map((exercise) => (
-                    <TableRow key={exercise.id}>
+                    <TableRow
+                      key={exercise.id}
+                      className="cursor-pointer"
+                      onClick={() => openExerciseDetails(exercise, "view")}
+                    >
                       <TableCell className="font-medium sticky left-0 bg-background z-10">
                         {exercise.name}
                       </TableCell>
@@ -902,64 +919,25 @@ export function Exercises() {
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={(event) => event.stopPropagation()}
+                            >
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <Dialog>
-                              <DialogTrigger asChild>
-                                <DropdownMenuItem
-                                  onSelect={() => {
-                                    setActiveExercise(exercise);
-                                    setEditDefaults(exercise);
-                                  }}
-                                >
-                                  {t("exerciseLibrary.suggestChange", "Änderung vorschlagen")}
-                                </DropdownMenuItem>
-                              </DialogTrigger>
-                              <DialogContent className="max-w-3xl overflow-y-auto max-h-[85vh]">
-                                <DialogHeader>
-                                  <DialogTitle>{t("exerciseLibrary.suggestChangeTitle", "Änderung vorschlagen")}</DialogTitle>
-                                </DialogHeader>
-                                {editDraft && (
-                                  <ExerciseForm
-                                    value={editDraft}
-                                    onChange={setEditDraft}
-                                    onSubmit={handleEditRequest}
-                                    submitLabel={t("exerciseLibrary.sendRequest", "Anfrage senden")}
-                                    showDescriptionToggle
-                                  />
-                                )}
-                              </DialogContent>
-                            </Dialog>
-                            <Dialog>
-                              <DialogTrigger asChild>
-                                <DropdownMenuItem onSelect={() => setActiveExercise(exercise)}>
-                                  {t("exerciseLibrary.report", "Melden")}
-                                </DropdownMenuItem>
-                              </DialogTrigger>
-                              <DialogContent>
-                                <DialogHeader>
-                                  <DialogTitle>{t("exerciseLibrary.reportTitle", "Übung melden")}</DialogTitle>
-                                </DialogHeader>
-                                <div className="space-y-3">
-                                  <Input
-                                    value={reportReason}
-                                    onChange={(e) => setReportReason(e.target.value)}
-                                    placeholder={t("exerciseLibrary.reportReason", "Grund")}
-                                  />
-                                  <Textarea
-                                    value={reportDetails}
-                                    onChange={(e) => setReportDetails(e.target.value)}
-                                    placeholder={t("exerciseLibrary.reportDetails", "Details")}
-                                  />
-                                  <Button onClick={handleReport}>
-                                    {t("exerciseLibrary.sendReport", "Report senden")}
-                                  </Button>
-                                </div>
-                              </DialogContent>
-                            </Dialog>
+                            <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "view")}>
+                              {t("exerciseLibrary.details", "Details anzeigen")}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "edit")}>
+                              {t("exerciseLibrary.suggestChange", "Änderung vorschlagen")}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "report")}>
+                              {t("exerciseLibrary.report", "Melden")}
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -992,6 +970,97 @@ export function Exercises() {
             )}
           </CardContent>
         </Card>
+        <Dialog open={Boolean(detailExerciseId)} onOpenChange={(open) => (open ? null : closeExerciseDetails())}>
+          <DialogContent className="max-w-4xl overflow-y-auto max-h-[85vh]">
+            <DialogHeader>
+              <div className="flex items-center justify-between">
+                <DialogTitle>
+                  {detailExercise?.name || t("exerciseLibrary.details", "Übung")}
+                </DialogTitle>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="icon" onClick={() => navigateExercise("prev")}>
+                    <ArrowUp className="h-4 w-4 rotate-[-90deg]" />
+                  </Button>
+                  <Button variant="outline" size="icon" onClick={() => navigateExercise("next")}>
+                    <ArrowDown className="h-4 w-4 rotate-[-90deg]" />
+                  </Button>
+                </div>
+              </div>
+            </DialogHeader>
+            {detailExercise && (
+              <div className="space-y-4">
+                <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+                  <span>{detailExercise.category || "-"}</span>
+                  <span>·</span>
+                  <span>{detailExercise.discipline || "-"}</span>
+                  <span>·</span>
+                  <span>{detailExercise.measurementType || "-"}</span>
+                </div>
+                {detailExercise.description && (
+                  <p className="text-sm text-muted-foreground">{detailExercise.description}</p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  {detailExercise.requiresWeight && (
+                    <Badge variant="outline">{t("exerciseLibrary.requiresWeight", "Gewicht erforderlich")}</Badge>
+                  )}
+                  {detailExercise.supportsTime && <Badge variant="outline">Zeit</Badge>}
+                  {detailExercise.supportsDistance && <Badge variant="outline">Distanz</Badge>}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button variant={detailMode === "view" ? "default" : "outline"} onClick={() => setDetailMode("view")}>
+                    {t("exerciseLibrary.details", "Details")}
+                  </Button>
+                  <Button
+                    variant={detailMode === "edit" ? "default" : "outline"}
+                    onClick={() => {
+                      if (detailExercise) {
+                        setEditDefaults(detailExercise);
+                        setDetailMode("edit");
+                      }
+                    }}
+                  >
+                    {t("exerciseLibrary.suggestChange", "Änderung vorschlagen")}
+                  </Button>
+                  <Button
+                    variant={detailMode === "report" ? "default" : "outline"}
+                    onClick={() => setDetailMode("report")}
+                  >
+                    {t("exerciseLibrary.report", "Melden")}
+                  </Button>
+                </div>
+
+                {detailMode === "edit" && editDraft && (
+                  <ExerciseForm
+                    value={editDraft}
+                    onChange={setEditDraft}
+                    onSubmit={handleEditRequest}
+                    submitLabel={t("exerciseLibrary.sendRequest", "Anfrage senden")}
+                    showDescriptionToggle
+                  />
+                )}
+
+                {detailMode === "report" && (
+                  <div className="space-y-3">
+                    <Input
+                      value={reportReason}
+                      onChange={(e) => setReportReason(e.target.value)}
+                      placeholder={t("exerciseLibrary.reportReason", "Grund")}
+                    />
+                    <Textarea
+                      value={reportDetails}
+                      onChange={(e) => setReportDetails(e.target.value)}
+                      placeholder={t("exerciseLibrary.reportDetails", "Details")}
+                    />
+                    <Button onClick={handleReport}>
+                      {t("exerciseLibrary.sendReport", "Report senden")}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </PageTemplate>
   );

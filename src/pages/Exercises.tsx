@@ -1,4 +1,5 @@
 import { PageTemplate } from "@/components/common/PageTemplate";
+import { PageSizeSelector } from "@/components/common/pagination/PageSizeSelector";
 import {
   PaginationControls,
   PaginationMeta,
@@ -120,7 +121,7 @@ export function Exercises() {
     hasNext: false,
     hasPrev: false,
   });
-  const pageSize = 12;
+  const [pageSize, setPageSize] = useState(12);
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
   const [formValue, setFormValue] = useState<ExerciseFormValue>({
@@ -779,71 +780,112 @@ export function Exercises() {
               <>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {paginatedExercises.map((exercise) => (
-                    <div key={exercise.id} className="border rounded-lg p-4 flex flex-col h-full">
-                      <div className="flex-1 space-y-3">
-                        <div>
-                          <div className="font-medium">{exercise.name}</div>
+                    <div key={exercise.id} className="border rounded-xl p-4 flex flex-col h-full bg-background/60">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-semibold truncate">{exercise.name}</div>
                           <div className="text-xs text-muted-foreground">
                             {exercise.category || "-"} · {exercise.discipline || "-"}
                           </div>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                          {exercise.measurementType && (
-                            <Badge variant="secondary">{exercise.measurementType}</Badge>
-                          )}
-                          {exercise.requiresWeight && (
-                            <Badge variant="outline">Gewicht erforderlich</Badge>
-                          )}
-                          {exercise.supportsTime && (
-                            <Badge variant="outline">Zeit</Badge>
-                          )}
-                          {exercise.supportsDistance && (
-                            <Badge variant="outline">Distanz</Badge>
-                          )}
+                        <div onClick={(event) => event.stopPropagation()}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "view")}>
+                                {t("exerciseLibrary.details", "Details anzeigen")}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "edit")}>
+                                {t("exerciseLibrary.suggestChange", "Änderung vorschlagen")}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "report")}>
+                                {t("exerciseLibrary.report", "Melden")}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "view")}>
-                              {t("exerciseLibrary.details", "Details anzeigen")}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "edit")}>
-                              {t("exerciseLibrary.suggestChange", "Änderung vorschlagen")}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "report")}>
-                              {t("exerciseLibrary.report", "Melden")}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {exercise.measurementType && (
+                          <Badge variant="secondary">{exercise.measurementType}</Badge>
+                        )}
+                        {exercise.difficultyTier !== null && exercise.difficultyTier !== undefined && (
+                          <Badge variant="outline">
+                            {t("exerciseLibrary.difficulty", "Schwierigkeit")} {exercise.difficultyTier}
+                          </Badge>
+                        )}
+                        {exercise.requiresWeight && (
+                          <Badge variant="outline">{t("exerciseLibrary.requiresWeight", "Gewicht erforderlich")}</Badge>
+                        )}
+                        {exercise.supportsTime && <Badge variant="outline">Zeit</Badge>}
+                        {exercise.supportsDistance && <Badge variant="outline">Distanz</Badge>}
                       </div>
+
+                      {exercise.muscleGroups && exercise.muscleGroups.length > 0 && (
+                        <div className="mt-3">
+                          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                            {t("exerciseLibrary.muscleGroups", "Muskelgruppen")}
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {exercise.muscleGroups.slice(0, 4).map((group) => (
+                              <Badge key={group} variant="secondary">
+                                {group}
+                              </Badge>
+                            ))}
+                            {exercise.muscleGroups.length > 4 && (
+                              <Badge variant="secondary">+{exercise.muscleGroups.length - 4}</Badge>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
                 {pagination.totalPages > 1 && (
-                  <PaginationControls
-                    pagination={pagination}
-                    onPageChange={setCurrentPage}
-                    pageSize={pageSize}
-                    labels={{
-                      page: (current, total) =>
-                        t("filters.pageLabel", { current, total, defaultValue: `${current}/${total}` }),
-                      summary: (start, end, total) =>
-                        t("filters.pageSummary", {
-                          start,
-                          end,
-                          total,
-                          defaultValue: `${start}–${end} / ${total}`,
-                        }),
-                      previous: t("filters.prev", "Zurück"),
-                      next: t("filters.next", "Weiter"),
-                    }}
-                  />
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-muted-foreground">
+                        {pagination.totalItems > 0 &&
+                          t("exerciseLibrary.totalExercises", {
+                            count: pagination.totalItems,
+                            defaultValue: `${pagination.totalItems} Übungen gefunden`,
+                          })}
+                      </div>
+                      <PageSizeSelector
+                        pageSize={pageSize}
+                        onPageSizeChange={(next) => {
+                          setPageSize(next);
+                          setCurrentPage(1);
+                        }}
+                        label={t("filters.itemsPerPage", "Pro Seite:")}
+                        options={[6, 12, 24, 48]}
+                      />
+                    </div>
+                    <PaginationControls
+                      pagination={pagination}
+                      onPageChange={setCurrentPage}
+                      pageSize={pageSize}
+                      maxVisiblePages={7}
+                      labels={{
+                        page: (current, total) =>
+                          t("filters.pageLabel", { current, total, defaultValue: `${current}/${total}` }),
+                        summary: (start, end, total) =>
+                          t("filters.pageSummary", {
+                            start,
+                            end,
+                            total,
+                            defaultValue: `${start}–${end} / ${total}`,
+                          }),
+                        previous: t("filters.prev", "Zurück"),
+                        next: t("filters.next", "Weiter"),
+                      }}
+                    />
+                  </div>
                 )}
               </>
             ) : (
@@ -955,24 +997,45 @@ export function Exercises() {
               </Table>
               </div>
               {pagination.totalPages > 1 && (
-                <PaginationControls
-                  pagination={pagination}
-                  onPageChange={setCurrentPage}
-                  pageSize={pageSize}
-                  labels={{
-                    page: (current, total) =>
-                      t("filters.pageLabel", { current, total, defaultValue: `${current}/${total}` }),
-                    summary: (start, end, total) =>
-                      t("filters.pageSummary", {
-                        start,
-                        end,
-                        total,
-                        defaultValue: `${start}–${end} / ${total}`,
-                      }),
-                    previous: t("filters.prev", "Zurück"),
-                    next: t("filters.next", "Weiter"),
-                  }}
-                />
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-muted-foreground">
+                      {pagination.totalItems > 0 &&
+                        t("exerciseLibrary.totalExercises", {
+                          count: pagination.totalItems,
+                          defaultValue: `${pagination.totalItems} Übungen gefunden`,
+                        })}
+                    </div>
+                    <PageSizeSelector
+                      pageSize={pageSize}
+                      onPageSizeChange={(next) => {
+                        setPageSize(next);
+                        setCurrentPage(1);
+                      }}
+                      label={t("filters.itemsPerPage", "Pro Seite:")}
+                      options={[6, 12, 24, 48]}
+                    />
+                  </div>
+                  <PaginationControls
+                    pagination={pagination}
+                    onPageChange={setCurrentPage}
+                    pageSize={pageSize}
+                    maxVisiblePages={7}
+                    labels={{
+                      page: (current, total) =>
+                        t("filters.pageLabel", { current, total, defaultValue: `${current}/${total}` }),
+                      summary: (start, end, total) =>
+                        t("filters.pageSummary", {
+                          start,
+                          end,
+                          total,
+                          defaultValue: `${start}–${end} / ${total}`,
+                        }),
+                      previous: t("filters.prev", "Zurück"),
+                      next: t("filters.next", "Weiter"),
+                    }}
+                  />
+                </div>
               )}
               </>
             )}

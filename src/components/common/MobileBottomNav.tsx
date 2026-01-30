@@ -61,6 +61,11 @@ export function MobileBottomNav() {
       icon: Dumbbell,
     },
     {
+      title: t("navigation.exercises", "Übungen"),
+      url: "/exercises",
+      icon: Dumbbell,
+    },
+    {
       title: t("navigation.stats"),
       url: "/stats",
       icon: BarChart,

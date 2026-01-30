@@ -1,5 +1,6 @@
 import { PageTemplate } from "@/components/common/PageTemplate";
 import { PublicHeader } from "@/components/common/PublicHeader";
+import { PublicPageLayout } from "@/components/common/PublicPageLayout";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -412,10 +413,8 @@ export function Changelog() {
 
   // Für nicht-eingeloggte Benutzer: Öffentliches Layout (wie Legal-Seiten)
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <PublicHeader
-        title={t("changelog.title", "Changelog")}
-      />
+    <PublicPageLayout className="bg-gradient-to-br from-background via-background to-muted/20">
+      <PublicHeader />
 
       <div className="container mx-auto px-4 py-8 md:py-12">
         {/* Titel */}
@@ -466,6 +465,6 @@ export function Changelog() {
           </div>
         </div>
       </footer>
-    </div>
+    </PublicPageLayout>
   );
 }

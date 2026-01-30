@@ -16,6 +16,7 @@ interface PaginationControlsProps {
   className?: string;
   disabled?: boolean;
   pageSize?: number;
+  maxVisiblePages?: number;
   labels?: {
     previous?: string;
     next?: string;
@@ -30,6 +31,7 @@ export function PaginationControls({
   className,
   disabled,
   pageSize,
+  maxVisiblePages = 5,
   labels,
 }: PaginationControlsProps) {
   const { currentPage, totalPages, totalItems, hasNext, hasPrev } = pagination;
@@ -73,10 +75,35 @@ export function PaginationControls({
     onPageChange(currentPage + 1);
   };
 
+  const buildPageNumbers = () => {
+    if (totalPages <= 1) return [];
+    const safeMax = Math.max(3, maxVisiblePages);
+    const half = Math.floor(safeMax / 2);
+    let start = Math.max(1, currentPage - half);
+    let end = Math.min(totalPages, start + safeMax - 1);
+    if (end - start + 1 < safeMax) {
+      start = Math.max(1, end - safeMax + 1);
+    }
+
+    const pages: (number | string)[] = [];
+    if (start > 1) {
+      pages.push(1);
+      if (start > 2) pages.push("...");
+    }
+    for (let page = start; page <= end; page += 1) {
+      pages.push(page);
+    }
+    if (end < totalPages) {
+      if (end < totalPages - 1) pages.push("...");
+      pages.push(totalPages);
+    }
+    return pages;
+  };
+
   return (
     <div className={cn("flex flex-col gap-2 border-t pt-4 sm:flex-row sm:items-center sm:justify-between", className)}>
       <div className="text-xs text-muted-foreground sm:text-sm">{summaryLabel}</div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <Button
           variant="outline"
           size="sm"
@@ -87,6 +114,28 @@ export function PaginationControls({
           <ChevronLeft className="mr-1 h-4 w-4" />
           {previousLabel}
         </Button>
+        {buildPageNumbers().map((page, index) => {
+          if (page === "...") {
+            return (
+              <span key={`ellipsis-${index}`} className="px-2 text-xs text-muted-foreground">
+                …
+              </span>
+            );
+          }
+          const pageNumber = page as number;
+          return (
+            <Button
+              key={pageNumber}
+              variant={pageNumber === currentPage ? "default" : "outline"}
+              size="sm"
+              className="text-xs sm:text-sm min-w-[36px]"
+              onClick={() => onPageChange(pageNumber)}
+              disabled={disabled}
+            >
+              {pageNumber}
+            </Button>
+          );
+        })}
         <div className="text-xs text-muted-foreground sm:text-sm">
           {labels?.page
             ? labels.page(currentPage, totalPages)

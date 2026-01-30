@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { PublicHeader } from "@/components/common/PublicHeader";
+import { PublicPageLayout } from "@/components/common/PublicPageLayout";
 import { LegalFooter } from "@/components/legal/LegalFooter";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/use-auth";
@@ -20,29 +21,19 @@ export function LegalPageTemplate({
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
 
-  return (
-    <div
-      className={
-        isAuthenticated
-          ? ""
-          : "min-h-screen bg-gradient-to-br from-background via-background to-muted/20"
-      }
-    >
-      {/* Header - nur anzeigen wenn nicht eingeloggt */}
-      {!isAuthenticated && (
-        <PublicHeader
-          title={title}
-        />
-      )}
+  const pageContent = (
+    <>
+      {/* Header - ohne Seitentitel (nur Logo/Nav), Titel steht über dem Inhalt */}
+      {!isAuthenticated && <PublicHeader />}
 
-      {/* Titel für eingeloggte Benutzer */}
-      {isAuthenticated && (
-        <div className="mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-            {title}
-          </h1>
-        </div>
-      )}
+      {/* Seitentitel über dem Inhalt */}
+      <div
+        className={`${isAuthenticated ? "max-w-4xl" : "container mx-auto px-4 pt-8 md:pt-12 max-w-4xl"}`}
+      >
+        <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-8">
+          {title}
+        </h1>
+      </div>
 
       {/* Main Content */}
       <div
@@ -75,6 +66,16 @@ export function LegalPageTemplate({
 
       {/* Footer - nur anzeigen wenn nicht eingeloggt */}
       {!isAuthenticated && <LegalFooter />}
-    </div>
+    </>
+  );
+
+  if (isAuthenticated) {
+    return <div>{pageContent}</div>;
+  }
+
+  return (
+    <PublicPageLayout className="bg-gradient-to-br from-background via-background to-muted/20">
+      {pageContent}
+    </PublicPageLayout>
   );
 }

@@ -62,6 +62,9 @@ const Terms = lazy(() => import("@/pages/Terms"));
 const Training = lazy(() =>
   import("@/pages/Training").then((m) => ({ default: m.Training }))
 );
+const Exercises = lazy(() =>
+  import("@/pages/Exercises").then((m) => ({ default: m.Exercises }))
+);
 const Share = lazy(() => import("@/pages/Share"));
 const Changelog = lazy(() =>
   import("@/pages/Changelog").then((m) => ({ default: m.Changelog }))
@@ -219,6 +222,7 @@ const App = () => {
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/scoreboard" element={<Scoreboard />} />
                   <Route path="/training" element={<Training />} />
+                  <Route path="/exercises" element={<Exercises />} />
                   <Route path="/my-workouts" element={<MyWorkouts />} />
                   <Route path="/stats" element={<Stats />} />
                   <Route path="/profile" element={<Profile />} />

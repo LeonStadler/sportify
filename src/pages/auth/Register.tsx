@@ -31,7 +31,7 @@ export default function Register() {
   }, [searchParams, inviteUserId]);
 
   return (
-    <div className="min-h-screen h-screen bg-gradient-to-br from-background via-background to-muted/20 flex flex-col overflow-y-auto">
+    <div className="min-h-screen h-screen bg-gradient-to-br from-background via-background to-muted/20 flex flex-col overflow-y-auto pt-[var(--safe-area-top)]">
       <PublicHeader variant="minimal" />
 
       {/* Main Content */}

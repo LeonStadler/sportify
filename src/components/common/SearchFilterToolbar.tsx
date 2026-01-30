@@ -43,19 +43,20 @@ export function SearchFilterToolbar({
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
+      <div className="flex flex-wrap items-center gap-2">
         <Input
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
           placeholder={t("common.search", "Suche")}
-          className="md:flex-1"
+          className="flex-1 min-w-[220px]"
         />
         {hasViewToggle && (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex w-full gap-2 sm:w-auto">
             <Button
               variant={viewMode === "grid" ? "default" : "outline"}
               size="sm"
               onClick={() => onViewModeChange?.("grid")}
+              className="flex-1 sm:flex-none"
             >
               <LayoutGrid className="mr-2 h-4 w-4" />
               Grid
@@ -64,6 +65,7 @@ export function SearchFilterToolbar({
               variant={viewMode === "table" ? "default" : "outline"}
               size="sm"
               onClick={() => onViewModeChange?.("table")}
+              className="flex-1 sm:flex-none"
             >
               <List className="mr-2 h-4 w-4" />
               Tabelle
@@ -73,13 +75,13 @@ export function SearchFilterToolbar({
       </div>
 
       {(hasFiltersToggle || hasSort) && (
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
           {hasFiltersToggle ? (
             <Button
               variant={filtersOpen ? "default" : "outline"}
               size="sm"
               onClick={onToggleFilters}
-              className="md:w-fit"
+              className="w-full sm:w-auto"
             >
               <SlidersHorizontal className="mr-2 h-4 w-4" />
               {filtersOpen ? t("filters.hide", "Filter ausblenden") : t("filters.show", "Filter")}
@@ -89,10 +91,10 @@ export function SearchFilterToolbar({
           )}
 
           {hasSort && (
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-nowrap items-center gap-2 w-full sm:w-auto sm:ml-auto">
               <span className="text-xs text-muted-foreground">{t("filters.sort", "Sortieren")}</span>
               <Select value={sortBy} onValueChange={(next) => onSortByChange?.(next)}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px] flex-1 sm:flex-none min-w-0">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

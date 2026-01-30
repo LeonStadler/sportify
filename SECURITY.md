@@ -2,11 +2,11 @@
 
 ## Supported Versions
 
-We actively support the following versions with security updates:
+I actively support the following versions with security updates:
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.0.x   | :white_check_mark: |
+| 1.9.x   | :white_check_mark: |
 
 ## Reporting a Vulnerability
 
@@ -21,24 +21,26 @@ Please include:
 - Potential impact
 - Suggested fix (if any)
 
-We will respond within 48 hours and work with you to address the issue before making it public.
+I will respond as soon as possible and work with you to address the issue before making it public.
 
 ## Security Best Practices
 
 When using this software:
 
-- Never commit `.env` files
 - Use strong, unique passwords
 - Enable 2FA when available
-- Keep dependencies up to date
-- Review code changes before deploying
+- Only accept friend requests from people you actually know
+- Keep your account credentials secure
+- Report any security concerns immediately
 
 ## Disclosure Policy
 
-- We will acknowledge receipt of your vulnerability report within 48 hours
-- We will provide an initial assessment within 7 days
-- We will keep you informed of our progress
-- We will notify you when the vulnerability is fixed
-- We will credit you for the discovery (unless you prefer to remain anonymous)
+As this is a personal fun project, I cannot guarantee fixed response times. However, I will:
+
+- Acknowledge receipt of your vulnerability report as soon as possible
+- Review and assess the vulnerability as time permits
+- Keep you informed of progress when significant updates are available
+- Notify you when the vulnerability is fixed
+- Credit you for the discovery (unless you prefer to remain anonymous)
 
 Thank you for helping keep Sportify secure!

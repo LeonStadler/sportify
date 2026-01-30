@@ -7,7 +7,14 @@ export interface WorkoutActivity {
   sets?: Array<{
     reps: number;
     weight?: number;
+    duration?: number;
+    distance?: number;
+    isDropSet?: boolean;
   }>;
+  restBetweenSetsSeconds?: number;
+  restAfterSeconds?: number;
+  effort?: number;
+  supersetGroup?: string;
 }
 
 export interface WorkoutReactionUser {
@@ -55,6 +62,21 @@ export interface Workout {
   startTimeTimestamp?: string; // Vollständiger ISO-String (TIMESTAMPTZ)
   duration?: number; // in Minuten
   useEndTime?: boolean; // true = Endzeit-Modus, false = Dauer-Modus
+  difficulty?: number;
+  sessionType?: string;
+  rounds?: number;
+  restBetweenSetsSeconds?: number;
+  restBetweenActivitiesSeconds?: number;
+  restBetweenRoundsSeconds?: number;
+  visibility?: "private" | "friends" | "public";
+  isTemplate?: boolean;
+  owner?: {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+    nickname?: string;
+    displayPreference?: string;
+  };
   createdAt: string;
   updatedAt: string;
   activities: WorkoutActivity[];

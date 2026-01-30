@@ -58,9 +58,11 @@ Fuer Incline/Decline/Weighted werden **separate Uebungen** erstellt.
 ## Konzept: Workouts (als Vorlagen speicherbar)
 - Workouts bleiben **Workouts** (keine Umbenennung zu Templates).
 - Ein Workout kann als **Vorlage** markiert und wiederverwendet werden.
-- Workouts behalten Sets/Reps/Weight/Distance/Time/Notes als Vorlage, die Vorlage allein kann nicht als Workout gespciehrt werden, es müssen alle Werte bestätigt werden bzw sichergestellt werden dass die werte auch korrekt sind und man die anzahl übugnen ect absolviert hat
-- Sichtbarkeit: private / friends / public.
+- Workouts behalten Sets/Reps/Weight/Distance/Time/Notes.
+- Eine Vorlage dient als Vorschlag; beim Speichern eines echten Workouts muessen Werte bestaetigt/angepasst werden.
+- Sichtbarkeit: private / friends / public (in der Workout-Liste sichtbar).
 - Andere Nutzer duerfen Vorlagen nutzen, optional kopieren, aber nicht bearbeiten.
+- Empfehlung Datenmodell: Workout enthaelt `visibility` und `is_template` (statt separater Template-Entitaet).
 
 ---
 
@@ -89,39 +91,39 @@ Spaeter erweiterbar zu Engines pro Kategorie.
 ## Phase 0 – Vorbereitung & Analyse
 - [ ] Bestehende Touchpoints fuer hartcodierte Uebungen erfassen
 - [ ] Bestehende Trainingsdaten & Punkteberechnung pruefen
-- [ ] Entscheidung: Exercise Variants vs Separate Exercises
-- [ ] Entscheidung: Private Exercises moeglich? (Empfehlung: global + pending only)
 
 ## Phase 1 – Datenmodell & Migration
-- [ ] Datenmodell erweitern (Uebung-Metadaten, Aliases, Varianten, Templates)
-- [ ] Seed-Update fuer Kern-Uebungen (Slug + Kategorien + Units)
-- [ ] Migration: vorhandene Workouts referenzieren `exercise_id`
-- [ ] Fallback/Mapping fuer Legacy-Workouts (falls noetig)
-- [ ] Migrations-Validierung auf Test-Daten
+- [x] Datenmodell erweitern (Uebung-Metadaten, Aliases, Varianten, Templates)
+- [x] Workout-Sichtbarkeit und Vorlage-Flag einfuehren (`visibility`, `is_template`)
+- [x] Seed-Update fuer Kern-Uebungen (Slug + Kategorien + Units)
+- [x] Migration: vorhandene Workouts referenzieren `exercise_id`
+- [x] Fallback/Mapping fuer Legacy-Workouts (falls noetig)
+- [x] Migrations-Validierung auf Test-Daten
 
 ## Phase 2 – Exercises API + Admin Kuration
-- [ ] `GET /api/exercises` mit Search + Filter
-- [ ] Filter-Facets: Kategorie, Muskelgruppe, Equipment
-- [ ] `POST /api/exercises` (User Vorschlaege -> pending)
-- [ ] Similarity-Search (bei POST direkt liefern)
-- [ ] Admin Approve/Reject/Update
-- [ ] Admin Merge (Reassign Activities + Alias erstellen)
-- [ ] Deactivate (soft delete)
-- [ ] Exercise Reports (Create + Admin Resolve)
+- [x] `GET /api/exercises` mit Search + Filter
+- [x] Filter-Facets: Kategorie, Muskelgruppe, Equipment
+- [x] `POST /api/exercises` (User Vorschlaege -> pending)
+- [x] Similarity-Search (bei POST direkt liefern)
+- [x] Admin Approve/Reject/Update
+- [x] Admin Merge (Reassign Activities + Alias erstellen)
+- [x] Deactivate (soft delete)
+- [x] Exercise Reports (Create + Admin Resolve)
+- [x] Exercise Edit-Requests (strukturierte Aenderungsvorschlaege)
 
 ## Phase 3 – Frontend: Uebungslexikon & Training Form
-- [ ] Uebungslexikon-Seite (Liste + Filter + Suchfeld)
-- [ ] New Exercise Flow (Aehnliche Vorschlaege anzeigen)
-- [ ] Training Form: Dropdown aus API (kein Hardcode)
-- [ ] Filter in Training Form (push/pull/legs/core, weight-required, endurance, climbing, muscle/equipment)
-- [ ] Einheiten-UI basierend auf Measurement Type
- - [ ] Report-Action in Exercise Detail (optional v1.5)
+- [x] Uebungslexikon-Seite (Liste + Filter + Suchfeld)
+- [x] New Exercise Flow (Aehnliche Vorschlaege anzeigen)
+- [x] Training Form: Dropdown aus API (kein Hardcode)
+- [x] Filter in Training Form (push/pull/legs/core, weight-required, endurance, climbing, muscle/equipment)
+- [x] Einheiten-UI basierend auf Measurement Type
+- [ ] Report-Action in Exercise Detail (optional v1.5)
 
 ## Phase 4 – Workout Vorlagen (Workouts als Vorlagen)
-- [ ] "Als Vorlage speichern" im Workout-Detail
-- [ ] Vorlagen-Liste (own/friends/public)
-- [ ] "Vorlage nutzen" -> Prefill Workout
-- [ ] Sichtbarkeit/Permissions pruefen
+- [x] "Als Vorlage speichern" im Workout-Detail
+- [x] Vorlagen-Liste (own/friends/public)
+- [x] "Vorlage nutzen" -> Prefill Workout
+- [x] Sichtbarkeit/Permissions pruefen
 
 ## Phase 5 – Climbing/Bouldering
 - [ ] Aktivitaetstyp route/grade definieren

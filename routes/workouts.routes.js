@@ -73,6 +73,14 @@ export const createWorkoutsRouter = (pool) => {
                     w.start_time,
                     w.duration,
                     w.use_end_time,
+                    w.difficulty,
+                    w.session_type,
+                    w.rounds,
+                    w.rest_between_sets_seconds,
+                    w.rest_between_activities_seconds,
+                    w.rest_between_rounds_seconds,
+                    w.visibility,
+                    w.is_template,
                     w.created_at,
                     w.updated_at,
                     COALESCE(
@@ -84,6 +92,10 @@ export const createWorkoutsRouter = (pool) => {
                                 'points', wa.points_earned,
                                 'notes', wa.notes,
                                 'unit', wa.unit,
+                                'restBetweenSetsSeconds', wa.rest_between_sets_seconds,
+                                'restAfterSeconds', wa.rest_after_seconds,
+                                'effort', wa.effort,
+                                'supersetGroup', wa.superset_group,
                                 'setsData', wa.sets_data
                             ) ORDER BY wa.order_index, wa.id
                         ) FILTER (WHERE wa.id IS NOT NULL),
@@ -124,7 +136,7 @@ export const createWorkoutsRouter = (pool) => {
                   ) reaction_data
                 ) reactions ON true
                 ${filterClause}
-                GROUP BY w.id, w.title, w.description, w.start_time, w.duration, w.use_end_time, w.created_at, w.updated_at, reactions.reactions
+                GROUP BY w.id, w.title, w.description, w.start_time, w.duration, w.use_end_time, w.difficulty, w.session_type, w.rounds, w.rest_between_sets_seconds, w.rest_between_activities_seconds, w.rest_between_rounds_seconds, w.visibility, w.is_template, w.created_at, w.updated_at, reactions.reactions
                 ORDER BY w.start_time DESC, w.created_at DESC
                 LIMIT $${params.length + 1} OFFSET $${params.length + 2};
             `;
@@ -170,6 +182,10 @@ export const createWorkoutsRouter = (pool) => {
                   points: a.points,
                   notes: a.notes,
                   unit: a.unit,
+                  restBetweenSetsSeconds: a.restBetweenSetsSeconds ?? null,
+                  restAfterSeconds: a.restAfterSeconds ?? null,
+                  effort: a.effort ?? null,
+                  supersetGroup: a.supersetGroup ?? null,
                   sets,
                 };
               })
@@ -295,6 +311,205 @@ export const createWorkoutsRouter = (pool) => {
     }
   });
 
+  const buildTemplateAccessClause = (userIdParamIndex) => `
+    (w.user_id = $${userIdParamIndex}
+      OR w.visibility = 'public'
+      OR (
+        w.visibility = 'friends'
+        AND w.user_id IN (
+          SELECT CASE
+            WHEN requester_id = $${userIdParamIndex} THEN addressee_id
+            ELSE requester_id
+          END
+          FROM friendships
+          WHERE (requester_id = $${userIdParamIndex} OR addressee_id = $${userIdParamIndex})
+            AND status = 'accepted'
+        )
+      )
+    )
+  `;
+
+  // GET /api/workouts/templates - List template workouts accessible to user
+  router.get("/templates", authMiddleware, async (req, res) => {
+    try {
+      const { limit = 50, offset = 0 } = req.query || {};
+      const params = [req.user.id, Number(limit), Number(offset)];
+
+      const query = `
+        SELECT 
+          w.id,
+          w.user_id,
+          w.title,
+          w.description,
+          w.start_time,
+          w.duration,
+          w.use_end_time,
+          w.difficulty,
+          w.session_type,
+          w.rounds,
+          w.rest_between_sets_seconds,
+          w.rest_between_activities_seconds,
+          w.rest_between_rounds_seconds,
+          w.visibility,
+          w.is_template,
+          w.created_at,
+          w.updated_at,
+          u.first_name,
+          u.last_name,
+          u.nickname,
+          u.display_preference,
+          COALESCE(
+            JSON_AGG(
+              JSON_BUILD_OBJECT(
+                'id', wa.id,
+                'activityType', wa.activity_type,
+                'quantity', wa.quantity,
+                'points', wa.points_earned,
+                'notes', wa.notes,
+                'unit', wa.unit,
+                'restBetweenSetsSeconds', wa.rest_between_sets_seconds,
+                'restAfterSeconds', wa.rest_after_seconds,
+                'effort', wa.effort,
+                'supersetGroup', wa.superset_group,
+                'setsData', wa.sets_data
+              ) ORDER BY wa.order_index, wa.id
+            ) FILTER (WHERE wa.id IS NOT NULL),
+            '[]'::json
+          ) as activities
+        FROM workouts w
+        JOIN users u ON u.id = w.user_id
+        LEFT JOIN workout_activities wa ON w.id = wa.workout_id
+        WHERE w.is_template = true
+          AND ${buildTemplateAccessClause(1)}
+        GROUP BY w.id, u.id
+        ORDER BY w.updated_at DESC
+        LIMIT $2 OFFSET $3;
+      `;
+
+      const { rows } = await pool.query(query, params);
+      const templates = rows.map((row) => {
+        const activities = Array.isArray(row.activities)
+          ? row.activities
+              .map((a) => ({
+                id: a.id,
+                activityType: a.activityType,
+                amount: a.quantity,
+                points: a.points,
+                notes: a.notes,
+                unit: a.unit,
+                restBetweenSetsSeconds: a.restBetweenSetsSeconds ?? null,
+                restAfterSeconds: a.restAfterSeconds ?? null,
+                effort: a.effort ?? null,
+                supersetGroup: a.supersetGroup ?? null,
+                sets: a.setsData
+                  ? typeof a.setsData === "string"
+                    ? JSON.parse(a.setsData)
+                    : a.setsData
+                  : null,
+              }))
+              .filter((a) => a.id !== null)
+          : [];
+
+        const workout = toCamelCase(row);
+        workout.activities = activities;
+        workout.owner = {
+          id: row.user_id,
+          firstName: row.first_name,
+          lastName: row.last_name,
+          nickname: row.nickname,
+          displayPreference: row.display_preference,
+        };
+        return workout;
+      });
+
+      res.json({ templates });
+    } catch (error) {
+      console.error("Template workouts error:", error);
+      res.status(500).json({ error: "Serverfehler beim Laden der Vorlagen." });
+    }
+  });
+
+  // GET /api/workouts/templates/:id - Get single template if accessible
+  router.get("/templates/:id", authMiddleware, async (req, res) => {
+    try {
+      const templateId = req.params.id;
+      const query = `
+        SELECT 
+          w.id,
+          w.user_id,
+          w.title,
+          w.description,
+          w.start_time,
+          w.duration,
+          w.use_end_time,
+          w.difficulty,
+          w.session_type,
+          w.rounds,
+          w.rest_between_sets_seconds,
+          w.rest_between_activities_seconds,
+          w.rest_between_rounds_seconds,
+          w.visibility,
+          w.is_template,
+          w.created_at,
+          w.updated_at,
+          COALESCE(
+            JSON_AGG(
+              JSON_BUILD_OBJECT(
+                'id', wa.id,
+                'activityType', wa.activity_type,
+                'quantity', wa.quantity,
+                'points', wa.points_earned,
+                'notes', wa.notes,
+                'unit', wa.unit,
+                'restBetweenSetsSeconds', wa.rest_between_sets_seconds,
+                'restAfterSeconds', wa.rest_after_seconds,
+                'effort', wa.effort,
+                'supersetGroup', wa.superset_group,
+                'setsData', wa.sets_data
+              ) ORDER BY wa.order_index, wa.id
+            ) FILTER (WHERE wa.id IS NOT NULL),
+            '[]'::json
+          ) as activities
+        FROM workouts w
+        LEFT JOIN workout_activities wa ON w.id = wa.workout_id
+        WHERE w.id = $1 AND w.is_template = true AND ${buildTemplateAccessClause(2)}
+        GROUP BY w.id
+      `;
+      const { rows } = await pool.query(query, [templateId, req.user.id]);
+      if (rows.length === 0) {
+        return res.status(404).json({ error: "Vorlage nicht gefunden." });
+      }
+      const row = rows[0];
+      const activities = Array.isArray(row.activities)
+        ? row.activities
+            .map((a) => ({
+              id: a.id,
+              activityType: a.activityType,
+              amount: a.quantity,
+              points: a.points,
+              notes: a.notes,
+              unit: a.unit,
+              restBetweenSetsSeconds: a.restBetweenSetsSeconds ?? null,
+              restAfterSeconds: a.restAfterSeconds ?? null,
+              effort: a.effort ?? null,
+              supersetGroup: a.supersetGroup ?? null,
+              sets: a.setsData
+                ? typeof a.setsData === "string"
+                  ? JSON.parse(a.setsData)
+                  : a.setsData
+                : null,
+            }))
+            .filter((a) => a.id !== null)
+        : [];
+      const workout = toCamelCase(row);
+      workout.activities = activities;
+      res.json(workout);
+    } catch (error) {
+      console.error("Template workout get error:", error);
+      res.status(500).json({ error: "Serverfehler beim Laden der Vorlage." });
+    }
+  });
+
   // POST /api/workouts - Create new workout
   router.post("/", authMiddleware, async (req, res) => {
     try {
@@ -307,7 +522,42 @@ export const createWorkoutsRouter = (pool) => {
         startTime,
         endTime,
         useEndTime,
+        visibility,
+        isTemplate,
+        difficulty,
+        sessionType,
+        rounds,
+        restBetweenSetsSeconds,
+        restBetweenActivitiesSeconds,
+        restBetweenRoundsSeconds,
       } = req.body;
+
+      const parsePositiveInt = (value) => {
+        const num = Number(value);
+        return Number.isFinite(num) && num > 0 ? Math.round(num) : null;
+      };
+
+      const parseNonNegativeInt = (value) => {
+        const num = Number(value);
+        return Number.isFinite(num) && num >= 0 ? Math.round(num) : null;
+      };
+
+      const normalizedVisibility = ["private", "friends", "public"].includes(
+        visibility
+      )
+        ? visibility
+        : "private";
+      const normalizedDifficulty = parsePositiveInt(difficulty);
+      const normalizedRounds = parsePositiveInt(rounds) ?? 1;
+      const normalizedRestBetweenSetsSeconds = parseNonNegativeInt(
+        restBetweenSetsSeconds
+      );
+      const normalizedRestBetweenActivitiesSeconds = parseNonNegativeInt(
+        restBetweenActivitiesSeconds
+      );
+      const normalizedRestBetweenRoundsSeconds = parseNonNegativeInt(
+        restBetweenRoundsSeconds
+      );
 
       console.log("Received workout data:", {
         title,
@@ -319,6 +569,8 @@ export const createWorkoutsRouter = (pool) => {
           hasSets: !!a.sets,
           setsCount: a.sets?.length,
         })),
+        visibility,
+        isTemplate,
       });
 
       if (!title || !title.trim()) {
@@ -490,9 +742,24 @@ export const createWorkoutsRouter = (pool) => {
 
         // Create workout with start_time (TIMESTAMPTZ), duration, and use_end_time
         const workoutQuery = `
-                    INSERT INTO workouts (user_id, title, description, start_time, duration, use_end_time)
-                    VALUES ($1, $2, $3, $4, $5, $6)
-                    RETURNING id, title, description, start_time, duration, use_end_time, created_at, updated_at;
+                    INSERT INTO workouts (
+                      user_id,
+                      title,
+                      description,
+                      start_time,
+                      duration,
+                      use_end_time,
+                      difficulty,
+                      session_type,
+                      rounds,
+                      rest_between_sets_seconds,
+                      rest_between_activities_seconds,
+                      rest_between_rounds_seconds,
+                      visibility,
+                      is_template
+                    )
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                    RETURNING id, title, description, start_time, duration, use_end_time, difficulty, session_type, rounds, rest_between_sets_seconds, rest_between_activities_seconds, rest_between_rounds_seconds, visibility, is_template, created_at, updated_at;
                 `;
         const { rows: workoutRows } = await client.query(workoutQuery, [
           req.user.id,
@@ -501,6 +768,14 @@ export const createWorkoutsRouter = (pool) => {
           finalStartTime,
           finalDuration && finalDuration > 0 ? Math.round(finalDuration) : null,
           finalUseEndTime,
+          normalizedDifficulty,
+          sessionType || null,
+          normalizedRounds,
+          normalizedRestBetweenSetsSeconds,
+          normalizedRestBetweenActivitiesSeconds,
+          normalizedRestBetweenRoundsSeconds,
+          normalizedVisibility,
+          Boolean(isTemplate),
         ]);
 
         const workoutId = workoutRows[0].id;
@@ -587,7 +862,12 @@ export const createWorkoutsRouter = (pool) => {
           ) {
             // Filtere Sets heraus, die keine Reps haben (reps <= 0)
             const validSets = activity.sets.filter(
-              (set) => set && (set.reps || 0) > 0
+              (set) =>
+                set &&
+                ((set.reps || 0) > 0 ||
+                  (set.weight || 0) > 0 ||
+                  (set.duration || 0) > 0 ||
+                  (set.distance || 0) > 0)
             );
             const totalFromSets = validSets.reduce(
               (sum, set) => sum + (set.reps || 0),
@@ -608,9 +888,22 @@ export const createWorkoutsRouter = (pool) => {
           );
 
           const activityQuery = `
-                        INSERT INTO workout_activities (workout_id, activity_type, quantity, points_earned, notes, order_index, sets_data, unit)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                        RETURNING id, activity_type, quantity, points_earned, notes, order_index, sets_data, unit;
+                        INSERT INTO workout_activities (
+                          workout_id,
+                          activity_type,
+                          quantity,
+                          points_earned,
+                          notes,
+                          order_index,
+                          sets_data,
+                          unit,
+                          rest_between_sets_seconds,
+                          rest_after_seconds,
+                          effort,
+                          superset_group
+                        )
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                        RETURNING id, activity_type, quantity, points_earned, notes, order_index, sets_data, unit, rest_between_sets_seconds, rest_after_seconds, effort, superset_group;
                     `;
 
           let setsDataValue = null;
@@ -648,6 +941,10 @@ export const createWorkoutsRouter = (pool) => {
               i,
               setsDataValue,
               activity.unit || "Stück",
+              parseNonNegativeInt(activity.restBetweenSetsSeconds),
+              parseNonNegativeInt(activity.restAfterSeconds),
+              parsePositiveInt(activity.effort),
+              activity.supersetGroup || null,
             ]);
             const row = toCamelCase(activityRows[0]);
             row.amount = row.quantity;
@@ -819,6 +1116,14 @@ export const createWorkoutsRouter = (pool) => {
                     w.start_time,
                     w.duration,
                     w.use_end_time,
+                    w.difficulty,
+                    w.session_type,
+                    w.rounds,
+                    w.rest_between_sets_seconds,
+                    w.rest_between_activities_seconds,
+                    w.rest_between_rounds_seconds,
+                    w.visibility,
+                    w.is_template,
                     w.created_at, w.updated_at,
                     COALESCE(
                         JSON_AGG(
@@ -829,6 +1134,10 @@ export const createWorkoutsRouter = (pool) => {
                                 'points', wa.points_earned,
                                 'notes', wa.notes,
                                 'unit', wa.unit,
+                                'restBetweenSetsSeconds', wa.rest_between_sets_seconds,
+                                'restAfterSeconds', wa.rest_after_seconds,
+                                'effort', wa.effort,
+                                'supersetGroup', wa.superset_group,
                                 'setsData', wa.sets_data
                             ) ORDER BY wa.order_index, wa.id
                         ) FILTER (WHERE wa.id IS NOT NULL),
@@ -837,7 +1146,7 @@ export const createWorkoutsRouter = (pool) => {
                 FROM workouts w
                 LEFT JOIN workout_activities wa ON w.id = wa.workout_id
                 WHERE w.id = $1 AND w.user_id = $2
-                GROUP BY w.id, w.title, w.description, w.start_time, w.duration, w.use_end_time, w.created_at, w.updated_at;
+                GROUP BY w.id, w.title, w.description, w.start_time, w.duration, w.use_end_time, w.visibility, w.is_template, w.created_at, w.updated_at;
             `;
       const { rows } = await pool.query(query, [workoutId, req.user.id]);
       if (rows.length === 0) {
@@ -853,6 +1162,10 @@ export const createWorkoutsRouter = (pool) => {
               points: a.points,
               notes: a.notes,
               unit: a.unit,
+              restBetweenSetsSeconds: a.restBetweenSetsSeconds ?? null,
+              restAfterSeconds: a.restAfterSeconds ?? null,
+              effort: a.effort ?? null,
+              supersetGroup: a.supersetGroup ?? null,
               sets: a.setsData
                 ? typeof a.setsData === "string"
                   ? JSON.parse(a.setsData)
@@ -942,7 +1255,42 @@ export const createWorkoutsRouter = (pool) => {
         startTime,
         endTime,
         useEndTime,
+        visibility,
+        isTemplate,
+        difficulty,
+        sessionType,
+        rounds,
+        restBetweenSetsSeconds,
+        restBetweenActivitiesSeconds,
+        restBetweenRoundsSeconds,
       } = req.body;
+
+      const parsePositiveInt = (value) => {
+        const num = Number(value);
+        return Number.isFinite(num) && num > 0 ? Math.round(num) : null;
+      };
+
+      const parseNonNegativeInt = (value) => {
+        const num = Number(value);
+        return Number.isFinite(num) && num >= 0 ? Math.round(num) : null;
+      };
+
+      const normalizedVisibility = ["private", "friends", "public"].includes(
+        visibility
+      )
+        ? visibility
+        : "private";
+      const normalizedDifficulty = parsePositiveInt(difficulty);
+      const normalizedRounds = parsePositiveInt(rounds) ?? 1;
+      const normalizedRestBetweenSetsSeconds = parseNonNegativeInt(
+        restBetweenSetsSeconds
+      );
+      const normalizedRestBetweenActivitiesSeconds = parseNonNegativeInt(
+        restBetweenActivitiesSeconds
+      );
+      const normalizedRestBetweenRoundsSeconds = parseNonNegativeInt(
+        restBetweenRoundsSeconds
+      );
 
       if (!title || !title.trim()) {
         return res
@@ -1082,9 +1430,17 @@ export const createWorkoutsRouter = (pool) => {
                         start_time = $3,
                         duration = $4,
                         use_end_time = $5,
+                        difficulty = $6,
+                        session_type = $7,
+                        rounds = $8,
+                        rest_between_sets_seconds = $9,
+                        rest_between_activities_seconds = $10,
+                        rest_between_rounds_seconds = $11,
+                        visibility = $12,
+                        is_template = $13,
                         updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $6 AND user_id = $7
-                    RETURNING id, title, description, start_time, duration, use_end_time, created_at, updated_at;
+                    WHERE id = $14 AND user_id = $15
+                    RETURNING id, title, description, start_time, duration, use_end_time, difficulty, session_type, rounds, rest_between_sets_seconds, rest_between_activities_seconds, rest_between_rounds_seconds, visibility, is_template, created_at, updated_at;
                 `;
         const { rows: workoutRows } = await client.query(updateQuery, [
           title.trim(),
@@ -1092,6 +1448,14 @@ export const createWorkoutsRouter = (pool) => {
           finalStartTime,
           finalDuration && finalDuration > 0 ? Math.round(finalDuration) : null,
           finalUseEndTime,
+          normalizedDifficulty,
+          sessionType || null,
+          normalizedRounds,
+          normalizedRestBetweenSetsSeconds,
+          normalizedRestBetweenActivitiesSeconds,
+          normalizedRestBetweenRoundsSeconds,
+          normalizedVisibility,
+          Boolean(isTemplate),
           workoutId,
           req.user.id,
         ]);
@@ -1150,7 +1514,12 @@ export const createWorkoutsRouter = (pool) => {
           ) {
             // Filtere Sets heraus, die keine Reps haben (reps <= 0)
             const validSets = activity.sets.filter(
-              (set) => set && (set.reps || 0) > 0
+              (set) =>
+                set &&
+                ((set.reps || 0) > 0 ||
+                  (set.weight || 0) > 0 ||
+                  (set.duration || 0) > 0 ||
+                  (set.distance || 0) > 0)
             );
             const totalFromSets = validSets.reduce(
               (sum, set) => sum + (set.reps || 0),
@@ -1170,9 +1539,22 @@ export const createWorkoutsRouter = (pool) => {
             activityAmount
           );
           const activityQuery = `
-                        INSERT INTO workout_activities (workout_id, activity_type, quantity, points_earned, notes, order_index, sets_data, unit)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                        RETURNING id, activity_type, quantity, points_earned, notes, order_index, sets_data, unit;
+                        INSERT INTO workout_activities (
+                          workout_id,
+                          activity_type,
+                          quantity,
+                          points_earned,
+                          notes,
+                          order_index,
+                          sets_data,
+                          unit,
+                          rest_between_sets_seconds,
+                          rest_after_seconds,
+                          effort,
+                          superset_group
+                        )
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                        RETURNING id, activity_type, quantity, points_earned, notes, order_index, sets_data, unit, rest_between_sets_seconds, rest_after_seconds, effort, superset_group;
                     `;
 
           let setsDataValue = null;
@@ -1204,6 +1586,10 @@ export const createWorkoutsRouter = (pool) => {
             i,
             setsDataValue,
             activity.unit || "Stück",
+            parseNonNegativeInt(activity.restBetweenSetsSeconds),
+            parseNonNegativeInt(activity.restAfterSeconds),
+            parsePositiveInt(activity.effort),
+            activity.supersetGroup || null,
           ]);
           const row = toCamelCase(activityRows[0]);
           row.amount = row.quantity;

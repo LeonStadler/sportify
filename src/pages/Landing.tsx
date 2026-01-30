@@ -32,6 +32,7 @@ import { Link } from "react-router-dom";
 
 import { PublicFooter } from "@/components/common/PublicFooter";
 import { PublicHeader } from "@/components/common/PublicHeader";
+import { PublicPageLayout } from "@/components/common/PublicPageLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -405,7 +406,7 @@ export default function Landing() {
   );
 
   return (
-    <div className="min-h-screen bg-background" lang={i18n.language}>
+    <PublicPageLayout className="bg-background" lang={i18n.language}>
       {/* Skip to main content - Accessibility */}
       <a
         href="#main-content"
@@ -1110,6 +1111,6 @@ export default function Landing() {
 
       {/* Global Styles for Animations - respects reduced motion */}
       <style>{ANIMATION_STYLES}</style>
-    </div>
+    </PublicPageLayout>
   );
 }

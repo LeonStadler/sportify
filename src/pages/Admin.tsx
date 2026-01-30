@@ -2,8 +2,24 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
   Table,
@@ -31,7 +47,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 interface AdminUser {
   id: string;
@@ -49,14 +65,48 @@ interface AdminUser {
 interface Exercise {
   id: string;
   name: string;
+  description?: string;
+  category?: string;
+  discipline?: string;
+  movementPattern?: string | null;
+  measurementType?: string;
   pointsPerUnit: number;
   unit: string;
   hasWeight: boolean;
   hasSetMode: boolean;
+  requiresWeight?: boolean;
+  allowsWeight?: boolean;
+  supportsSets?: boolean;
+  supportsTime?: boolean;
+  supportsDistance?: boolean;
+  supportsGrade?: boolean;
+  difficultyTier?: number | null;
+  muscleGroups?: string[];
+  equipment?: string[];
   unitOptions: Array<{ value: string; label: string; multiplier: number }>;
+  status?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+interface ExerciseReport {
+  id: string;
+  exerciseId: string;
+  reportedBy: string;
+  reason: string;
+  description?: string;
+  status: string;
+  createdAt: string;
+}
+
+interface ExerciseEditRequest {
+  id: string;
+  exerciseId: string;
+  requestedBy: string;
+  changeRequest: Record<string, unknown>;
+  status: string;
+  createdAt: string;
 }
 
 export function Admin() {
@@ -65,6 +115,8 @@ export function Admin() {
 
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [exerciseReports, setExerciseReports] = useState<ExerciseReport[]>([]);
+  const [exerciseEditRequests, setExerciseEditRequests] = useState<ExerciseEditRequest[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showEmails, setShowEmails] = useState(false);
   const [isExerciseFormOpen, setIsExerciseFormOpen] = useState(false);
@@ -75,11 +127,170 @@ export function Admin() {
     id: "",
     name: "",
     pointsPerUnit: 1,
-    unit: "Wiederholungen",
+    unit: "reps",
     hasWeight: false,
     hasSetMode: true,
     isActive: true,
   });
+  const [scoringQuery, setScoringQuery] = useState("");
+  const [scoringCategory, setScoringCategory] = useState("all");
+  const [scoringStatus, setScoringStatus] = useState("all");
+  const [mergeSourceId, setMergeSourceId] = useState("");
+  const [mergeTargetId, setMergeTargetId] = useState("");
+
+  const exerciseMap = useMemo(
+    () => new Map(exercises.map((exercise) => [exercise.id, exercise])),
+    [exercises]
+  );
+
+  const scoringCategories = useMemo(() => {
+    const values = exercises
+      .map((exercise) => exercise.category)
+      .filter((value): value is string => Boolean(value));
+    return Array.from(new Set(values));
+  }, [exercises]);
+
+  const filteredScoringExercises = useMemo(() => {
+    const query = scoringQuery.trim().toLowerCase();
+    return exercises.filter((exercise) => {
+      if (scoringCategory !== "all" && exercise.category !== scoringCategory) {
+        return false;
+      }
+      if (scoringStatus !== "all") {
+        const isActive = exercise.isActive === true;
+        if (scoringStatus === "active" && !isActive) return false;
+        if (scoringStatus === "inactive" && isActive) return false;
+      }
+      if (!query) return true;
+      return (
+        exercise.name.toLowerCase().includes(query) ||
+        exercise.id.toLowerCase().includes(query)
+      );
+    });
+  }, [exercises, scoringCategory, scoringQuery, scoringStatus]);
+
+  const formatChangeValue = (value: unknown) => {
+    if (Array.isArray(value)) {
+      return value.join(", ");
+    }
+    if (value === null || value === undefined) return "-";
+    if (typeof value === "boolean") return value ? "Ja" : "Nein";
+    if (typeof value === "object") return JSON.stringify(value);
+    return String(value);
+  };
+
+  const changeKeyLabels: Record<string, string> = {
+    name: "Name",
+    description: "Beschreibung",
+    category: "Kategorie",
+    discipline: "Disziplin",
+    movementPattern: "Movement",
+    measurementType: "Messung",
+    requiresWeight: "Gewicht erforderlich",
+    allowsWeight: "Gewicht optional",
+    supportsSets: "Sets/Reps",
+    supportsTime: "Zeit",
+    supportsDistance: "Distanz",
+    supportsGrade: "Route",
+    difficultyTier: "Schwierigkeit",
+    muscleGroups: "Muskelgruppen",
+    equipment: "Equipment",
+    unitOptions: "Einheiten",
+  };
+
+  const MergeDialog = ({ sourceId }: { sourceId: string }) => {
+    const [open, setOpen] = useState(false);
+    const [targetId, setTargetId] = useState("");
+
+    useEffect(() => {
+      if (!open) {
+        setTargetId("");
+      }
+    }, [open]);
+
+    return (
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm">
+            Merge
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Übung zusammenführen</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Ziel-Übung</Label>
+            <Select value={targetId} onValueChange={setTargetId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Ziel wählen" />
+              </SelectTrigger>
+              <SelectContent>
+                {exercises
+                  .filter((item) => item.id !== sourceId)
+                  .map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Alle Aktivitäten werden auf die Ziel‑Übung umgehängt.
+            </p>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Abbrechen</Button>
+            </DialogClose>
+            <Button
+              disabled={!targetId}
+              onClick={async () => {
+                await handleMergeExercise(sourceId, targetId);
+                setOpen(false);
+              }}
+            >
+              Zusammenführen
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
+  const handleMergeExercise = async (sourceId: string, targetId: string) => {
+    if (!targetId || sourceId === targetId) return;
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `${API_URL}/admin/exercises/${sourceId}/merge`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ targetId }),
+        }
+      );
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Merge fehlgeschlagen.");
+      }
+      toast({
+        title: "Merge erfolgreich",
+        description: "Die Übung wurde zusammengeführt.",
+      });
+      await loadExercises();
+    } catch (error) {
+      toast({
+        title: "Fehler",
+        description:
+          error instanceof Error ? error.message : "Merge fehlgeschlagen.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const loadUsers = async () => {
     try {
@@ -114,6 +325,83 @@ export function Admin() {
       }
     } catch (error) {
       console.error("Error loading exercises:", error);
+    }
+  };
+
+  const loadExerciseReports = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/admin/exercise-reports?status=pending`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setExerciseReports(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error("Error loading exercise reports:", error);
+    }
+  };
+
+  const loadExerciseEditRequests = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `${API_URL}/admin/exercise-edit-requests?status=pending`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setExerciseEditRequests(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error("Error loading exercise edit requests:", error);
+    }
+  };
+
+  const resolveExerciseReport = async (reportId: string, status: string) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `${API_URL}/admin/exercise-reports/${reportId}/resolve`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status }),
+        }
+      );
+      if (!response.ok) {
+        throw new Error("Resolve failed");
+      }
+      await loadExerciseReports();
+    } catch (error) {
+      console.error("Resolve report error:", error);
+    }
+  };
+
+  const resolveEditRequest = async (requestId: string, status: string) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `${API_URL}/admin/exercise-edit-requests/${requestId}/resolve`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status }),
+        }
+      );
+      if (!response.ok) {
+        throw new Error("Resolve failed");
+      }
+      await loadExerciseEditRequests();
+    } catch (error) {
+      console.error("Resolve edit request error:", error);
     }
   };
 
@@ -172,7 +460,12 @@ export function Admin() {
   const loadAdminData = useCallback(async () => {
     setIsLoading(true);
     try {
-      await Promise.all([loadUsers(), loadExercises()]);
+      await Promise.all([
+        loadUsers(),
+        loadExercises(),
+        loadExerciseReports(),
+        loadExerciseEditRequests(),
+      ]);
     } catch (error) {
       toast({
         title: "Fehler",
@@ -214,7 +507,6 @@ export function Admin() {
     e.preventDefault();
 
     if (
-      !exerciseForm.id ||
       !exerciseForm.name ||
       exerciseForm.pointsPerUnit <= 0
     ) {
@@ -235,7 +527,9 @@ export function Admin() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          id: exerciseForm.id.toLowerCase().replace(/\s+/g, "-"),
+          id: exerciseForm.id
+            ? exerciseForm.id.toLowerCase().replace(/\s+/g, "-")
+            : undefined,
           name: exerciseForm.name,
           pointsPerUnit: exerciseForm.pointsPerUnit,
           unit: exerciseForm.unit,
@@ -395,10 +689,11 @@ export function Admin() {
       </Alert>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="flex flex-wrap w-full gap-2">
           <TabsTrigger value="overview">Übersicht</TabsTrigger>
           <TabsTrigger value="users">Benutzerverwaltung</TabsTrigger>
           <TabsTrigger value="scoring">Wertung</TabsTrigger>
+          <TabsTrigger value="moderation">Moderation</TabsTrigger>
           <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
         </TabsList>
 
@@ -587,9 +882,123 @@ export function Admin() {
                   Neue Übung
                 </Button>
               </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Punkte pro Einheit definieren die Basiswertung. Einheit und Messung
+                kommen aus der Übung selbst.
+              </p>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
+                <div className="flex flex-col md:flex-row gap-3">
+                  <div className="flex-1">
+                    <Label>Suche</Label>
+                    <Input
+                      value={scoringQuery}
+                      onChange={(e) => setScoringQuery(e.target.value)}
+                      placeholder="Name oder ID"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div className="w-full md:w-48">
+                    <Label>Kategorie</Label>
+                    <Select
+                      value={scoringCategory}
+                      onValueChange={setScoringCategory}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Alle</SelectItem>
+                        {scoringCategories.map((category) => (
+                          <SelectItem key={category} value={category}>
+                            {category}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="w-full md:w-40">
+                    <Label>Status</Label>
+                    <Select
+                      value={scoringStatus}
+                      onValueChange={setScoringStatus}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Alle</SelectItem>
+                        <SelectItem value="active">Aktiv</SelectItem>
+                        <SelectItem value="inactive">Inaktiv</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <Card className="border-dashed">
+                  <CardContent className="p-4 space-y-2 text-sm">
+                    <p className="font-medium">Wertungslogik</p>
+                    <p className="text-muted-foreground">
+                      Punkte = Basiswert pro Einheit × Menge. Bei Sets wird die Summe der
+                      Wiederholungen genutzt. Einheit und Messung kommen aus der Übung.
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Zusammenführen</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                    <div>
+                      <Label>Quell‑Übung</Label>
+                      <Select
+                        value={mergeSourceId}
+                        onValueChange={setMergeSourceId}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Quelle wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {exercises.map((exercise) => (
+                            <SelectItem key={exercise.id} value={exercise.id}>
+                              {exercise.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Ziel‑Übung</Label>
+                      <Select
+                        value={mergeTargetId}
+                        onValueChange={setMergeTargetId}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Ziel wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {exercises
+                            .filter((exercise) => exercise.id !== mergeSourceId)
+                            .map((exercise) => (
+                              <SelectItem key={exercise.id} value={exercise.id}>
+                                {exercise.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      variant="outline"
+                      disabled={!mergeSourceId || !mergeTargetId}
+                      onClick={() => handleMergeExercise(mergeSourceId, mergeTargetId)}
+                    >
+                      Zusammenführen
+                    </Button>
+                  </CardContent>
+                </Card>
+
                 {isExerciseFormOpen && (
                   <Card className="border-2">
                     <CardHeader>
@@ -651,24 +1060,6 @@ export function Admin() {
                         className="space-y-4"
                       >
                         <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label htmlFor="exercise-id">
-                              ID (eindeutig, z.B. "burpees")
-                            </Label>
-                            <Input
-                              id="exercise-id"
-                              value={exerciseForm.id}
-                              onChange={(e) =>
-                                setExerciseForm((prev) => ({
-                                  ...prev,
-                                  id: e.target.value,
-                                }))
-                              }
-                              placeholder="burpees"
-                              disabled={!!editingExercise}
-                              required
-                            />
-                          </div>
                           <div>
                             <Label htmlFor="exercise-name">Name</Label>
                             <Input
@@ -788,22 +1179,19 @@ export function Admin() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Name</TableHead>
-                        <TableHead>ID</TableHead>
                         <TableHead>Punkte/Einheit</TableHead>
-                        <TableHead>Einheit</TableHead>
+                        <TableHead>Kategorie</TableHead>
+                        <TableHead>Messung</TableHead>
                         <TableHead>Eigenschaften</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Aktionen</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {exercises.map((exercise) => (
+                      {filteredScoringExercises.map((exercise) => (
                         <TableRow key={exercise.id}>
                           <TableCell className="font-medium">
                             {exercise.name}
-                          </TableCell>
-                          <TableCell className="font-mono text-sm">
-                            {exercise.id}
                           </TableCell>
                           <TableCell>
                             <Input
@@ -820,8 +1208,16 @@ export function Admin() {
                               }
                               className="w-24"
                             />
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {exercise.unitOptions?.[0]?.label || exercise.unit}
+                            </div>
                           </TableCell>
-                          <TableCell>{exercise.unit}</TableCell>
+                          <TableCell className="text-sm">
+                            {exercise.category || "-"}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {exercise.measurementType || "-"}
+                          </TableCell>
                           <TableCell>
                             <div className="flex flex-col gap-1">
                               {exercise.hasSetMode && (
@@ -840,6 +1236,21 @@ export function Admin() {
                                   Mit Gewicht
                                 </Badge>
                               )}
+                              {exercise.supportsTime && (
+                                <Badge variant="outline" className="text-xs w-fit">
+                                  Zeit
+                                </Badge>
+                              )}
+                              {exercise.supportsDistance && (
+                                <Badge variant="outline" className="text-xs w-fit">
+                                  Distanz
+                                </Badge>
+                              )}
+                              {exercise.supportsGrade && (
+                                <Badge variant="outline" className="text-xs w-fit">
+                                  Route
+                                </Badge>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell>
@@ -852,13 +1263,16 @@ export function Admin() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => startEditExercise(exercise)}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => startEditExercise(exercise)}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <MergeDialog sourceId={exercise.id} />
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -866,7 +1280,7 @@ export function Admin() {
                   </Table>
                 </div>
 
-                {exercises.length === 0 && (
+                {filteredScoringExercises.length === 0 && (
                   <div className="text-center py-8">
                     <p className="text-muted-foreground">
                       Keine Übungen gefunden
@@ -885,6 +1299,169 @@ export function Admin() {
           >
             {isLoading ? "Wird geladen..." : "Übungen aktualisieren"}
           </Button>
+        </TabsContent>
+
+        <TabsContent value="moderation" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5" />
+                Übungs-Reports
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {exerciseReports.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Keine offenen Reports
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Übung</TableHead>
+                        <TableHead>Grund</TableHead>
+                        <TableHead>Beschreibung</TableHead>
+                        <TableHead>Erstellt</TableHead>
+                        <TableHead>Aktionen</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {exerciseReports.map((report) => (
+                        <TableRow key={report.id}>
+                          <TableCell className="text-sm">
+                            {exerciseMap.get(report.exerciseId)?.name ||
+                              report.exerciseId}
+                          </TableCell>
+                          <TableCell>{report.reason}</TableCell>
+                          <TableCell className="text-xs">
+                            {report.description || "-"}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {formatDate(report.createdAt)}
+                          </TableCell>
+                          <TableCell className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                resolveExerciseReport(report.id, "resolved")
+                              }
+                            >
+                              Erledigt
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() =>
+                                resolveExerciseReport(report.id, "dismissed")
+                              }
+                            >
+                              Ablehnen
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <RefreshCw className="w-5 h-5" />
+                Änderungsanfragen
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {exerciseEditRequests.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Keine offenen Änderungsanfragen
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Übung</TableHead>
+                        <TableHead>Änderungen</TableHead>
+                        <TableHead>Erstellt</TableHead>
+                        <TableHead>Aktionen</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {exerciseEditRequests.map((request) => (
+                        <TableRow key={request.id}>
+                          <TableCell className="text-sm">
+                            {exerciseMap.get(request.exerciseId)?.name ||
+                              request.exerciseId}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            <div className="space-y-1">
+                              {Object.entries(request.changeRequest || {}).map(
+                                ([key, value]) => {
+                                  const exercise = exerciseMap.get(
+                                    request.exerciseId
+                                  ) as any;
+                                  const oldValue =
+                                    exercise && key in exercise
+                                      ? formatChangeValue(exercise[key])
+                                      : null;
+                                  return (
+                                    <div key={key}>
+                                      <span className="font-medium">
+                                        {changeKeyLabels[key] || key}
+                                      </span>
+                                      :{" "}
+                                      {oldValue ? (
+                                        <>
+                                          <span className="line-through text-muted-foreground">
+                                            {oldValue}
+                                          </span>{" "}
+                                          → <span>{formatChangeValue(value)}</span>
+                                        </>
+                                      ) : (
+                                        <span>{formatChangeValue(value)}</span>
+                                      )}
+                                    </div>
+                                  );
+                                }
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {formatDate(request.createdAt)}
+                          </TableCell>
+                          <TableCell className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() =>
+                                resolveEditRequest(request.id, "approved")
+                              }
+                            >
+                              Freigeben
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() =>
+                                resolveEditRequest(request.id, "rejected")
+                              }
+                            >
+                              Ablehnen
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="monitoring" className="space-y-6 mt-6">

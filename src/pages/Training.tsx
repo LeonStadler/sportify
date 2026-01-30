@@ -545,7 +545,7 @@ export function Training() {
       )}
     >
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-6">
+        <TabsList className="mb-6">
           <TabsTrigger value="trainings">
             {t("training.trainingsDiary")}
           </TabsTrigger>

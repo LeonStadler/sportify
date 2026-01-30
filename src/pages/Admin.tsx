@@ -1,7 +1,27 @@
+import { SearchFilterToolbar } from "@/components/common/SearchFilterToolbar";
+import { PageSizeSelector } from "@/components/common/pagination/PageSizeSelector";
+import { PaginationControls, PaginationMeta } from "@/components/common/pagination/PaginationControls";
+import { ExerciseFiltersPanel } from "@/components/exercises/ExerciseFiltersPanel";
+import { ExerciseForm, ExerciseFormValue } from "@/components/exercises/ExerciseForm";
+import { PageTemplate } from "@/components/common/PageTemplate";
+import {
+  categoryOptions,
+  disciplineOptions,
+  measurementOptions,
+  movementPatternOptions,
+  muscleGroupTree,
+} from "@/components/exercises/exerciseOptions";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogClose,
@@ -13,6 +33,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -36,11 +57,17 @@ import { API_URL } from "@/lib/api";
 import {
   Activity,
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  Check,
+  ChevronDown,
   Edit,
   Eye,
   EyeOff,
+  MoreHorizontal,
   Plus,
   RefreshCw,
+  Search,
   Settings,
   Shield,
   Trophy,
@@ -48,6 +75,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface AdminUser {
   id: string;
@@ -112,6 +140,7 @@ interface ExerciseEditRequest {
 export function Admin() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -137,6 +166,33 @@ export function Admin() {
   const [scoringStatus, setScoringStatus] = useState("all");
   const [mergeSourceId, setMergeSourceId] = useState("");
   const [mergeTargetId, setMergeTargetId] = useState("");
+  const [exerciseManagementView, setExerciseManagementView] = useState<"grid" | "table">("table");
+  const [exerciseManagementFiltersOpen, setExerciseManagementFiltersOpen] = useState(false);
+  const [exerciseManagementQuery, setExerciseManagementQuery] = useState("");
+  const [exerciseManagementCategoryFilter, setExerciseManagementCategoryFilter] = useState("all");
+  const [exerciseManagementDisciplineFilter, setExerciseManagementDisciplineFilter] = useState("all");
+  const [exerciseManagementMovementPatternFilter, setExerciseManagementMovementPatternFilter] = useState("all");
+  const [exerciseManagementMeasurementFilters, setExerciseManagementMeasurementFilters] = useState<string[]>([]);
+  const [exerciseManagementMuscleFilters, setExerciseManagementMuscleFilters] = useState<string[]>([]);
+  const [exerciseManagementRequiresWeightFilter, setExerciseManagementRequiresWeightFilter] = useState("all");
+  const [exerciseManagementDifficultyRange, setExerciseManagementDifficultyRange] = useState<[number, number]>([1, 10]);
+  const [exerciseManagementSortBy, setExerciseManagementSortBy] = useState("name");
+  const [exerciseManagementSortDirection, setExerciseManagementSortDirection] = useState<"asc" | "desc">("asc");
+  const [exerciseManagementPageSize, setExerciseManagementPageSize] = useState(12);
+  const [exerciseManagementPage, setExerciseManagementPage] = useState(1);
+  const [exerciseManagementPagination, setExerciseManagementPagination] = useState<PaginationMeta>({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    hasNext: false,
+    hasPrev: false,
+  });
+  const [exerciseEditDialogOpen, setExerciseEditDialogOpen] = useState(false);
+  const [exerciseEditTarget, setExerciseEditTarget] = useState<Exercise | null>(null);
+  const [exerciseEditDraft, setExerciseEditDraft] = useState<ExerciseFormValue | null>(null);
+  const [exerciseEditDescriptionOpen, setExerciseEditDescriptionOpen] = useState(false);
+  const [exerciseEditSaving, setExerciseEditSaving] = useState(false);
+  const [exerciseDialogMode, setExerciseDialogMode] = useState<"view" | "edit">("edit");
 
   const exerciseMap = useMemo(
     () => new Map(exercises.map((exercise) => [exercise.id, exercise])),
@@ -169,6 +225,341 @@ export function Admin() {
     });
   }, [exercises, scoringCategory, scoringQuery, scoringStatus]);
 
+  const normalizeCategory = (value?: string | null) => {
+    if (!value) return value;
+    const lower = value.toLowerCase();
+    if (lower === "strength") return "Kraft";
+    if (lower === "endurance") return "Ausdauer";
+    return value;
+  };
+
+  const normalizeDiscipline = (value?: string | null) => {
+    if (!value) return value;
+    const lower = value.toLowerCase();
+    if (lower === "strength") return "Kraft";
+    if (lower === "endurance") return "Ausdauer";
+    return value;
+  };
+
+  const exerciseManagementSortOptions = [
+    { value: "none", label: t("filters.sortNone", "Keine") },
+    { value: "name", label: t("filters.sortName", "Name") },
+    { value: "category", label: t("filters.sortCategory", "Kategorie") },
+    { value: "discipline", label: t("filters.sortDiscipline", "Disziplin") },
+    { value: "measurement", label: t("filters.sortMeasurement", "Einheit") },
+    { value: "weight", label: t("filters.sortWeight", "Gewicht") },
+    { value: "difficulty", label: t("filters.sortDifficulty", "Schwierigkeit") },
+    { value: "newest", label: t("filters.sortNewest", "Neueste") },
+  ];
+
+  const exerciseManagementCategoryOptions = useMemo(() => {
+    const combined = new Set<string>(categoryOptions);
+    exercises.forEach((exercise) => {
+      const normalized = normalizeCategory(exercise.category);
+      if (normalized) combined.add(normalized);
+    });
+    return Array.from(combined);
+  }, [exercises]);
+
+  const exerciseManagementDisciplineOptions = useMemo(() => {
+    const combined = new Set<string>(disciplineOptions);
+    exercises.forEach((exercise) => {
+      const normalized = normalizeDiscipline(exercise.discipline);
+      if (normalized) combined.add(normalized);
+    });
+    return Array.from(combined);
+  }, [exercises]);
+
+  const exerciseManagementHandleSortClick = (next: string) => {
+    if (exerciseManagementSortBy !== next) {
+      setExerciseManagementSortBy(next);
+      setExerciseManagementSortDirection("asc");
+      return;
+    }
+    if (exerciseManagementSortDirection === "asc") {
+      setExerciseManagementSortDirection("desc");
+      return;
+    }
+    setExerciseManagementSortBy("none");
+    setExerciseManagementSortDirection("asc");
+  };
+
+  const exerciseManagementResetFilters = () => {
+    setExerciseManagementCategoryFilter("all");
+    setExerciseManagementDisciplineFilter("all");
+    setExerciseManagementMovementPatternFilter("all");
+    setExerciseManagementMeasurementFilters([]);
+    setExerciseManagementMuscleFilters([]);
+    setExerciseManagementRequiresWeightFilter("all");
+    setExerciseManagementDifficultyRange([1, 10]);
+  };
+
+  const exerciseManagementToFormValue = (exercise: Exercise): ExerciseFormValue => {
+    const measurementSet = new Set<string>();
+    if (exercise.measurementType) measurementSet.add(exercise.measurementType);
+    if (exercise.supportsTime && exercise.measurementType !== "time") measurementSet.add("time");
+    if (exercise.supportsDistance && exercise.measurementType !== "distance") measurementSet.add("distance");
+    if (exercise.supportsSets || exercise.measurementType === "reps") measurementSet.add("reps");
+
+    return {
+      name: exercise.name,
+      description: exercise.description || "",
+      category: exercise.category || "Kraft",
+      discipline: exercise.discipline || "",
+      movementPattern: exercise.movementPattern || "push",
+      measurementTypes: Array.from(measurementSet),
+      difficulty: exercise.difficultyTier || 5,
+      requiresWeight: exercise.requiresWeight || false,
+      allowsWeight: exercise.allowsWeight || false,
+      supportsSets: exercise.supportsSets ?? true,
+      muscleGroups: exercise.muscleGroups || [],
+      equipment: (exercise.equipment || []).join(", "),
+    };
+  };
+
+  const exerciseManagementOpenEdit = (exercise: Exercise) => {
+    setExerciseEditTarget(exercise);
+    const formValue = exerciseManagementToFormValue(exercise);
+    setExerciseEditDraft(formValue);
+    setExerciseEditDescriptionOpen(Boolean(formValue.description));
+    setExerciseDialogMode("edit");
+    setExerciseEditDialogOpen(true);
+  };
+
+  const exerciseManagementOpenView = (exercise: Exercise) => {
+    setExerciseEditTarget(exercise);
+    setExerciseEditDraft(null);
+    setExerciseEditDescriptionOpen(false);
+    setExerciseDialogMode("view");
+    setExerciseEditDialogOpen(true);
+  };
+
+  const exerciseManagementCloseEdit = () => {
+    setExerciseEditDialogOpen(false);
+    setExerciseEditTarget(null);
+    setExerciseEditDraft(null);
+    setExerciseEditDescriptionOpen(false);
+    setExerciseDialogMode("edit");
+  };
+
+  const exerciseManagementHandleSave = async () => {
+    if (!exerciseEditTarget || !exerciseEditDraft) return;
+    const payload = {
+      name: exerciseEditDraft.name,
+      description: exerciseEditDraft.description,
+      category: exerciseEditDraft.category,
+      discipline: exerciseEditDraft.discipline,
+      movementPattern: exerciseEditDraft.movementPattern,
+      measurementType: exerciseEditDraft.measurementTypes.includes("distance")
+        ? "distance"
+        : exerciseEditDraft.measurementTypes.includes("reps")
+          ? "reps"
+          : "time",
+      difficultyTier: exerciseEditDraft.difficulty,
+      requiresWeight: exerciseEditDraft.requiresWeight,
+      allowsWeight: exerciseEditDraft.allowsWeight,
+      supportsSets: exerciseEditDraft.supportsSets,
+      supportsTime: exerciseEditDraft.measurementTypes.includes("time"),
+      supportsDistance: exerciseEditDraft.measurementTypes.includes("distance"),
+      supportsGrade: false,
+      muscleGroups: exerciseEditDraft.muscleGroups,
+      equipment: exerciseEditDraft.equipment
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
+    };
+
+    const changes: Record<string, unknown> = {};
+    const fields: Array<keyof Exercise> = [
+      "name",
+      "description",
+      "category",
+      "discipline",
+      "movementPattern",
+      "measurementType",
+      "requiresWeight",
+      "allowsWeight",
+      "supportsSets",
+      "supportsTime",
+      "supportsDistance",
+      "supportsGrade",
+      "difficultyTier",
+      "muscleGroups",
+      "equipment",
+    ];
+    fields.forEach((field) => {
+      const nextValue = payload[field];
+      const prevValue = exerciseEditTarget[field];
+      if (Array.isArray(nextValue)) {
+        const nextSorted = [...nextValue].sort();
+        const prevSorted = Array.isArray(prevValue) ? [...prevValue].sort() : [];
+        if (JSON.stringify(nextSorted) !== JSON.stringify(prevSorted)) {
+          changes[field] = nextValue;
+        }
+        return;
+      }
+      if (nextValue !== undefined && nextValue !== prevValue) {
+        changes[field] = nextValue;
+      }
+    });
+
+    if (Object.keys(changes).length === 0) {
+      toast({
+        title: t("common.error"),
+        description: t("exerciseLibrary.noChanges", "Keine Änderungen angegeben."),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setExerciseEditSaving(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/admin/exercises/${exerciseEditTarget.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(changes),
+      });
+      if (!response.ok) throw new Error("Update failed");
+      const updated = await response.json();
+      setExercises((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      toast({
+        title: t("common.saved", "Gespeichert"),
+        description: t("exerciseLibrary.updateSuccess", "Übung wurde aktualisiert."),
+      });
+      exerciseManagementCloseEdit();
+    } catch (error) {
+      console.error("Admin exercise update error:", error);
+      toast({
+        title: t("common.error"),
+        description: t("exerciseLibrary.updateError", "Änderungen konnten nicht gespeichert werden."),
+        variant: "destructive",
+      });
+    } finally {
+      setExerciseEditSaving(false);
+    }
+  };
+
+  const exerciseManagementFiltered = useMemo(() => {
+    const normalizedQuery = exerciseManagementQuery.trim().toLowerCase();
+    const results = exercises.filter((exercise) => {
+      if (normalizedQuery) {
+        const nameMatch = exercise.name?.toLowerCase().includes(normalizedQuery);
+        const descriptionMatch = exercise.description?.toLowerCase().includes(normalizedQuery);
+        if (!nameMatch && !descriptionMatch) return false;
+      }
+
+      if (exerciseManagementCategoryFilter !== "all") {
+        const normalizedCategory = normalizeCategory(exercise.category) || "";
+        if (normalizedCategory !== exerciseManagementCategoryFilter) return false;
+      }
+
+      if (exerciseManagementDisciplineFilter !== "all") {
+        const normalizedDiscipline = normalizeDiscipline(exercise.discipline) || "";
+        if (normalizedDiscipline !== exerciseManagementDisciplineFilter) return false;
+      }
+
+      if (exerciseManagementMovementPatternFilter !== "all") {
+        if ((exercise.movementPattern || "") !== exerciseManagementMovementPatternFilter) return false;
+      }
+
+      if (exerciseManagementMeasurementFilters.length > 0) {
+        const measurementSet = new Set<string>();
+        if (exercise.measurementType) measurementSet.add(exercise.measurementType);
+        if (exercise.supportsTime) measurementSet.add("time");
+        if (exercise.supportsDistance) measurementSet.add("distance");
+        if (exercise.supportsSets || exercise.measurementType === "reps") measurementSet.add("reps");
+        const matchesMeasurement = exerciseManagementMeasurementFilters.some((item) => measurementSet.has(item));
+        if (!matchesMeasurement) return false;
+      }
+
+      if (exerciseManagementMuscleFilters.length > 0) {
+        const muscleGroups = exercise.muscleGroups || [];
+        const hasMatch = exerciseManagementMuscleFilters.some((group) => muscleGroups.includes(group));
+        if (!hasMatch) return false;
+      }
+
+      if (exerciseManagementRequiresWeightFilter !== "all") {
+        const requiresWeight = Boolean(exercise.requiresWeight);
+        if (exerciseManagementRequiresWeightFilter === "yes" && !requiresWeight) return false;
+        if (exerciseManagementRequiresWeightFilter === "no" && requiresWeight) return false;
+      }
+
+      const difficulty = exercise.difficultyTier ?? 5;
+      if (difficulty < exerciseManagementDifficultyRange[0] || difficulty > exerciseManagementDifficultyRange[1]) {
+        return false;
+      }
+
+      return true;
+    });
+
+    const sorted = [...results];
+    const direction = exerciseManagementSortDirection === "asc" ? 1 : -1;
+    if (exerciseManagementSortBy !== "none") {
+      sorted.sort((a, b) => {
+        switch (exerciseManagementSortBy) {
+          case "name":
+            return (a.name || "").localeCompare(b.name || "") * direction;
+          case "category":
+            return (a.category || "").localeCompare(b.category || "") * direction;
+          case "discipline":
+            return (a.discipline || "").localeCompare(b.discipline || "") * direction;
+          case "measurement":
+            return (a.measurementType || "").localeCompare(b.measurementType || "") * direction;
+          case "weight": {
+            const weightValue = (exercise?: Exercise) =>
+              exercise?.requiresWeight ? 2 : exercise?.allowsWeight ? 1 : 0;
+            return (weightValue(a) - weightValue(b)) * direction;
+          }
+          case "difficulty":
+            return ((a.difficultyTier ?? 0) - (b.difficultyTier ?? 0)) * direction;
+          case "newest":
+            return ((new Date(b.createdAt || 0).getTime() || 0) - (new Date(a.createdAt || 0).getTime() || 0)) * direction;
+          default:
+            return 0;
+        }
+      });
+    }
+
+    return sorted;
+  }, [
+    exercises,
+    exerciseManagementQuery,
+    exerciseManagementCategoryFilter,
+    exerciseManagementDisciplineFilter,
+    exerciseManagementMovementPatternFilter,
+    exerciseManagementMeasurementFilters,
+    exerciseManagementMuscleFilters,
+    exerciseManagementRequiresWeightFilter,
+    exerciseManagementDifficultyRange,
+    exerciseManagementSortBy,
+    exerciseManagementSortDirection,
+  ]);
+
+  useEffect(() => {
+    const totalItems = exerciseManagementFiltered.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / exerciseManagementPageSize));
+    const nextPage = Math.min(exerciseManagementPage, totalPages);
+    if (nextPage !== exerciseManagementPage) {
+      setExerciseManagementPage(nextPage);
+    }
+    setExerciseManagementPagination({
+      currentPage: nextPage,
+      totalPages,
+      totalItems,
+      hasNext: nextPage < totalPages,
+      hasPrev: nextPage > 1,
+    });
+  }, [exerciseManagementFiltered, exerciseManagementPage, exerciseManagementPageSize]);
+
+  const exerciseManagementPageItems = useMemo(() => {
+    const start = (exerciseManagementPage - 1) * exerciseManagementPageSize;
+    return exerciseManagementFiltered.slice(start, start + exerciseManagementPageSize);
+  }, [exerciseManagementFiltered, exerciseManagementPage, exerciseManagementPageSize]);
+
   const formatChangeValue = (value: unknown) => {
     if (Array.isArray(value)) {
       return value.join(", ");
@@ -196,6 +587,95 @@ export function Admin() {
     muscleGroups: "Muskelgruppen",
     equipment: "Equipment",
     unitOptions: "Einheiten",
+  };
+
+  const ExerciseMergeSelect = ({
+    value,
+    onChange,
+    placeholder,
+    options,
+  }: {
+    value: string;
+    onChange: (value: string) => void;
+    placeholder: string;
+    options: Exercise[];
+  }) => {
+    const [open, setOpen] = useState(false);
+    const [query, setQuery] = useState("");
+
+    const selected = options.find((exercise) => exercise.id === value) || null;
+
+    const filtered = useMemo(() => {
+      const normalizedQuery = query.trim().toLowerCase();
+      if (!normalizedQuery) return options;
+      return options.filter((exercise) =>
+        exercise.name.toLowerCase().includes(normalizedQuery)
+      );
+    }, [options, query]);
+
+    const displayOptions = useMemo(() => {
+      if (!selected) return filtered;
+      if (filtered.some((exercise) => exercise.id === selected.id)) return filtered;
+      return [selected, ...filtered];
+    }, [filtered, selected]);
+
+    return (
+      <Popover
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (next) setQuery("");
+        }}
+      >
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="mt-1 w-full justify-between"
+          >
+            {selected ? selected.name : placeholder}
+            <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[320px] p-0" align="start">
+          <Command shouldFilter={false}>
+            <div className="flex items-center gap-2 px-3 py-2 border-b">
+              <Search className="h-4 w-4 text-muted-foreground" />
+              <CommandInput
+                placeholder={t("common.search", "Suche")}
+                value={query}
+                onValueChange={setQuery}
+              />
+            </div>
+            <CommandList className="max-h-[260px]">
+              <CommandEmpty>{t("common.noResults", "Keine Treffer")}</CommandEmpty>
+              <CommandGroup>
+                {displayOptions.map((exercise) => (
+                  <CommandItem
+                    key={exercise.id}
+                    value={exercise.id}
+                    onSelect={() => {
+                      onChange(exercise.id);
+                      setOpen(false);
+                    }}
+                  >
+                    <Check
+                      className={
+                        value === exercise.id
+                          ? "mr-2 h-4 w-4 opacity-100"
+                          : "mr-2 h-4 w-4 opacity-0"
+                      }
+                    />
+                    {exercise.name}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    );
   };
 
   const MergeDialog = ({ sourceId }: { sourceId: string }) => {
@@ -537,12 +1017,12 @@ export function Admin() {
           hasSetMode: exerciseForm.hasSetMode,
           unitOptions: exerciseForm.hasSetMode
             ? [
-                {
-                  value: exerciseForm.unit,
-                  label: exerciseForm.unit,
-                  multiplier: 1,
-                },
-              ]
+              {
+                value: exerciseForm.unit,
+                label: exerciseForm.unit,
+                multiplier: 1,
+              },
+            ]
             : [],
           isActive: exerciseForm.isActive,
         }),
@@ -672,27 +1152,18 @@ export function Admin() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Admin Panel</h1>
-        <p className="text-muted-foreground mt-2">
-          Verwaltung der App-Einstellungen und Benutzer
-        </p>
-      </div>
-
-      <Alert>
-        <Shield className="h-4 w-4" />
-        <AlertDescription>
-          Sie sind als Administrator angemeldet und haben vollständigen Zugriff
-          auf alle Einstellungen.
-        </AlertDescription>
-      </Alert>
+    <PageTemplate
+      title="Admin Panel"
+      subtitle="Verwaltung der App-Einstellungen und Benutzer"
+    >
+      <div className="space-y-6">
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="flex flex-wrap w-full gap-2">
+        <TabsList>
           <TabsTrigger value="overview">Übersicht</TabsTrigger>
           <TabsTrigger value="users">Benutzerverwaltung</TabsTrigger>
           <TabsTrigger value="scoring">Wertung</TabsTrigger>
+          <TabsTrigger value="exercise-management">Übungsverwaltung</TabsTrigger>
           <TabsTrigger value="moderation">Moderation</TabsTrigger>
           <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
         </TabsList>
@@ -946,59 +1417,6 @@ export function Admin() {
                   </CardContent>
                 </Card>
 
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Zusammenführen</CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-                    <div>
-                      <Label>Quell‑Übung</Label>
-                      <Select
-                        value={mergeSourceId}
-                        onValueChange={setMergeSourceId}
-                      >
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Quelle wählen" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {exercises.map((exercise) => (
-                            <SelectItem key={exercise.id} value={exercise.id}>
-                              {exercise.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Ziel‑Übung</Label>
-                      <Select
-                        value={mergeTargetId}
-                        onValueChange={setMergeTargetId}
-                      >
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Ziel wählen" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {exercises
-                            .filter((exercise) => exercise.id !== mergeSourceId)
-                            .map((exercise) => (
-                              <SelectItem key={exercise.id} value={exercise.id}>
-                                {exercise.name}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <Button
-                      variant="outline"
-                      disabled={!mergeSourceId || !mergeTargetId}
-                      onClick={() => handleMergeExercise(mergeSourceId, mergeTargetId)}
-                    >
-                      Zusammenführen
-                    </Button>
-                  </CardContent>
-                </Card>
-
                 {isExerciseFormOpen && (
                   <Card className="border-2">
                     <CardHeader>
@@ -1022,39 +1440,39 @@ export function Admin() {
                         onSubmit={
                           editingExercise
                             ? async (e) => {
-                                e.preventDefault();
-                                await handleUpdateExercise(
-                                  editingExercise,
-                                  "name",
-                                  exerciseForm.name
-                                );
-                                await handleUpdateExercise(
-                                  editingExercise,
-                                  "pointsPerUnit",
-                                  exerciseForm.pointsPerUnit
-                                );
-                                await handleUpdateExercise(
-                                  editingExercise,
-                                  "unit",
-                                  exerciseForm.unit
-                                );
-                                await handleUpdateExercise(
-                                  editingExercise,
-                                  "hasWeight",
-                                  exerciseForm.hasWeight
-                                );
-                                await handleUpdateExercise(
-                                  editingExercise,
-                                  "hasSetMode",
-                                  exerciseForm.hasSetMode
-                                );
-                                await handleUpdateExercise(
-                                  editingExercise,
-                                  "isActive",
-                                  exerciseForm.isActive
-                                );
-                                resetExerciseForm();
-                              }
+                              e.preventDefault();
+                              await handleUpdateExercise(
+                                editingExercise,
+                                "name",
+                                exerciseForm.name
+                              );
+                              await handleUpdateExercise(
+                                editingExercise,
+                                "pointsPerUnit",
+                                exerciseForm.pointsPerUnit
+                              );
+                              await handleUpdateExercise(
+                                editingExercise,
+                                "unit",
+                                exerciseForm.unit
+                              );
+                              await handleUpdateExercise(
+                                editingExercise,
+                                "hasWeight",
+                                exerciseForm.hasWeight
+                              );
+                              await handleUpdateExercise(
+                                editingExercise,
+                                "hasSetMode",
+                                exerciseForm.hasSetMode
+                              );
+                              await handleUpdateExercise(
+                                editingExercise,
+                                "isActive",
+                                exerciseForm.isActive
+                              );
+                              resetExerciseForm();
+                            }
                             : handleCreateExercise
                         }
                         className="space-y-4"
@@ -1299,6 +1717,471 @@ export function Admin() {
           >
             {isLoading ? "Wird geladen..." : "Übungen aktualisieren"}
           </Button>
+        </TabsContent>
+
+        <TabsContent value="exercise-management" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader className="space-y-4">
+              <CardTitle className="flex items-center gap-2">
+                <Edit className="h-5 w-5" />
+                Übungsverwaltung
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Zusammenführen</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                  <div>
+                    <Label>Quell‑Übung</Label>
+                    <ExerciseMergeSelect
+                      value={mergeSourceId}
+                      onChange={setMergeSourceId}
+                      placeholder="Quelle wählen"
+                      options={exercises}
+                    />
+                  </div>
+                  <div>
+                    <Label>Ziel‑Übung</Label>
+                    <ExerciseMergeSelect
+                      value={mergeTargetId}
+                      onChange={setMergeTargetId}
+                      placeholder="Ziel wählen"
+                      options={exercises.filter((exercise) => exercise.id !== mergeSourceId)}
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    disabled={!mergeSourceId || !mergeTargetId}
+                    onClick={() => handleMergeExercise(mergeSourceId, mergeTargetId)}
+                  >
+                    Zusammenführen
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <SearchFilterToolbar
+                query={exerciseManagementQuery}
+                onQueryChange={(value) => {
+                  setExerciseManagementQuery(value);
+                  setExerciseManagementPage(1);
+                }}
+                viewMode={exerciseManagementView}
+                onViewModeChange={setExerciseManagementView}
+                filtersOpen={exerciseManagementFiltersOpen}
+                onToggleFilters={() => setExerciseManagementFiltersOpen((prev) => !prev)}
+                sortBy={exerciseManagementSortBy}
+                sortDirection={exerciseManagementSortDirection}
+                onSortByChange={(value) => {
+                  setExerciseManagementSortBy(value);
+                  setExerciseManagementSortDirection("asc");
+                }}
+                onSortDirectionToggle={() =>
+                  setExerciseManagementSortDirection((prev) =>
+                    prev === "asc" ? "desc" : "asc"
+                  )
+                }
+                sortOptions={exerciseManagementSortOptions}
+              />
+
+              {exerciseManagementFiltersOpen && (
+                <ExerciseFiltersPanel
+                  categoryOptions={exerciseManagementCategoryOptions}
+                  disciplineOptions={exerciseManagementDisciplineOptions}
+                  movementPatternOptions={movementPatternOptions}
+                  measurementOptions={measurementOptions}
+                  muscleGroups={muscleGroupTree}
+                  categoryFilter={exerciseManagementCategoryFilter}
+                  onCategoryFilterChange={(value) => {
+                    setExerciseManagementCategoryFilter(value);
+                    setExerciseManagementPage(1);
+                  }}
+                  disciplineFilter={exerciseManagementDisciplineFilter}
+                  onDisciplineFilterChange={(value) => {
+                    setExerciseManagementDisciplineFilter(value);
+                    setExerciseManagementPage(1);
+                  }}
+                  movementPatternFilter={exerciseManagementMovementPatternFilter}
+                  onMovementPatternFilterChange={(value) => {
+                    setExerciseManagementMovementPatternFilter(value);
+                    setExerciseManagementPage(1);
+                  }}
+                  measurementFilters={exerciseManagementMeasurementFilters}
+                  onMeasurementFiltersChange={(value) => {
+                    setExerciseManagementMeasurementFilters(value);
+                    setExerciseManagementPage(1);
+                  }}
+                  muscleFilters={exerciseManagementMuscleFilters}
+                  onMuscleFiltersChange={(value) => {
+                    setExerciseManagementMuscleFilters(value);
+                    setExerciseManagementPage(1);
+                  }}
+                  requiresWeightFilter={exerciseManagementRequiresWeightFilter}
+                  onRequiresWeightFilterChange={(value) => {
+                    setExerciseManagementRequiresWeightFilter(value);
+                    setExerciseManagementPage(1);
+                  }}
+                  difficultyRange={exerciseManagementDifficultyRange}
+                  onDifficultyRangeChange={(value) => {
+                    setExerciseManagementDifficultyRange(value);
+                    setExerciseManagementPage(1);
+                  }}
+                  onReset={() => {
+                    exerciseManagementResetFilters();
+                    setExerciseManagementPage(1);
+                  }}
+                />
+              )}
+
+              {exerciseManagementView === "grid" ? (
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {exerciseManagementPageItems.map((exercise) => (
+                    <Card
+                      key={exercise.id}
+                      className="flex h-full flex-col"
+                      onClick={() => exerciseManagementOpenView(exercise)}
+                    >
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="space-y-1">
+                            <CardTitle className="text-lg">{exercise.name}</CardTitle>
+                            <div className="text-xs text-muted-foreground">
+                              {exercise.category || "-"} • {exercise.discipline || "-"}
+                            </div>
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onSelect={() => exerciseManagementOpenView(exercise)}>
+                                Anzeigen
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => exerciseManagementOpenEdit(exercise)}>
+                                Bearbeiten
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onSelect={() => {
+                                  setMergeSourceId(exercise.id);
+                                  toast({
+                                    title: "Quelle gesetzt",
+                                    description: `${exercise.name} als Quell‑Übung ausgewählt.`,
+                                  });
+                                }}
+                              >
+                                Zusammenführen
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="flex flex-1 flex-col gap-3">
+                        <div className="flex flex-wrap gap-2">
+                          {exercise.measurementType && (
+                            <Badge variant="secondary">{exercise.measurementType}</Badge>
+                          )}
+                          {exercise.supportsTime && <Badge variant="secondary">Zeit</Badge>}
+                          {exercise.supportsDistance && <Badge variant="secondary">Distanz</Badge>}
+                          {exercise.requiresWeight && (
+                            <Badge variant="outline">
+                              {t("exerciseLibrary.requiresWeight", "Gewicht erforderlich")}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {t("exerciseLibrary.difficulty", "Schwierigkeit")}: {exercise.difficultyTier ?? "-"}
+                        </div>
+                        {exercise.muscleGroups && exercise.muscleGroups.length > 0 && (
+                          <div>
+                            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                              {t("exerciseLibrary.muscleGroups", "Muskelgruppen")}
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {exercise.muscleGroups.slice(0, 4).map((group) => (
+                                <Badge key={group} variant="secondary">
+                                  {group}
+                                </Badge>
+                              ))}
+                              {exercise.muscleGroups.length > 4 && (
+                                <Badge variant="secondary">
+                                  +{exercise.muscleGroups.length - 4}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table className="min-w-[720px]">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="sticky left-0 z-10 bg-background">
+                          <button
+                            className="inline-flex items-center gap-1 text-left"
+                            onClick={() => exerciseManagementHandleSortClick("name")}
+                          >
+                            Name
+                            {exerciseManagementSortBy === "name" &&
+                              (exerciseManagementSortDirection === "asc" ? (
+                                <ArrowUp className="h-3 w-3" />
+                              ) : (
+                                <ArrowDown className="h-3 w-3" />
+                              ))}
+                          </button>
+                        </TableHead>
+                        <TableHead>
+                          <button
+                            className="inline-flex items-center gap-1 text-left"
+                            onClick={() => exerciseManagementHandleSortClick("category")}
+                          >
+                            Kategorie
+                            {exerciseManagementSortBy === "category" &&
+                              (exerciseManagementSortDirection === "asc" ? (
+                                <ArrowUp className="h-3 w-3" />
+                              ) : (
+                                <ArrowDown className="h-3 w-3" />
+                              ))}
+                          </button>
+                        </TableHead>
+                        <TableHead>
+                          <button
+                            className="inline-flex items-center gap-1 text-left"
+                            onClick={() => exerciseManagementHandleSortClick("discipline")}
+                          >
+                            Disziplin
+                            {exerciseManagementSortBy === "discipline" &&
+                              (exerciseManagementSortDirection === "asc" ? (
+                                <ArrowUp className="h-3 w-3" />
+                              ) : (
+                                <ArrowDown className="h-3 w-3" />
+                              ))}
+                          </button>
+                        </TableHead>
+                        <TableHead>
+                          <button
+                            className="inline-flex items-center gap-1 text-left"
+                            onClick={() => exerciseManagementHandleSortClick("measurement")}
+                          >
+                            Einheit
+                            {exerciseManagementSortBy === "measurement" &&
+                              (exerciseManagementSortDirection === "asc" ? (
+                                <ArrowUp className="h-3 w-3" />
+                              ) : (
+                                <ArrowDown className="h-3 w-3" />
+                              ))}
+                          </button>
+                        </TableHead>
+                        <TableHead>
+                          <button
+                            className="inline-flex items-center gap-1 text-left"
+                            onClick={() => exerciseManagementHandleSortClick("difficulty")}
+                          >
+                            Schwierigkeit
+                            {exerciseManagementSortBy === "difficulty" &&
+                              (exerciseManagementSortDirection === "asc" ? (
+                                <ArrowUp className="h-3 w-3" />
+                              ) : (
+                                <ArrowDown className="h-3 w-3" />
+                              ))}
+                          </button>
+                        </TableHead>
+                        <TableHead className="sticky right-0 z-10 bg-background text-right">
+                          Aktionen
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {exerciseManagementPageItems.map((exercise) => (
+                        <TableRow
+                          key={exercise.id}
+                          className="cursor-pointer"
+                          onClick={() => exerciseManagementOpenView(exercise)}
+                        >
+                          <TableCell className="font-medium sticky left-0 bg-background z-10">
+                            {exercise.name}
+                          </TableCell>
+                          <TableCell>{exercise.category || "-"}</TableCell>
+                          <TableCell>{exercise.discipline || "-"}</TableCell>
+                          <TableCell>{exercise.measurementType || "-"}</TableCell>
+                          <TableCell>{exercise.difficultyTier ?? "-"}</TableCell>
+                          <TableCell
+                            className="text-right sticky right-0 z-10 bg-background"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onSelect={() => exerciseManagementOpenView(exercise)}>
+                                  Anzeigen
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => exerciseManagementOpenEdit(exercise)}>
+                                  Bearbeiten
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onSelect={() => {
+                                    setMergeSourceId(exercise.id);
+                                    toast({
+                                      title: "Quelle gesetzt",
+                                      description: `${exercise.name} als Quell‑Übung ausgewählt.`,
+                                    });
+                                  }}
+                                >
+                                  Zusammenführen
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {exerciseManagementPagination.totalPages > 1 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-muted-foreground">
+                      {exerciseManagementPagination.totalItems > 0 &&
+                        t("exerciseLibrary.totalExercises", {
+                          count: exerciseManagementPagination.totalItems,
+                          defaultValue: `${exerciseManagementPagination.totalItems} Übungen gefunden`,
+                        })}
+                    </div>
+                    <PageSizeSelector
+                      pageSize={exerciseManagementPageSize}
+                      onPageSizeChange={(next) => {
+                        setExerciseManagementPageSize(next);
+                        setExerciseManagementPage(1);
+                      }}
+                      label={t("filters.itemsPerPage", "Pro Seite:")}
+                      options={[6, 12, 24, 48]}
+                    />
+                  </div>
+                  <PaginationControls
+                    pagination={exerciseManagementPagination}
+                    onPageChange={setExerciseManagementPage}
+                    pageSize={exerciseManagementPageSize}
+                    maxVisiblePages={7}
+                    labels={{
+                      page: (current, total) =>
+                        t("filters.pageLabel", { current, total, defaultValue: `${current}/${total}` }),
+                      summary: (start, end, total) =>
+                        t("filters.pageSummary", {
+                          start,
+                          end,
+                          total,
+                          defaultValue: `${start}–${end} / ${total}`,
+                        }),
+                      previous: t("filters.prev", "Zurück"),
+                      next: t("filters.next", "Weiter"),
+                    }}
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Dialog open={exerciseEditDialogOpen} onOpenChange={(open) => (open ? null : exerciseManagementCloseEdit())}>
+            <DialogContent className="max-h-[90vh] w-full max-w-[720px] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>
+                  {exerciseDialogMode === "view" ? "Übung anzeigen" : "Übung bearbeiten"}
+                </DialogTitle>
+              </DialogHeader>
+              {exerciseDialogMode === "view" && exerciseEditTarget && (
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-lg font-semibold">{exerciseEditTarget.name}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {exerciseEditTarget.category || "-"} • {exerciseEditTarget.discipline || "-"}
+                    </p>
+                  </div>
+                  <div className="grid gap-2 text-sm">
+                    <div><strong>Bewegungsmuster:</strong> {exerciseEditTarget.movementPattern || "-"}</div>
+                    <div><strong>Einheit:</strong> {exerciseEditTarget.measurementType || "-"}</div>
+                    <div><strong>Schwierigkeit:</strong> {exerciseEditTarget.difficultyTier ?? "-"}</div>
+                    <div><strong>Sets/Reps:</strong> {exerciseEditTarget.supportsSets ? "Ja" : "Nein"}</div>
+                    <div><strong>Zeit:</strong> {exerciseEditTarget.supportsTime ? "Ja" : "Nein"}</div>
+                    <div><strong>Distanz:</strong> {exerciseEditTarget.supportsDistance ? "Ja" : "Nein"}</div>
+                    <div><strong>Gewicht erforderlich:</strong> {exerciseEditTarget.requiresWeight ? "Ja" : "Nein"}</div>
+                    <div><strong>Gewicht optional:</strong> {exerciseEditTarget.allowsWeight ? "Ja" : "Nein"}</div>
+                  </div>
+                  {exerciseEditTarget.muscleGroups && exerciseEditTarget.muscleGroups.length > 0 && (
+                    <div>
+                      <div className="text-xs font-medium text-muted-foreground">Muskelgruppen</div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {exerciseEditTarget.muscleGroups.map((group) => (
+                          <Badge key={group} variant="secondary">
+                            {group}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {exerciseEditTarget.equipment && exerciseEditTarget.equipment.length > 0 && (
+                    <div>
+                      <div className="text-xs font-medium text-muted-foreground">Equipment</div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {exerciseEditTarget.equipment.map((item) => (
+                          <Badge key={item} variant="secondary">
+                            {item}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {exerciseEditTarget.description && (
+                    <div className="rounded-md border bg-muted/20 p-3 text-sm text-muted-foreground">
+                      {exerciseEditTarget.description}
+                    </div>
+                  )}
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={() => {
+                        if (exerciseEditTarget) {
+                          const formValue = exerciseManagementToFormValue(exerciseEditTarget);
+                          setExerciseEditDraft(formValue);
+                          setExerciseEditDescriptionOpen(Boolean(formValue.description));
+                          setExerciseDialogMode("edit");
+                        }
+                      }}
+                    >
+                      Bearbeiten
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {exerciseDialogMode === "edit" && exerciseEditDraft && (
+                <ExerciseForm
+                  value={exerciseEditDraft}
+                  onChange={setExerciseEditDraft}
+                  onSubmit={exerciseManagementHandleSave}
+                  submitLabel="Änderungen speichern"
+                  submitDisabled={exerciseEditSaving}
+                  descriptionOpen={exerciseEditDescriptionOpen}
+                  onDescriptionToggle={setExerciseEditDescriptionOpen}
+                  showDescriptionToggle
+                />
+              )}
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         <TabsContent value="moderation" className="space-y-6 mt-6">
@@ -1588,7 +2471,7 @@ export function Admin() {
                             <p className="text-sm font-medium">{stat.status}</p>
                             <p className="text-xs text-muted-foreground">
                               {stat.status === "failed" &&
-                              stat.failed_after_retries > 0
+                                stat.failed_after_retries > 0
                                 ? `${stat.failed_after_retries} nach Retries`
                                 : "Gesamt"}
                             </p>
@@ -1674,6 +2557,7 @@ export function Admin() {
           )}
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </PageTemplate>
   );
 }

@@ -17,6 +17,7 @@ import { z } from "zod";
 
 import { PublicFooter } from "@/components/common/PublicFooter";
 import { PublicHeader } from "@/components/common/PublicHeader";
+import { PublicPageLayout } from "@/components/common/PublicPageLayout";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -150,10 +151,8 @@ export default function Contact() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <PublicHeader
-        title={t("contact.title")}
-      />
+    <PublicPageLayout className="bg-gradient-to-br from-background via-background to-muted/20">
+      <PublicHeader />
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-12">
@@ -329,6 +328,6 @@ export default function Contact() {
       </div>
 
       <PublicFooter />
-    </div>
+    </PublicPageLayout>
   );
 }

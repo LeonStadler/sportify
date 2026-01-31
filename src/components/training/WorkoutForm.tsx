@@ -698,7 +698,7 @@ export function WorkoutForm({
 
     if (field === "reps") {
       const isLastSet = setIndex === newActivities[activityIndex].sets.length - 1;
-      if (isLastSet && (prevSet.reps || 0) === 0 && value > 0) {
+      if (isLastSet && (prevSet.reps || 0) === 0 && typeof value === "number" && value > 0) {
         const exercise = exercises.find(
           (ex) => ex.id === newActivities[activityIndex].activityType
         );

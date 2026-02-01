@@ -4,9 +4,17 @@ import {
   PaginationControls,
   PaginationMeta,
 } from "@/components/common/pagination/PaginationControls";
+import { ExerciseBrowsePanel } from "@/components/exercises/ExerciseBrowsePanel";
+import { getExerciseBrowseLabels } from "@/components/exercises/exerciseBrowseLabels";
+import { ExerciseBrowseGrid, ExerciseBrowseTable } from "@/components/exercises/ExerciseBrowseList";
+import {
+  getExerciseCategoryLabel,
+  getExerciseDisciplineLabel,
+  getExerciseMovementPatternLabel,
+  getExerciseMuscleGroupLabel,
+} from "@/components/exercises/exerciseLabels";
 import { ExerciseFiltersPanel } from "@/components/exercises/ExerciseFiltersPanel";
 import { ExerciseForm } from "@/components/exercises/ExerciseForm";
-import { SearchFilterToolbar } from "@/components/common/SearchFilterToolbar";
 import type { ExerciseFormValue } from "@/components/exercises/ExerciseForm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -127,10 +135,12 @@ export function Exercises() {
   const [formValue, setFormValue] = useState<ExerciseFormValue>({
     name: "",
     description: "",
-    category: "Kraft",
+    category: "",
     discipline: "",
-    movementPattern: "push",
+    movementPattern: "",
     measurementTypes: ["reps"],
+    distanceUnit: user?.preferences?.units?.distance || "km",
+    timeUnit: "min",
     difficulty: 5,
     requiresWeight: false,
     allowsWeight: false,
@@ -375,6 +385,30 @@ export function Exercises() {
       });
       return;
     }
+    if (!formValue.category) {
+      toast({
+        title: t("common.error"),
+        description: t("exerciseLibrary.categoryRequired", "Bitte wähle eine Kategorie aus."),
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!formValue.discipline) {
+      toast({
+        title: t("common.error"),
+        description: t("exerciseLibrary.disciplineRequired", "Bitte wähle eine Disziplin aus."),
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!formValue.movementPattern) {
+      toast({
+        title: t("common.error"),
+        description: t("exerciseLibrary.movementPatternRequired", "Bitte wähle ein Bewegungsmuster aus."),
+        variant: "destructive",
+      });
+      return;
+    }
     if (nameExactMatch) {
       toast({
         title: t("common.error"),
@@ -404,6 +438,26 @@ export function Exercises() {
           ? "reps"
           : "time";
 
+      const distanceUnitOptions = [
+        { value: "km", label: t("training.form.units.kilometers") },
+        { value: "m", label: t("training.form.units.meters") },
+        { value: "miles", label: t("training.form.units.miles") },
+      ];
+      const timeUnitOptions = [
+        { value: "min", label: t("training.form.units.minutes", "Minuten") },
+        { value: "sec", label: t("training.form.units.seconds", "Sekunden") },
+      ];
+      const unitOptions = measurementType === "distance"
+        ? distanceUnitOptions
+        : measurementType === "time"
+          ? timeUnitOptions
+          : [];
+      const resolvedUnit = measurementType === "distance"
+        ? formValue.distanceUnit || (user?.preferences?.units?.distance || "km")
+        : measurementType === "time"
+          ? formValue.timeUnit || "min"
+          : "reps";
+
       const payload = {
         name: formValue.name.trim(),
         description: formValue.description.trim() || null,
@@ -411,6 +465,8 @@ export function Exercises() {
         discipline: formValue.discipline || null,
         movementPattern: formValue.movementPattern,
         measurementType,
+        unit: resolvedUnit,
+        unitOptions,
         difficultyTier: formValue.difficulty,
         requiresWeight: formValue.requiresWeight,
         allowsWeight: formValue.allowsWeight,
@@ -453,10 +509,12 @@ export function Exercises() {
       setFormValue({
         name: "",
         description: "",
-        category: "Kraft",
+        category: "",
         discipline: "",
-        movementPattern: "push",
+        movementPattern: "",
         measurementTypes: ["reps"],
+        distanceUnit: user?.preferences?.units?.distance || "km",
+        timeUnit: "min",
         difficulty: 5,
         requiresWeight: false,
         allowsWeight: false,
@@ -524,17 +582,46 @@ export function Exercises() {
 
   const handleEditRequest = async () => {
     if (!activeExercise || !editDraft) return;
+    if (!editDraft.category || !editDraft.discipline || !editDraft.movementPattern) {
+      toast({
+        title: t("common.error"),
+        description: t("exerciseLibrary.requiredFields", "Bitte fülle Kategorie, Disziplin und Bewegungsmuster aus."),
+        variant: "destructive",
+      });
+      return;
+    }
+    const measurementType = editDraft.measurementTypes.includes("distance")
+      ? "distance"
+      : editDraft.measurementTypes.includes("reps")
+        ? "reps"
+        : "time";
+    const unitOptions = measurementType === "distance"
+      ? [
+          { value: "km", label: t("training.form.units.kilometers") },
+          { value: "m", label: t("training.form.units.meters") },
+          { value: "miles", label: t("training.form.units.miles") },
+        ]
+      : measurementType === "time"
+        ? [
+            { value: "min", label: t("training.form.units.minutes", "Minuten") },
+            { value: "sec", label: t("training.form.units.seconds", "Sekunden") },
+          ]
+        : [];
+    const resolvedUnit = measurementType === "distance"
+      ? editDraft.distanceUnit || (user?.preferences?.units?.distance || "km")
+      : measurementType === "time"
+        ? editDraft.timeUnit || "min"
+        : "reps";
+
     const changePayload = {
       name: editDraft.name,
       description: editDraft.description,
       category: editDraft.category,
       discipline: editDraft.discipline,
       movementPattern: editDraft.movementPattern,
-      measurementType: editDraft.measurementTypes.includes("distance")
-        ? "distance"
-        : editDraft.measurementTypes.includes("reps")
-          ? "reps"
-          : "time",
+      measurementType,
+      unit: resolvedUnit,
+      unitOptions,
       difficultyTier: editDraft.difficulty,
       requiresWeight: editDraft.requiresWeight,
       allowsWeight: editDraft.allowsWeight,
@@ -652,6 +739,33 @@ export function Exercises() {
     if (exercise.supportsTime && exercise.measurementType !== "time") measurementSet.add("time");
     if (exercise.supportsDistance && exercise.measurementType !== "distance") measurementSet.add("distance");
     if (exercise.supportsSets || exercise.measurementType === "reps") measurementSet.add("reps");
+    const normalizeUnitValue = (unit?: string | null) => {
+      if (!unit) return "";
+      const lower = unit.toLowerCase();
+      if (lower.includes("sek")) return "sec";
+      if (lower.includes("min")) return "min";
+      if (lower.includes("mile") || lower.includes("meile")) return "miles";
+      if (lower === "m" || lower.includes("meter")) return "m";
+      if (lower.includes("km") || lower.includes("kilometer")) return "km";
+      if (lower.includes("wdh") || lower.includes("reps") || lower.includes("wiederholung"))
+        return "reps";
+      return unit;
+    };
+
+    const unitOptionsValues = Array.isArray(exercise.unitOptions)
+      ? exercise.unitOptions.map((option) => option.value)
+      : [];
+
+    const distanceUnit =
+      unitOptionsValues.find((value) => ["km", "m", "miles"].includes(value)) ||
+      normalizeUnitValue(exercise.unit) ||
+      (user?.preferences?.units?.distance || "km");
+
+    const timeUnit =
+      unitOptionsValues.find((value) => ["min", "sec"].includes(value)) ||
+      normalizeUnitValue(exercise.unit) ||
+      "min";
+
     setEditDraft({
       name: exercise.name,
       description: exercise.description || "",
@@ -659,6 +773,8 @@ export function Exercises() {
       discipline: exercise.discipline || "",
       movementPattern: exercise.movementPattern || "push",
       measurementTypes: Array.from(measurementSet),
+      distanceUnit,
+      timeUnit,
       difficulty: exercise.difficultyTier || 5,
       requiresWeight: exercise.requiresWeight || false,
       allowsWeight: exercise.allowsWeight || false,
@@ -708,339 +824,154 @@ export function Exercises() {
               nameExactMatch={nameExactMatch}
               confirmSimilar={confirmSimilar}
               onConfirmSimilarChange={setConfirmSimilar}
+              defaultDistanceUnit={user?.preferences?.units?.distance || "km"}
+              defaultTimeUnit="min"
             />
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="space-y-4">
-            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              <CardTitle>{t("exerciseLibrary.search", "Übungen durchsuchen")}</CardTitle>
-            </div>
-
-            <SearchFilterToolbar
-              query={query}
-              onQueryChange={setQuery}
-              viewMode={viewMode}
-              onViewModeChange={setViewMode}
-              filtersOpen={filtersOpen}
-              onToggleFilters={() => setFiltersOpen((open) => !open)}
+        <ExerciseBrowsePanel
+          title={t("exerciseLibrary.search", "Übungen durchsuchen")}
+          query={query}
+          onQueryChange={setQuery}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          filtersOpen={filtersOpen}
+          onToggleFilters={() => setFiltersOpen((open) => !open)}
+          sortBy={sortBy}
+          sortDirection={sortDirection}
+          onSortByChange={setSortBy}
+          onSortDirectionToggle={() =>
+            setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"))
+          }
+          sortOptions={sortOptions}
+          filtersPanel={
+            <ExerciseFiltersPanel
+              categoryOptions={categoryFilterOptions}
+              disciplineOptions={disciplineOptions}
+              movementPatternOptions={movementPatternOptions}
+              measurementOptions={measurementOptions}
+              muscleGroups={muscleGroupTree}
+              categoryFilter={categoryFilter}
+              onCategoryFilterChange={setCategoryFilter}
+              disciplineFilter={disciplineFilter}
+              onDisciplineFilterChange={setDisciplineFilter}
+              movementPatternFilter={movementPatternFilter}
+              onMovementPatternFilterChange={setMovementPatternFilter}
+              measurementFilters={measurementFilters}
+              onMeasurementFiltersChange={(next) =>
+                setMeasurementFilters(normalizeMeasurementFilters(next))
+              }
+              muscleFilters={muscleFilters}
+              onMuscleFiltersChange={setMuscleFilters}
+              requiresWeightFilter={requiresWeightFilter}
+              onRequiresWeightFilterChange={setRequiresWeightFilter}
+              difficultyRange={difficultyRange}
+              onDifficultyRangeChange={setDifficultyRange}
+              onReset={() => {
+                setQuery("");
+                setCategoryFilter("all");
+                setDisciplineFilter("all");
+                setMovementPatternFilter("all");
+                setMeasurementFilters([]);
+                setMuscleFilters([]);
+                setRequiresWeightFilter("all");
+                setDifficultyRange([1, 10]);
+                setCurrentPage(1);
+              }}
+            />
+          }
+          loading={loading}
+          empty={pagination.totalItems === 0}
+          emptyText={t("exerciseLibrary.empty", "Keine Übungen gefunden.")}
+          loadingText={t("common.loading", "Lade...")}
+          grid={
+            <ExerciseBrowseGrid
+              items={paginatedExercises}
+              onSelect={(exercise) => openExerciseDetails(exercise, "view")}
+              renderMenuItems={(exercise) => (
+                <>
+                  <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "view")}>
+                    {t("exerciseLibrary.details", "Details anzeigen")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "edit")}>
+                    {t("exerciseLibrary.suggestChange", "Änderung vorschlagen")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "report")}>
+                    {t("exerciseLibrary.report", "Melden")}
+                  </DropdownMenuItem>
+                </>
+              )}
+              labels={getExerciseBrowseLabels(t)}
+            />
+          }
+          table={
+            <ExerciseBrowseTable
+              items={paginatedExercises}
               sortBy={sortBy}
               sortDirection={sortDirection}
-              onSortByChange={setSortBy}
-              onSortDirectionToggle={() =>
-                setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"))
-              }
-              sortOptions={sortOptions}
+              onSortClick={handleSortClick}
+              onSelect={(exercise) => openExerciseDetails(exercise, "view")}
+              renderMenuItems={(exercise) => (
+                <>
+                  <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "view")}>
+                    {t("exerciseLibrary.details", "Details anzeigen")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "edit")}>
+                    {t("exerciseLibrary.suggestChange", "Änderung vorschlagen")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "report")}>
+                    {t("exerciseLibrary.report", "Melden")}
+                  </DropdownMenuItem>
+                </>
+              )}
+              labels={getExerciseBrowseLabels(t)}
             />
-
-            {filtersOpen && (
-              <ExerciseFiltersPanel
-                categoryOptions={categoryFilterOptions}
-                disciplineOptions={disciplineOptions}
-                movementPatternOptions={movementPatternOptions}
-                measurementOptions={measurementOptions}
-                muscleGroups={muscleGroupTree}
-                categoryFilter={categoryFilter}
-                onCategoryFilterChange={setCategoryFilter}
-                disciplineFilter={disciplineFilter}
-                onDisciplineFilterChange={setDisciplineFilter}
-                movementPatternFilter={movementPatternFilter}
-                onMovementPatternFilterChange={setMovementPatternFilter}
-                measurementFilters={measurementFilters}
-                onMeasurementFiltersChange={(next) =>
-                  setMeasurementFilters(normalizeMeasurementFilters(next))
-                }
-                muscleFilters={muscleFilters}
-                onMuscleFiltersChange={setMuscleFilters}
-                requiresWeightFilter={requiresWeightFilter}
-                onRequiresWeightFilterChange={setRequiresWeightFilter}
-                difficultyRange={difficultyRange}
-                onDifficultyRangeChange={setDifficultyRange}
-                onReset={() => {
-                  setQuery("");
-                  setCategoryFilter("all");
-                  setDisciplineFilter("all");
-                  setMovementPatternFilter("all");
-                  setMeasurementFilters([]);
-                  setMuscleFilters([]);
-                  setRequiresWeightFilter("all");
-                  setDifficultyRange([1, 10]);
-                  setCurrentPage(1);
-                }}
-              />
-            )}
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="text-sm text-muted-foreground">{t("common.loading", "Lade...")}</div>
-            ) : pagination.totalItems === 0 ? (
-              <div className="text-sm text-muted-foreground">{t("exerciseLibrary.empty", "Keine Übungen gefunden.")}</div>
-            ) : viewMode === "grid" ? (
-              <>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {paginatedExercises.map((exercise) => (
-                    <div key={exercise.id} className="border rounded-xl p-4 flex flex-col h-full bg-background/60">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="font-semibold truncate">{exercise.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {exercise.category || "-"} · {exercise.discipline || "-"}
-                          </div>
-                        </div>
-                        <div onClick={(event) => event.stopPropagation()}>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "view")}>
-                                {t("exerciseLibrary.details", "Details anzeigen")}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "edit")}>
-                                {t("exerciseLibrary.suggestChange", "Änderung vorschlagen")}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "report")}>
-                                {t("exerciseLibrary.report", "Melden")}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {exercise.measurementType && (
-                          <Badge variant="secondary">{exercise.measurementType}</Badge>
-                        )}
-                        {exercise.difficultyTier !== null && exercise.difficultyTier !== undefined && (
-                          <Badge variant="outline">
-                            {t("exerciseLibrary.difficulty", "Schwierigkeit")} {exercise.difficultyTier}
-                          </Badge>
-                        )}
-                        {exercise.requiresWeight && (
-                          <Badge variant="outline">{t("exerciseLibrary.requiresWeight", "Gewicht erforderlich")}</Badge>
-                        )}
-                        {exercise.supportsTime && <Badge variant="outline">Zeit</Badge>}
-                        {exercise.supportsDistance && <Badge variant="outline">Distanz</Badge>}
-                      </div>
-
-                      {exercise.muscleGroups && exercise.muscleGroups.length > 0 && (
-                        <div className="mt-3">
-                          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                            {t("exerciseLibrary.muscleGroups", "Muskelgruppen")}
-                          </div>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {exercise.muscleGroups.slice(0, 4).map((group) => (
-                              <Badge key={group} variant="secondary">
-                                {group}
-                              </Badge>
-                            ))}
-                            {exercise.muscleGroups.length > 4 && (
-                              <Badge variant="secondary">+{exercise.muscleGroups.length - 4}</Badge>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+          }
+          footer={
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  {pagination.totalItems > 0 &&
+                    t("exerciseLibrary.totalExercises", {
+                      count: pagination.totalItems,
+                      defaultValue: `${pagination.totalItems} Übungen gefunden`,
+                    })}
                 </div>
-                {pagination.totalPages > 1 && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-muted-foreground">
-                        {pagination.totalItems > 0 &&
-                          t("exerciseLibrary.totalExercises", {
-                            count: pagination.totalItems,
-                            defaultValue: `${pagination.totalItems} Übungen gefunden`,
-                          })}
-                      </div>
-                      <PageSizeSelector
-                        pageSize={pageSize}
-                        onPageSizeChange={(next) => {
-                          setPageSize(next);
-                          setCurrentPage(1);
-                        }}
-                        label={t("filters.itemsPerPage", "Pro Seite:")}
-                        options={[6, 12, 24, 48]}
-                      />
-                    </div>
-                    <PaginationControls
-                      pagination={pagination}
-                      onPageChange={setCurrentPage}
-                      pageSize={pageSize}
-                      maxVisiblePages={7}
-                      labels={{
-                        page: (current, total) =>
-                          t("filters.pageLabel", { current, total, defaultValue: `${current}/${total}` }),
-                        summary: (start, end, total) =>
-                          t("filters.pageSummary", {
-                            start,
-                            end,
-                            total,
-                            defaultValue: `${start}–${end} / ${total}`,
-                          }),
-                        previous: t("filters.prev", "Zurück"),
-                        next: t("filters.next", "Weiter"),
-                      }}
-                    />
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-              <div className="overflow-x-auto">
-              <Table className="min-w-[720px]">
-                <TableHeader>
-                  <TableRow>
-                  <TableHead className="sticky left-0 z-10 bg-background">
-                    <button
-                      className="inline-flex items-center gap-1 text-left"
-                      onClick={() => handleSortClick("name")}
-                    >
-                      Name
-                      {sortBy === "name" && (sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
-                    </button>
-                  </TableHead>
-                  <TableHead>
-                    <button
-                      className="inline-flex items-center gap-1 text-left"
-                      onClick={() => handleSortClick("category")}
-                    >
-                      Kategorie
-                      {sortBy === "category" && (sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
-                    </button>
-                  </TableHead>
-                  <TableHead>
-                    <button
-                      className="inline-flex items-center gap-1 text-left"
-                      onClick={() => handleSortClick("discipline")}
-                    >
-                      Disziplin
-                      {sortBy === "discipline" && (sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
-                    </button>
-                  </TableHead>
-                  <TableHead>
-                    <button
-                      className="inline-flex items-center gap-1 text-left"
-                      onClick={() => handleSortClick("measurement")}
-                    >
-                      Einheit
-                      {sortBy === "measurement" && (sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
-                    </button>
-                  </TableHead>
-                  <TableHead>
-                    <button
-                      className="inline-flex items-center gap-1 text-left"
-                      onClick={() => handleSortClick("weight")}
-                    >
-                      Gewicht
-                      {sortBy === "weight" && (sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
-                    </button>
-                  </TableHead>
-                    <TableHead className="sticky right-0 z-10 bg-background text-right"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedExercises.map((exercise) => (
-                    <TableRow
-                      key={exercise.id}
-                      className="cursor-pointer"
-                      onClick={() => openExerciseDetails(exercise, "view")}
-                    >
-                      <TableCell className="font-medium sticky left-0 bg-background z-10">
-                        {exercise.name}
-                      </TableCell>
-                      <TableCell>{exercise.category || "-"}</TableCell>
-                      <TableCell>{exercise.discipline || "-"}</TableCell>
-                      <TableCell>{exercise.measurementType || "-"}</TableCell>
-                      <TableCell>
-                        {exercise.requiresWeight ? t("exerciseLibrary.requiresWeight", "Gewicht erforderlich") : "-"}
-                      </TableCell>
-                      <TableCell
-                        className="text-right sticky right-0 z-10 bg-background"
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                            >
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onSelect={() => openExerciseDetails(exercise, "view")}
-                            >
-                              {t("exerciseLibrary.details", "Details anzeigen")}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onSelect={() => openExerciseDetails(exercise, "edit")}
-                            >
-                              {t("exerciseLibrary.suggestChange", "Änderung vorschlagen")}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onSelect={() => openExerciseDetails(exercise, "report")}
-                            >
-                              {t("exerciseLibrary.report", "Melden")}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                <PageSizeSelector
+                  pageSize={pageSize}
+                  onPageSizeChange={(next) => {
+                    setPageSize(next);
+                    setCurrentPage(1);
+                  }}
+                  label={t("filters.itemsPerPage", "Pro Seite:")}
+                  options={[6, 12, 24, 48]}
+                />
               </div>
               {pagination.totalPages > 1 && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm text-muted-foreground">
-                      {pagination.totalItems > 0 &&
-                        t("exerciseLibrary.totalExercises", {
-                          count: pagination.totalItems,
-                          defaultValue: `${pagination.totalItems} Übungen gefunden`,
-                        })}
-                    </div>
-                    <PageSizeSelector
-                      pageSize={pageSize}
-                      onPageSizeChange={(next) => {
-                        setPageSize(next);
-                        setCurrentPage(1);
-                      }}
-                      label={t("filters.itemsPerPage", "Pro Seite:")}
-                      options={[6, 12, 24, 48]}
-                    />
-                  </div>
-                  <PaginationControls
-                    pagination={pagination}
-                    onPageChange={setCurrentPage}
-                    pageSize={pageSize}
-                    maxVisiblePages={7}
-                    labels={{
-                      page: (current, total) =>
-                        t("filters.pageLabel", { current, total, defaultValue: `${current}/${total}` }),
-                      summary: (start, end, total) =>
-                        t("filters.pageSummary", {
-                          start,
-                          end,
-                          total,
-                          defaultValue: `${start}–${end} / ${total}`,
-                        }),
-                      previous: t("filters.prev", "Zurück"),
-                      next: t("filters.next", "Weiter"),
-                    }}
-                  />
-                </div>
+                <PaginationControls
+                  pagination={pagination}
+                  onPageChange={setCurrentPage}
+                  pageSize={pageSize}
+                  maxVisiblePages={7}
+                  labels={{
+                    page: (current, total) =>
+                      t("filters.pageLabel", { current, total, defaultValue: `${current}/${total}` }),
+                    summary: (start, end, total) =>
+                      t("filters.pageSummary", {
+                        start,
+                        end,
+                        total,
+                        defaultValue: `${start}–${end} / ${total}`,
+                      }),
+                    previous: t("filters.prev", "Zurück"),
+                    next: t("filters.next", "Weiter"),
+                  }}
+                />
               )}
-              </>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          }
+        />
         <Dialog open={Boolean(detailExerciseId)} onOpenChange={(open) => (open ? null : closeExerciseDetails())}>
           <DialogContent className="max-w-4xl overflow-y-auto max-h-[85vh]">
             <DialogHeader className="pr-10">
@@ -1051,9 +982,9 @@ export function Exercises() {
                   </DialogTitle>
                   {detailMode === "view" && (
                     <div className="mt-1 flex flex-wrap gap-2 text-sm text-muted-foreground">
-                      <span>{detailExercise?.category || "-"}</span>
+                      <span>{getExerciseCategoryLabel(detailExercise?.category, t) || "-"}</span>
                       <span>·</span>
-                      <span>{detailExercise?.discipline || "-"}</span>
+                      <span>{getExerciseDisciplineLabel(detailExercise?.discipline, t) || "-"}</span>
                       <span>·</span>
                       <span>{detailExercise?.measurementType || "-"}</span>
                     </div>
@@ -1079,13 +1010,13 @@ export function Exercises() {
                           {t("exerciseLibrary.details", "Details")}
                         </div>
                         <div className="space-y-1 text-sm">
-                          <div><strong>{t("exerciseLibrary.discipline", "Disziplin")}:</strong> {detailExercise.discipline || "-"}</div>
-                          <div><strong>{t("exerciseLibrary.pattern", "Bewegungsmuster")}:</strong> {detailExercise.movementPattern || "-"}</div>
+                          <div><strong>{t("exerciseLibrary.discipline", "Disziplin")}:</strong> {getExerciseDisciplineLabel(detailExercise.discipline, t) || "-"}</div>
+                          <div><strong>{t("exerciseLibrary.pattern", "Bewegungsmuster")}:</strong> {getExerciseMovementPatternLabel(detailExercise.movementPattern, t) || "-"}</div>
                           <div><strong>{t("exerciseLibrary.difficulty", "Schwierigkeit")}:</strong> {detailExercise.difficultyTier ?? "-"}</div>
                           <div><strong>{t("exerciseLibrary.unit", "Einheit")}:</strong> {detailExercise.unit || "-"}</div>
-                          <div><strong>{t("exerciseLibrary.supportsSets", "Sets/Reps")}:</strong> {detailExercise.supportsSets ? "Ja" : "Nein"}</div>
-                          <div><strong>{t("exerciseLibrary.requiresWeight", "Gewicht erforderlich")}:</strong> {detailExercise.requiresWeight ? "Ja" : "Nein"}</div>
-                          <div><strong>{t("exerciseLibrary.allowsWeight", "Gewicht optional")}:</strong> {detailExercise.allowsWeight ? "Ja" : "Nein"}</div>
+                          <div><strong>{t("exerciseLibrary.supportsSets", "Sets/Reps")}:</strong> {detailExercise.supportsSets ? t("common.yes", "Ja") : t("common.no", "Nein")}</div>
+                          <div><strong>{t("exerciseLibrary.requiresWeight", "Gewicht erforderlich")}:</strong> {detailExercise.requiresWeight ? t("common.yes", "Ja") : t("common.no", "Nein")}</div>
+                          <div><strong>{t("exerciseLibrary.allowsWeight", "Gewicht optional")}:</strong> {detailExercise.allowsWeight ? t("common.yes", "Ja") : t("common.no", "Nein")}</div>
                         </div>
                       </div>
                       <div className="space-y-2 rounded-lg border p-4">
@@ -1095,7 +1026,9 @@ export function Exercises() {
                         <div className="flex flex-wrap gap-2">
                           {(detailExercise.muscleGroups || []).length > 0
                             ? detailExercise.muscleGroups?.map((group) => (
-                              <Badge key={group} variant="secondary">{group}</Badge>
+                              <Badge key={group} variant="secondary">
+                                {getExerciseMuscleGroupLabel(group, t)}
+                              </Badge>
                             ))
                             : <span className="text-sm text-muted-foreground">-</span>}
                         </div>
@@ -1150,6 +1083,8 @@ export function Exercises() {
                     onSubmit={handleEditRequest}
                     submitLabel={t("exerciseLibrary.sendRequest", "Anfrage senden")}
                     showDescriptionToggle
+                    defaultDistanceUnit={user?.preferences?.units?.distance || "km"}
+                    defaultTimeUnit="min"
                   />
                 )}
 

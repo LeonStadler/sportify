@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Check, Copy, Download, Shield } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface RecoveryCodesDialogProps {
   open: boolean;
@@ -25,6 +26,7 @@ export function RecoveryCodesDialog({
   backupCodes,
 }: RecoveryCodesDialogProps) {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [copiedCodes, setCopiedCodes] = useState(false);
 
   const copyBackupCodes = async () => {
@@ -33,15 +35,15 @@ export function RecoveryCodesDialog({
       await navigator.clipboard.writeText(codesText);
       setCopiedCodes(true);
       toast({
-        title: "Kopiert",
-        description: "Recovery-Codes wurden in die Zwischenablage kopiert.",
+        title: t("auth.twoFactorSetup.copyCodesSuccessTitle"),
+        description: t("auth.twoFactorSetup.copyCodesSuccessDesc"),
       });
       setTimeout(() => setCopiedCodes(false), 2000);
     } catch (err) {
       console.error("Fehler beim Kopieren der Recovery-Codes:", err);
       toast({
-        title: "Fehler",
-        description: "Die Recovery-Codes konnten nicht kopiert werden.",
+        title: t("auth.twoFactorSetup.copyCodesErrorTitle"),
+        description: t("auth.twoFactorSetup.copyCodesErrorDesc"),
         variant: "destructive",
       });
     }
@@ -59,8 +61,8 @@ export function RecoveryCodesDialog({
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     toast({
-      title: "Download gestartet",
-      description: "Recovery-Codes wurden heruntergeladen.",
+      title: t("auth.twoFactorSetup.downloadTitle"),
+      description: t("auth.twoFactorSetup.downloadDesc"),
     });
   };
 
@@ -70,10 +72,10 @@ export function RecoveryCodesDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Shield className="w-5 h-5" />
-            Neue Recovery-Codes
+            {t("auth.recoveryCodes.title")}
           </DialogTitle>
           <DialogDescription>
-            Deine Recovery-Codes wurden zurückgesetzt. Speichere diese neuen Codes sicher.
+            {t("auth.recoveryCodes.description")}
           </DialogDescription>
         </DialogHeader>
 
@@ -81,17 +83,15 @@ export function RecoveryCodesDialog({
           <Alert>
             <Shield className="h-4 w-4" />
             <AlertDescription>
-              <strong>Wichtig:</strong> Speichere diese Recovery-Codes an
-              einem sicheren Ort. Du kannst sie verwenden, um auf dein Konto
-              zuzugreifen, falls du keinen Zugriff auf deine Authenticator-App
-              hast.
+              <strong>{t("auth.twoFactorSetup.backupTitle")}</strong>{" "}
+              {t("auth.twoFactorSetup.backupDesc")}
             </AlertDescription>
           </Alert>
 
           <div className="p-4 bg-muted rounded-lg space-y-3">
             <div className="flex items-center justify-between">
               <Label className="text-sm font-medium">
-                Deine Recovery-Codes:
+                {t("auth.twoFactorSetup.backupLabel")}
               </Label>
               <div className="flex gap-2">
                 <Button
@@ -103,12 +103,12 @@ export function RecoveryCodesDialog({
                   {copiedCodes ? (
                     <>
                       <Check className="w-4 h-4 mr-2" />
-                      Kopiert
+                      {t("auth.recoveryCodes.copied")}
                     </>
                   ) : (
                     <>
                       <Copy className="w-4 h-4 mr-2" />
-                      Kopieren
+                      {t("auth.recoveryCodes.copy")}
                     </>
                   )}
                 </Button>
@@ -119,7 +119,7 @@ export function RecoveryCodesDialog({
                   onClick={downloadBackupCodes}
                 >
                   <Download className="w-4 h-4 mr-2" />
-                  Download
+                  {t("auth.recoveryCodes.download")}
                 </Button>
               </div>
             </div>
@@ -138,20 +138,18 @@ export function RecoveryCodesDialog({
 
           <Alert variant="default">
             <AlertDescription className="text-sm">
-              Jeder Code kann nur einmal verwendet werden. Stelle sicher, dass
-              du diese Codes an einem sicheren Ort speicherst.
+              {t("auth.twoFactorSetup.backupSingleUse")}
             </AlertDescription>
           </Alert>
         </div>
 
         <DialogFooter>
           <Button type="button" onClick={() => onOpenChange(false)} className="w-full">
-            Fertig
+            {t("auth.recoveryCodes.done")}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-
 

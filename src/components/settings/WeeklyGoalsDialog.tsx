@@ -76,14 +76,11 @@ export function WeeklyGoalsDialog({
     } catch (error) {
       console.error("Error saving goals:", error);
       toast({
-        title: t("common.error", "Fehler"),
+        title: t("common.error"),
         description:
           error instanceof Error
             ? error.message
-            : t(
-              "weeklyGoals.saveError",
-              "Fehler beim Speichern der Wochenziele"
-            ),
+            : t("weeklyGoals.saveError"),
         variant: "destructive",
       });
     } finally {
@@ -97,13 +94,10 @@ export function WeeklyGoalsDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
-            {t("weeklyGoals.dialog.title", "Wochenziele einstellen")}
+            {t("weeklyGoals.dialog.title")}
           </DialogTitle>
           <DialogDescription>
-            {t(
-              "weeklyGoals.dialog.description",
-              "Passe deine wöchentlichen Ziele nach deinen Wünschen an."
-            )}
+            {t("weeklyGoals.dialog.description")}
           </DialogDescription>
         </DialogHeader>
 
@@ -115,23 +109,22 @@ export function WeeklyGoalsDialog({
             onClick={() => onOpenChange(false)}
             disabled={isSaving}
           >
-            {t("common.cancel", "Abbrechen")}
+            {t("common.cancel")}
           </Button>
           <Button
             variant="secondary"
             onClick={handleReset}
             disabled={isSaving}
           >
-            {t("common.reset", "Zurücksetzen")}
+            {t("common.reset")}
           </Button>
           <Button onClick={handleSave} disabled={isSaving}>
             {isSaving
-              ? t("common.saving", "Wird gespeichert...")
-              : t("common.save", "Speichern")}
+              ? t("common.saving")
+              : t("common.save")}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-

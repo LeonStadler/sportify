@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertTriangle } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface DeleteAccountPasswordDialogProps {
   open: boolean;
@@ -25,6 +26,7 @@ export function DeleteAccountPasswordDialog({
   onConfirm,
   isLoading = false,
 }: DeleteAccountPasswordDialogProps) {
+  const { t } = useTranslation();
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,7 +56,7 @@ export function DeleteAccountPasswordDialog({
     setError(null);
 
     if (!password || password.trim() === "") {
-      setError("Bitte gib dein Passwort ein.");
+      setError(t("profile.deleteAccountPasswordRequired"));
       passwordInputRef.current?.focus();
       return;
     }
@@ -67,7 +69,8 @@ export function DeleteAccountPasswordDialog({
       setError(null);
       onOpenChange(false);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.";
+      const errorMessage =
+        err instanceof Error ? err.message : t("common.error");
       setError(errorMessage);
       throw err;
     } finally {
@@ -90,17 +93,19 @@ export function DeleteAccountPasswordDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-destructive">
             <AlertTriangle className="w-5 h-5" />
-            Konto löschen
+            {t("profile.deleteAccountPasswordTitle")}
           </DialogTitle>
           <DialogDescription>
-            Bitte gib dein Passwort ein, um das Löschen deines Kontos zu bestätigen.
+            {t("profile.deleteAccountPasswordDesc")}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="password-input">Passwort zur Bestätigung:</Label>
+              <Label htmlFor="password-input">
+                {t("profile.deleteAccountPasswordLabel")}
+              </Label>
               <Input
                 id="password-input"
                 ref={passwordInputRef}
@@ -110,7 +115,7 @@ export function DeleteAccountPasswordDialog({
                   setPassword(e.target.value);
                   if (error) setError(null);
                 }}
-                placeholder="Dein Passwort eingeben"
+                placeholder={t("profile.deleteAccountPasswordPlaceholder")}
                 disabled={isSubmitting || isLoading}
                 autoComplete="current-password"
                 aria-invalid={!!error}
@@ -138,14 +143,16 @@ export function DeleteAccountPasswordDialog({
               onClick={handleCancel}
               disabled={isSubmitting || isLoading}
             >
-              Abbrechen
+              {t("common.cancel")}
             </Button>
             <Button
               type="submit"
               variant="destructive"
               disabled={!password || password.trim() === "" || isSubmitting || isLoading}
             >
-              {isSubmitting || isLoading ? "Wird gelöscht..." : "Konto löschen"}
+              {isSubmitting || isLoading
+                ? t("profile.deletingAccount")
+                : t("profile.deleteAccount")}
             </Button>
           </DialogFooter>
         </form>
@@ -153,4 +160,3 @@ export function DeleteAccountPasswordDialog({
     </Dialog>
   );
 }
-

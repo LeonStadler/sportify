@@ -206,12 +206,12 @@ const App = () => {
         >
           <AppSidebar />
           <SidebarTrigger />
-          <div className="flex-1 flex flex-col relative h-screen">
+          <div className="flex-1 flex flex-col relative h-screen min-w-0">
             <ScrollHeader scrollContainerRef={mainRef} />
             <main
               id="main-content"
               ref={mainRef}
-              className="flex-1 p-3 md:p-6 bg-background pb-20 md:pb-6 overflow-y-auto pt-16 lg:pt-6 safe-area-main"
+              className="flex-1 min-w-0 p-3 md:p-6 bg-background pb-20 md:pb-6 overflow-y-auto overflow-x-hidden pt-16 lg:pt-6 safe-area-main"
               role="main"
               aria-label="Hauptinhalt"
               tabIndex={-1}

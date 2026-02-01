@@ -10,6 +10,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface PasswordDialogProps {
   open: boolean;
@@ -28,10 +29,11 @@ export function PasswordDialog({
   title,
   description,
   onConfirm,
-  confirmLabel = "Bestätigen",
-  cancelLabel = "Abbrechen",
+  confirmLabel,
+  cancelLabel,
   error,
 }: PasswordDialogProps) {
+  const { t } = useTranslation();
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | undefined>(error);
@@ -39,16 +41,20 @@ export function PasswordDialog({
 
   // Ensure title and description are never empty - do this early to avoid rendering issues
   const safeTitle = React.useMemo(() => {
-    if (!title || typeof title !== 'string') return "Passwort erforderlich";
+    if (!title || typeof title !== 'string') {
+      return t("auth.passwordDialog.titleFallback");
+    }
     const trimmed = title.trim();
-    return trimmed || "Passwort erforderlich";
-  }, [title]);
+    return trimmed || t("auth.passwordDialog.titleFallback");
+  }, [title, t]);
 
   const safeDescription = React.useMemo(() => {
-    if (!description || typeof description !== 'string') return "Bitte gib dein Passwort ein.";
+    if (!description || typeof description !== 'string') {
+      return t("auth.passwordDialog.descriptionFallback");
+    }
     const trimmed = description.trim();
-    return trimmed || "Bitte gib dein Passwort ein.";
-  }, [description]);
+    return trimmed || t("auth.passwordDialog.descriptionFallback");
+  }, [description, t]);
 
   // Reset state when dialog opens/closes
   useEffect(() => {
@@ -68,7 +74,7 @@ export function PasswordDialog({
     setLocalError(undefined);
 
     if (!password || password.trim() === "") {
-      setLocalError("Bitte gib ein Passwort ein.");
+      setLocalError(t("auth.passwordDialog.enterPassword"));
       inputRef.current?.focus();
       return;
     }
@@ -80,7 +86,8 @@ export function PasswordDialog({
       setPassword("");
       onOpenChange(false);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.";
+      const errorMessage =
+        err instanceof Error ? err.message : t("auth.passwordDialog.error");
       setLocalError(errorMessage);
       // Keep password in input for user to retry, but clear it on close
     } finally {
@@ -119,7 +126,7 @@ export function PasswordDialog({
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="password-input" className="sr-only">
-                Passwort
+                {t("auth.passwordDialog.label")}
               </Label>
               <Input
                 id="password-input"
@@ -132,7 +139,7 @@ export function PasswordDialog({
                     setLocalError(undefined);
                   }
                 }}
-                placeholder="Passwort eingeben"
+                placeholder={t("auth.passwordDialog.placeholder")}
                 disabled={isSubmitting}
                 autoComplete="current-password"
                 aria-invalid={!!localError}
@@ -158,10 +165,12 @@ export function PasswordDialog({
               onClick={handleCancel}
               disabled={isSubmitting}
             >
-              {cancelLabel}
+              {cancelLabel || t("common.cancel")}
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Wird verarbeitet..." : confirmLabel}
+              {isSubmitting
+                ? t("auth.passwordDialog.processing")
+                : confirmLabel || t("common.confirm")}
             </Button>
           </DialogFooter>
         </form>
@@ -169,4 +178,3 @@ export function PasswordDialog({
     </Dialog>
   );
 }
-

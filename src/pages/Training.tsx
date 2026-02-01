@@ -45,11 +45,11 @@ import { API_URL } from "@/lib/api";
 import type { Workout } from "@/types/workout";
 import { getNormalizedRange, getRangeForPeriod, toDateParam } from "@/utils/dateRanges";
 import { convertDistance, convertWeightFromKg } from "@/utils/units";
-import { ArrowRight, Info } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Info } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { useTranslation } from "react-i18next";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 
 interface WorkoutResponse {
   workouts: Workout[];
@@ -67,6 +67,7 @@ interface TemplateResponse {
 }
 
 const WORKOUTS_PER_PAGE = 10;
+const RECENT_WORKOUTS_LIMIT = 5;
 
 const getVisibilityLabel = (value?: string) => {
   switch (value) {
@@ -92,10 +93,11 @@ const getVisibilityBadgeClass = (value?: string) => {
 
 export function Training() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [recentWorkouts, setRecentWorkouts] = useState<Workout[]>([]);
+  const [recentLoading, setRecentLoading] = useState(true);
   const [filterType, setFilterType] = useState<string>("all");
   const [period, setPeriod] = useState<string>("month");
   const [customRange, setCustomRange] = useState<DateRange | undefined>();
@@ -123,6 +125,7 @@ export function Training() {
   const [templateSearch, setTemplateSearch] = useState("");
   const [templateScope, setTemplateScope] = useState("all");
   const [templateCreateOpen, setTemplateCreateOpen] = useState(false);
+  const workoutFormRef = useRef<HTMLDivElement | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
   const weightUnit = user?.preferences?.units?.weight || "kg";
@@ -202,6 +205,41 @@ export function Training() {
     [resolvedRange?.from, resolvedRange?.to, t, toast, user]
   );
 
+  const loadRecentWorkouts = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      setRecentLoading(true);
+      const token = localStorage.getItem("token");
+      const params = new URLSearchParams({
+        page: "1",
+        limit: RECENT_WORKOUTS_LIMIT.toString(),
+      });
+
+      const response = await fetch(`${API_URL}/workouts?${params}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(t("training.loadError"));
+      }
+
+      const data: WorkoutResponse = await response.json();
+      setRecentWorkouts(Array.isArray(data.workouts) ? data.workouts : []);
+    } catch (error) {
+      console.error("Load recent workouts error:", error);
+      toast({
+        title: t("common.error"),
+        description: t("training.workoutsLoadError"),
+        variant: "destructive",
+      });
+    } finally {
+      setRecentLoading(false);
+    }
+  }, [t, toast, user]);
+
   const loadTemplates = useCallback(async () => {
     if (!user) return;
     try {
@@ -224,6 +262,10 @@ export function Training() {
   }, [loadWorkouts, filterType]);
 
   useEffect(() => {
+    loadRecentWorkouts();
+  }, [loadRecentWorkouts]);
+
+  useEffect(() => {
     loadTemplates();
   }, [loadTemplates]);
 
@@ -236,6 +278,7 @@ export function Training() {
   const handleWorkoutCreated = (workoutId?: string) => {
     // Lade die erste Seite neu um das neue Workout zu zeigen
     loadWorkouts(1, filterType);
+    loadRecentWorkouts();
     loadTemplates();
 
     // Zeige Dialog an, wenn ein neues Workout erstellt wurde
@@ -372,6 +415,7 @@ export function Training() {
       });
 
       loadWorkouts(currentPage, filterType);
+      loadRecentWorkouts();
     } catch (error) {
       console.error("Delete workout error:", error);
       toast({
@@ -384,11 +428,16 @@ export function Training() {
 
   const handleEditClick = (workout: Workout) => {
     setEditingWorkout(workout);
+    setActiveTab("trainings");
+    requestAnimationFrame(() => {
+      workoutFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   };
 
   const handleWorkoutUpdated = () => {
     setEditingWorkout(null);
     loadWorkouts(currentPage, filterType);
+    loadRecentWorkouts();
     loadTemplates();
   };
 
@@ -538,7 +587,7 @@ export function Training() {
 
   return (
     <PageTemplate
-      title={t("training.title", "Training Log")}
+      title={t("training.title", "Training")}
       subtitle={t(
         "training.subtitle",
         "Trage deine Workouts ein und verfolge deinen Fortschritt"
@@ -548,6 +597,9 @@ export function Training() {
         <TabsList className="mb-6">
           <TabsTrigger value="trainings">
             {t("training.trainingsDiary")}
+          </TabsTrigger>
+          <TabsTrigger value="workouts">
+            {t("training.yourWorkouts", "Vergangene Workouts")}
           </TabsTrigger>
           <TabsTrigger value="templates">
             {t("training.templates", "Vorlagen")}
@@ -667,21 +719,23 @@ export function Training() {
               </Dialog>
             </div>
 
-            <WorkoutForm
-              workout={editingWorkout ?? undefined}
-              prefillWorkout={prefillWorkout}
-              onPrefillConsumed={() => setPrefillWorkout(null)}
-              onWorkoutCreated={handleWorkoutCreated}
-              onWorkoutUpdated={handleWorkoutUpdated}
-              onCancelEdit={handleCancelEdit}
-            />
+            <div ref={workoutFormRef}>
+              <WorkoutForm
+                workout={editingWorkout ?? undefined}
+                prefillWorkout={prefillWorkout}
+                onPrefillConsumed={() => setPrefillWorkout(null)}
+                onWorkoutCreated={handleWorkoutCreated}
+                onWorkoutUpdated={handleWorkoutUpdated}
+                onCancelEdit={handleCancelEdit}
+              />
+            </div>
 
             <Card>
-              <CardHeader className="pb-4 space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <CardTitle className="text-lg md:text-xl">
-                      {t("training.yourWorkouts")}
+                      {t("training.recentWorkouts", "Letzte Trainings")}
                     </CardTitle>
                     <TooltipProvider delayDuration={150}>
                       <Tooltip>
@@ -704,47 +758,13 @@ export function Training() {
                       </Tooltip>
                     </TooltipProvider>
                   </div>
-                  <Select value={filterType} onValueChange={handleFilterChange}>
-                    <SelectTrigger className="w-full sm:w-48">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {exerciseTypes.map((type) => (
-                        <SelectItem key={type.id} value={type.id}>
-                          {type.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <TimeRangeFilter
-                    period={period}
-                    range={customRange}
-                    offset={offset}
-                    onPeriodChange={handlePeriodChange}
-                    onRangeChange={handleRangeChange}
-                    onOffsetChange={handleOffsetChange}
-                    t={t}
-                    locale={user?.languagePreference || "de"}
-                    presets={[
-                      { value: "week", label: t("filters.period.week") },
-                      { value: "month", label: t("filters.period.month") },
-                      { value: "quarter", label: t("filters.period.quarter") },
-                      { value: "year", label: t("filters.period.year") },
-                      { value: "all", label: t("filters.period.all") },
-                      { value: "custom", label: t("filters.period.custom") },
-                    ]}
-                    formatDate={(date) =>
-                      date.toLocaleDateString(
-                        user?.languagePreference === "en" ? "en-US" : "de-DE"
-                      )
-                    }
-                  />
+                  <Button variant="outline" onClick={() => setActiveTab("workouts")}>
+                    {t("training.viewAllWorkouts", "Alle anzeigen")}
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent>
-                {isLoading ? (
+                {recentLoading ? (
                   <div className="space-y-3">
                     {[...Array(5)].map((_, i) => (
                       <div key={i} className="animate-pulse">
@@ -752,14 +772,10 @@ export function Training() {
                       </div>
                     ))}
                   </div>
-                ) : workouts.length === 0 ? (
+                ) : recentWorkouts.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-muted-foreground mb-2">
-                      {filterType === "all"
-                        ? t("training.noWorkouts")
-                        : t("training.noWorkoutsForType", {
-                          type: getExerciseName(filterType),
-                        })}
+                      {t("training.noWorkouts")}
                     </p>
                     <p className="text-xs md:text-sm text-muted-foreground">
                       {t("training.createFirstWorkout", {
@@ -772,7 +788,7 @@ export function Training() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {workouts.map((workout) => (
+                    {recentWorkouts.map((workout) => (
                       <div
                         key={workout.id}
                         className="p-3 md:p-4 bg-muted/50 rounded-lg hover:bg-muted transition-colors"
@@ -883,42 +899,245 @@ export function Training() {
                         </div>
                       </div>
                     ))}
-
-                    {pagination.totalPages > 1 && (
-                      <PaginationControls
-                        pagination={pagination}
-                        onPageChange={handlePageChange}
-                        pageSize={WORKOUTS_PER_PAGE}
-                        disabled={isLoading}
-                        labels={{
-                          previous: t("filters.previous", t("training.previous")),
-                          next: t("filters.next", t("training.next")),
-                          page: (current, total) =>
-                            t("filters.pageLabel", { current, total }),
-                          summary: (start, end, total) =>
-                            t("filters.itemSummary", {
-                              start,
-                              end,
-                              total: total ?? end,
-                            }),
-                        }}
-                      />
-                    )}
-
-                    {/* Show More Button */}
-                    <Button
-                      variant="outline"
-                      className="w-full justify-center gap-2"
-                      onClick={() => navigate("/my-workouts")}
-                    >
-                      {t("training.viewAllWorkouts", "Alle anzeigen")}
-                      <ArrowRight className="h-4 w-4" />
-                    </Button>
                   </div>
                 )}
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="workouts" className="space-y-4 md:space-y-6">
+          <Card>
+            <CardHeader className="pb-4 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-lg md:text-xl">
+                    {t("training.yourWorkouts")}
+                  </CardTitle>
+                  <TooltipProvider delayDuration={150}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 p-0 text-muted-foreground"
+                          title={t("training.editWindowInfo")}
+                        >
+                          <Info className="h-4 w-4" />
+                          <span className="sr-only">
+                            {t("training.editWindowInfo")}
+                          </span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" align="start" className="max-w-xs text-sm">
+                        {t("training.editWindowInfo")}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <Select value={filterType} onValueChange={handleFilterChange}>
+                  <SelectTrigger className="w-full sm:w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {exerciseTypes.map((type) => (
+                      <SelectItem key={type.id} value={type.id}>
+                        {type.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-2">
+                <TimeRangeFilter
+                  period={period}
+                  range={customRange}
+                  offset={offset}
+                  onPeriodChange={handlePeriodChange}
+                  onRangeChange={handleRangeChange}
+                  onOffsetChange={handleOffsetChange}
+                  t={t}
+                  locale={user?.languagePreference || "de"}
+                  presets={[
+                    { value: "week", label: t("filters.period.week") },
+                    { value: "month", label: t("filters.period.month") },
+                    { value: "quarter", label: t("filters.period.quarter") },
+                    { value: "year", label: t("filters.period.year") },
+                    { value: "all", label: t("filters.period.all") },
+                    { value: "custom", label: t("filters.period.custom") },
+                  ]}
+                  formatDate={(date) =>
+                    date.toLocaleDateString(
+                      user?.languagePreference === "en" ? "en-US" : "de-DE"
+                    )
+                  }
+                />
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="space-y-3">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="animate-pulse">
+                      <div className="h-20 bg-muted rounded-lg"></div>
+                    </div>
+                  ))}
+                </div>
+              ) : workouts.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground mb-2">
+                    {filterType === "all"
+                      ? t("training.noWorkouts")
+                      : t("training.noWorkoutsForType", {
+                        type: getExerciseName(filterType),
+                      })}
+                  </p>
+                  <p className="text-xs md:text-sm text-muted-foreground">
+                    {t("training.createFirstWorkout", {
+                      location:
+                        window.innerWidth >= 1280
+                          ? t("training.location.left")
+                          : t("training.location.above"),
+                    })}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {workouts.map((workout) => (
+                    <div
+                      key={workout.id}
+                      className="p-3 md:p-4 bg-muted/50 rounded-lg hover:bg-muted transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-medium text-foreground text-sm md:text-base truncate">
+                              {workout.title}
+                            </h3>
+                            {workout.duration && (
+                              <Badge variant="outline" className="text-xs">
+                                ⏱️ {formatDuration(workout.duration)}
+                              </Badge>
+                            )}
+                          </div>
+
+                          {workout.description && (
+                            <p className="text-xs md:text-sm text-muted-foreground mb-2 line-clamp-2">
+                              {workout.description}
+                            </p>
+                          )}
+
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {workout.activities.map((activity) => {
+                              const formatSets = (
+                                sets: Array<{ reps: number; weight?: number }>
+                              ) => {
+                                if (!sets || sets.length === 0) return null;
+                                return sets
+                                  .map((set) => {
+                                    const reps = set.reps || 0;
+                                    const weight = set.weight;
+                                    if (weight) {
+                                      const displayWeight = convertWeightFromKg(weight, weightUnit);
+                                      return `${reps}x${displayWeight}${weightUnit}`;
+                                    }
+                                    return `${reps}`;
+                                  })
+                                  .join(", ");
+                              };
+
+                              const setsDisplay =
+                                activity.sets && activity.sets.length > 0
+                                  ? formatSets(activity.sets)
+                                  : null;
+
+                              return (
+                                <div
+                                  key={activity.id}
+                                  className="flex flex-col gap-1"
+                                >
+                                  <div className="flex items-center gap-1 flex-wrap">
+                                    <Badge
+                                      className={`text-xs ${getExerciseColor(activity.activityType)}`}
+                                      variant="secondary"
+                                    >
+                                      {getExerciseIcon(activity.activityType)}{" "}
+                                      {getActivityName(activity.activityType)}:{" "}
+                                      {formatActivityAmount(activity.amount, activity.unit)}
+                                    </Badge>
+                                    {setsDisplay && (
+                                      <span className="text-xs text-muted-foreground">
+                                        ({setsDisplay})
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>📅 {formatWorkoutDateTime(workout)}</span>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          {isWorkoutEditable(workout) && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEditClick(workout)}
+                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 flex-shrink-0"
+                                aria-label={t("training.edit")}
+                              >
+                                <span className="hidden sm:inline">
+                                  {t("training.edit")}
+                                </span>
+                                <span className="sm:hidden" aria-hidden="true">✏️</span>
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => deleteWorkout(workout.id)}
+                                className="text-destructive hover:text-destructive-foreground hover:bg-destructive flex-shrink-0"
+                                aria-label={t("training.delete")}
+                              >
+                                <span className="hidden sm:inline">
+                                  {t("training.delete")}
+                                </span>
+                                <span className="sm:hidden" aria-hidden="true">×</span>
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {pagination.totalPages > 1 && (
+                    <PaginationControls
+                      pagination={pagination}
+                      onPageChange={handlePageChange}
+                      pageSize={WORKOUTS_PER_PAGE}
+                      disabled={isLoading}
+                      labels={{
+                        previous: t("filters.previous", t("training.previous")),
+                        next: t("filters.next", t("training.next")),
+                        page: (current, total) =>
+                          t("filters.pageLabel", { current, total }),
+                        summary: (start, end, total) =>
+                          t("filters.itemSummary", {
+                            start,
+                            end,
+                            total: total ?? end,
+                          }),
+                      }}
+                    />
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="templates" className="space-y-6 mt-6">

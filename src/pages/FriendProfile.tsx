@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { API_URL } from "@/lib/api";
 import { parseAvatarConfig } from "@/lib/avatar";
+import { getBadgeText } from "@/lib/badges";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { ArrowLeft, Award, Dumbbell, Medal } from "lucide-react";
@@ -146,7 +147,7 @@ export function FriendProfile() {
 
     const loadProfile = async () => {
       if (!friendId) {
-        setError("Keine Freundes-ID angegeben.");
+        setError(t("friendProfile.errors.missingId"));
         setLoading(false);
         return;
       }
@@ -163,7 +164,7 @@ export function FriendProfile() {
         if (!response.ok) {
           const payload = await response.json().catch(() => ({}));
           const message =
-            payload?.error || "Profil konnte nicht geladen werden.";
+            payload?.error || t("friendProfile.errors.loadFailed");
           throw new Error(message);
         }
 
@@ -174,7 +175,7 @@ export function FriendProfile() {
         setError(
           fetchError instanceof Error
             ? fetchError.message
-            : "Unbekannter Fehler beim Laden des Profils."
+            : t("friendProfile.errors.unknown")
         );
       } finally {
         if (!controller.signal.aborted) {
@@ -246,7 +247,7 @@ export function FriendProfile() {
       return (
         <Card>
           <CardContent className="p-8 text-center text-muted-foreground">
-            Kein Profil gefunden.
+            {t("friendProfile.errors.notFound")}
           </CardContent>
         </Card>
       );
@@ -275,14 +276,17 @@ export function FriendProfile() {
                 </h1>
                 {profile.joinedAt && (
                   <p className="text-sm text-muted-foreground">
-                    Mitglied seit {formatDate(profile.joinedAt)}
+                    {t("friendProfile.joinedSince", {
+                      date: formatDate(profile.joinedAt),
+                    })}
                   </p>
                 )}
               </div>
             </div>
             <Button asChild variant="outline">
               <Link to="/friends">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Zurück zu Freunde
+                <ArrowLeft className="mr-2 h-4 w-4" />{" "}
+                {t("friendProfile.backToFriends")}
               </Link>
             </Button>
           </CardContent>
@@ -335,7 +339,8 @@ export function FriendProfile() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                <Medal className="h-5 w-5 text-primary" /> Badges
+                <Medal className="h-5 w-5 text-primary" />{" "}
+                {t("profile.achievements.badges")}
               </CardTitle>
               <UiBadge variant="outline">{sortedBadges.length}</UiBadge>
             </CardHeader>
@@ -345,35 +350,40 @@ export function FriendProfile() {
                   {t("friendProfile.noBadges", "Noch keine Badges.")}
                 </p>
               ) : (
-                sortedBadges.map((badge) => (
-                  <div
-                    key={badge.id}
-                    className="flex items-center justify-between rounded-lg border bg-card p-3"
-                  >
-                    <div>
-                      <p className="font-medium leading-none">{badge.label}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {badge.category}
-                        {badge.level
-                          ? ` · ${t("friendProfile.level", "Stufe")} ${badge.level}`
-                          : null}
-                      </p>
-                      {badge.earnedAt && (
-                        <p className="text-xs text-muted-foreground">
-                          {formatDate(badge.earnedAt)}
+                sortedBadges.map((badge) => {
+                  const badgeText = getBadgeText(badge, t);
+                  return (
+                    <div
+                      key={badge.id}
+                      className="flex items-center justify-between rounded-lg border bg-card p-3"
+                    >
+                      <div>
+                        <p className="font-medium leading-none">
+                          {badgeText.label}
                         </p>
-                      )}
+                        <p className="text-xs text-muted-foreground">
+                          {badgeText.category || badge.category}
+                          {badge.level
+                            ? ` · ${t("friendProfile.level", "Stufe")} ${badge.level}`
+                            : null}
+                        </p>
+                        {badge.earnedAt && (
+                          <p className="text-xs text-muted-foreground">
+                            {formatDate(badge.earnedAt)}
+                          </p>
+                        )}
+                      </div>
+                      {badge.icon ? (
+                        <UiBadge
+                          variant="secondary"
+                          className="text-xs uppercase"
+                        >
+                          {badgeText.icon || badge.icon.replace("badge-", "")}
+                        </UiBadge>
+                      ) : null}
                     </div>
-                    {badge.icon ? (
-                      <UiBadge
-                        variant="secondary"
-                        className="text-xs uppercase"
-                      >
-                        {badge.icon}
-                      </UiBadge>
-                    ) : null}
-                  </div>
-                ))
+                  );
+                })
               )}
             </CardContent>
           </Card>

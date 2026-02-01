@@ -80,13 +80,21 @@ export function PublicHeader({
           {/* Logo - immer zuerst (ganz links) */}
           <Link to="/" className="hover:opacity-80 transition-opacity">
             {variant === "minimal" ? (
-              <LogoFull className="h-10 sm:h-12" />
+              <LogoFull
+                className="h-10 sm:h-12"
+                alt={t("profile.logo.title")}
+                byline={t("profile.logo.byline")}
+              />
             ) : (
               <>
                 {/* Mobile: Nur Icon */}
                 <Logo variant="icon" className="xs:hidden h-10 w-10" />
                 {/* Desktop: Volles Logo */}
-                <LogoFull className="h-12 hidden xs:block" />
+                <LogoFull
+                  className="h-12 hidden xs:block"
+                  alt={t("profile.logo.title")}
+                  byline={t("profile.logo.byline")}
+                />
               </>
             )}
           </Link>

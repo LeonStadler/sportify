@@ -31,8 +31,9 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
 import { getUserInitials, parseAvatarConfig } from "@/lib/avatar";
+import { getBadgeText } from "@/lib/badges";
 import { format } from "date-fns";
-import { de } from "date-fns/locale";
+import { de, enUS } from "date-fns/locale";
 import {
   Award,
   Camera,
@@ -89,7 +90,7 @@ interface AchievementsData {
 }
 
 export function Profile() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { theme, setTheme } = useTheme();
   const {
     user,
@@ -106,6 +107,8 @@ export function Profile() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const dateLocale = i18n.language === "en" ? enUS : de;
+  const dateLocaleString = i18n.language === "en" ? "en-US" : "de-DE";
 
   // Get initial tab from URL query parameter
   const getInitialTab = () => {
@@ -343,7 +346,7 @@ export function Profile() {
     try {
       const token = localStorage.getItem("token");
       if (!token) {
-        throw new Error(t("errors.notAuthenticated", "Nicht authentifiziert"));
+        throw new Error(t("errors.notAuthenticated"));
       }
 
       const response = await fetch(`${API_URL}/goals`, {
@@ -358,10 +361,9 @@ export function Profile() {
       if (!response.ok) {
         const errorData = await response
           .json()
-          .catch(() => ({ error: "Fehler beim Speichern" }));
+          .catch(() => ({ error: t("goals.saveError") }));
         throw new Error(
-          errorData.error ||
-          t("goals.saveError", "Fehler beim Speichern der Ziele")
+          errorData.error || t("goals.saveError")
         );
       }
 
@@ -396,19 +398,18 @@ export function Profile() {
       setGoals(mergedGoals);
       setGoalsForm(mergedGoals);
       toast({
-        title: t("goals.saved", "Wochenziele gespeichert"),
+        title: t("goals.saved"),
         description: t(
-          "goals.savedDescription",
-          "Deine Wochenziele wurden erfolgreich aktualisiert."
+          "goals.savedDescription"
         ),
       });
     } catch (error) {
       toast({
-        title: t("common.error", "Fehler"),
+        title: t("common.error"),
         description:
           error instanceof Error
             ? error.message
-            : t("goals.saveError", "Fehler beim Speichern der Wochenziele"),
+            : t("goals.saveError"),
         variant: "destructive",
       });
       throw error;
@@ -465,21 +466,20 @@ export function Profile() {
         true
       );
       toast({
-        title: t("settings.saved", "Gespeichert"),
+        title: t("settings.saved"),
         description: t(
           "settings.settingSaved",
-          "{{setting}} wurde aktualisiert.",
-          { setting: "Sichtbarkeit in globaler Rangliste" }
+          { setting: t("profile.globalRankingSetting") }
         ),
       });
     } catch (error) {
       setShowInGlobalRankings(!checked); // Revert on error
       toast({
-        title: t("common.error", "Fehler"),
+        title: t("common.error"),
         description:
           error instanceof Error
             ? error.message
-            : t("settings.saveError", "Fehler beim Speichern"),
+            : t("settings.saveError"),
         variant: "destructive",
       });
     }
@@ -498,16 +498,16 @@ export function Profile() {
         showInGlobalRankings,
       });
       toast({
-        title: "Avatar gespeichert",
-        description: "Dein Avatar wurde erfolgreich aktualisiert.",
+        title: t("profile.avatarSaved"),
+        description: t("profile.avatarSavedDesc"),
       });
     } catch (error) {
       toast({
-        title: "Fehler",
+        title: t("common.error"),
         description:
           error instanceof Error
             ? error.message
-            : "Fehler beim Speichern des Avatars",
+            : t("profile.avatarError"),
         variant: "destructive",
       });
     }
@@ -525,16 +525,16 @@ export function Profile() {
         showInGlobalRankings,
       });
       toast({
-        title: "Avatar entfernt",
-        description: "Dein Profilbild wurde erfolgreich entfernt.",
+        title: t("profile.avatarRemoved"),
+        description: t("profile.avatarRemovedDesc"),
       });
     } catch (error) {
       toast({
-        title: "Fehler",
+        title: t("common.error"),
         description:
           error instanceof Error
             ? error.message
-            : "Fehler beim Entfernen des Avatars",
+            : t("profile.avatarRemoveError"),
         variant: "destructive",
       });
     }
@@ -549,11 +549,11 @@ export function Profile() {
     const errors: { firstName?: string; lastName?: string } = {};
 
     if (!profileForm.firstName || profileForm.firstName.trim() === "") {
-      errors.firstName = "Vorname ist ein Pflichtfeld.";
+      errors.firstName = t("profile.firstNameRequired");
     }
 
     if (!profileForm.lastName || profileForm.lastName.trim() === "") {
-      errors.lastName = "Nachname ist ein Pflichtfeld.";
+      errors.lastName = t("profile.lastNameRequired");
     }
 
     setValidationErrors(errors);
@@ -566,14 +566,14 @@ export function Profile() {
     if (fieldName === "firstName" && !profileForm.firstName?.trim()) {
       setValidationErrors((prev) => ({
         ...prev,
-        firstName: "Vorname ist ein Pflichtfeld.",
+        firstName: t("profile.firstNameRequired"),
       }));
       return;
     }
     if (fieldName === "lastName" && !profileForm.lastName?.trim()) {
       setValidationErrors((prev) => ({
         ...prev,
-        lastName: "Nachname ist ein Pflichtfeld.",
+        lastName: t("profile.lastNameRequired"),
       }));
       return;
     }
@@ -584,9 +584,8 @@ export function Profile() {
       (!profileForm.nickname || profileForm.nickname.trim() === "")
     ) {
       toast({
-        title: t("common.error", "Fehler"),
-        description:
-          "Wenn 'Spitzname' als Anzeigename gewählt ist, muss ein Spitzname angegeben werden.",
+        title: t("common.error"),
+        description: t("profile.nicknameRequired"),
         variant: "destructive",
       });
       return;
@@ -604,27 +603,26 @@ export function Profile() {
       setValidationErrors({});
 
       const fieldLabels: Record<string, string> = {
-        firstName: "Vorname",
-        lastName: "Nachname",
-        nickname: "Spitzname",
-        displayPreference: "Anzeigename",
+        firstName: t("profile.firstName"),
+        lastName: t("profile.lastName"),
+        nickname: t("profile.nicknameLabel"),
+        displayPreference: t("profile.displayNameLabel"),
       };
 
       toast({
-        title: t("settings.saved", "Gespeichert"),
+        title: t("settings.saved"),
         description: t(
           "settings.settingSaved",
-          "{{setting}} wurde aktualisiert.",
           { setting: fieldLabels[fieldName] || fieldName }
         ),
       });
     } catch (error) {
       toast({
-        title: t("common.error", "Fehler"),
+        title: t("common.error"),
         description:
           error instanceof Error
             ? error.message
-            : "Fehler beim Speichern des Profils",
+            : t("profile.profileSaveError"),
         variant: "destructive",
       });
     }
@@ -653,20 +651,19 @@ export function Profile() {
         true // silent mode - kein globaler Loading-State
       );
       toast({
-        title: t("settings.saved", "Gespeichert"),
+        title: t("settings.saved"),
         description: t(
           "settings.settingSaved",
-          "{{setting}} wurde aktualisiert.",
           { setting: settingName }
         ),
       });
     } catch (error) {
       toast({
-        title: t("common.error", "Fehler"),
+        title: t("common.error"),
         description:
           error instanceof Error
             ? error.message
-            : t("settings.saveError", "Fehler beim Speichern"),
+            : t("settings.saveError"),
         variant: "destructive",
       });
     }
@@ -683,8 +680,8 @@ export function Profile() {
 
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       toast({
-        title: "Fehler",
-        description: "Die Passwörter stimmen nicht überein.",
+        title: t("common.error"),
+        description: t("profile.passwordMismatch"),
         variant: "destructive",
       });
       return;
@@ -692,8 +689,8 @@ export function Profile() {
 
     if (passwordForm.newPassword.length < 8) {
       toast({
-        title: "Fehler",
-        description: "Das Passwort muss mindestens 8 Zeichen lang sein.",
+        title: t("common.error"),
+        description: t("profile.passwordTooShort"),
         variant: "destructive",
       });
       return;
@@ -701,8 +698,8 @@ export function Profile() {
 
     if (!passwordForm.currentPassword) {
       toast({
-        title: "Fehler",
-        description: "Bitte gib dein aktuelles Passwort ein.",
+        title: t("common.error"),
+        description: t("profile.currentPasswordRequired"),
         variant: "destructive",
       });
       return;
@@ -710,8 +707,8 @@ export function Profile() {
 
     if (!passwordForm.newPassword) {
       toast({
-        title: "Fehler",
-        description: "Bitte gib ein neues Passwort ein.",
+        title: t("common.error"),
+        description: t("profile.newPasswordRequired"),
         variant: "destructive",
       });
       return;
@@ -723,8 +720,8 @@ export function Profile() {
         passwordForm.newPassword
       );
       toast({
-        title: "Passwort geändert",
-        description: "Dein Passwort wurde erfolgreich geändert.",
+        title: t("profile.passwordChanged"),
+        description: t("profile.passwordChangedDesc"),
       });
       // Reset form
       setPasswordForm({
@@ -737,11 +734,11 @@ export function Profile() {
       // But we can add additional logging if needed
       console.error("Password change error:", error);
       toast({
-        title: "Fehler",
+        title: t("common.error"),
         description:
           error instanceof Error
             ? error.message
-            : "Fehler beim Ändern des Passworts",
+            : t("profile.passwordChangeError"),
         variant: "destructive",
       });
     }
@@ -754,25 +751,23 @@ export function Profile() {
     } else {
       // Show password dialog for disabling 2FA
       setPasswordDialogConfig({
-        title: "2FA deaktivieren",
-        description:
-          "Bitte gib dein Passwort ein, um die Zwei-Faktor-Authentifizierung zu deaktivieren.",
-        confirmLabel: "2FA deaktivieren",
+        title: t("profile.disable2FATitle"),
+        description: t("profile.disable2FAPrompt"),
+        confirmLabel: t("auth.disable2FA"),
         onConfirm: async (password: string) => {
           try {
             await disable2FA(password);
             toast({
-              title: "2FA deaktiviert",
-              description:
-                "Zwei-Faktor-Authentifizierung wurde erfolgreich deaktiviert.",
+              title: t("profile.disable2FA"),
+              description: t("profile.disable2FADesc"),
             });
           } catch (error) {
             toast({
-              title: "Fehler",
+              title: t("common.error"),
               description:
                 error instanceof Error
                   ? error.message
-                  : "Fehler beim Deaktivieren der 2FA",
+                  : t("profile.disable2FAError"),
               variant: "destructive",
             });
             throw error;
@@ -812,24 +807,26 @@ export function Profile() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({
-          error: "Fehler beim erneuten Versenden",
+          error: t("profile.invitationResendError"),
         }));
-        throw new Error(errorData.error || "Fehler beim erneuten Versenden");
+        throw new Error(
+          errorData.error || t("profile.invitationResendError")
+        );
       }
 
       toast({
-        title: "Einladung erneut versendet",
-        description: "Die Einladung wurde erfolgreich erneut versendet.",
+        title: t("profile.invitationResent"),
+        description: t("profile.invitationResentDesc"),
       });
 
       await loadInvitations();
     } catch (error) {
       toast({
-        title: "Fehler",
+        title: t("common.error"),
         description:
           error instanceof Error
             ? error.message
-            : "Fehler beim erneuten Versenden der Einladung",
+            : t("profile.invitationResendErrorDesc"),
         variant: "destructive",
       });
     }
@@ -852,24 +849,24 @@ export function Profile() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({
-          error: "Fehler beim Löschen",
+          error: t("profile.invitationDeleteError"),
         }));
-        throw new Error(errorData.error || "Fehler beim Löschen");
+        throw new Error(errorData.error || t("profile.invitationDeleteError"));
       }
 
       toast({
-        title: "Einladung gelöscht",
-        description: "Die Einladung wurde erfolgreich gelöscht.",
+        title: t("profile.invitationDeleted"),
+        description: t("profile.invitationDeletedDesc"),
       });
 
       await loadInvitations();
     } catch (error) {
       toast({
-        title: "Fehler",
+        title: t("common.error"),
         description:
           error instanceof Error
             ? error.message
-            : "Fehler beim Löschen der Einladung",
+            : t("profile.invitationDeleteErrorDesc"),
         variant: "destructive",
       });
     }
@@ -883,13 +880,13 @@ export function Profile() {
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2000);
       toast({
-        title: "Link kopiert",
-        description: "Einladungslink wurde in die Zwischenablage kopiert.",
+        title: t("profile.linkCopied"),
+        description: t("profile.linkCopiedDesc"),
       });
     } catch (error) {
       toast({
-        title: "Fehler",
-        description: "Link konnte nicht kopiert werden.",
+        title: t("common.error"),
+        description: t("profile.linkCopyError"),
         variant: "destructive",
       });
     }
@@ -908,8 +905,8 @@ export function Profile() {
     try {
       await deleteAccount(password);
       toast({
-        title: "Konto gelöscht",
-        description: "Dein Konto wurde erfolgreich gelöscht.",
+        title: t("profile.accountDeleted"),
+        description: t("profile.accountDeletedDesc"),
       });
       setDeleteAccountPasswordDialogOpen(false);
       // Redirect to login after successful account deletion
@@ -918,11 +915,11 @@ export function Profile() {
       }, 1500);
     } catch (error) {
       toast({
-        title: "Fehler",
+        title: t("common.error"),
         description:
           error instanceof Error
             ? error.message
-            : "Fehler beim Löschen des Kontos",
+            : t("profile.deleteAccountError"),
         variant: "destructive",
       });
       throw error;
@@ -933,27 +930,24 @@ export function Profile() {
     if (invitation.status === "accepted" || invitation.used) {
       return (
         <Badge variant="default" className="bg-green-500">
-          Eingeladen
+          {t("profile.invitationStatus.accepted")}
         </Badge>
       );
     }
     if (new Date(invitation.expiresAt) < new Date()) {
-      return <Badge variant="secondary">Abgelaufen</Badge>;
+      return <Badge variant="secondary">{t("profile.invitationStatus.expired")}</Badge>;
     }
-    return <Badge variant="outline">Ausstehend</Badge>;
+    return <Badge variant="outline">{t("profile.invitationStatus.pending")}</Badge>;
   };
 
   if (!user) {
-    return <div>Lädt...</div>;
+    return <div>{t("profile.loading")}</div>;
   }
 
   return (
     <PageTemplate
-      title={t("profile.title", "Profil")}
-      subtitle={t(
-        "profile.subtitle",
-        "Verwalte deine persönlichen Einstellungen und Ziele"
-      )}
+      title={t("profile.title")}
+      subtitle={t("profile.subtitle")}
       className="space-y-6"
     >
       <Tabs
@@ -967,13 +961,17 @@ export function Profile() {
         className="w-full"
       >
         <TabsList>
-          <TabsTrigger value="profile">Profil</TabsTrigger>
-          <TabsTrigger value="preferences">Einstellungen</TabsTrigger>
-          <TabsTrigger value="goals">Wochenziele</TabsTrigger>
-          <TabsTrigger value="achievements">Erfolge</TabsTrigger>
-          <TabsTrigger value="security">Sicherheit</TabsTrigger>
+          <TabsTrigger value="profile">{t("profile.tabs.profile")}</TabsTrigger>
+          <TabsTrigger value="preferences">
+            {t("profile.tabs.preferences")}
+          </TabsTrigger>
+          <TabsTrigger value="goals">{t("profile.tabs.goals")}</TabsTrigger>
+          <TabsTrigger value="achievements">
+            {t("profile.tabs.achievements")}
+          </TabsTrigger>
+          <TabsTrigger value="security">{t("profile.tabs.security")}</TabsTrigger>
           <TabsTrigger value="danger" className="text-destructive">
-            Gefahrenzone
+            {t("profile.tabs.danger")}
           </TabsTrigger>
         </TabsList>
 
@@ -982,7 +980,7 @@ export function Profile() {
             {/* Profile Info */}
             <Card>
               <CardHeader>
-                <CardTitle>Profil Informationen</CardTitle>
+                <CardTitle>{t("profile.profileInfo")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-4 mb-4">
@@ -1015,7 +1013,7 @@ export function Profile() {
                         variant="destructive"
                         onClick={handleAvatarRemove}
                         disabled={isLoading}
-                        title="Avatar entfernen"
+                        title={t("profile.removeAvatar")}
                       >
                         <Trash2 size={14} />
                       </Button>
@@ -1029,7 +1027,7 @@ export function Profile() {
                     {user.role === "admin" && (
                       <Badge variant="secondary" className="mt-1">
                         <Shield size={12} className="mr-1" />
-                        Administrator
+                        {t("profile.administrator")}
                       </Badge>
                     )}
                   </div>
@@ -1038,17 +1036,21 @@ export function Profile() {
                 <Separator />
 
                 <div className="bg-accent p-3 rounded-lg">
-                  <p className="text-sm font-medium">E-Mail Verifizierung</p>
+                  <p className="text-sm font-medium">
+                    {t("profile.emailVerification")}
+                  </p>
                   <p className="text-sm text-muted-foreground">
                     {user.isEmailVerified
-                      ? "✓ Deine E-Mail ist verifiziert"
-                      : "⚠ Bitte verifiziere deine E-Mail-Adresse"}
+                      ? t("profile.emailVerified")
+                      : t("profile.emailNotVerified")}
                   </p>
                 </div>
 
                 <div className="space-y-3">
                   <div>
-                    <Label htmlFor="firstName">Vorname *</Label>
+                    <Label htmlFor="firstName">
+                      {t("profile.firstName")} {t("profile.required")}
+                    </Label>
                     <Input
                       id="firstName"
                       value={profileForm.firstName}
@@ -1077,7 +1079,9 @@ export function Profile() {
                   </div>
 
                   <div>
-                    <Label htmlFor="lastName">Nachname *</Label>
+                    <Label htmlFor="lastName">
+                      {t("profile.lastName")} {t("profile.required")}
+                    </Label>
                     <Input
                       id="lastName"
                       value={profileForm.lastName}
@@ -1106,7 +1110,7 @@ export function Profile() {
                   </div>
 
                   <div>
-                    <Label htmlFor="nickname">Spitzname (optional)</Label>
+                    <Label htmlFor="nickname">{t("profile.nickname")}</Label>
                     <Input
                       id="nickname"
                       value={profileForm.nickname}
@@ -1121,7 +1125,9 @@ export function Profile() {
                   </div>
 
                   <div>
-                    <Label htmlFor="displayPreference">Anzeigename</Label>
+                    <Label htmlFor="displayPreference">
+                      {t("profile.displayNameLabel")}
+                    </Label>
                     <Select
                       value={profileForm.displayPreference}
                       onValueChange={(value) => {
@@ -1143,9 +1149,11 @@ export function Profile() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="firstName">Vorname</SelectItem>
+                        <SelectItem value="firstName">
+                          {t("profile.firstNameOption")}
+                        </SelectItem>
                         <SelectItem value="fullName">
-                          Vollständiger Name
+                          {t("profile.fullNameOption")}
                         </SelectItem>
                         <SelectItem
                           value="nickname"
@@ -1154,10 +1162,10 @@ export function Profile() {
                             profileForm.nickname.trim() === ""
                           }
                         >
-                          Spitzname{" "}
+                          {t("profile.nicknameOption")}{" "}
                           {(!profileForm.nickname ||
                             profileForm.nickname.trim() === "") &&
-                            "(kein Spitzname vergeben)"}
+                            t("profile.nicknameNotSet")}
                         </SelectItem>
                       </SelectContent>
                     </Select>
@@ -1165,8 +1173,7 @@ export function Profile() {
                       (!profileForm.nickname ||
                         profileForm.nickname.trim() === "") && (
                         <p className="text-sm text-muted-foreground mt-1">
-                          Bitte gib einen Spitzname ein, um diese Option zu
-                          verwenden.
+                          {t("profile.nicknameRequiredForDisplay")}
                         </p>
                       )}
                   </div>
@@ -1179,12 +1186,12 @@ export function Profile() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Share2 className="w-5 h-5" />
-                  Freunde einladen
+                  {t("profile.inviteFriends")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Lade deine Freunde ein und trainiert gemeinsam!
+                  {t("profile.inviteFriendsDesc")}
                 </p>
 
                 <InviteFriendForm onSuccess={handleInviteSuccess} />
@@ -1192,7 +1199,7 @@ export function Profile() {
                 <Separator />
 
                 <div>
-                  <Label htmlFor="invite-link">Dein Einladungslink</Label>
+                  <Label htmlFor="invite-link">{t("profile.yourInviteLink")}</Label>
                   <div className="flex gap-2 mt-1">
                     <Input
                       id="invite-link"
@@ -1210,13 +1217,15 @@ export function Profile() {
                 {/* Invitations List */}
                 <div>
                   <h4 className="text-sm font-semibold mb-2">
-                    Eingeladene Freunde
+                    {t("profile.invitedFriends")}
                   </h4>
                   {loadingInvitations ? (
-                    <p className="text-sm text-muted-foreground">Lädt...</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t("profile.loadingInvitations")}
+                    </p>
                   ) : invitations.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                      Noch keine Einladungen gesendet.
+                      {t("profile.noInvitations")}
                     </p>
                   ) : (
                     <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -1244,7 +1253,7 @@ export function Profile() {
                                   <p className="text-xs text-muted-foreground">
                                     {new Date(
                                       invitation.createdAt
-                                    ).toLocaleDateString("de-DE")}
+                                    ).toLocaleDateString(dateLocaleString)}
                                   </p>
                                 </div>
                               </div>
@@ -1260,7 +1269,7 @@ export function Profile() {
                                       handleResendInvitation(invitation.id)
                                     }
                                     className="h-8 w-8 p-0"
-                                    title="Erneut versenden"
+                                    title={t("profile.invitationResend")}
                                   >
                                     <RefreshCw className="h-4 w-4" />
                                   </Button>
@@ -1271,7 +1280,7 @@ export function Profile() {
                                       handleDeleteInvitation(invitation.id)
                                     }
                                     className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                                    title="Löschen"
+                                    title={t("common.delete")}
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
@@ -1296,13 +1305,15 @@ export function Profile() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Key className="w-5 h-5" />
-                  Passwort ändern
+                  {t("profile.changePassword")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <form onSubmit={handlePasswordChange} className="space-y-4">
                   <div>
-                    <Label htmlFor="current-password">Aktuelles Passwort</Label>
+                    <Label htmlFor="current-password">
+                      {t("profile.currentPassword")}
+                    </Label>
                     <Input
                       id="current-password"
                       type="password"
@@ -1317,7 +1328,9 @@ export function Profile() {
                   </div>
 
                   <div>
-                    <Label htmlFor="new-password">Neues Passwort</Label>
+                    <Label htmlFor="new-password">
+                      {t("profile.newPassword")}
+                    </Label>
                     <Input
                       id="new-password"
                       type="password"
@@ -1333,7 +1346,7 @@ export function Profile() {
 
                   <div>
                     <Label htmlFor="confirm-password">
-                      Passwort bestätigen
+                      {t("profile.confirmPassword")}
                     </Label>
                     <Input
                       id="confirm-password"
@@ -1355,7 +1368,9 @@ export function Profile() {
                     disabled={isLoading}
                     onClick={handlePasswordChange}
                   >
-                    {isLoading ? "Wird geändert..." : "Passwort ändern"}
+                    {isLoading
+                      ? t("profile.passwordChanging")
+                      : t("profile.changePassword")}
                   </Button>
                 </form>
               </CardContent>
@@ -1366,18 +1381,21 @@ export function Profile() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Lock className="w-5 h-5" />
-                  Zwei-Faktor-Authentifizierung
+                  {t("profile.twoFactorAuth")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium">2FA aktivieren</p>
+                    <p className="font-medium">{t("profile.enable2FA")}</p>
                     <p className="text-sm text-muted-foreground">
-                      Zusätzliche Sicherheit für dein Konto
+                      {t("profile.enable2FADesc")}
                     </p>
                     <p className="text-sm">
-                      Status: {user.has2FA ? "✓ Aktiviert" : "○ Deaktiviert"}
+                      {t("profile.status")}:{" "}
+                      {user.has2FA
+                        ? t("profile.activated")
+                        : t("profile.deactivated")}
                     </p>
                   </div>
                   <Switch
@@ -1392,9 +1410,11 @@ export function Profile() {
                     <Separator />
                     <div className="space-y-3 text-sm">
                       <div className="space-y-1">
-                        <p className="font-medium">2FA Details</p>
+                        <p className="font-medium">
+                          {t("profile.twoFactorDetails")}
+                        </p>
                         <p className="text-muted-foreground">
-                          Aktiviert am:{" "}
+                          {t("profile.enabledAt")}{" "}
                           {user.twoFactorEnabledAt &&
                             user.twoFactorEnabledAt !== null &&
                             user.twoFactorEnabledAt !== undefined &&
@@ -1402,14 +1422,14 @@ export function Profile() {
                             !isNaN(new Date(user.twoFactorEnabledAt).getTime())
                             ? new Date(
                               user.twoFactorEnabledAt
-                            ).toLocaleDateString("de-DE", {
+                            ).toLocaleDateString(dateLocaleString, {
                               day: "2-digit",
                               month: "2-digit",
                               year: "numeric",
                               hour: "2-digit",
                               minute: "2-digit",
                             })
-                            : "Nicht verfügbar"}
+                            : t("profile.notAvailable")}
                         </p>
                       </div>
                       <Button
@@ -1422,24 +1442,23 @@ export function Profile() {
                             setNewRecoveryCodes(codes);
                             setRecoveryCodesDialogOpen(true);
                             toast({
-                              title: "Recovery-Keys zurückgesetzt",
-                              description:
-                                "Neue Recovery-Keys wurden erfolgreich generiert.",
+                              title: t("profile.recoveryKeysReset"),
+                              description: t("profile.recoveryKeysResetDesc"),
                             });
                           } catch (error) {
                             toast({
-                              title: "Fehler",
+                              title: t("common.error"),
                               description:
                                 error instanceof Error
                                   ? error.message
-                                  : "Fehler beim Zurücksetzen der Recovery-Keys",
+                                  : t("profile.recoveryKeysResetError"),
                               variant: "destructive",
                             });
                           }
                         }}
                         className="w-full"
                       >
-                        Recovery-Keys zurücksetzen
+                        {t("profile.resetRecoveryKeys")}
                       </Button>
                     </div>
                   </>
@@ -1452,13 +1471,15 @@ export function Profile() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Shield className="w-5 h-5" />
-                  Kontosicherheit
+                  {t("profile.accountSecurity")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1">
-                    <p className="text-sm font-medium">Letzter Login</p>
+                    <p className="text-sm font-medium">
+                      {t("profile.lastLogin")}
+                    </p>
                     <p className="text-sm text-muted-foreground">
                       {user.lastLoginAt &&
                         user.lastLoginAt !== null &&
@@ -1466,7 +1487,7 @@ export function Profile() {
                         user.lastLoginAt !== "" &&
                         !isNaN(new Date(user.lastLoginAt).getTime())
                         ? new Date(user.lastLoginAt).toLocaleDateString(
-                          "de-DE",
+                          dateLocaleString,
                           {
                             day: "2-digit",
                             month: "2-digit",
@@ -1475,12 +1496,12 @@ export function Profile() {
                             minute: "2-digit",
                           }
                         )
-                        : "Nie"}
+                        : t("profile.never")}
                     </p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-sm font-medium">
-                      Letzte Passwortänderung
+                      {t("profile.lastPasswordChange")}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {user.passwordChangedAt &&
@@ -1489,7 +1510,7 @@ export function Profile() {
                         user.passwordChangedAt !== "" &&
                         !isNaN(new Date(user.passwordChangedAt).getTime())
                         ? new Date(user.passwordChangedAt).toLocaleDateString(
-                          "de-DE",
+                          dateLocaleString,
                           {
                             day: "2-digit",
                             month: "2-digit",
@@ -1498,19 +1519,21 @@ export function Profile() {
                             minute: "2-digit",
                           }
                         )
-                        : "Nie geändert"}
+                        : t("profile.neverChanged")}
                     </p>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-sm font-medium">E-Mail-Verifizierung</p>
+                    <p className="text-sm font-medium">
+                      {t("profile.emailVerification")}
+                    </p>
                     <p className="text-sm text-muted-foreground">
                       {user.isEmailVerified ? (
                         <span className="text-green-600 dark:text-green-400">
-                          ✓ Verifiziert
+                          {t("profile.verified")}
                         </span>
                       ) : (
                         <span className="text-yellow-600 dark:text-yellow-400">
-                          ⚠ Nicht verifiziert
+                          {t("profile.notVerified")}
                         </span>
                       )}
                     </p>
@@ -1526,21 +1549,25 @@ export function Profile() {
             {/* Benutzereinstellungen */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Benutzereinstellungen</CardTitle>
+                <CardTitle className="text-lg">
+                  {t("profile.userPreferences")}
+                </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Passe die App an deine Vorlieben an
+                  {t("profile.userPreferencesDesc")}
                 </p>
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Sprache */}
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Sprache</Label>
+                  <Label className="text-sm font-medium">
+                    {t("profile.language")}
+                  </Label>
                   <Select
                     value={preferencesForm.languagePreference}
                     onValueChange={(value) =>
                       savePreference(
                         { languagePreference: value as "de" | "en" },
-                        "Sprache"
+                        t("profile.language")
                       )
                     }
                   >
@@ -1548,21 +1575,23 @@ export function Profile() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="de">Deutsch</SelectItem>
-                      <SelectItem value="en">English</SelectItem>
+                      <SelectItem value="de">{t("profile.german")}</SelectItem>
+                      <SelectItem value="en">{t("profile.english")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 {/* Uhrzeitformat */}
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Uhrzeitformat</Label>
+                  <Label className="text-sm font-medium">
+                    {t("profile.timeFormat")}
+                  </Label>
                   <Select
                     value={preferencesForm.timeFormat}
                     onValueChange={(value) =>
                       savePreference(
                         { timeFormat: value as "12h" | "24h" },
-                        "Uhrzeitformat"
+                        t("profile.timeFormat")
                       )
                     }
                   >
@@ -1570,8 +1599,12 @@ export function Profile() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="24h">24-Stunden (14:30)</SelectItem>
-                      <SelectItem value="12h">12-Stunden (2:30 PM)</SelectItem>
+                      <SelectItem value="24h">
+                        {t("profile.timeFormat24h")}
+                      </SelectItem>
+                      <SelectItem value="12h">
+                        {t("profile.timeFormat12h")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1587,7 +1620,7 @@ export function Profile() {
                       setTheme(value as "light" | "dark" | "system");
                       savePreference(
                         { theme: value as "light" | "dark" | "system" },
-                        t("settings.theme", "Design")
+                        t("profile.theme")
                       );
                     }}
                   >
@@ -1613,15 +1646,19 @@ export function Profile() {
             {/* Einheiten-Präferenzen */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Einheiten-Präferenzen</CardTitle>
+                <CardTitle className="text-lg">
+                  {t("profile.unitsPreferences")}
+                </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Wähle deine bevorzugten Einheiten für Messungen
+                  {t("profile.unitsPreferencesDesc")}
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Distanz */}
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Distanz</Label>
+                  <Label className="text-sm font-medium">
+                    {t("profile.distance")}
+                  </Label>
                   <Select
                     value={preferencesForm.units.distance}
                     onValueChange={(value) =>
@@ -1632,7 +1669,7 @@ export function Profile() {
                             distance: value as "km" | "m" | "miles" | "yards",
                           },
                         },
-                        "Distanzeinheit"
+                        t("profile.distance")
                       )
                     }
                   >
@@ -1640,17 +1677,23 @@ export function Profile() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="km">Kilometer (km)</SelectItem>
-                      <SelectItem value="m">Meter (m)</SelectItem>
-                      <SelectItem value="miles">Meilen</SelectItem>
-                      <SelectItem value="yards">Yards</SelectItem>
+                      <SelectItem value="km">{t("profile.distanceKm")}</SelectItem>
+                      <SelectItem value="m">{t("profile.distanceM")}</SelectItem>
+                      <SelectItem value="miles">
+                        {t("profile.distanceMiles")}
+                      </SelectItem>
+                      <SelectItem value="yards">
+                        {t("profile.distanceYards")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 {/* Gewicht */}
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Gewicht</Label>
+                  <Label className="text-sm font-medium">
+                    {t("profile.weight")}
+                  </Label>
                   <Select
                     value={preferencesForm.units.weight}
                     onValueChange={(value) =>
@@ -1661,7 +1704,7 @@ export function Profile() {
                             weight: value as "kg" | "lbs" | "stone",
                           },
                         },
-                        "Gewichtseinheit"
+                        t("profile.weight")
                       )
                     }
                   >
@@ -1669,16 +1712,20 @@ export function Profile() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="kg">Kilogramm (kg)</SelectItem>
-                      <SelectItem value="lbs">Pfund (lbs)</SelectItem>
-                      <SelectItem value="stone">Stone</SelectItem>
+                      <SelectItem value="kg">{t("profile.weightKg")}</SelectItem>
+                      <SelectItem value="lbs">{t("profile.weightLbs")}</SelectItem>
+                      <SelectItem value="stone">
+                        {t("profile.weightStone")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 {/* Temperatur */}
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Temperatur</Label>
+                  <Label className="text-sm font-medium">
+                    {t("profile.temperature")}
+                  </Label>
                   <Select
                     value={preferencesForm.units.temperature}
                     onValueChange={(value) =>
@@ -1689,7 +1736,7 @@ export function Profile() {
                             temperature: value as "celsius" | "fahrenheit",
                           },
                         },
-                        "Temperatureinheit"
+                        t("profile.temperature")
                       )
                     }
                   >
@@ -1697,9 +1744,11 @@ export function Profile() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="celsius">Celsius (°C)</SelectItem>
+                      <SelectItem value="celsius">
+                        {t("profile.temperatureCelsius")}
+                      </SelectItem>
                       <SelectItem value="fahrenheit">
-                        Fahrenheit (°F)
+                        {t("profile.temperatureFahrenheit")}
                       </SelectItem>
                     </SelectContent>
                   </Select>
@@ -1710,16 +1759,18 @@ export function Profile() {
             {/* App-Einstellungen */}
             <Card className="md:col-span-2">
               <CardHeader>
-                <CardTitle className="text-lg">App-Einstellungen</CardTitle>
+                <CardTitle className="text-lg">
+                  {t("profile.appSettings")}
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label className="text-sm font-medium">
-                      E-Mail-Benachrichtigungen
+                      {t("profile.emailNotifications")}
                     </Label>
                     <p className="text-xs text-muted-foreground">
-                      Wöchentliche Zusammenfassung deiner Fortschritte
+                      {t("profile.emailNotificationsDesc")}
                     </p>
                   </div>
                   <Switch
@@ -1732,7 +1783,7 @@ export function Profile() {
                             email: checked,
                           },
                         },
-                        "E-Mail-Benachrichtigungen"
+                        t("profile.emailNotifications")
                       )
                     }
                   />
@@ -1741,11 +1792,10 @@ export function Profile() {
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label className="text-sm font-medium">
-                      Öffentliches Profil
+                      {t("profile.publicProfileSetting")}
                     </Label>
                     <p className="text-xs text-muted-foreground">
-                      Andere Benutzer können dein Profil und deine Aktivitäten
-                      sehen
+                      {t("profile.publicProfileDesc")}
                     </p>
                   </div>
                   <Switch
@@ -1758,7 +1808,7 @@ export function Profile() {
                             publicProfile: checked,
                           },
                         },
-                        "Öffentliches Profil"
+                        t("profile.publicProfileSetting")
                       )
                     }
                   />
@@ -1767,11 +1817,10 @@ export function Profile() {
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label className="text-sm font-medium">
-                      In globaler Rangliste anzeigen
+                      {t("profile.globalRankingSetting")}
                     </Label>
                     <p className="text-xs text-muted-foreground">
-                      Dein Profil erscheint in den globalen Statistiken und
-                      Ranglisten für alle Nutzer
+                      {t("profile.globalRankingDesc")}
                     </p>
                   </div>
                   <Switch
@@ -1786,10 +1835,10 @@ export function Profile() {
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label className="text-sm font-medium">
-                        {t("settings.reactions.friendsCanSee", "Freunde können Reaktionen sehen")}
+                        {t("settings.reactions.friendsCanSee")}
                       </Label>
                       <p className="text-xs text-muted-foreground">
-                        {t("settings.reactions.friendsCanSeeDescription", "Erlaube deinen Freunden, Reaktionen auf deine Workouts zu sehen")}
+                        {t("settings.reactions.friendsCanSeeDescription")}
                       </p>
                     </div>
                     <Switch
@@ -1804,7 +1853,7 @@ export function Profile() {
                               showNames: checked ? preferencesForm.reactions.showNames : false,
                             },
                           },
-                          t("settings.reactions.friendsCanSee", "Freunde können Reaktionen sehen")
+                          t("settings.reactions.friendsCanSee")
                         )
                       }
                     />
@@ -1813,10 +1862,10 @@ export function Profile() {
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label className="text-sm font-medium">
-                        {t("settings.reactions.showNames", "Namen bei Reaktionen anzeigen")}
+                        {t("settings.reactions.showNames")}
                       </Label>
                       <p className="text-xs text-muted-foreground">
-                        {t("settings.reactions.showNamesDescription", "Zeige die Namen der Nutzer, die auf deine Workouts reagiert haben")}
+                        {t("settings.reactions.showNamesDescription")}
                       </p>
                     </div>
                     <Switch
@@ -1830,7 +1879,7 @@ export function Profile() {
                               showNames: checked,
                             },
                           },
-                          t("settings.reactions.showNames", "Namen bei Reaktionen anzeigen")
+                          t("settings.reactions.showNames")
                         )
                       }
                     />
@@ -1847,16 +1896,14 @@ export function Profile() {
         <TabsContent value="goals" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Wochenziele</CardTitle>
+              <CardTitle>{t("profile.weeklyGoalsTitle")}</CardTitle>
               <p className="text-sm text-muted-foreground mt-2">
-                Passe deine wöchentlichen Ziele nach deinen Wünschen an. Die
-                Fortschritte werden automatisch basierend auf deinen Trainings
-                aktualisiert.
+                {t("profile.weeklyGoalsDesc")}
               </p>
             </CardHeader>
             <CardContent>
               {loadingGoals ? (
-                <p className="text-muted-foreground">Lädt...</p>
+                <p className="text-muted-foreground">{t("profile.loading")}</p>
               ) : (
                 <form onSubmit={handleGoalsSubmit}>
                   <WeeklyGoalsForm
@@ -1875,7 +1922,7 @@ export function Profile() {
                       onClick={handleResetGoals}
                       disabled={savingGoals || isLoading}
                     >
-                      {t("common.reset", "Zurücksetzen")}
+                      {t("common.reset")}
                     </Button>
                     <Button
                       type="submit"
@@ -1883,8 +1930,8 @@ export function Profile() {
                       disabled={savingGoals || isLoading}
                     >
                       {savingGoals
-                        ? "Wird gespeichert..."
-                        : "Wochenziele speichern"}
+                        ? t("profile.weeklyGoalsSaving")
+                        : t("profile.weeklyGoalsSaveAction")}
                     </Button>
                   </div>
                 </form>
@@ -1930,7 +1977,7 @@ export function Profile() {
                 <CardHeader className="flex flex-row items-center justify-between space-y-0">
                   <CardTitle className="text-lg font-semibold flex items-center gap-2">
                     <Trophy className="h-5 w-5 text-amber-500" />
-                    {t("profile.achievements.awards", "Auszeichnungen")}
+                    {t("profile.achievements.awards")}
                   </CardTitle>
                   <Badge variant="outline">{achievements.awards.length}</Badge>
                 </CardHeader>
@@ -1939,16 +1986,10 @@ export function Profile() {
                     <div className="text-center py-8">
                       <Trophy className="mx-auto h-12 w-12 text-muted-foreground/30 mb-3" />
                       <p className="text-sm text-muted-foreground">
-                        {t(
-                          "profile.achievements.noAwards",
-                          "Noch keine Auszeichnungen erhalten."
-                        )}
+                        {t("profile.achievements.noAwards")}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {t(
-                          "profile.achievements.noAwardsHint",
-                          "Trainiere regelmäßig, um Auszeichnungen zu erhalten!"
-                        )}
+                        {t("profile.achievements.noAwardsHint")}
                       </p>
                     </div>
                   ) : (
@@ -1966,12 +2007,12 @@ export function Profile() {
                         {(award.periodStart || award.periodEnd) && (
                           <p className="text-xs text-muted-foreground">
                             {award.periodStart && award.periodEnd
-                              ? `${format(new Date(award.periodStart), "dd.MM.yyyy", { locale: de })} – ${format(new Date(award.periodEnd), "dd.MM.yyyy", { locale: de })}`
+                              ? `${format(new Date(award.periodStart), "dd.MM.yyyy", { locale: dateLocale })} – ${format(new Date(award.periodEnd), "dd.MM.yyyy", { locale: dateLocale })}`
                               : award.periodStart
                                 ? format(
                                   new Date(award.periodStart),
                                   "dd.MM.yyyy",
-                                  { locale: de }
+                                  { locale: dateLocale }
                                 )
                                 : ""}
                           </p>
@@ -1995,7 +2036,7 @@ export function Profile() {
                 <CardHeader className="flex flex-row items-center justify-between space-y-0">
                   <CardTitle className="text-lg font-semibold flex items-center gap-2">
                     <Medal className="h-5 w-5 text-primary" />
-                    {t("profile.achievements.badges", "Badges")}
+                    {t("profile.achievements.badges")}
                   </CardTitle>
                   <Badge variant="outline">{achievements.badges.length}</Badge>
                 </CardHeader>
@@ -2004,68 +2045,67 @@ export function Profile() {
                     <div className="text-center py-8">
                       <Medal className="mx-auto h-12 w-12 text-muted-foreground/30 mb-3" />
                       <p className="text-sm text-muted-foreground">
-                        {t(
-                          "profile.achievements.noBadges",
-                          "Noch keine Badges erhalten."
-                        )}
+                        {t("profile.achievements.noBadges")}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {t(
-                          "profile.achievements.noBadgesHint",
-                          "Erreiche Meilensteine, um Badges freizuschalten!"
-                        )}
+                        {t("profile.achievements.noBadgesHint")}
                       </p>
                     </div>
                   ) : (
-                    achievements.badges.map((badge) => (
-                      <div
-                        key={badge.id}
-                        className="flex items-center justify-between rounded-lg border bg-card p-4 hover:bg-accent/50 transition-colors"
-                      >
-                        <div className="flex-1">
-                          <p className="font-semibold leading-none mb-1">
-                            {badge.label}
-                          </p>
-                          {badge.description && (
-                            <p className="text-xs text-muted-foreground mb-1">
-                              {badge.description}
+                    achievements.badges.map((badge) => {
+                      const badgeText = getBadgeText(badge, t);
+                      return (
+                        <div
+                          key={badge.id}
+                          className="flex items-center justify-between rounded-lg border bg-card p-4 hover:bg-accent/50 transition-colors"
+                        >
+                          <div className="flex-1">
+                            <p className="font-semibold leading-none mb-1">
+                              {badgeText.label}
                             </p>
-                          )}
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span className="capitalize">{badge.category}</span>
-                            {badge.level && (
-                              <>
-                                <span>·</span>
-                                <span>
-                                  {t("profile.achievements.level", "Stufe")}{" "}
-                                  {badge.level}
-                                </span>
-                              </>
+                            {badgeText.description && (
+                              <p className="text-xs text-muted-foreground mb-1">
+                                {badgeText.description}
+                              </p>
                             )}
-                            {badge.earnedAt && (
-                              <>
-                                <span>·</span>
-                                <span>
-                                  {format(
-                                    new Date(badge.earnedAt),
-                                    "dd.MM.yyyy",
-                                    { locale: de }
-                                  )}
-                                </span>
-                              </>
-                            )}
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span className="capitalize">
+                                {badgeText.category || badge.category}
+                              </span>
+                              {badge.level && (
+                                <>
+                                  <span>·</span>
+                                  <span>
+                                    {t("profile.achievements.level")}{" "}
+                                    {badge.level}
+                                  </span>
+                                </>
+                              )}
+                              {badge.earnedAt && (
+                                <>
+                                  <span>·</span>
+                                  <span>
+                                    {format(
+                                      new Date(badge.earnedAt),
+                                      "dd.MM.yyyy",
+                                      { locale: dateLocale }
+                                    )}
+                                  </span>
+                                </>
+                              )}
+                            </div>
                           </div>
+                          {badge.icon && (
+                            <Badge
+                              variant="secondary"
+                              className="text-xs uppercase ml-3"
+                            >
+                              {badgeText.icon || badge.icon.replace("badge-", "")}
+                            </Badge>
+                          )}
                         </div>
-                        {badge.icon && (
-                          <Badge
-                            variant="secondary"
-                            className="text-xs uppercase ml-3"
-                          >
-                            {badge.icon.replace("badge-", "")}
-                          </Badge>
-                        )}
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </CardContent>
               </Card>
@@ -2079,7 +2119,7 @@ export function Profile() {
                 <CardHeader>
                   <CardTitle className="text-lg font-semibold flex items-center gap-2">
                     <Award className="h-5 w-5 text-green-500" />
-                    {t("profile.achievements.progress", "Fortschritt")}
+                    {t("profile.achievements.progress")}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -2098,8 +2138,7 @@ export function Profile() {
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {t(
-                              "profile.achievements.timesAchieved",
-                              "mal erreicht"
+                              "profile.achievements.timesAchieved"
                             )}
                           </p>
                         </div>
@@ -2119,16 +2158,10 @@ export function Profile() {
                 <CardContent className="py-12 text-center">
                   <Award className="mx-auto h-16 w-16 text-muted-foreground/30 mb-4" />
                   <h3 className="text-lg font-semibold mb-2">
-                    {t(
-                      "profile.achievements.startYourJourney",
-                      "Starte deine Reise!"
-                    )}
+                    {t("profile.achievements.startYourJourney")}
                   </h3>
                   <p className="text-muted-foreground max-w-md mx-auto">
-                    {t(
-                      "profile.achievements.startYourJourneyDescription",
-                      "Absolviere Workouts und erreiche deine Ziele, um Badges und Auszeichnungen zu sammeln. Jeder Erfolg zählt!"
-                    )}
+                    {t("profile.achievements.startYourJourneyDescription")}
                   </p>
                 </CardContent>
               </Card>
@@ -2140,30 +2173,24 @@ export function Profile() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-destructive">
                 <Shield className="w-5 h-5" />
-                Gefahrenzone
+                {t("profile.dangerZone")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 space-y-3">
                 <div>
                   <h3 className="font-semibold text-destructive mb-2">
-                    Konto löschen
+                    {t("profile.deleteAccount")}
                   </h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Wenn du dein Konto löschst, werden alle deine Daten
-                    unwiderruflich gelöscht. Diese Aktion kann nicht rückgängig
-                    gemacht werden. Alle deine Trainingsdaten, Erfolge,
-                    Freundschaften und Einstellungen gehen verloren.
+                    {t("profile.deleteAccountWarning")}
                   </p>
                   <ul className="text-sm text-muted-foreground space-y-1 mb-4 list-disc list-inside">
-                    <li>Alle deine Trainingsdaten werden gelöscht</li>
-                    <li>Deine Erfolge und Statistiken gehen verloren</li>
-                    <li>Alle Freundschaften werden beendet</li>
-                    <li>Dein Profil ist nicht mehr erreichbar</li>
-                    <li>
-                      Diese Aktion ist dauerhaft und kann nicht rückgängig
-                      gemacht werden
-                    </li>
+                    <li>{t("profile.deleteAccountList.data")}</li>
+                    <li>{t("profile.deleteAccountList.achievements")}</li>
+                    <li>{t("profile.deleteAccountList.friendships")}</li>
+                    <li>{t("profile.deleteAccountList.profile")}</li>
+                    <li>{t("profile.deleteAccountList.irreversible")}</li>
                   </ul>
                 </div>
                 <Button
@@ -2172,7 +2199,7 @@ export function Profile() {
                   onClick={handleDeleteAccount}
                   disabled={isLoading}
                 >
-                  Konto löschen
+                  {t("profile.deleteAccount")}
                 </Button>
               </div>
             </CardContent>

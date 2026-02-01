@@ -59,7 +59,7 @@ export function SearchFilterToolbar({
               className="flex-1 sm:flex-none"
             >
               <LayoutGrid className="mr-2 h-4 w-4" />
-              Grid
+              {t("filters.viewGrid", "Grid")}
             </Button>
             <Button
               variant={viewMode === "table" ? "default" : "outline"}
@@ -68,7 +68,7 @@ export function SearchFilterToolbar({
               className="flex-1 sm:flex-none"
             >
               <List className="mr-2 h-4 w-4" />
-              Tabelle
+              {t("filters.viewTable", "Tabelle")}
             </Button>
           </div>
         )}

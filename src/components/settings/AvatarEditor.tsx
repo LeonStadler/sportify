@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Shuffle } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from "react-i18next";
 import NiceAvatar, { NiceAvatarProps, genConfig } from 'react-nice-avatar';
 
 interface AvatarEditorProps {
@@ -32,6 +33,7 @@ const defaultConfig: NiceAvatarProps = {
 };
 
 export function AvatarEditor({ open, onOpenChange, currentConfig, onSave }: AvatarEditorProps) {
+  const { t } = useTranslation();
   const [config, setConfig] = useState<NiceAvatarProps>(currentConfig || defaultConfig);
 
   // Update config when currentConfig changes
@@ -86,48 +88,58 @@ export function AvatarEditor({ open, onOpenChange, currentConfig, onSave }: Avat
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Avatar erstellen</DialogTitle>
-          <DialogDescription>
-            Passe deinen Avatar nach deinen Wünschen an
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-hidden p-0">
+        <div className="flex flex-col max-h-[90vh]">
+          <DialogHeader className="px-6 pt-6">
+            <DialogTitle>{t("profile.avatarEditor.title")}</DialogTitle>
+            <DialogDescription>
+              {t("profile.avatarEditor.description")}
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-6 py-4">
-          {/* Avatar Preview */}
-          <div className="flex flex-col items-center gap-4">
-            <div className="relative">
-              <NiceAvatar
-                style={{ width: '200px', height: '200px' }}
-                {...config}
-              />
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleRandomize}
-              className="gap-2"
-            >
-              <Shuffle className="w-4 h-4" />
-              Zufällig generieren
-            </Button>
-          </div>
+          <div className="flex-1 overflow-y-auto px-6 pb-6 pt-4">
+            <div className="space-y-6">
+              {/* Avatar Preview */}
+              <div className="flex flex-col items-center gap-4">
+                <div className="relative">
+                  <NiceAvatar
+                    style={{ width: '200px', height: '200px' }}
+                    {...config}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleRandomize}
+                  className="gap-2"
+                >
+                  <Shuffle className="w-4 h-4" />
+                  {t("profile.avatarEditor.randomize")}
+                </Button>
+              </div>
 
-          {/* Configuration Options with Tabs */}
-          <Tabs defaultValue="face" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="face">Gesicht</TabsTrigger>
-              <TabsTrigger value="hair">Haare</TabsTrigger>
-              <TabsTrigger value="accessories">Accessoires</TabsTrigger>
-              <TabsTrigger value="other">Sonstiges</TabsTrigger>
-            </TabsList>
+              {/* Configuration Options with Tabs */}
+              <Tabs defaultValue="face" className="w-full">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="face">
+                    {t("profile.avatarEditor.tabs.face")}
+                  </TabsTrigger>
+                  <TabsTrigger value="hair">
+                    {t("profile.avatarEditor.tabs.hair")}
+                  </TabsTrigger>
+                  <TabsTrigger value="accessories">
+                    {t("profile.avatarEditor.tabs.accessories")}
+                  </TabsTrigger>
+                  <TabsTrigger value="other">
+                    {t("profile.avatarEditor.tabs.other")}
+                  </TabsTrigger>
+                </TabsList>
 
             {/* Face Tab */}
             <TabsContent value="face" className="space-y-4 mt-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Geschlecht</Label>
+                  <Label>{t("profile.avatarEditor.labels.gender")}</Label>
                   <Select
                     value={config.sex || 'man'}
                     onValueChange={(value) => updateConfig('sex', value as 'man' | 'woman')}
@@ -136,14 +148,18 @@ export function AvatarEditor({ open, onOpenChange, currentConfig, onSave }: Avat
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="man">Mann</SelectItem>
-                      <SelectItem value="woman">Frau</SelectItem>
+                      <SelectItem value="man">
+                        {t("profile.avatarEditor.options.gender.man")}
+                      </SelectItem>
+                      <SelectItem value="woman">
+                        {t("profile.avatarEditor.options.gender.woman")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Gesichtsfarbe</Label>
+                  <Label>{t("profile.avatarEditor.labels.faceColor")}</Label>
                   <Select
                     value={config.faceColor || '#F9C9B6'}
                     onValueChange={(value) => updateConfig('faceColor', value)}
@@ -152,17 +168,27 @@ export function AvatarEditor({ open, onOpenChange, currentConfig, onSave }: Avat
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="#F9C9B6">Hell</SelectItem>
-                      <SelectItem value="#AC6651">Dunkel</SelectItem>
-                      <SelectItem value="#E5A68A">Mittel</SelectItem>
-                      <SelectItem value="#FDBCB4">Rosa</SelectItem>
-                      <SelectItem value="#F8D25C">Gelb</SelectItem>
+                      <SelectItem value="#F9C9B6">
+                        {t("profile.avatarEditor.options.faceColor.light")}
+                      </SelectItem>
+                      <SelectItem value="#AC6651">
+                        {t("profile.avatarEditor.options.faceColor.dark")}
+                      </SelectItem>
+                      <SelectItem value="#E5A68A">
+                        {t("profile.avatarEditor.options.faceColor.medium")}
+                      </SelectItem>
+                      <SelectItem value="#FDBCB4">
+                        {t("profile.avatarEditor.options.faceColor.pink")}
+                      </SelectItem>
+                      <SelectItem value="#F8D25C">
+                        {t("profile.avatarEditor.options.faceColor.yellow")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Ohrgröße</Label>
+                  <Label>{t("profile.avatarEditor.labels.earSize")}</Label>
                   <Select
                     value={config.earSize || 'big'}
                     onValueChange={(value) => updateConfig('earSize', value as 'big' | 'small')}
@@ -171,14 +197,18 @@ export function AvatarEditor({ open, onOpenChange, currentConfig, onSave }: Avat
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="big">Groß</SelectItem>
-                      <SelectItem value="small">Klein</SelectItem>
+                      <SelectItem value="big">
+                        {t("profile.avatarEditor.options.earSize.big")}
+                      </SelectItem>
+                      <SelectItem value="small">
+                        {t("profile.avatarEditor.options.earSize.small")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Augenform</Label>
+                  <Label>{t("profile.avatarEditor.labels.eyeStyle")}</Label>
                   <Select
                     value={config.eyeStyle || 'circle'}
                     onValueChange={(value) => updateConfig('eyeStyle', value as 'circle' | 'oval' | 'smile')}
@@ -187,15 +217,21 @@ export function AvatarEditor({ open, onOpenChange, currentConfig, onSave }: Avat
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="circle">Rund</SelectItem>
-                      <SelectItem value="oval">Oval</SelectItem>
-                      <SelectItem value="smile">Lächeln</SelectItem>
+                      <SelectItem value="circle">
+                        {t("profile.avatarEditor.options.eyeStyle.circle")}
+                      </SelectItem>
+                      <SelectItem value="oval">
+                        {t("profile.avatarEditor.options.eyeStyle.oval")}
+                      </SelectItem>
+                      <SelectItem value="smile">
+                        {t("profile.avatarEditor.options.eyeStyle.smile")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Nasenform</Label>
+                  <Label>{t("profile.avatarEditor.labels.noseStyle")}</Label>
                   <Select
                     value={config.noseStyle || 'short'}
                     onValueChange={(value) => updateConfig('noseStyle', value as 'short' | 'long' | 'round')}
@@ -204,15 +240,21 @@ export function AvatarEditor({ open, onOpenChange, currentConfig, onSave }: Avat
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="short">Kurz</SelectItem>
-                      <SelectItem value="long">Lang</SelectItem>
-                      <SelectItem value="round">Rund</SelectItem>
+                      <SelectItem value="short">
+                        {t("profile.avatarEditor.options.noseStyle.short")}
+                      </SelectItem>
+                      <SelectItem value="long">
+                        {t("profile.avatarEditor.options.noseStyle.long")}
+                      </SelectItem>
+                      <SelectItem value="round">
+                        {t("profile.avatarEditor.options.noseStyle.round")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Mundform</Label>
+                  <Label>{t("profile.avatarEditor.labels.mouthStyle")}</Label>
                   <Select
                     value={config.mouthStyle || 'smile'}
                     onValueChange={(value) => updateConfig('mouthStyle', value as 'laugh' | 'smile' | 'peace')}
@@ -221,9 +263,15 @@ export function AvatarEditor({ open, onOpenChange, currentConfig, onSave }: Avat
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="laugh">Lachen</SelectItem>
-                      <SelectItem value="smile">Lächeln</SelectItem>
-                      <SelectItem value="peace">Peace</SelectItem>
+                      <SelectItem value="laugh">
+                        {t("profile.avatarEditor.options.mouthStyle.laugh")}
+                      </SelectItem>
+                      <SelectItem value="smile">
+                        {t("profile.avatarEditor.options.mouthStyle.smile")}
+                      </SelectItem>
+                      <SelectItem value="peace">
+                        {t("profile.avatarEditor.options.mouthStyle.peace")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -234,7 +282,7 @@ export function AvatarEditor({ open, onOpenChange, currentConfig, onSave }: Avat
             <TabsContent value="hair" className="space-y-4 mt-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Haarstil</Label>
+                  <Label>{t("profile.avatarEditor.labels.hairStyle")}</Label>
                   <Select
                     value={config.hairStyle || 'normal'}
                     onValueChange={(value) => updateConfig('hairStyle', value as 'normal' | 'thick' | 'mohawk' | 'womanLong' | 'womanShort')}
@@ -243,13 +291,23 @@ export function AvatarEditor({ open, onOpenChange, currentConfig, onSave }: Avat
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="normal">Normal</SelectItem>
-                      <SelectItem value="thick">Dick</SelectItem>
-                      <SelectItem value="mohawk">Mohawk</SelectItem>
+                      <SelectItem value="normal">
+                        {t("profile.avatarEditor.options.hairStyle.normal")}
+                      </SelectItem>
+                      <SelectItem value="thick">
+                        {t("profile.avatarEditor.options.hairStyle.thick")}
+                      </SelectItem>
+                      <SelectItem value="mohawk">
+                        {t("profile.avatarEditor.options.hairStyle.mohawk")}
+                      </SelectItem>
                       {config.sex === 'woman' && (
                         <>
-                          <SelectItem value="womanLong">Lang (Frau)</SelectItem>
-                          <SelectItem value="womanShort">Kurz (Frau)</SelectItem>
+                          <SelectItem value="womanLong">
+                            {t("profile.avatarEditor.options.hairStyle.womanLong")}
+                          </SelectItem>
+                          <SelectItem value="womanShort">
+                            {t("profile.avatarEditor.options.hairStyle.womanShort")}
+                          </SelectItem>
                         </>
                       )}
                     </SelectContent>
@@ -257,7 +315,7 @@ export function AvatarEditor({ open, onOpenChange, currentConfig, onSave }: Avat
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Haarfarbe</Label>
+                  <Label>{t("profile.avatarEditor.labels.hairColor")}</Label>
                   <Select
                     value={config.hairColor || '#4A4A4A'}
                     onValueChange={(value) => updateConfig('hairColor', value)}
@@ -266,13 +324,27 @@ export function AvatarEditor({ open, onOpenChange, currentConfig, onSave }: Avat
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="#4A4A4A">Schwarz</SelectItem>
-                      <SelectItem value="#8B4513">Braun</SelectItem>
-                      <SelectItem value="#D4A574">Blond</SelectItem>
-                      <SelectItem value="#DC143C">Rot</SelectItem>
-                      <SelectItem value="#FFD700">Gold</SelectItem>
-                      <SelectItem value="#708090">Grau</SelectItem>
-                      <SelectItem value="#FFFFFF">Weiß</SelectItem>
+                      <SelectItem value="#4A4A4A">
+                        {t("profile.avatarEditor.options.hairColor.black")}
+                      </SelectItem>
+                      <SelectItem value="#8B4513">
+                        {t("profile.avatarEditor.options.hairColor.brown")}
+                      </SelectItem>
+                      <SelectItem value="#D4A574">
+                        {t("profile.avatarEditor.options.hairColor.blonde")}
+                      </SelectItem>
+                      <SelectItem value="#DC143C">
+                        {t("profile.avatarEditor.options.hairColor.red")}
+                      </SelectItem>
+                      <SelectItem value="#FFD700">
+                        {t("profile.avatarEditor.options.hairColor.gold")}
+                      </SelectItem>
+                      <SelectItem value="#708090">
+                        {t("profile.avatarEditor.options.hairColor.gray")}
+                      </SelectItem>
+                      <SelectItem value="#FFFFFF">
+                        {t("profile.avatarEditor.options.hairColor.white")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -283,7 +355,7 @@ export function AvatarEditor({ open, onOpenChange, currentConfig, onSave }: Avat
             <TabsContent value="accessories" className="space-y-4 mt-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Hut</Label>
+                  <Label>{t("profile.avatarEditor.labels.hat")}</Label>
                   <Select
                     value={config.hatStyle || 'none'}
                     onValueChange={(value) => updateConfig('hatStyle', value as 'none' | 'beanie' | 'turban')}
@@ -292,16 +364,22 @@ export function AvatarEditor({ open, onOpenChange, currentConfig, onSave }: Avat
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Kein Hut</SelectItem>
-                      <SelectItem value="beanie">Mütze</SelectItem>
-                      <SelectItem value="turban">Turban</SelectItem>
+                      <SelectItem value="none">
+                        {t("profile.avatarEditor.options.hat.none")}
+                      </SelectItem>
+                      <SelectItem value="beanie">
+                        {t("profile.avatarEditor.options.hat.beanie")}
+                      </SelectItem>
+                      <SelectItem value="turban">
+                        {t("profile.avatarEditor.options.hat.turban")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 {config.hatStyle !== 'none' && (
                   <div className="space-y-2">
-                    <Label>Hutfarbe</Label>
+                    <Label>{t("profile.avatarEditor.labels.hatColor")}</Label>
                     <Select
                       value={config.hatColor || '#000000'}
                       onValueChange={(value) => updateConfig('hatColor', value)}
@@ -310,19 +388,31 @@ export function AvatarEditor({ open, onOpenChange, currentConfig, onSave }: Avat
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="#000000">Schwarz</SelectItem>
-                        <SelectItem value="#FFFFFF">Weiß</SelectItem>
-                        <SelectItem value="#FF0000">Rot</SelectItem>
-                        <SelectItem value="#0000FF">Blau</SelectItem>
-                        <SelectItem value="#008000">Grün</SelectItem>
-                        <SelectItem value="#FFA500">Orange</SelectItem>
+                        <SelectItem value="#000000">
+                          {t("profile.avatarEditor.options.hatColor.black")}
+                        </SelectItem>
+                        <SelectItem value="#FFFFFF">
+                          {t("profile.avatarEditor.options.hatColor.white")}
+                        </SelectItem>
+                        <SelectItem value="#FF0000">
+                          {t("profile.avatarEditor.options.hatColor.red")}
+                        </SelectItem>
+                        <SelectItem value="#0000FF">
+                          {t("profile.avatarEditor.options.hatColor.blue")}
+                        </SelectItem>
+                        <SelectItem value="#008000">
+                          {t("profile.avatarEditor.options.hatColor.green")}
+                        </SelectItem>
+                        <SelectItem value="#FFA500">
+                          {t("profile.avatarEditor.options.hatColor.orange")}
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 )}
 
                 <div className="space-y-2">
-                  <Label>Brille</Label>
+                  <Label>{t("profile.avatarEditor.labels.glasses")}</Label>
                   <Select
                     value={config.glassesStyle || 'none'}
                     onValueChange={(value) => updateConfig('glassesStyle', value as 'none' | 'round' | 'square')}
@@ -331,9 +421,15 @@ export function AvatarEditor({ open, onOpenChange, currentConfig, onSave }: Avat
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Keine Brille</SelectItem>
-                      <SelectItem value="round">Rund</SelectItem>
-                      <SelectItem value="square">Eckig</SelectItem>
+                      <SelectItem value="none">
+                        {t("profile.avatarEditor.options.glasses.none")}
+                      </SelectItem>
+                      <SelectItem value="round">
+                        {t("profile.avatarEditor.options.glasses.round")}
+                      </SelectItem>
+                      <SelectItem value="square">
+                        {t("profile.avatarEditor.options.glasses.square")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -344,7 +440,7 @@ export function AvatarEditor({ open, onOpenChange, currentConfig, onSave }: Avat
             <TabsContent value="other" className="space-y-4 mt-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Kleidung</Label>
+                  <Label>{t("profile.avatarEditor.labels.clothing")}</Label>
                   <Select
                     value={config.shirtStyle || 'polo'}
                     onValueChange={(value) => updateConfig('shirtStyle', value as 'polo' | 'short' | 'hoody')}
@@ -353,15 +449,21 @@ export function AvatarEditor({ open, onOpenChange, currentConfig, onSave }: Avat
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="polo">Polo</SelectItem>
-                      <SelectItem value="short">T-Shirt</SelectItem>
-                      <SelectItem value="hoody">Kapuze</SelectItem>
+                      <SelectItem value="polo">
+                        {t("profile.avatarEditor.options.clothing.polo")}
+                      </SelectItem>
+                      <SelectItem value="short">
+                        {t("profile.avatarEditor.options.clothing.short")}
+                      </SelectItem>
+                      <SelectItem value="hoody">
+                        {t("profile.avatarEditor.options.clothing.hoody")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Kleidungsfarbe</Label>
+                  <Label>{t("profile.avatarEditor.labels.clothingColor")}</Label>
                   <Select
                     value={config.shirtColor || '#FC909F'}
                     onValueChange={(value) => updateConfig('shirtColor', value)}
@@ -370,20 +472,36 @@ export function AvatarEditor({ open, onOpenChange, currentConfig, onSave }: Avat
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="#FC909F">Rosa</SelectItem>
-                      <SelectItem value="#73D1EF">Blau</SelectItem>
-                      <SelectItem value="#50C878">Grün</SelectItem>
-                      <SelectItem value="#FF6B6B">Rot</SelectItem>
-                      <SelectItem value="#FFD93D">Gelb</SelectItem>
-                      <SelectItem value="#6BCB77">Lichtgrün</SelectItem>
-                      <SelectItem value="#000000">Schwarz</SelectItem>
-                      <SelectItem value="#FFFFFF">Weiß</SelectItem>
+                      <SelectItem value="#FC909F">
+                        {t("profile.avatarEditor.options.clothingColor.pink")}
+                      </SelectItem>
+                      <SelectItem value="#73D1EF">
+                        {t("profile.avatarEditor.options.clothingColor.blue")}
+                      </SelectItem>
+                      <SelectItem value="#50C878">
+                        {t("profile.avatarEditor.options.clothingColor.green")}
+                      </SelectItem>
+                      <SelectItem value="#FF6B6B">
+                        {t("profile.avatarEditor.options.clothingColor.red")}
+                      </SelectItem>
+                      <SelectItem value="#FFD93D">
+                        {t("profile.avatarEditor.options.clothingColor.yellow")}
+                      </SelectItem>
+                      <SelectItem value="#6BCB77">
+                        {t("profile.avatarEditor.options.clothingColor.lightGreen")}
+                      </SelectItem>
+                      <SelectItem value="#000000">
+                        {t("profile.avatarEditor.options.clothingColor.black")}
+                      </SelectItem>
+                      <SelectItem value="#FFFFFF">
+                        {t("profile.avatarEditor.options.clothingColor.white")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Hintergrundfarbe</Label>
+                  <Label>{t("profile.avatarEditor.labels.backgroundColor")}</Label>
                   <Select
                     value={config.bgColor || '#F9C9B6'}
                     onValueChange={(value) => updateConfig('bgColor', value)}
@@ -392,34 +510,55 @@ export function AvatarEditor({ open, onOpenChange, currentConfig, onSave }: Avat
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="#F9C9B6">Beige</SelectItem>
-                      <SelectItem value="#AC6651">Braun</SelectItem>
-                      <SelectItem value="#D08B5B">Orange</SelectItem>
-                      <SelectItem value="#F4D150">Gelb</SelectItem>
-                      <SelectItem value="#ED9C6E">Pfirsich</SelectItem>
-                      <SelectItem value="#6C9BD1">Blau</SelectItem>
-                      <SelectItem value="#A8D5BA">Grün</SelectItem>
-                      <SelectItem value="#E8B4D1">Rosa</SelectItem>
-                      <SelectItem value="#FFFFFF">Weiß</SelectItem>
-                      <SelectItem value="#000000">Schwarz</SelectItem>
+                      <SelectItem value="#F9C9B6">
+                        {t("profile.avatarEditor.options.backgroundColor.beige")}
+                      </SelectItem>
+                      <SelectItem value="#AC6651">
+                        {t("profile.avatarEditor.options.backgroundColor.brown")}
+                      </SelectItem>
+                      <SelectItem value="#D08B5B">
+                        {t("profile.avatarEditor.options.backgroundColor.orange")}
+                      </SelectItem>
+                      <SelectItem value="#F4D150">
+                        {t("profile.avatarEditor.options.backgroundColor.yellow")}
+                      </SelectItem>
+                      <SelectItem value="#ED9C6E">
+                        {t("profile.avatarEditor.options.backgroundColor.peach")}
+                      </SelectItem>
+                      <SelectItem value="#6C9BD1">
+                        {t("profile.avatarEditor.options.backgroundColor.blue")}
+                      </SelectItem>
+                      <SelectItem value="#A8D5BA">
+                        {t("profile.avatarEditor.options.backgroundColor.green")}
+                      </SelectItem>
+                      <SelectItem value="#E8B4D1">
+                        {t("profile.avatarEditor.options.backgroundColor.pink")}
+                      </SelectItem>
+                      <SelectItem value="#FFFFFF">
+                        {t("profile.avatarEditor.options.backgroundColor.white")}
+                      </SelectItem>
+                      <SelectItem value="#000000">
+                        {t("profile.avatarEditor.options.backgroundColor.black")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
             </TabsContent>
-          </Tabs>
-        </div>
+              </Tabs>
+            </div>
+          </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Abbrechen
-          </Button>
-          <Button onClick={handleSave}>
-            Speichern
-          </Button>
-        </DialogFooter>
+          <DialogFooter className="px-6 pb-6">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              {t("profile.avatarEditor.actions.cancel")}
+            </Button>
+            <Button onClick={handleSave}>
+              {t("profile.avatarEditor.actions.save")}
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
 }
-

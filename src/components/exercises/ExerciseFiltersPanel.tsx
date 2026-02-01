@@ -3,6 +3,7 @@ import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useTranslation } from "react-i18next";
 import { MuscleGroupSelector } from "@/components/exercises/MuscleGroupSelector";
+import { getExerciseCategoryLabel, getExerciseDisciplineLabel } from "@/components/exercises/exerciseLabels";
 
 interface OptionItem {
   value: string;
@@ -83,7 +84,7 @@ export function ExerciseFiltersPanel({
             </ToggleGroupItem>
             {categoryOptions.map((item) => (
               <ToggleGroupItem key={item} value={item} className={filterPillClass}>
-                {item}
+                {getExerciseCategoryLabel(item, t)}
               </ToggleGroupItem>
             ))}
           </ToggleGroup>
@@ -104,7 +105,7 @@ export function ExerciseFiltersPanel({
             </ToggleGroupItem>
             {disciplineOptions.map((item) => (
               <ToggleGroupItem key={item} value={item} className={filterPillClass}>
-                {item}
+                {getExerciseDisciplineLabel(item, t)}
               </ToggleGroupItem>
             ))}
           </ToggleGroup>

@@ -15,6 +15,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { MuscleGroupSelector } from "@/components/exercises/MuscleGroupSelector";
+import { getExerciseCategoryLabel, getExerciseDisciplineLabel } from "@/components/exercises/exerciseLabels";
+import { cn } from "@/lib/utils";
 import {
   categoryOptions,
   disciplineOptions,
@@ -22,7 +24,7 @@ import {
   movementPatternOptions,
   muscleGroupTree,
 } from "@/components/exercises/exerciseOptions";
-import { Info } from "lucide-react";
+import { ChevronDown, Info } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -33,6 +35,8 @@ export type ExerciseFormValue = {
   discipline: string;
   movementPattern: string;
   measurementTypes: string[];
+  distanceUnit: string;
+  timeUnit: string;
   difficulty: number;
   requiresWeight: boolean;
   allowsWeight: boolean;
@@ -56,6 +60,8 @@ interface ExerciseFormProps {
   nameExactMatch?: boolean;
   confirmSimilar?: boolean;
   onConfirmSimilarChange?: (value: boolean) => void;
+  defaultDistanceUnit?: string;
+  defaultTimeUnit?: string;
 }
 
 export function ExerciseForm({
@@ -73,6 +79,8 @@ export function ExerciseForm({
   nameExactMatch,
   confirmSimilar,
   onConfirmSimilarChange,
+  defaultDistanceUnit = "km",
+  defaultTimeUnit = "min",
 }: ExerciseFormProps) {
   const { t } = useTranslation();
 
@@ -145,6 +153,13 @@ export function ExerciseForm({
       nextValue.supportsSets = true;
     }
 
+    if (normalized.includes("distance") && !value.distanceUnit) {
+      nextValue.distanceUnit = defaultDistanceUnit;
+    }
+    if (normalized.includes("time") && !value.timeUnit) {
+      nextValue.timeUnit = defaultTimeUnit;
+    }
+
     onChange(nextValue);
   };
 
@@ -180,7 +195,7 @@ export function ExerciseForm({
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground">
                     <Info className="h-4 w-4" />
-                    <span className="sr-only">Info</span>
+                    <span className="sr-only">{t("common.info", "Information")}</span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs text-sm" side="right" align="center" collisionPadding={16}>
@@ -252,13 +267,13 @@ export function ExerciseForm({
         <div>
           <Label>{t("exerciseLibrary.category")}</Label>
           <Select value={value.category} onValueChange={(next) => setField("category", next)}>
-            <SelectTrigger className="mt-1">
-              <SelectValue />
+            <SelectTrigger className={cn("mt-1", !value.category && "text-muted-foreground")}>
+              <SelectValue placeholder={t("exerciseLibrary.category", "Kategorie")} />
             </SelectTrigger>
             <SelectContent className="z-[300]">
               {categoryOptionsWithValue.map((item) => (
                 <SelectItem key={item} value={item}>
-                  {item}
+                  {getExerciseCategoryLabel(item, t)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -267,13 +282,13 @@ export function ExerciseForm({
         <div>
           <Label>{t("exerciseLibrary.discipline")}</Label>
           <Select value={value.discipline} onValueChange={(next) => setField("discipline", next)}>
-            <SelectTrigger className="mt-1">
+            <SelectTrigger className={cn("mt-1", !value.discipline && "text-muted-foreground")}>
               <SelectValue placeholder={t("exerciseLibrary.discipline", "Disziplin")} />
             </SelectTrigger>
             <SelectContent className="z-[300]">
               {disciplineOptionsWithValue.map((item) => (
                 <SelectItem key={item} value={item}>
-                  {item}
+                  {getExerciseDisciplineLabel(item, t)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -282,8 +297,8 @@ export function ExerciseForm({
         <div>
           <Label>{t("exerciseLibrary.pattern")}</Label>
           <Select value={value.movementPattern} onValueChange={(next) => setField("movementPattern", next)}>
-            <SelectTrigger className="mt-1">
-              <SelectValue />
+            <SelectTrigger className={cn("mt-1", !value.movementPattern && "text-muted-foreground")}>
+              <SelectValue placeholder={t("exerciseLibrary.pattern", "Bewegungsmuster")} />
             </SelectTrigger>
             <SelectContent className="z-[300]">
               {movementOptionsWithValue.map((item) => (
@@ -311,6 +326,46 @@ export function ExerciseForm({
           ))}
         </ToggleGroup>
       </div>
+
+      {(value.measurementTypes.includes("distance") || value.measurementTypes.includes("time")) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {value.measurementTypes.includes("distance") && (
+            <div>
+              <Label>{t("exerciseLibrary.defaultDistanceUnit", "Standard Distanz-Einheit")}</Label>
+              <Select
+                value={value.distanceUnit || defaultDistanceUnit}
+                onValueChange={(next) => setField("distanceUnit", next)}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="km">{t("training.form.units.kilometers")}</SelectItem>
+                  <SelectItem value="m">{t("training.form.units.meters")}</SelectItem>
+                  <SelectItem value="miles">{t("training.form.units.miles")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {value.measurementTypes.includes("time") && (
+            <div>
+              <Label>{t("exerciseLibrary.defaultTimeUnit", "Standard Zeit-Einheit")}</Label>
+              <Select
+                value={value.timeUnit || defaultTimeUnit}
+                onValueChange={(next) => setField("timeUnit", next)}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="min">{t("training.form.units.minutes", "Minuten")}</SelectItem>
+                  <SelectItem value="sec">{t("training.form.units.seconds", "Sekunden")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label>{t("exerciseLibrary.difficulty")}</Label>
@@ -358,31 +413,6 @@ export function ExerciseForm({
         </div>
       </div>
 
-      {showDescriptionToggle ? (
-        <Collapsible open={descriptionIsOpen} onOpenChange={onDescriptionToggle ?? (() => undefined)}>
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" className="px-0">
-              {descriptionIsOpen
-                ? t("exerciseLibrary.hideDescription", "Beschreibung ausblenden")
-                : t("exerciseLibrary.addDescription", "Beschreibung hinzufügen")}
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <Textarea
-              value={value.description}
-              onChange={(e) => setField("description", e.target.value)}
-              placeholder={t("exerciseLibrary.descriptionPlaceholder", "Optional")}
-            />
-          </CollapsibleContent>
-        </Collapsible>
-      ) : (
-        <Textarea
-          value={value.description}
-          onChange={(e) => setField("description", e.target.value)}
-          placeholder={t("exerciseLibrary.descriptionPlaceholder", "Optional")}
-        />
-      )}
-
       <div className="flex flex-wrap gap-3">
         <div className="flex items-center gap-2">
           <Switch checked={value.requiresWeight} onCheckedChange={handleRequiresWeightChange} />
@@ -397,6 +427,43 @@ export function ExerciseForm({
           <span className="text-sm">{t("exerciseLibrary.supportsSets", "Sets/Reps")}</span>
         </div>
       </div>
+
+      {showDescriptionToggle ? (
+        <Collapsible open={descriptionIsOpen} onOpenChange={onDescriptionToggle ?? (() => undefined)}>
+          <CollapsibleTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full justify-between text-sm"
+            >
+              <span>
+                {descriptionIsOpen
+                  ? t("exerciseLibrary.hideDescription", "Beschreibung ausblenden")
+                  : t("exerciseLibrary.addDescription", "Beschreibung hinzufügen")}
+              </span>
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 transition-transform",
+                  descriptionIsOpen && "rotate-180"
+                )}
+              />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-2">
+            <Textarea
+              value={value.description}
+              onChange={(e) => setField("description", e.target.value)}
+              placeholder={t("exerciseLibrary.descriptionPlaceholder", "Optional")}
+            />
+          </CollapsibleContent>
+        </Collapsible>
+      ) : (
+        <Textarea
+          value={value.description}
+          onChange={(e) => setField("description", e.target.value)}
+          placeholder={t("exerciseLibrary.descriptionPlaceholder", "Optional")}
+        />
+      )}
 
       {!hideSubmit && onSubmit && (
         <Button onClick={onSubmit} disabled={submitDisabled}>

@@ -16,6 +16,10 @@ import {
 import { ExerciseFiltersPanel } from "@/components/exercises/ExerciseFiltersPanel";
 import { ExerciseForm } from "@/components/exercises/ExerciseForm";
 import type { ExerciseFormValue } from "@/components/exercises/ExerciseForm";
+import {
+  extractNormalizedExerciseUnits,
+  normalizeExerciseUnit,
+} from "@/components/exercises/unitNormalization";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -81,15 +85,31 @@ const buildEditChanges = (original: Exercise, draft: Partial<Exercise>) => {
     "difficultyTier",
     "muscleGroups",
     "equipment",
+    "unit",
     "unitOptions",
   ];
   fields.forEach((field) => {
     const nextValue = draft[field];
     const prevValue = original[field];
     if (Array.isArray(nextValue)) {
-      const nextSorted = [...nextValue].sort();
-      const prevSorted = Array.isArray(prevValue) ? [...prevValue].sort() : [];
-      if (JSON.stringify(nextSorted) !== JSON.stringify(prevSorted)) {
+      const normalize = (value: unknown[]) => {
+        if (value.length > 0 && typeof value[0] === "object" && value[0] !== null) {
+          return [...(value as Array<Record<string, unknown>>)]
+            .map((item) => ({
+              value: String(item.value ?? ""),
+              label: String(item.label ?? ""),
+              multiplier:
+                typeof item.multiplier === "number"
+                  ? item.multiplier
+                  : Number(item.multiplier ?? 0),
+            }))
+            .sort((a, b) => a.value.localeCompare(b.value));
+        }
+        return [...value].map((item) => String(item)).sort();
+      };
+      const nextNormalized = normalize(nextValue);
+      const prevNormalized = Array.isArray(prevValue) ? normalize(prevValue) : [];
+      if (JSON.stringify(nextNormalized) !== JSON.stringify(prevNormalized)) {
         changes[field] = nextValue;
       }
       return;
@@ -432,11 +452,16 @@ export function Exercises() {
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem("token");
-      const measurementType = formValue.measurementTypes.includes("distance")
+      const hasDistance = formValue.measurementTypes.includes("distance");
+      const hasReps = formValue.measurementTypes.includes("reps");
+      const hasTime = formValue.measurementTypes.includes("time");
+      const measurementType = hasDistance
         ? "distance"
-        : formValue.measurementTypes.includes("reps")
-          ? "reps"
-          : "time";
+        : hasReps && hasTime
+          ? "mixed"
+          : hasReps
+            ? "reps"
+            : "time";
 
       const distanceUnitOptions = [
         { value: "km", label: t("training.form.units.kilometers") },
@@ -447,14 +472,14 @@ export function Exercises() {
         { value: "min", label: t("training.form.units.minutes", "Minuten") },
         { value: "sec", label: t("training.form.units.seconds", "Sekunden") },
       ];
-      const unitOptions = measurementType === "distance"
+      const unitOptions = hasDistance
         ? distanceUnitOptions
-        : measurementType === "time"
+        : hasTime
           ? timeUnitOptions
           : [];
-      const resolvedUnit = measurementType === "distance"
+      const resolvedUnit = hasDistance
         ? formValue.distanceUnit || (user?.preferences?.units?.distance || "km")
-        : measurementType === "time"
+        : hasTime
           ? formValue.timeUnit || "min"
           : "reps";
 
@@ -471,8 +496,8 @@ export function Exercises() {
         requiresWeight: formValue.requiresWeight,
         allowsWeight: formValue.allowsWeight,
         supportsSets: formValue.supportsSets,
-        supportsTime: formValue.measurementTypes.includes("time"),
-        supportsDistance: formValue.measurementTypes.includes("distance"),
+        supportsTime: hasTime,
+        supportsDistance: hasDistance,
         supportsGrade: false,
         muscleGroups: formValue.muscleGroups,
         equipment: formValue.equipment
@@ -590,26 +615,31 @@ export function Exercises() {
       });
       return;
     }
-    const measurementType = editDraft.measurementTypes.includes("distance")
+    const hasDistance = editDraft.measurementTypes.includes("distance");
+    const hasReps = editDraft.measurementTypes.includes("reps");
+    const hasTime = editDraft.measurementTypes.includes("time");
+    const measurementType = hasDistance
       ? "distance"
-      : editDraft.measurementTypes.includes("reps")
-        ? "reps"
-        : "time";
-    const unitOptions = measurementType === "distance"
+      : hasReps && hasTime
+        ? "mixed"
+        : hasReps
+          ? "reps"
+          : "time";
+    const unitOptions = hasDistance
       ? [
           { value: "km", label: t("training.form.units.kilometers") },
           { value: "m", label: t("training.form.units.meters") },
           { value: "miles", label: t("training.form.units.miles") },
         ]
-      : measurementType === "time"
+      : hasTime
         ? [
             { value: "min", label: t("training.form.units.minutes", "Minuten") },
             { value: "sec", label: t("training.form.units.seconds", "Sekunden") },
           ]
         : [];
-    const resolvedUnit = measurementType === "distance"
+    const resolvedUnit = hasDistance
       ? editDraft.distanceUnit || (user?.preferences?.units?.distance || "km")
-      : measurementType === "time"
+      : hasTime
         ? editDraft.timeUnit || "min"
         : "reps";
 
@@ -626,8 +656,8 @@ export function Exercises() {
       requiresWeight: editDraft.requiresWeight,
       allowsWeight: editDraft.allowsWeight,
       supportsSets: editDraft.supportsSets,
-      supportsTime: editDraft.measurementTypes.includes("time"),
-      supportsDistance: editDraft.measurementTypes.includes("distance"),
+      supportsTime: hasTime,
+      supportsDistance: hasDistance,
       supportsGrade: false,
       muscleGroups: editDraft.muscleGroups,
       equipment: editDraft.equipment
@@ -739,31 +769,17 @@ export function Exercises() {
     if (exercise.supportsTime && exercise.measurementType !== "time") measurementSet.add("time");
     if (exercise.supportsDistance && exercise.measurementType !== "distance") measurementSet.add("distance");
     if (exercise.supportsSets || exercise.measurementType === "reps") measurementSet.add("reps");
-    const normalizeUnitValue = (unit?: string | null) => {
-      if (!unit) return "";
-      const lower = unit.toLowerCase();
-      if (lower.includes("sek")) return "sec";
-      if (lower.includes("min")) return "min";
-      if (lower.includes("mile") || lower.includes("meile")) return "miles";
-      if (lower === "m" || lower.includes("meter")) return "m";
-      if (lower.includes("km") || lower.includes("kilometer")) return "km";
-      if (lower.includes("wdh") || lower.includes("reps") || lower.includes("wiederholung"))
-        return "reps";
-      return unit;
-    };
-
-    const unitOptionsValues = Array.isArray(exercise.unitOptions)
-      ? exercise.unitOptions.map((option) => option.value)
-      : [];
+    const unitOptionsValues = extractNormalizedExerciseUnits(exercise.unitOptions);
+    const normalizedUnit = normalizeExerciseUnit(exercise.unit);
 
     const distanceUnit =
+      (["km", "m", "miles"].includes(normalizedUnit) ? normalizedUnit : "") ||
       unitOptionsValues.find((value) => ["km", "m", "miles"].includes(value)) ||
-      normalizeUnitValue(exercise.unit) ||
       (user?.preferences?.units?.distance || "km");
 
     const timeUnit =
+      (["min", "sec"].includes(normalizedUnit) ? normalizedUnit : "") ||
       unitOptionsValues.find((value) => ["min", "sec"].includes(value)) ||
-      normalizeUnitValue(exercise.unit) ||
       "min";
 
     setEditDraft({

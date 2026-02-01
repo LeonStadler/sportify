@@ -7,6 +7,10 @@ import { PaginationControls, PaginationMeta } from "@/components/common/paginati
 import { ExerciseFiltersPanel } from "@/components/exercises/ExerciseFiltersPanel";
 import { ExerciseForm, ExerciseFormValue } from "@/components/exercises/ExerciseForm";
 import {
+  extractNormalizedExerciseUnits,
+  normalizeExerciseUnit,
+} from "@/components/exercises/unitNormalization";
+import {
   getExerciseCategoryLabel,
   getExerciseDisciplineLabel,
   getExerciseMovementPatternLabel,
@@ -28,6 +32,7 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
+  DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
@@ -268,31 +273,17 @@ export function Admin() {
     if (exercise.supportsDistance && exercise.measurementType !== "distance") measurementSet.add("distance");
     if (exercise.supportsSets || exercise.measurementType === "reps") measurementSet.add("reps");
 
-    const normalizeUnitValue = (unit?: string | null) => {
-      if (!unit) return "";
-      const lower = unit.toLowerCase();
-      if (lower.includes("sek")) return "sec";
-      if (lower.includes("min")) return "min";
-      if (lower.includes("mile") || lower.includes("meile")) return "miles";
-      if (lower === "m" || lower.includes("meter")) return "m";
-      if (lower.includes("km") || lower.includes("kilometer")) return "km";
-      if (lower.includes("wdh") || lower.includes("reps") || lower.includes("wiederholung"))
-        return "reps";
-      return unit;
-    };
-
-    const unitOptionsValues = Array.isArray(exercise.unitOptions)
-      ? exercise.unitOptions.map((option) => option.value)
-      : [];
+    const unitOptionsValues = extractNormalizedExerciseUnits(exercise.unitOptions);
+    const normalizedUnit = normalizeExerciseUnit(exercise.unit);
 
     const distanceUnit =
+      (["km", "m", "miles"].includes(normalizedUnit) ? normalizedUnit : "") ||
       unitOptionsValues.find((value) => ["km", "m", "miles"].includes(value)) ||
-      normalizeUnitValue(exercise.unit) ||
       (user?.preferences?.units?.distance || "km");
 
     const timeUnit =
+      (["min", "sec"].includes(normalizedUnit) ? normalizedUnit : "") ||
       unitOptionsValues.find((value) => ["min", "sec"].includes(value)) ||
-      normalizeUnitValue(exercise.unit) ||
       "min";
 
     return {
@@ -313,21 +304,22 @@ export function Admin() {
     };
   };
 
-  const exerciseManagementOpenEdit = (exercise: Exercise) => {
+  const exerciseManagementOpenDetails = (
+    exerciseLike: { id: string },
+    mode: "view" | "edit" = "view"
+  ) => {
+    const exercise = exercises.find((item) => item.id === exerciseLike.id);
+    if (!exercise) return;
     setExerciseEditTarget(exercise);
-    const formValue = exerciseManagementToFormValue(exercise);
-    setExerciseEditDraft(formValue);
-    setExerciseEditDescriptionOpen(Boolean(formValue.description));
-    setExerciseDialogMode("edit");
-    setDetailExerciseId(exercise.id);
-    setExerciseEditDialogOpen(true);
-  };
-
-  const exerciseManagementOpenView = (exercise: Exercise) => {
-    setExerciseEditTarget(exercise);
-    setExerciseEditDraft(null);
-    setExerciseEditDescriptionOpen(false);
-    setExerciseDialogMode("view");
+    if (mode === "edit") {
+      const formValue = exerciseManagementToFormValue(exercise);
+      setExerciseEditDraft(formValue);
+      setExerciseEditDescriptionOpen(Boolean(formValue.description));
+    } else {
+      setExerciseEditDraft(null);
+      setExerciseEditDescriptionOpen(false);
+    }
+    setExerciseDialogMode(mode);
     setDetailExerciseId(exercise.id);
     setExerciseEditDialogOpen(true);
   };
@@ -351,11 +343,17 @@ export function Admin() {
       });
       return;
     }
-    const measurementType = exerciseEditDraft.measurementTypes.includes("distance")
+    const hasDistance = exerciseEditDraft.measurementTypes.includes("distance");
+    const hasReps = exerciseEditDraft.measurementTypes.includes("reps");
+    const hasTime = exerciseEditDraft.measurementTypes.includes("time");
+
+    const measurementType = hasDistance
       ? "distance"
-      : exerciseEditDraft.measurementTypes.includes("reps")
-        ? "reps"
-        : "time";
+      : hasReps && hasTime
+        ? "mixed"
+        : hasReps
+          ? "reps"
+          : "time";
     const distanceUnitOptions = [
       { value: "km", label: t("training.form.units.kilometers") },
       { value: "m", label: t("training.form.units.meters") },
@@ -365,14 +363,14 @@ export function Admin() {
       { value: "min", label: t("training.form.units.minutes", "Minuten") },
       { value: "sec", label: t("training.form.units.seconds", "Sekunden") },
     ];
-    const unitOptions = measurementType === "distance"
+    const unitOptions = hasDistance
       ? distanceUnitOptions
-      : measurementType === "time"
+      : hasTime
         ? timeUnitOptions
         : [];
-    const resolvedUnit = measurementType === "distance"
+    const resolvedUnit = hasDistance
       ? exerciseEditDraft.distanceUnit || (user?.preferences?.units?.distance || "km")
-      : measurementType === "time"
+      : hasTime
         ? exerciseEditDraft.timeUnit || "min"
         : "reps";
     const payload = {
@@ -388,8 +386,8 @@ export function Admin() {
       requiresWeight: exerciseEditDraft.requiresWeight,
       allowsWeight: exerciseEditDraft.allowsWeight,
       supportsSets: exerciseEditDraft.supportsSets,
-      supportsTime: exerciseEditDraft.measurementTypes.includes("time"),
-      supportsDistance: exerciseEditDraft.measurementTypes.includes("distance"),
+      supportsTime: hasTime,
+      supportsDistance: hasDistance,
       supportsGrade: false,
       muscleGroups: exerciseEditDraft.muscleGroups,
       equipment: exerciseEditDraft.equipment
@@ -422,9 +420,25 @@ export function Admin() {
       const nextValue = payload[field];
       const prevValue = exerciseEditTarget[field];
       if (Array.isArray(nextValue)) {
-        const nextSorted = [...nextValue].sort();
-        const prevSorted = Array.isArray(prevValue) ? [...prevValue].sort() : [];
-        if (JSON.stringify(nextSorted) !== JSON.stringify(prevSorted)) {
+        const normalize = (value: unknown[]) => {
+          if (value.length > 0 && typeof value[0] === "object" && value[0] !== null) {
+            return [...(value as Array<Record<string, unknown>>)]
+              .map((item) => ({
+                value: String(item.value ?? ""),
+                label: String(item.label ?? ""),
+                multiplier:
+                  typeof item.multiplier === "number"
+                    ? item.multiplier
+                    : Number(item.multiplier ?? 0),
+              }))
+              .sort((a, b) => a.value.localeCompare(b.value));
+          }
+          return [...value].map((item) => String(item)).sort();
+        };
+
+        const nextNormalized = normalize(nextValue);
+        const prevNormalized = Array.isArray(prevValue) ? normalize(prevValue) : [];
+        if (JSON.stringify(nextNormalized) !== JSON.stringify(prevNormalized)) {
           changes[field] = nextValue;
         }
         return;
@@ -705,7 +719,8 @@ export function Admin() {
           className="w-[var(--radix-popover-trigger-width)] max-w-[90vw] p-0"
           align="start"
           side="bottom"
-          sideOffset={4}
+          sideOffset={6}
+          collisionPadding={12}
         >
           <Command shouldFilter={false}>
             <div className="flex items-center gap-2 px-3 py-2 border-b">
@@ -1015,11 +1030,19 @@ export function Admin() {
 
   useEffect(() => {
     if (user?.role === "admin" && activeTab === "monitoring") {
-      if (!monitoringData && !isLoadingMonitoring) {
-        loadMonitoringData();
-      }
+      loadMonitoringData();
     }
-  }, [user?.role, activeTab, monitoringData, isLoadingMonitoring]);
+  }, [user?.role, activeTab]);
+
+  const monitoringJobs = monitoringData?.jobs ?? {
+    stats: [],
+    stuckJobs: [],
+    recentFailures: [],
+  };
+  const monitoringEmails = monitoringData?.emails ?? {
+    stats: [],
+    recent: [],
+  };
 
   // Prüfe Admin-Rechte
   if (user?.role !== "admin") {
@@ -1428,17 +1451,28 @@ export function Admin() {
                 grid={
                   <ExerciseBrowseGrid
                     items={exerciseManagementPageItems}
-                    onSelect={(exercise) => exerciseManagementOpenView(exercise)}
+                    onSelect={(exercise) => exerciseManagementOpenDetails(exercise, "view")}
                     renderMenuItems={(exercise) => (
                       <>
-                        <DropdownMenuItem onSelect={() => exerciseManagementOpenView(exercise)}>
+                        <DropdownMenuItem
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            exerciseManagementOpenDetails(exercise, "view");
+                          }}
+                        >
                           {t("admin.exercises.actions.details", "Details")}
                         </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => exerciseManagementOpenEdit(exercise)}>
+                        <DropdownMenuItem
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            exerciseManagementOpenDetails(exercise, "edit");
+                          }}
+                        >
                           {t("admin.exercises.actions.edit", "Bearbeiten")}
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          onSelect={() => {
+                          onSelect={(event) => {
+                            event.preventDefault();
                             setMergeSourceId(exercise.id);
                             toast({
                               title: t("admin.exercises.merge.toastTitle", "Quelle gesetzt"),
@@ -1471,17 +1505,28 @@ export function Admin() {
                     sortBy={exerciseManagementSortBy}
                     sortDirection={exerciseManagementSortDirection}
                     onSortClick={exerciseManagementHandleSortClick}
-                    onSelect={(exercise) => exerciseManagementOpenView(exercise)}
+                    onSelect={(exercise) => exerciseManagementOpenDetails(exercise, "view")}
                     renderMenuItems={(exercise) => (
                       <>
-                        <DropdownMenuItem onSelect={() => exerciseManagementOpenView(exercise)}>
+                        <DropdownMenuItem
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            exerciseManagementOpenDetails(exercise, "view");
+                          }}
+                        >
                           {t("admin.exercises.actions.details", "Details")}
                         </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => exerciseManagementOpenEdit(exercise)}>
+                        <DropdownMenuItem
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            exerciseManagementOpenDetails(exercise, "edit");
+                          }}
+                        >
                           {t("admin.exercises.actions.edit", "Bearbeiten")}
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          onSelect={() => {
+                          onSelect={(event) => {
+                            event.preventDefault();
                             setMergeSourceId(exercise.id);
                             toast({
                               title: t("admin.exercises.merge.toastTitle", "Quelle gesetzt"),
@@ -1560,16 +1605,18 @@ export function Admin() {
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <DialogTitle className="text-xl">
-                        {detailExercise?.name ||
-                          t("admin.exerciseDetail.exercise", "Übung")}
+                        {detailExercise?.name || t("exerciseLibrary.details", "Übung")}
                       </DialogTitle>
-                      {exerciseDialogMode === "view" && detailExercise && (
+                      <DialogDescription className="sr-only">
+                        {t("exerciseLibrary.details", "Übung")}
+                      </DialogDescription>
+                      {exerciseDialogMode === "view" && (
                         <div className="mt-1 flex flex-wrap gap-2 text-sm text-muted-foreground">
-                          <span>{getExerciseCategoryLabel(detailExercise.category, t) || "-"}</span>
+                          <span>{getExerciseCategoryLabel(detailExercise?.category, t) || "-"}</span>
                           <span>·</span>
-                          <span>{getExerciseDisciplineLabel(detailExercise.discipline, t) || "-"}</span>
+                          <span>{getExerciseDisciplineLabel(detailExercise?.discipline, t) || "-"}</span>
                           <span>·</span>
-                          <span>{detailExercise.measurementType || "-"}</span>
+                          <span>{detailExercise?.measurementType || "-"}</span>
                         </div>
                       )}
                     </div>
@@ -1589,50 +1636,23 @@ export function Admin() {
                       <>
                         <div className="grid gap-4 md:grid-cols-2">
                           <div className="space-y-2 rounded-lg border p-4">
-                          <div className="text-xs font-medium text-muted-foreground">
-                            {t("admin.exerciseDetail.title", "Details")}
-                          </div>
-                          <div className="space-y-1 text-sm">
-                            <div>
-                              <strong>{t("admin.exerciseDetail.discipline", "Disziplin")}:</strong>{" "}
-                              {getExerciseDisciplineLabel(detailExercise.discipline, t) || "-"}
+                            <div className="text-xs font-medium text-muted-foreground">
+                              {t("exerciseLibrary.details", "Details")}
                             </div>
-                            <div>
-                              <strong>{t("admin.exerciseDetail.movementPattern", "Bewegungsmuster")}:</strong>{" "}
-                              {getExerciseMovementPatternLabel(detailExercise.movementPattern, t) || "-"}
-                            </div>
-                            <div>
-                              <strong>{t("admin.exerciseDetail.difficulty", "Schwierigkeit")}:</strong>{" "}
-                              {detailExercise.difficultyTier ?? "-"}
-                            </div>
-                            <div>
-                              <strong>{t("admin.exerciseDetail.unit", "Einheit")}:</strong>{" "}
-                              {detailExercise.unit || "-"}
-                            </div>
-                            <div>
-                              <strong>{t("admin.exerciseDetail.supportsSets", "Sets/Reps")}:</strong>{" "}
-                              {detailExercise.supportsSets
-                                ? t("admin.exerciseDetail.yes", "Ja")
-                                : t("admin.exerciseDetail.no", "Nein")}
-                            </div>
-                            <div>
-                              <strong>{t("admin.exerciseDetail.requiresWeight", "Gewicht erforderlich")}:</strong>{" "}
-                              {detailExercise.requiresWeight
-                                ? t("admin.exerciseDetail.yes", "Ja")
-                                : t("admin.exerciseDetail.no", "Nein")}
-                            </div>
-                            <div>
-                              <strong>{t("admin.exerciseDetail.allowsWeight", "Gewicht optional")}:</strong>{" "}
-                              {detailExercise.allowsWeight
-                                ? t("admin.exerciseDetail.yes", "Ja")
-                                : t("admin.exerciseDetail.no", "Nein")}
+                            <div className="space-y-1 text-sm">
+                              <div><strong>{t("exerciseLibrary.discipline", "Disziplin")}:</strong> {getExerciseDisciplineLabel(detailExercise.discipline, t) || "-"}</div>
+                              <div><strong>{t("exerciseLibrary.pattern", "Bewegungsmuster")}:</strong> {getExerciseMovementPatternLabel(detailExercise.movementPattern, t) || "-"}</div>
+                              <div><strong>{t("exerciseLibrary.difficulty", "Schwierigkeit")}:</strong> {detailExercise.difficultyTier ?? "-"}</div>
+                              <div><strong>{t("exerciseLibrary.unit", "Einheit")}:</strong> {detailExercise.unit || "-"}</div>
+                              <div><strong>{t("exerciseLibrary.supportsSets", "Sets/Reps")}:</strong> {detailExercise.supportsSets ? t("common.yes", "Ja") : t("common.no", "Nein")}</div>
+                              <div><strong>{t("exerciseLibrary.requiresWeight", "Gewicht erforderlich")}:</strong> {detailExercise.requiresWeight ? t("common.yes", "Ja") : t("common.no", "Nein")}</div>
+                              <div><strong>{t("exerciseLibrary.allowsWeight", "Gewicht optional")}:</strong> {detailExercise.allowsWeight ? t("common.yes", "Ja") : t("common.no", "Nein")}</div>
                             </div>
                           </div>
-                        </div>
-                        <div className="space-y-2 rounded-lg border p-4">
-                          <div className="text-xs font-medium text-muted-foreground">
-                            {t("admin.exerciseDetail.muscleGroups", "Muskelgruppen")}
-                          </div>
+                          <div className="space-y-2 rounded-lg border p-4">
+                            <div className="text-xs font-medium text-muted-foreground">
+                              {t("exerciseLibrary.muscleGroups", "Muskelgruppen")}
+                            </div>
                             <div className="flex flex-wrap gap-2">
                               {(detailExercise.muscleGroups || []).length > 0
                                 ? detailExercise.muscleGroups?.map((group) => (
@@ -1642,9 +1662,9 @@ export function Admin() {
                                 ))
                                 : <span className="text-sm text-muted-foreground">-</span>}
                             </div>
-                          <div className="mt-3 text-xs font-medium text-muted-foreground">
-                            {t("admin.exerciseDetail.equipment", "Equipment")}
-                          </div>
+                            <div className="mt-3 text-xs font-medium text-muted-foreground">
+                              {t("exerciseLibrary.equipment", "Equipment")}
+                            </div>
                             <div className="flex flex-wrap gap-2">
                               {(detailExercise.equipment || []).length > 0
                                 ? detailExercise.equipment?.map((item) => (
@@ -1664,11 +1684,8 @@ export function Admin() {
                     )}
 
                     <div className="flex flex-wrap gap-2">
-                      <Button
-                        variant={exerciseDialogMode === "view" ? "default" : "outline"}
-                        onClick={() => setExerciseDialogMode("view")}
-                      >
-                      {t("admin.exercises.actions.details", "Details")}
+                      <Button variant={exerciseDialogMode === "view" ? "default" : "outline"} onClick={() => setExerciseDialogMode("view")}>
+                        {t("exerciseLibrary.details", "Details")}
                       </Button>
                       <Button
                         variant={exerciseDialogMode === "edit" ? "default" : "outline"}
@@ -1681,7 +1698,7 @@ export function Admin() {
                           }
                         }}
                       >
-                      {t("admin.exercises.actions.edit", "Bearbeiten")}
+                        {t("admin.exercises.actions.edit", "Bearbeiten")}
                       </Button>
                     </div>
 
@@ -1690,10 +1707,10 @@ export function Admin() {
                         value={exerciseEditDraft}
                         onChange={setExerciseEditDraft}
                         onSubmit={exerciseManagementHandleSave}
-                      submitLabel={t(
-                        "admin.exerciseDetail.saveChanges",
-                        "Änderungen speichern"
-                      )}
+                        submitLabel={t(
+                          "admin.exerciseDetail.saveChanges",
+                          "Änderungen speichern"
+                        )}
                         submitDisabled={exerciseEditSaving}
                         descriptionOpen={exerciseEditDescriptionOpen}
                         onDescriptionToggle={setExerciseEditDescriptionOpen}
@@ -1915,13 +1932,13 @@ export function Admin() {
                   <CardTitle>{t("admin.monitoring.jobs.title", "Job-Status")}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {monitoringData.jobs.stuckJobs.length > 0 && (
+                    {monitoringJobs.stuckJobs.length > 0 && (
                       <Alert variant="destructive">
                         <AlertTriangle className="h-4 w-4" />
                         <AlertDescription>
                         {t("admin.monitoring.jobs.stuck", {
-                          count: monitoringData.jobs.stuckJobs.length,
-                          defaultValue: `${monitoringData.jobs.stuckJobs.length} stuck job(s) gefunden`,
+                          count: monitoringJobs.stuckJobs.length,
+                          defaultValue: `${monitoringJobs.stuckJobs.length} stuck job(s) gefunden`,
                         })}
                         <Button
                           onClick={handleCleanupJobs}
@@ -1936,7 +1953,7 @@ export function Admin() {
                     )}
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {monitoringData.jobs.stats.map((stat: any) => (
+                      {monitoringJobs.stats.map((stat: any) => (
                         <div
                           key={`${stat.job_name}-${stat.status}`}
                           className="p-4 border rounded-lg"
@@ -1970,15 +1987,20 @@ export function Admin() {
                           )}
                         </div>
                       ))}
+                      {monitoringJobs.stats.length === 0 && (
+                        <div className="text-sm text-muted-foreground">
+                          {t("admin.monitoring.jobs.empty", "Keine Job-Statistiken verfügbar.")}
+                        </div>
+                      )}
                     </div>
 
-                    {monitoringData.jobs.recentFailures.length > 0 && (
+                    {monitoringJobs.recentFailures.length > 0 && (
                       <div className="mt-4">
                         <h4 className="font-semibold mb-2">
                         {t("admin.monitoring.jobs.recentFailures", "Fehler der letzten 7 Tage")}
                         </h4>
                         <div className="space-y-2">
-                          {monitoringData.jobs.recentFailures.map(
+                          {monitoringJobs.recentFailures.map(
                             (failure: any) => (
                               <div
                                 key={failure.job_name}
@@ -2006,7 +2028,7 @@ export function Admin() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {monitoringData.emails.stats.map((stat: any) => (
+                      {monitoringEmails.stats.map((stat: any) => (
                         <div key={stat.status} className="p-4 border rounded-lg">
                           <div className="flex items-center justify-between">
                             <div>
@@ -2035,6 +2057,11 @@ export function Admin() {
                           </div>
                         </div>
                       ))}
+                      {monitoringEmails.stats.length === 0 && (
+                        <div className="text-sm text-muted-foreground">
+                          {t("admin.monitoring.emails.empty", "Keine E-Mail-Statistiken verfügbar.")}
+                        </div>
+                      )}
                     </div>
 
                     <div>
@@ -2055,7 +2082,7 @@ export function Admin() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {monitoringData.emails.recent
+                            {monitoringEmails.recent
                               .slice(0, 10)
                               .map((email: any) => (
                                 <TableRow key={email.id}>
@@ -2095,21 +2122,7 @@ export function Admin() {
               </>
             )}
 
-            {!monitoringData && !isLoadingMonitoring && (
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <p className="text-muted-foreground">
-                  {t(
-                    "admin.monitoring.refreshHint",
-                    t(
-                      "admin.monitoring.refreshHint",
-                      'Klicken Sie auf "Aktualisieren", um Monitoring-Daten zu laden'
-                    )
-                  )}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
+            {!monitoringData && !isLoadingMonitoring && null}
           </TabsContent>
         </Tabs>
       </div>

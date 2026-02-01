@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,8 +17,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
@@ -33,8 +35,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   getExerciseCategoryLabel,
+  getExerciseDisciplineLabel,
   getExerciseMuscleGroupLabel,
 } from "@/components/exercises/exerciseLabels";
+import {
+  categoryOptions as exerciseCategoryOptions,
+  disciplineOptions as exerciseDisciplineOptions,
+  movementPatternOptions as exerciseMovementPatternOptions,
+} from "@/components/exercises/exerciseOptions";
 
 interface WorkoutSet {
   reps: number;
@@ -49,6 +57,7 @@ interface WorkoutActivity {
   totalDuration?: number;
   totalWeight?: number;
   unit: string;
+  timeUnit?: "min" | "sec";
   useSetMode: boolean; // Umschalten zwischen Gesamtmenge und Sets/Reps
   sets: WorkoutSet[];
   notes?: string;
@@ -107,6 +116,26 @@ export function WorkoutForm({
   };
   const getUserWeightUnit = () => {
     return user?.preferences?.units?.weight || "kg";
+  };
+  const getDistanceUnitOptionsForProfile = () => {
+    const pref = String(getUserDistanceUnit()).toLowerCase();
+    if (pref === "miles" || pref === "mi") {
+      return [{ value: "miles", label: t("training.form.units.miles"), multiplier: 1 }];
+    }
+    return [
+      { value: "km", label: t("training.form.units.kilometers"), multiplier: 1 },
+      { value: "m", label: t("training.form.units.meters"), multiplier: 0.001 },
+    ];
+  };
+  const getTimeUnitOptions = (preferred?: string) => {
+    const options = [
+      { value: "min", label: t("training.form.units.minutes", "Minuten"), multiplier: 1 },
+      { value: "sec", label: t("training.form.units.seconds", "Sekunden"), multiplier: 1 / 60 },
+    ];
+    if (preferred === "sec") {
+      return [options[1], options[0]];
+    }
+    return options;
   };
 
   const getDefaultUnitOptions = useCallback(
@@ -207,16 +236,6 @@ export function WorkoutForm({
     [t]
   );
 
-  const sessionTypeOptions = useMemo(
-    () => [
-      { value: "strength", label: t("training.form.sessionStrength", "Kraft") },
-      { value: "cardio", label: t("training.form.sessionCardio", "Ausdauer") },
-      { value: "mixed", label: t("training.form.sessionMixed", "Mixed") },
-      { value: "mobility", label: t("training.form.sessionMobility", "Mobility") },
-    ],
-    [t]
-  );
-
   // Workout-Grunddaten
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -226,13 +245,23 @@ export function WorkoutForm({
   const [endTime, setEndTime] = useState<string>(""); // Format: "HH:mm"
   const [useEndTime, setUseEndTime] = useState<boolean>(false); // Toggle zwischen Dauer und Endzeit
   const [difficulty, setDifficulty] = useState<number>(5);
-  const [sessionType, setSessionType] = useState<string>("strength");
+  const [restBetweenSetsSeconds, setRestBetweenSetsSeconds] = useState<string>("");
   const [restBetweenActivitiesSeconds, setRestBetweenActivitiesSeconds] = useState<string>("");
   const [visibility, setVisibility] = useState<"private" | "friends" | "public">("private");
   const [isTemplate, setIsTemplate] = useState<boolean>(defaultIsTemplate ?? false);
+  const [templateCategory, setTemplateCategory] = useState<string>("");
+  const [templateDiscipline, setTemplateDiscipline] = useState<string>("");
+  const [templateMovementPatterns, setTemplateMovementPatterns] = useState<string[]>([]);
+  const [pauseSettingsOpen, setPauseSettingsOpen] = useState(false);
   const isTemplateLocked = forceTemplate === true;
   const [descriptionOpen, setDescriptionOpen] = useState(false);
   const getDefaultUnit = () => "reps";
+  const getUnitKind = (unit?: string | null) => {
+    if (!unit) return "reps";
+    if (["min", "sec"].includes(unit)) return "time";
+    if (["km", "m", "miles"].includes(unit)) return "distance";
+    return "reps";
+  };
   const getUnitLabel = useCallback(
     (unit: string | undefined, exercise?: Exercise | null) => {
       if (!unit) return t("training.form.units.repetitions");
@@ -260,39 +289,39 @@ export function WorkoutForm({
   };
 
   const supportsSetModeForExercise = (exercise?: Exercise | null) => {
-    if (!exercise) return false;
-    if (!exercise.supportsSets) return false;
-    const measurementType = exercise.measurementType || "reps";
-    return ["reps", "weight", "mixed"].includes(measurementType);
+    return Boolean(exercise);
   };
 
   const getExerciseUnitOptions = (exercise?: Exercise | null) => {
-    if (exercise?.measurementType && ["reps", "weight", "mixed"].includes(exercise.measurementType)) {
-      return getDefaultUnitOptions("reps");
+    if (!exercise) return getDefaultUnitOptions("reps");
+    const measurementType = exercise.measurementType || "reps";
+    const supportsTime = Boolean(exercise.supportsTime || measurementType === "time");
+    const supportsDistance = Boolean(
+      exercise.supportsDistance || measurementType === "distance"
+    );
+    if (supportsDistance) {
+      const options = getDistanceUnitOptionsForProfile();
+      if (exercise.unit && options.some((option) => option.value === exercise.unit)) {
+        return [
+          options.find((option) => option.value === exercise.unit)!,
+          ...options.filter((option) => option.value !== exercise.unit),
+        ];
+      }
+      return options;
     }
-    if (exercise && exercise.unitOptions && exercise.unitOptions.length > 0) {
-      return exercise.unitOptions;
-    }
-    return getDefaultUnitOptions(exercise?.measurementType);
+    if (supportsTime) return getTimeUnitOptions(exercise.unit);
+    return getDefaultUnitOptions("reps");
   };
 
   const getPreferredUnitForExercise = useCallback(
     (exercise: Exercise, fallback?: string) => {
       const unitOptions = getExerciseUnitOptions(exercise);
-      const userUnit = getUserDistanceUnit();
-      const preferredUnit =
-        unitOptions.find((u) => {
-          const value = u.value.toLowerCase();
-          const target = userUnit.toLowerCase();
-          if (value === target) return true;
-          if (target === "miles" && value === "meilen") return true;
-          if (target === "meilen" && value === "miles") return true;
-          return false;
-        }) || unitOptions[0];
-
-      return preferredUnit?.value || fallback || getDefaultUnit();
+      if (exercise.unit && unitOptions.some((option) => option.value === exercise.unit)) {
+        return exercise.unit;
+      }
+      return unitOptions[0]?.value || fallback || getDefaultUnit();
     },
-    [getDefaultUnitOptions]
+    [getDefaultUnitOptions, getDistanceUnitOptionsForProfile, getTimeUnitOptions]
   );
 
   const getSetTotalAmount = (sets: WorkoutSet[]) => {
@@ -307,17 +336,42 @@ export function WorkoutForm({
     return 0;
   };
 
-  const getSetTotalAmountForExercise = (sets: WorkoutSet[], exercise?: Exercise | null) => {
+  const getSetTotalAmountForExercise = (
+    sets: WorkoutSet[],
+    exercise?: Exercise | null,
+    unit?: string | null
+  ) => {
     if (!exercise) return getSetTotalAmount(sets);
+    const unitKind = getUnitKind(unit);
     const supportsTime = Boolean(exercise.supportsTime || exercise.measurementType === "time");
     const supportsDistance = Boolean(exercise.supportsDistance || exercise.measurementType === "distance");
     const measurementType = exercise.measurementType || "reps";
 
     if (supportsTime && supportsDistance) {
       const totalDistance = sets.reduce((sum, set) => sum + (set.distance || 0), 0);
-      if (totalDistance > 0) return totalDistance;
       const totalDuration = sets.reduce((sum, set) => sum + (set.duration || 0), 0);
+      if (unitKind === "distance") return totalDistance;
+      if (unitKind === "time") return totalDuration;
+      if (totalDistance > 0) return totalDistance;
       if (totalDuration > 0) return totalDuration;
+      return 0;
+    }
+
+    if (supportsTime && ["reps", "weight", "mixed"].includes(measurementType)) {
+      if (unitKind === "time") {
+        const totalWeightedDuration = sets.reduce((sum, set) => {
+          const duration = set.duration || 0;
+          if (duration <= 0) return sum;
+          const reps = set.reps && set.reps > 0 ? set.reps : 1;
+          return sum + duration * reps;
+        }, 0);
+        if (totalWeightedDuration > 0) return totalWeightedDuration;
+        const totalDuration = sets.reduce((sum, set) => sum + (set.duration || 0), 0);
+        if (totalDuration > 0) return totalDuration;
+        return 0;
+      }
+      const totalReps = sets.reduce((sum, set) => sum + (set.reps || 0), 0);
+      if (totalReps > 0) return totalReps;
       return 0;
     }
 
@@ -337,6 +391,30 @@ export function WorkoutForm({
     if (totalReps > 0) return totalReps;
     return 0;
   };
+
+  const getMetricVisibility = (exercise?: Exercise | null, unit?: string | null) => {
+    if (!exercise) {
+      return { showReps: true, showTime: false, showDistance: false };
+    }
+    const measurementType = exercise.measurementType || "reps";
+    const supportsReps = ["reps", "weight", "mixed"].includes(measurementType);
+    const supportsTime = Boolean(exercise.supportsTime || measurementType === "time");
+    const supportsDistance = Boolean(
+      exercise.supportsDistance || measurementType === "distance"
+    );
+    if (supportsTime && supportsDistance) {
+      return { showReps: false, showTime: true, showDistance: true };
+    }
+    if (supportsTime && supportsReps && !supportsDistance) {
+      return { showReps: true, showTime: true, showDistance: false };
+    }
+    if (supportsDistance && supportsReps && !supportsTime) {
+      return { showReps: true, showTime: false, showDistance: true };
+    }
+    if (supportsTime) return { showReps: false, showTime: true, showDistance: false };
+    if (supportsDistance) return { showReps: false, showTime: false, showDistance: true };
+    return { showReps: true, showTime: false, showDistance: false };
+  };
   
   const [activities, setActivities] = useState<WorkoutActivity[]>([
     {
@@ -345,6 +423,7 @@ export function WorkoutForm({
     totalDuration: undefined,
     totalWeight: undefined,
     unit: getDefaultUnit(),
+    timeUnit: "min",
     useSetMode: false,
     sets: [{ reps: 0 }],
       notes: "",
@@ -379,7 +458,16 @@ export function WorkoutForm({
     if (!isTemplate && visibility !== "private") {
       setVisibility("private");
     }
+    if (isTemplateLocked && useEndTime) {
+      setUseEndTime(false);
+    }
   }, [isTemplate, isTemplateLocked, visibility]);
+
+  useEffect(() => {
+    if (isTemplateLocked) {
+      setPauseSettingsOpen(true);
+    }
+  }, [isTemplateLocked]);
 
   // Berechne Endzeit aus Startzeit und Dauer
   const calculateEndTime = (start: string, dur: number): string => {
@@ -448,7 +536,20 @@ export function WorkoutForm({
         setEndTime(""); // Endzeit-Feld leeren
       }
       setDifficulty(workout.difficulty ?? 5);
-      setSessionType(workout.sessionType || "strength");
+      setRestBetweenSetsSeconds(
+        workout.restBetweenSetsSeconds !== undefined && workout.restBetweenSetsSeconds !== null
+          ? String(workout.restBetweenSetsSeconds)
+          : ""
+      );
+      setTemplateCategory(workout.category || "");
+      setTemplateDiscipline(workout.discipline || "");
+      setTemplateMovementPatterns(
+        (workout.movementPatterns && workout.movementPatterns.length > 0)
+          ? workout.movementPatterns
+          : workout.movementPattern
+            ? [workout.movementPattern]
+            : []
+      );
       setRestBetweenActivitiesSeconds(
         workout.restBetweenActivitiesSeconds !== undefined && workout.restBetweenActivitiesSeconds !== null
           ? String(workout.restBetweenActivitiesSeconds)
@@ -469,6 +570,10 @@ export function WorkoutForm({
               ? convertWeightFromKg(a.sets[0].weight ?? 0, getUserWeightUnit())
               : undefined,
           unit: normalizeUnitValue(a.unit),
+          timeUnit:
+            normalizeUnitValue(a.unit) === "sec"
+              ? "sec"
+              : "min",
           useSetMode: !!a.sets,
           sets:
             a.sets && a.sets.length > 0
@@ -489,7 +594,7 @@ export function WorkoutForm({
     } else {
       // Wenn kein Workout vorhanden ist und Titel noch nicht initialisiert wurde, Standard-Titel setzen
       if (!isTitleInitialized.current) {
-        setTitle(getDefaultTitle());
+        setTitle(isTemplateLocked ? "" : getDefaultTitle());
         isTitleInitialized.current = true;
       }
       setVisibility("private");
@@ -509,7 +614,20 @@ export function WorkoutForm({
       setEndTime("");
       setUseEndTime(false);
       setDifficulty(prefillWorkout.difficulty ?? 5);
-      setSessionType(prefillWorkout.sessionType || "strength");
+      setRestBetweenSetsSeconds(
+        prefillWorkout.restBetweenSetsSeconds !== undefined && prefillWorkout.restBetweenSetsSeconds !== null
+          ? String(prefillWorkout.restBetweenSetsSeconds)
+          : ""
+      );
+      setTemplateCategory(prefillWorkout.category || "");
+      setTemplateDiscipline(prefillWorkout.discipline || "");
+      setTemplateMovementPatterns(
+        (prefillWorkout.movementPatterns && prefillWorkout.movementPatterns.length > 0)
+          ? prefillWorkout.movementPatterns
+          : prefillWorkout.movementPattern
+            ? [prefillWorkout.movementPattern]
+            : []
+      );
       setRestBetweenActivitiesSeconds(
         prefillWorkout.restBetweenActivitiesSeconds !== undefined && prefillWorkout.restBetweenActivitiesSeconds !== null
           ? String(prefillWorkout.restBetweenActivitiesSeconds)
@@ -531,6 +649,10 @@ export function WorkoutForm({
               ? convertWeightFromKg(a.sets[0].weight ?? 0, getUserWeightUnit())
               : undefined,
           unit: normalizeUnitValue(a.unit),
+          timeUnit:
+            normalizeUnitValue(a.unit) === "sec"
+              ? "sec"
+              : "min",
           useSetMode: !!a.sets,
           sets:
             a.sets && a.sets.length > 0
@@ -559,6 +681,7 @@ export function WorkoutForm({
       totalDuration: undefined,
       totalWeight: undefined,
       unit: getDefaultUnit(),
+      timeUnit: "min",
       useSetMode: false,
       sets: [{ reps: 0 }],
         notes: "",
@@ -584,17 +707,63 @@ export function WorkoutForm({
     if (field === "activityType") {
       const exercise = exercises.find((ex) => ex.id === value);
       if (exercise) {
-        newActivities[index].unit = getPreferredUnitForExercise(exercise);
+        const timeUnit =
+          exercise.unit === "sec"
+            ? "sec"
+            : "min";
+        const unitOptions = getExerciseUnitOptions(exercise);
+        const preferredUnit = unitOptions[0]?.value || "reps";
+        newActivities[index].unit = preferredUnit;
+        newActivities[index].timeUnit = timeUnit;
         const supportsWeight = Boolean(
           exercise.requiresWeight || exercise.allowsWeight
         );
         newActivities[index].sets = [{ reps: 0, weight: supportsWeight ? undefined : undefined }];
-        newActivities[index].useSetMode = supportsSetModeForExercise(exercise);
-        if (!supportsSetModeForExercise(exercise)) {
-          newActivities[index].totalAmount = 0;
-        }
+        newActivities[index].useSetMode = Boolean(exercise.supportsSets);
         newActivities[index].totalDuration = undefined;
         newActivities[index].totalWeight = undefined;
+        newActivities[index].totalAmount = 0;
+      }
+    }
+
+    if (field === "timeUnit" && (value === "min" || value === "sec")) {
+      const prevTimeUnit = newActivities[index].timeUnit || "min";
+      const nextTimeUnit = value;
+      const convertTime = (time: number) => {
+        if (!Number.isFinite(time)) return time;
+        if (prevTimeUnit === nextTimeUnit) return time;
+        if (prevTimeUnit === "min" && nextTimeUnit === "sec") return time * 60;
+        if (prevTimeUnit === "sec" && nextTimeUnit === "min") return time / 60;
+        return time;
+      };
+
+      newActivities[index].timeUnit = nextTimeUnit;
+      const exercise = exercises.find((ex) => ex.id === newActivities[index].activityType);
+      const measurementType = exercise?.measurementType || "reps";
+      const supportsTime = Boolean(exercise?.supportsTime || measurementType === "time");
+      if (supportsTime) {
+        newActivities[index].unit = nextTimeUnit;
+
+        if (typeof newActivities[index].totalDuration === "number") {
+          newActivities[index].totalDuration = Number(
+            convertTime(newActivities[index].totalDuration).toFixed(2)
+          );
+        }
+
+        if (Array.isArray(newActivities[index].sets)) {
+          newActivities[index].sets = newActivities[index].sets.map((set) => {
+            if (typeof set.duration !== "number") return set;
+            return {
+              ...set,
+              duration: Number(convertTime(set.duration).toFixed(2)),
+            };
+          });
+          newActivities[index].totalAmount = getSetTotalAmountForExercise(
+            newActivities[index].sets,
+            exercise,
+            nextTimeUnit
+          );
+        }
       }
     }
     
@@ -605,7 +774,11 @@ export function WorkoutForm({
       Array.isArray(value)
     ) {
       const exercise = exercises.find((ex) => ex.id === newActivities[index].activityType);
-      newActivities[index].totalAmount = getSetTotalAmountForExercise(value, exercise);
+      newActivities[index].totalAmount = getSetTotalAmountForExercise(
+        value,
+        exercise,
+        newActivities[index].unit
+      );
     }
     
     setActivities(newActivities);
@@ -619,11 +792,21 @@ export function WorkoutForm({
         if (!exercise) return activity;
         const unitOptions = getExerciseUnitOptions(exercise);
         const hasUnit = unitOptions.some((option) => option.value === activity.unit);
-        if (hasUnit) return activity;
-        const nextUnit = getPreferredUnitForExercise(exercise, unitOptions[0]?.value);
-        if (nextUnit !== activity.unit) {
+        const measurementType = exercise.measurementType || "reps";
+        const supportsTime = Boolean(exercise.supportsTime || measurementType === "time");
+        const nextUnit = hasUnit
+          ? activity.unit
+          : getPreferredUnitForExercise(exercise, unitOptions[0]?.value);
+        const nextTimeUnit = activity.timeUnit || (exercise.unit === "sec" ? "sec" : "min");
+        if (nextUnit !== activity.unit || nextTimeUnit !== activity.timeUnit) {
           changed = true;
-          return { ...activity, unit: nextUnit };
+          return {
+            ...activity,
+            unit: supportsTime && !unitOptions.some((u) => u.value === "reps")
+              ? (activity.timeUnit || nextTimeUnit)
+              : nextUnit,
+            timeUnit: nextTimeUnit,
+          };
         }
         return activity;
       });
@@ -658,8 +841,13 @@ export function WorkoutForm({
       newActivities[activityIndex].sets.splice(setIndex, 1);
       // Gesamtmenge neu berechnen
       if (newActivities[activityIndex].useSetMode) {
-        newActivities[activityIndex].totalAmount = getSetTotalAmount(
-          newActivities[activityIndex].sets
+        const exercise = exercises.find(
+          (ex) => ex.id === newActivities[activityIndex].activityType
+        );
+        newActivities[activityIndex].totalAmount = getSetTotalAmountForExercise(
+          newActivities[activityIndex].sets,
+          exercise,
+          newActivities[activityIndex].unit
         );
       }
       setActivities(newActivities);
@@ -715,7 +903,8 @@ export function WorkoutForm({
       );
       newActivities[activityIndex].totalAmount = getSetTotalAmountForExercise(
         newActivities[activityIndex].sets,
-        exercise
+        exercise,
+        newActivities[activityIndex].unit
       );
     }
 
@@ -826,6 +1015,10 @@ export function WorkoutForm({
       const supportsTime = Boolean(exercise?.supportsTime || measurementType === "time");
       const supportsDistance = Boolean(exercise?.supportsDistance || measurementType === "distance");
       const supportsWeight = Boolean(exercise?.requiresWeight || exercise?.allowsWeight);
+      const { showReps, showTime, showDistance } = getMetricVisibility(
+        exercise,
+        activity.unit
+      );
       
       // Wenn Sets-Modus aktiviert ist, prüfe ob es gültige Sets gibt
       if (activity.useSetMode && activity.sets && activity.sets.length > 0) {
@@ -877,6 +1070,17 @@ export function WorkoutForm({
           });
           return hasValidSetWithWeight;
         }
+        if (supportsDistance && supportsTime) {
+          return activity.sets.some(
+            (set) => (set.distance || 0) > 0 && (set.duration || 0) > 0
+          );
+        }
+        if (showTime) {
+          return activity.sets.some((set) => (set.duration || 0) > 0);
+        }
+        if (showDistance) {
+          return activity.sets.some((set) => (set.distance || 0) > 0);
+        }
         return validSets.length > 0;
       }
       
@@ -898,25 +1102,8 @@ export function WorkoutForm({
         }
         return ok;
       }
-      if (supportsTime && measurementType !== "distance") {
-        if (measurementType === "reps" || measurementType === "weight" || measurementType === "mixed") {
-          const ok = (activity.totalAmount || 0) > 0 && (activity.totalDuration || 0) > 0;
-          if (!ok) {
-            nextErrors.activities = nextErrors.activities || {};
-            nextErrors.activities[activityIndex] = {
-              ...nextErrors.activities[activityIndex],
-              totalAmount: (activity.totalAmount || 0) <= 0,
-              totalDuration: (activity.totalDuration || 0) <= 0,
-            };
-            missingFields.push(
-              t("training.form.activityMissing", "Aktivität {{index}} unvollständig", {
-                index: activityIndex + 1,
-              })
-            );
-          }
-          return ok;
-        }
-        const ok = (activity.totalDuration || activity.totalAmount || 0) > 0;
+      if (showTime) {
+        const ok = (activity.totalDuration || 0) > 0;
         if (!ok) {
           nextErrors.activities = nextErrors.activities || {};
           nextErrors.activities[activityIndex] = {
@@ -931,7 +1118,7 @@ export function WorkoutForm({
         }
         return ok;
       }
-      if (supportsDistance || measurementType === "distance") {
+      if (showDistance) {
         const ok = (activity.totalAmount || 0) > 0;
         if (!ok) {
           nextErrors.activities = nextErrors.activities || {};
@@ -951,12 +1138,13 @@ export function WorkoutForm({
         const requiresWeight = Boolean(exercise?.requiresWeight);
         const ok = requiresWeight
           ? (activity.totalWeight || 0) > 0
-          : (activity.totalAmount || 0) > 0 || (activity.totalWeight || 0) > 0;
+          : (activity.totalAmount || 0) > 0 ||
+            (activity.totalDuration || 0) > 0 ||
+            (activity.totalWeight || 0) > 0;
         if (!ok) {
           nextErrors.activities = nextErrors.activities || {};
           nextErrors.activities[activityIndex] = {
             ...nextErrors.activities[activityIndex],
-            totalAmount: !requiresWeight,
             totalWeight: true,
           };
           missingFields.push(
@@ -1035,13 +1223,10 @@ export function WorkoutForm({
         const supportsTime = Boolean(exercise?.supportsTime || measurementType === "time");
         const supportsDistance = Boolean(exercise?.supportsDistance || measurementType === "distance");
         const supportsWeight = Boolean(exercise?.requiresWeight || exercise?.allowsWeight);
-        const showDistance = supportsDistance;
-        const showTime = supportsTime;
-        const showReps =
-          !showDistance &&
-          (measurementType === "reps" ||
-            measurementType === "weight" ||
-            measurementType === "mixed");
+        const { showReps, showTime, showDistance } = getMetricVisibility(
+          exercise,
+          activity.unit
+        );
 
         // Filtere ungültige Sets heraus (reps <= 0)
         let setsToSend = null;
@@ -1128,7 +1313,17 @@ export function WorkoutForm({
           visibility: isTemplate ? visibility : "private",
           isTemplate,
           difficulty: isTemplate ? difficulty : null,
-          sessionType: isTemplate ? sessionType : null,
+          category: isTemplate ? templateCategory || null : null,
+          discipline: isTemplate ? templateDiscipline || null : null,
+          movementPatterns: isTemplate
+            ? templateMovementPatterns.length > 0
+              ? templateMovementPatterns
+              : null
+            : null,
+          restBetweenSetsSeconds:
+            isTemplate && restBetweenSetsSeconds !== ""
+              ? Number(restBetweenSetsSeconds)
+              : null,
           restBetweenActivitiesSeconds:
             isTemplate && restBetweenActivitiesSeconds !== ""
               ? Number(restBetweenActivitiesSeconds)
@@ -1172,7 +1367,7 @@ export function WorkoutForm({
 
       // Form zurücksetzen
       isTitleInitialized.current = false;
-      setTitle(getDefaultTitle());
+      setTitle(isTemplateLocked ? "" : getDefaultTitle());
       setDescription("");
       setDescriptionOpen(false);
       setWorkoutDate(new Date());
@@ -1181,13 +1376,19 @@ export function WorkoutForm({
       setEndTime("");
       setUseEndTime(false);
       setDifficulty(5);
-      setSessionType("strength");
+      setRestBetweenSetsSeconds("");
+      setTemplateCategory("");
+      setTemplateDiscipline("");
+      setTemplateMovementPatterns([]);
       setRestBetweenActivitiesSeconds("");
       setActivities([
         {
           activityType: "",
           totalAmount: 0,
+          totalDuration: undefined,
+          totalWeight: undefined,
           unit: getDefaultUnit(),
+          timeUnit: "min",
           useSetMode: false,
           sets: [{ reps: 0 }],
           notes: "",
@@ -1322,6 +1523,7 @@ export function WorkoutForm({
       >
         <PopoverTrigger asChild>
           <Button
+            type="button"
             variant="outline"
             role="combobox"
             aria-expanded={open}
@@ -1536,8 +1738,8 @@ export function WorkoutForm({
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Zeile 1: Titel und Datum */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
+          <div className="flex flex-wrap gap-4">
+            <div className="flex-1 min-w-[240px]">
               <Label htmlFor="title" className="text-sm font-medium">
                 {t("training.form.workoutTitle")}
               </Label>
@@ -1555,246 +1757,357 @@ export function WorkoutForm({
                 </div>
               )}
             </div>
-            <div>
-              <Label htmlFor="date" className="text-sm font-medium">
-                {t("training.form.dateRequired")}
-              </Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-full justify-start text-left font-normal mt-1",
-                      !workoutDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {workoutDate
-                      ? format(workoutDate, "PPP", { locale })
-                      : t("training.form.selectDate")}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={workoutDate}
-                    onSelect={(date) => date && setWorkoutDate(date)}
-                    initialFocus
-                    locale={locale}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-
-          {/* Zeile 2: Uhrzeit und Dauer/Endzeit */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="time" className="text-sm font-medium">
-                {useEndTime
-                  ? t("training.form.startTime")
-                  : t("training.form.timeRequired")}
-              </Label>
-              <div className="relative mt-1">
-                <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="time"
-                  type="time"
-                  value={workoutTime}
-                  onChange={(e) => setWorkoutTime(e.target.value)}
-                  className={cn("pl-10", formErrors.workoutTime && "border-destructive focus-visible:ring-destructive")}
-                />
-                {formErrors.workoutTime && (
-                  <div className="mt-1 flex items-center gap-1 text-xs text-destructive">
-                    <AlertTriangle className="h-3 w-3" />
-                    <span>{t("training.form.timeRequiredField")}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div>
-              {useEndTime ? (
-                <>
-                  <Label htmlFor="endTime" className="text-sm font-medium">
-                    {t("training.form.endTime")}
-                  </Label>
-                  <div className="relative mt-1">
-                    <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="endTime"
-                      type="time"
-                      value={endTime}
-                      onChange={(e) => setEndTime(e.target.value)}
-                      className={cn("pl-10", formErrors.endTime && "border-destructive focus-visible:ring-destructive")}
-                    />
-                    {formErrors.endTime && (
-                      <div className="mt-1 flex items-center gap-1 text-xs text-destructive">
-                        <AlertTriangle className="h-3 w-3" />
-                        <span>{t("training.form.endTimeRequiredField")}</span>
-                      </div>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <Label htmlFor="duration" className="text-sm font-medium">
-                    {t("training.form.duration")}
-                  </Label>
+            {isTemplateLocked && (
+              <div className="flex-1 min-w-[240px]">
+                <Label htmlFor="duration" className="text-sm font-medium">
+                  {t("training.form.duration")}
+                </Label>
                 <Input
                   id="duration"
                   type="number"
                   value={duration}
                   onChange={(e) => setDuration(e.target.value)}
-                    placeholder={t("training.form.durationPlaceholder")}
+                  placeholder={t("training.form.durationPlaceholder")}
                   min="1"
                   className="mt-1"
                 />
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Zeile 3: Toggle Switches */}
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="toggleEndTime"
-                checked={useEndTime}
-                onCheckedChange={handleToggleEndTime}
-              />
-              <Label htmlFor="toggleEndTime" className="text-sm cursor-pointer">
-                {t("training.form.toggleDurationEndTime")}
-              </Label>
-            </div>
-            {!hideTemplateToggle && !isTemplateLocked && (
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="template-flag"
-                  checked={isTemplate}
-                  onCheckedChange={setIsTemplate}
-                />
-                <Label htmlFor="template-flag" className="text-sm cursor-pointer">
-                  {t("training.form.saveAsTemplate", "Als Vorlage speichern")}
+              </div>
+            )}
+            {!isTemplateLocked && (
+              <div className="flex-1 min-w-[240px]">
+                <Label htmlFor="date" className="text-sm font-medium">
+                  {t("training.form.dateRequired")}
                 </Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal mt-1",
+                        !workoutDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {workoutDate
+                        ? format(workoutDate, "PPP", { locale })
+                        : t("training.form.selectDate")}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={workoutDate}
+                      onSelect={(date) => date && setWorkoutDate(date)}
+                      initialFocus
+                      locale={locale}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             )}
           </div>
 
+          {!isTemplateLocked && (
+            <>
+              {/* Zeile 2: Uhrzeit und Dauer/Endzeit */}
+              <div className="flex flex-wrap gap-4">
+                <div className="flex-1 min-w-[240px]">
+                  <Label htmlFor="time" className="text-sm font-medium">
+                    {useEndTime
+                      ? t("training.form.startTime")
+                      : t("training.form.timeRequired")}
+                  </Label>
+                  <div className="relative mt-1">
+                    <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="time"
+                      type="time"
+                      value={workoutTime}
+                      onChange={(e) => setWorkoutTime(e.target.value)}
+                      className={cn("pl-10", formErrors.workoutTime && "border-destructive focus-visible:ring-destructive")}
+                    />
+                    {formErrors.workoutTime && (
+                      <div className="mt-1 flex items-center gap-1 text-xs text-destructive">
+                        <AlertTriangle className="h-3 w-3" />
+                        <span>{t("training.form.timeRequiredField")}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex-1 min-w-[240px]">
+                  {useEndTime ? (
+                    <>
+                      <Label htmlFor="endTime" className="text-sm font-medium">
+                        {t("training.form.endTime")}
+                      </Label>
+                      <div className="relative mt-1">
+                        <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="endTime"
+                          type="time"
+                          value={endTime}
+                          onChange={(e) => setEndTime(e.target.value)}
+                          className={cn("pl-10", formErrors.endTime && "border-destructive focus-visible:ring-destructive")}
+                        />
+                        {formErrors.endTime && (
+                          <div className="mt-1 flex items-center gap-1 text-xs text-destructive">
+                            <AlertTriangle className="h-3 w-3" />
+                            <span>{t("training.form.endTimeRequiredField")}</span>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <Label htmlFor="duration" className="text-sm font-medium">
+                        {t("training.form.duration")}
+                      </Label>
+                      <Input
+                        id="duration"
+                        type="number"
+                        value={duration}
+                        onChange={(e) => setDuration(e.target.value)}
+                        placeholder={t("training.form.durationPlaceholder")}
+                        min="1"
+                        className="mt-1"
+                      />
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Zeile 3: Toggle Switches */}
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="toggleEndTime"
+                    checked={useEndTime}
+                    onCheckedChange={handleToggleEndTime}
+                  />
+                  <Label htmlFor="toggleEndTime" className="text-sm cursor-pointer">
+                    {t("training.form.toggleDurationEndTime")}
+                  </Label>
+                </div>
+                {!hideTemplateToggle && !isTemplateLocked && (
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="template-flag"
+                      checked={isTemplate}
+                      onCheckedChange={setIsTemplate}
+                    />
+                    <Label htmlFor="template-flag" className="text-sm cursor-pointer">
+                      {t("training.form.saveAsTemplate", "Als Vorlage speichern")}
+                    </Label>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+
+
+          
+
           {isTemplate && (
             <div className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium">
-                    {t("training.form.sessionType", "Session Type")}
-                  </Label>
-                  <Select value={sessionType} onValueChange={setSessionType}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {sessionTypeOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <div className="rounded-lg border bg-muted/20 p-4 space-y-4">
+                <div className="text-sm font-medium">
+                  {t("training.form.templateAttributes", "Vorlagen-Attribute")}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium">
+                      {t("exerciseLibrary.category", "Kategorie")}
+                    </Label>
+                    <Select value={templateCategory} onValueChange={setTemplateCategory}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder={t("exerciseLibrary.category", "Kategorie")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {exerciseCategoryOptions.map((item) => (
+                          <SelectItem key={item} value={item}>
+                            {getExerciseCategoryLabel(item, t)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">
+                      {t("exerciseLibrary.discipline", "Disziplin")}
+                    </Label>
+                    <Select value={templateDiscipline} onValueChange={setTemplateDiscipline}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder={t("exerciseLibrary.discipline", "Disziplin")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {exerciseDisciplineOptions.map((item) => (
+                          <SelectItem key={item} value={item}>
+                            {getExerciseDisciplineLabel(item, t)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <Label className="text-sm font-medium">
+                      {t("exerciseLibrary.pattern", "Bewegungsmuster")}
+                    </Label>
+                    {templateMovementPatterns.length > 0 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setTemplateMovementPatterns([])}
+                      >
+                        {t("filters.reset", "Zurücksetzen")}
+                      </Button>
+                    )}
+                  </div>
+                  <ToggleGroup
+                    type="multiple"
+                    className="flex flex-wrap justify-start gap-2"
+                    value={templateMovementPatterns}
+                    onValueChange={setTemplateMovementPatterns}
+                  >
+                    {exerciseMovementPatternOptions.map((item) => (
+                      <ToggleGroupItem
+                        key={item.value}
+                        value={item.value}
+                        className="rounded-full px-3 text-xs"
+                      >
+                        {item.labelKey ? t(item.labelKey, item.fallback) : item.fallback}
+                      </ToggleGroupItem>
+                    ))}
+                  </ToggleGroup>
+                  <div className="text-xs text-muted-foreground">
+                    {t(
+                      "training.form.movementPatternHint",
+                      "Mehrfachauswahl möglich, z. B. Push + Pull."
+                    )}
+                  </div>
                 </div>
                 <div>
                   <Label className="text-sm font-medium">
                     {t("training.form.difficulty", "Schwierigkeit")}
                   </Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="10"
-                    value={difficulty}
-                    onChange={(e) =>
-                      setDifficulty(Math.min(10, Math.max(1, Number(e.target.value) || 1)))
-                    }
-                    className="mt-1"
-                    inputMode="numeric"
-                  />
+                  <div className="mt-2 flex items-center gap-3">
+                    <Slider
+                      value={[difficulty]}
+                      min={1}
+                      max={10}
+                      step={1}
+                      onValueChange={(next) => setDifficulty(next[0])}
+                      className="flex-1"
+                    />
+                    <Input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={difficulty}
+                      onChange={(e) =>
+                        setDifficulty(Math.min(10, Math.max(1, Number(e.target.value) || 1)))
+                      }
+                      className="w-24"
+                      inputMode="numeric"
+                    />
+                  </div>
                 </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium">
-                    {t("training.form.restBetweenActivities", "Pause zwischen Übungen (Sek)")}
+                    {t("training.form.visibility", "Sichtbarkeit")}
                   </Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={restBetweenActivitiesSeconds}
-                    onChange={(e) => setRestBetweenActivitiesSeconds(e.target.value)}
-                    className="mt-1"
-                    inputMode="numeric"
-                  />
+                  <Select
+                    value={visibility}
+                    onValueChange={(value) =>
+                      setVisibility(value as "private" | "friends" | "public")
+                    }
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="private">
+                        {t("training.form.visibilityPrivate", "Private")}
+                      </SelectItem>
+                      <SelectItem value="friends">
+                        {t("training.form.visibilityFriends", "Friends")}
+                      </SelectItem>
+                      <SelectItem value="public">
+                        {t("training.form.visibilityPublic", "Public")}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>
           )}
 
-          {isTemplate && (
-            <div>
-              <Label className="text-sm font-medium">
-                {t("training.form.visibility", "Sichtbarkeit")}
-              </Label>
-              <Select
-                value={visibility}
-                onValueChange={(value) =>
-                  setVisibility(value as "private" | "friends" | "public")
-                }
-              >
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="private">
-                    {t("training.form.visibilityPrivate", "Private")}
-                  </SelectItem>
-                  <SelectItem value="friends">
-                    {t("training.form.visibilityFriends", "Friends")}
-                  </SelectItem>
-                  <SelectItem value="public">
-                    {t("training.form.visibilityPublic", "Public")}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          <Collapsible open={descriptionOpen} onOpenChange={setDescriptionOpen}>
-            <CollapsibleTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full justify-between text-sm"
-              >
-                <span>
-                  {descriptionOpen
-                    ? t("training.form.hideDescription", "Beschreibung ausblenden")
-                    : t("training.form.addDescription", "Beschreibung hinzufügen")}
-                </span>
-                <ChevronDown
-                  className={cn(
-                    "h-4 w-4 transition-transform",
-                    descriptionOpen && "rotate-180"
-                  )}
+          <Accordion
+            type="multiple"
+            className="space-y-2"
+            value={[
+              ...(pauseSettingsOpen ? ["pauses"] : []),
+              ...(descriptionOpen ? ["description"] : []),
+            ]}
+            onValueChange={(next) => {
+              setPauseSettingsOpen(next.includes("pauses"));
+              setDescriptionOpen(next.includes("description"));
+            }}
+          >
+            <AccordionItem value="pauses" className="border rounded-md">
+              <AccordionTrigger className="px-4 py-2 text-sm">
+                {t("training.form.pauseSettings", "Pausen")}
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium">
+                      {t("training.form.restBetweenActivities", "Pause zwischen Übungen (Sek)")}
+                    </Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={restBetweenActivitiesSeconds}
+                      onChange={(e) => setRestBetweenActivitiesSeconds(e.target.value)}
+                      className="mt-1"
+                      inputMode="numeric"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">
+                      {t("training.form.restBetweenSets", "Standard Pause zwischen Sätzen (Sek)")}
+                    </Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={restBetweenSetsSeconds}
+                      onChange={(e) => setRestBetweenSetsSeconds(e.target.value)}
+                      className="mt-1"
+                      inputMode="numeric"
+                    />
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="description" className="border rounded-md">
+              <AccordionTrigger className="px-4 py-2 text-sm">
+                {t("training.form.description", "Beschreibung (optional)")}
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <Textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder={t("training.form.descriptionPlaceholder")}
+                  rows={2}
+                  className="w-full"
                 />
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-2">
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder={t("training.form.descriptionPlaceholder")}
-                rows={2}
-                className="w-full"
-              />
-            </CollapsibleContent>
-          </Collapsible>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
 
           {/* Aktivitäten */}
           <div>
@@ -1846,40 +2159,111 @@ export function WorkoutForm({
                       </div>
 
                         {exercise && (() => {
-                          const unitOptions = getExerciseUnitOptions(exercise);
-                          const disableUnitSelect =
-                            unitOptions.length <= 1 ||
-                            unitOptions.every((option) => option.value === "reps");
-                          return (
-          <div>
-                          <Label className="text-xs md:text-sm">
-                            {t("training.form.unit")}
-                          </Label>
-                          <Select 
-                            value={activity.unit} 
-                            onValueChange={(value) =>
-                              updateActivity(index, "unit", value)
-                            }
-                            disabled={disableUnitSelect}
-                          >
-                            <SelectTrigger className="mt-1">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {unitOptions.map((unit) => (
-                                <SelectItem key={unit.value} value={unit.value}>
-                                  {unit.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                          const measurementType = exercise.measurementType || "reps";
+                          const supportsTime = Boolean(
+                            exercise.supportsTime || measurementType === "time"
                           );
+                          const supportsDistance = Boolean(
+                            exercise.supportsDistance || measurementType === "distance"
+                          );
+                          const distanceOptions = getDistanceUnitOptionsForProfile();
+                          const timeOptions = getTimeUnitOptions();
+
+                          if (supportsTime && supportsDistance) {
+                            return (
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <Label className="text-xs md:text-sm">{t("training.form.totalDistance", "Distanz")}</Label>
+                                  <Select
+                                    value={activity.unit}
+                                    onValueChange={(value) => updateActivity(index, "unit", value)}
+                                  >
+                                    <SelectTrigger className="mt-1">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {distanceOptions.map((unit) => (
+                                        <SelectItem key={unit.value} value={unit.value}>
+                                          {unit.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div>
+                                  <Label className="text-xs md:text-sm">{t("training.form.totalDuration", "Zeit (Min)")}</Label>
+                                  <Select
+                                    value={activity.timeUnit || "min"}
+                                    onValueChange={(value) => updateActivity(index, "timeUnit", value)}
+                                  >
+                                    <SelectTrigger className="mt-1">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {timeOptions.map((unit) => (
+                                        <SelectItem key={unit.value} value={unit.value}>
+                                          {unit.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          if (supportsDistance) {
+                            return (
+                              <div>
+                                <Label className="text-xs md:text-sm">{t("training.form.unit")}</Label>
+                                <Select
+                                  value={activity.unit}
+                                  onValueChange={(value) => updateActivity(index, "unit", value)}
+                                >
+                                  <SelectTrigger className="mt-1">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {distanceOptions.map((unit) => (
+                                      <SelectItem key={unit.value} value={unit.value}>
+                                        {unit.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            );
+                          }
+
+                          if (supportsTime) {
+                            return (
+                              <div>
+                                <Label className="text-xs md:text-sm">{t("training.form.unit")}</Label>
+                                <Select
+                                  value={activity.timeUnit || "min"}
+                                  onValueChange={(value) => updateActivity(index, "timeUnit", value)}
+                                >
+                                  <SelectTrigger className="mt-1">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {timeOptions.map((unit) => (
+                                      <SelectItem key={unit.value} value={unit.value}>
+                                        {unit.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            );
+                          }
+
+                          return null;
                         })()}
                     </div>
 
                     {/* Sets/Reps oder Gesamtmenge Toggle */}
-                    {exercise && supportsSetModeForExercise(exercise) && (
+                    {exercise && (
                       <div className="flex items-center space-x-2">
                         <Switch
                           id={`setMode-${index}`}
@@ -1912,49 +2296,29 @@ export function WorkoutForm({
                             <div className="flex flex-1 flex-col gap-1">
                               <div className="flex gap-2">
                               {(() => {
-                                const measurementType = exercise?.measurementType || "reps";
-                                const supportsTime = Boolean(
-                                  exercise?.supportsTime || measurementType === "time"
+                                const { showReps, showTime, showDistance } = getMetricVisibility(
+                                  exercise,
+                                  activity.unit
                                 );
-                                const supportsDistance = Boolean(
-                                  exercise?.supportsDistance || measurementType === "distance"
-                                );
-                                const showDistance = supportsDistance;
-                                const showTime = supportsTime;
-                                const useRepsAsDuration =
-                                  showTime && (measurementType === "reps" || measurementType === "mixed");
-                                const showReps =
-                                  !useRepsAsDuration &&
-                                  !showDistance &&
-                                  (measurementType === "reps" ||
-                                    measurementType === "weight" ||
-                                    measurementType === "mixed");
                                 return (
                                   <>
-                                    {(showReps || useRepsAsDuration) && (
+                                    {showReps && (
                                       <Input
                                         type="number"
-                                        placeholder={
-                                          useRepsAsDuration
-                                            ? t("training.form.durationPerSet", "Dauer (Min)")
-                                            : t("training.form.reps")
-                                        }
-                                        value={useRepsAsDuration ? set.duration || "" : set.reps || ""}
+                                        placeholder={t("training.form.reps")}
+                                        value={set.reps || ""}
                                         onChange={(e) =>
                                           updateSet(
                                             index,
                                             setIndex,
-                                            useRepsAsDuration ? "duration" : "reps",
+                                            "reps",
                                             parseFloat(e.target.value) || 0
                                           )
                                         }
                                         className={cn(
                                           "flex-1",
-                                          useRepsAsDuration
-                                            ? activityError.sets?.[setIndex]?.duration &&
-                                              "border-destructive focus-visible:ring-destructive"
-                                            : activityError.sets?.[setIndex]?.reps &&
-                                              "border-destructive focus-visible:ring-destructive"
+                                          activityError.sets?.[setIndex]?.reps &&
+                                            "border-destructive focus-visible:ring-destructive"
                                         )}
                                         min="0"
                                         step="1"
@@ -1984,7 +2348,7 @@ export function WorkoutForm({
                                         inputMode="decimal"
                                       />
                                     )}
-                                    {showTime && !useRepsAsDuration && (
+                                    {showTime && (
                                       <Input
                                         type="number"
                                         placeholder={t("training.form.totalDuration", "Zeit (Min)")}
@@ -2081,30 +2445,76 @@ export function WorkoutForm({
                           {t("training.form.addSet")}
                         </Button>
                         <div className="text-sm text-muted-foreground">
-                          {t("training.form.total")}: {activity.totalAmount}{" "}
-                          {getUnitLabel(activity.unit, exercise)}
+                          {(() => {
+                            const { showReps, showTime, showDistance } = getMetricVisibility(
+                              exercise,
+                              activity.unit
+                            );
+                            const supportsWeight = Boolean(
+                              exercise.requiresWeight || exercise.allowsWeight
+                            );
+                            const totalReps = activity.sets.reduce((sum, set) => sum + (set.reps || 0), 0);
+                            const totalDuration = activity.sets.reduce((sum, set) => {
+                              const duration = set.duration || 0;
+                              if (!showReps || !showTime) return sum + duration;
+                              const reps = set.reps && set.reps > 0 ? set.reps : 1;
+                              return sum + duration * reps;
+                            }, 0);
+                            const totalDistance = activity.sets.reduce((sum, set) => sum + (set.distance || 0), 0);
+                            const totalWeight = activity.sets.reduce((sum, set) => sum + (set.weight || 0), 0);
+                            const totalWeightVolume = activity.sets.reduce((sum, set) => {
+                              const weight = set.weight || 0;
+                              if (weight <= 0) return sum;
+                              const multiplier = showReps
+                                ? (set.reps && set.reps > 0 ? set.reps : 1)
+                                : 1;
+                              return sum + weight * multiplier;
+                            }, 0);
+                            const weightUnitLabel = getUserWeightUnit();
+
+                            if (showDistance && showTime) {
+                              return `${t("training.form.total")}: ${totalDistance} ${getUnitLabel(
+                                activity.unit,
+                                exercise
+                              )} · ${totalDuration} ${getUnitLabel(activity.timeUnit || "min", exercise)}`;
+                            }
+                            if (showReps && showTime) {
+                              const base = `${t("training.form.total")}: ${totalReps} ${t(
+                                "training.form.units.repetitions"
+                              )} · ${totalDuration} ${getUnitLabel(activity.unit, exercise)}`;
+                              if (supportsWeight && totalWeightVolume > 0) {
+                                return `${base} · ${totalWeightVolume} ${weightUnitLabel}`;
+                              }
+                              return base;
+                            }
+                            if (showReps && supportsWeight && totalWeightVolume > 0) {
+                              return `${t("training.form.total")}: ${totalReps} ${t(
+                                "training.form.units.repetitions"
+                              )} · ${totalWeightVolume} ${weightUnitLabel}`;
+                            }
+                            if (!showReps && supportsWeight && totalWeight > 0) {
+                              return `${t("training.form.total")}: ${activity.totalAmount} ${getUnitLabel(
+                                activity.unit,
+                                exercise
+                              )} · ${totalWeight} ${weightUnitLabel}`;
+                            }
+                            return `${t("training.form.total")}: ${activity.totalAmount} ${getUnitLabel(
+                              activity.unit,
+                              exercise
+                            )}`;
+                          })()}
                         </div>
                       </div>
                     ) : exercise ? (
                       // Gesamtmenge Modus
                       (() => {
-                        const measurementType = exercise.measurementType || "reps";
-                        const supportsTime = Boolean(
-                          exercise.supportsTime || measurementType === "time"
-                        );
-                        const supportsDistance = Boolean(
-                          exercise.supportsDistance || measurementType === "distance"
-                        );
                         const supportsWeight = Boolean(
                           exercise.requiresWeight || exercise.allowsWeight
                         );
-                        const showDistance = supportsDistance;
-                        const showTime = supportsTime;
-                        const showReps =
-                          !showDistance &&
-                          (measurementType === "reps" ||
-                            measurementType === "weight" ||
-                            measurementType === "mixed");
+                        const { showReps, showTime, showDistance } = getMetricVisibility(
+                          exercise,
+                          activity.unit
+                        );
 
                         return (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

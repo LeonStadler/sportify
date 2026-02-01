@@ -667,6 +667,7 @@ export const createAdminRouter = (pool) => {
             discipline: "discipline",
             movementPattern: "movement_pattern",
             measurementType: "measurement_type",
+            unit: "unit",
             requiresWeight: "requires_weight",
             allowsWeight: "allows_weight",
             supportsSets: "supports_sets",

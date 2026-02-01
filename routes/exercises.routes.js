@@ -307,10 +307,10 @@ export const createExercisesRouter = (pool) => {
       const resolvedUnit =
         unit ||
         (measurementType === "time"
-          ? "Sekunden"
+          ? "sec"
           : measurementType === "distance"
-            ? "Kilometer"
-            : "Wiederholungen");
+            ? "km"
+            : "reps");
 
       const { rows } = await pool.query(insertQuery, [
         exerciseId,

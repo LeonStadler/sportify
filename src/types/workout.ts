@@ -68,6 +68,11 @@ export interface Workout {
   restBetweenSetsSeconds?: number;
   restBetweenActivitiesSeconds?: number;
   restBetweenRoundsSeconds?: number;
+  category?: string | null;
+  discipline?: string | null;
+  movementPattern?: string | null;
+  movementPatterns?: string[] | null;
+  muscleGroups?: string[] | null;
   visibility?: "private" | "friends" | "public";
   isTemplate?: boolean;
   owner?: {

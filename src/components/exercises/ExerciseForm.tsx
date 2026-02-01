@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -186,8 +186,8 @@ export function ExerciseForm({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
+      <div className="flex flex-wrap gap-4">
+        <div className="flex-1 min-w-[240px]">
           <div className="flex items-center gap-2">
             <Label>{t("exerciseLibrary.name")}</Label>
             <TooltipProvider delayDuration={150}>
@@ -264,7 +264,7 @@ export function ExerciseForm({
             )}
           </div>
         </div>
-        <div>
+        <div className="flex-1 min-w-[220px]">
           <Label>{t("exerciseLibrary.category")}</Label>
           <Select value={value.category} onValueChange={(next) => setField("category", next)}>
             <SelectTrigger className={cn("mt-1", !value.category && "text-muted-foreground")}>
@@ -279,7 +279,7 @@ export function ExerciseForm({
             </SelectContent>
           </Select>
         </div>
-        <div>
+        <div className="flex-1 min-w-[220px]">
           <Label>{t("exerciseLibrary.discipline")}</Label>
           <Select value={value.discipline} onValueChange={(next) => setField("discipline", next)}>
             <SelectTrigger className={cn("mt-1", !value.discipline && "text-muted-foreground")}>
@@ -294,7 +294,7 @@ export function ExerciseForm({
             </SelectContent>
           </Select>
         </div>
-        <div>
+        <div className="flex-1 min-w-[220px]">
           <Label>{t("exerciseLibrary.pattern")}</Label>
           <Select value={value.movementPattern} onValueChange={(next) => setField("movementPattern", next)}>
             <SelectTrigger className={cn("mt-1", !value.movementPattern && "text-muted-foreground")}>
@@ -328,9 +328,9 @@ export function ExerciseForm({
       </div>
 
       {(value.measurementTypes.includes("distance") || value.measurementTypes.includes("time")) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="flex flex-wrap gap-4">
           {value.measurementTypes.includes("distance") && (
-            <div>
+            <div className="flex-1 min-w-[220px]">
               <Label>{t("exerciseLibrary.defaultDistanceUnit", "Standard Distanz-Einheit")}</Label>
               <Select
                 value={value.distanceUnit || defaultDistanceUnit}
@@ -348,7 +348,7 @@ export function ExerciseForm({
             </div>
           )}
           {value.measurementTypes.includes("time") && (
-            <div>
+            <div className="flex-1 min-w-[220px]">
               <Label>{t("exerciseLibrary.defaultTimeUnit", "Standard Zeit-Einheit")}</Label>
               <Select
                 value={value.timeUnit || defaultTimeUnit}
@@ -390,8 +390,8 @@ export function ExerciseForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
+      <div className="flex flex-wrap gap-4">
+        <div className="flex-1 min-w-[240px]">
           <Label>{t("exerciseLibrary.muscleGroups")}</Label>
           <div className="mt-1">
             <MuscleGroupSelector
@@ -402,7 +402,7 @@ export function ExerciseForm({
             />
           </div>
         </div>
-        <div>
+        <div className="flex-1 min-w-[240px]">
           <Label>{t("exerciseLibrary.equipment")}</Label>
           <Input
             value={value.equipment}
@@ -429,34 +429,26 @@ export function ExerciseForm({
       </div>
 
       {showDescriptionToggle ? (
-        <Collapsible open={descriptionIsOpen} onOpenChange={onDescriptionToggle ?? (() => undefined)}>
-          <CollapsibleTrigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full justify-between text-sm"
-            >
-              <span>
-                {descriptionIsOpen
-                  ? t("exerciseLibrary.hideDescription", "Beschreibung ausblenden")
-                  : t("exerciseLibrary.addDescription", "Beschreibung hinzufügen")}
-              </span>
-              <ChevronDown
-                className={cn(
-                  "h-4 w-4 transition-transform",
-                  descriptionIsOpen && "rotate-180"
-                )}
+        <Accordion
+          type="single"
+          collapsible
+          value={descriptionIsOpen ? "description" : ""}
+          onValueChange={(next) => (onDescriptionToggle ? onDescriptionToggle(next === "description") : undefined)}
+          className="space-y-2"
+        >
+          <AccordionItem value="description" className="border rounded-md">
+            <AccordionTrigger className="px-4 py-2 text-sm">
+              {t("exerciseLibrary.description", "Beschreibung")}
+            </AccordionTrigger>
+            <AccordionContent className="px-4 pb-4">
+              <Textarea
+                value={value.description}
+                onChange={(e) => setField("description", e.target.value)}
+                placeholder={t("exerciseLibrary.descriptionPlaceholder", "Optional")}
               />
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="mt-2">
-            <Textarea
-              value={value.description}
-              onChange={(e) => setField("description", e.target.value)}
-              placeholder={t("exerciseLibrary.descriptionPlaceholder", "Optional")}
-            />
-          </CollapsibleContent>
-        </Collapsible>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       ) : (
         <Textarea
           value={value.description}

@@ -1,9 +1,17 @@
-import { SearchFilterToolbar } from "@/components/common/SearchFilterToolbar";
+import { PageTemplate } from "@/components/common/PageTemplate";
+import { ExerciseBrowsePanel } from "@/components/exercises/ExerciseBrowsePanel";
+import { getExerciseBrowseLabels } from "@/components/exercises/exerciseBrowseLabels";
+import { ExerciseBrowseGrid, ExerciseBrowseTable } from "@/components/exercises/ExerciseBrowseList";
 import { PageSizeSelector } from "@/components/common/pagination/PageSizeSelector";
 import { PaginationControls, PaginationMeta } from "@/components/common/pagination/PaginationControls";
 import { ExerciseFiltersPanel } from "@/components/exercises/ExerciseFiltersPanel";
 import { ExerciseForm, ExerciseFormValue } from "@/components/exercises/ExerciseForm";
-import { PageTemplate } from "@/components/common/PageTemplate";
+import {
+  getExerciseCategoryLabel,
+  getExerciseDisciplineLabel,
+  getExerciseMovementPatternLabel,
+  getExerciseMuscleGroupLabel,
+} from "@/components/exercises/exerciseLabels";
 import {
   categoryOptions,
   disciplineOptions,
@@ -17,31 +25,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -61,20 +57,16 @@ import {
   ArrowUp,
   Check,
   ChevronDown,
-  Edit,
   Eye,
   EyeOff,
   MoreHorizontal,
-  Plus,
   RefreshCw,
   Search,
   Settings,
   Shield,
-  Trophy,
-  Users,
-  X,
+  Users
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 interface AdminUser {
@@ -137,33 +129,32 @@ interface ExerciseEditRequest {
   createdAt: string;
 }
 
+interface AdminOverviewStats {
+  users: number;
+  workouts: number;
+  templates: number;
+  exercises: number;
+  recoveryEntries: number;
+  awards: number;
+  badges: number;
+  workoutActivities: number;
+}
+
 export function Admin() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [exerciseReports, setExerciseReports] = useState<ExerciseReport[]>([]);
   const [exerciseEditRequests, setExerciseEditRequests] = useState<ExerciseEditRequest[]>([]);
+  const [overviewStats, setOverviewStats] = useState<AdminOverviewStats | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showEmails, setShowEmails] = useState(false);
-  const [isExerciseFormOpen, setIsExerciseFormOpen] = useState(false);
-  const [editingExercise, setEditingExercise] = useState<Exercise | null>(null);
+  const [activeTab, setActiveTab] = useState("overview");
   const [monitoringData, setMonitoringData] = useState<any>(null);
   const [isLoadingMonitoring, setIsLoadingMonitoring] = useState(false);
-  const [exerciseForm, setExerciseForm] = useState({
-    id: "",
-    name: "",
-    pointsPerUnit: 1,
-    unit: "reps",
-    hasWeight: false,
-    hasSetMode: true,
-    isActive: true,
-  });
-  const [scoringQuery, setScoringQuery] = useState("");
-  const [scoringCategory, setScoringCategory] = useState("all");
-  const [scoringStatus, setScoringStatus] = useState("all");
   const [mergeSourceId, setMergeSourceId] = useState("");
   const [mergeTargetId, setMergeTargetId] = useState("");
   const [exerciseManagementView, setExerciseManagementView] = useState<"grid" | "table">("table");
@@ -192,38 +183,14 @@ export function Admin() {
   const [exerciseEditDraft, setExerciseEditDraft] = useState<ExerciseFormValue | null>(null);
   const [exerciseEditDescriptionOpen, setExerciseEditDescriptionOpen] = useState(false);
   const [exerciseEditSaving, setExerciseEditSaving] = useState(false);
-  const [exerciseDialogMode, setExerciseDialogMode] = useState<"view" | "edit">("edit");
+  const [exerciseDialogMode, setExerciseDialogMode] = useState<"view" | "edit">("view");
+  const [detailExerciseId, setDetailExerciseId] = useState<string | null>(null);
+  const mergeSectionRef = useRef<HTMLDivElement | null>(null);
 
   const exerciseMap = useMemo(
     () => new Map(exercises.map((exercise) => [exercise.id, exercise])),
     [exercises]
   );
-
-  const scoringCategories = useMemo(() => {
-    const values = exercises
-      .map((exercise) => exercise.category)
-      .filter((value): value is string => Boolean(value));
-    return Array.from(new Set(values));
-  }, [exercises]);
-
-  const filteredScoringExercises = useMemo(() => {
-    const query = scoringQuery.trim().toLowerCase();
-    return exercises.filter((exercise) => {
-      if (scoringCategory !== "all" && exercise.category !== scoringCategory) {
-        return false;
-      }
-      if (scoringStatus !== "all") {
-        const isActive = exercise.isActive === true;
-        if (scoringStatus === "active" && !isActive) return false;
-        if (scoringStatus === "inactive" && isActive) return false;
-      }
-      if (!query) return true;
-      return (
-        exercise.name.toLowerCase().includes(query) ||
-        exercise.id.toLowerCase().includes(query)
-      );
-    });
-  }, [exercises, scoringCategory, scoringQuery, scoringStatus]);
 
   const normalizeCategory = (value?: string | null) => {
     if (!value) return value;
@@ -301,6 +268,33 @@ export function Admin() {
     if (exercise.supportsDistance && exercise.measurementType !== "distance") measurementSet.add("distance");
     if (exercise.supportsSets || exercise.measurementType === "reps") measurementSet.add("reps");
 
+    const normalizeUnitValue = (unit?: string | null) => {
+      if (!unit) return "";
+      const lower = unit.toLowerCase();
+      if (lower.includes("sek")) return "sec";
+      if (lower.includes("min")) return "min";
+      if (lower.includes("mile") || lower.includes("meile")) return "miles";
+      if (lower === "m" || lower.includes("meter")) return "m";
+      if (lower.includes("km") || lower.includes("kilometer")) return "km";
+      if (lower.includes("wdh") || lower.includes("reps") || lower.includes("wiederholung"))
+        return "reps";
+      return unit;
+    };
+
+    const unitOptionsValues = Array.isArray(exercise.unitOptions)
+      ? exercise.unitOptions.map((option) => option.value)
+      : [];
+
+    const distanceUnit =
+      unitOptionsValues.find((value) => ["km", "m", "miles"].includes(value)) ||
+      normalizeUnitValue(exercise.unit) ||
+      (user?.preferences?.units?.distance || "km");
+
+    const timeUnit =
+      unitOptionsValues.find((value) => ["min", "sec"].includes(value)) ||
+      normalizeUnitValue(exercise.unit) ||
+      "min";
+
     return {
       name: exercise.name,
       description: exercise.description || "",
@@ -308,6 +302,8 @@ export function Admin() {
       discipline: exercise.discipline || "",
       movementPattern: exercise.movementPattern || "push",
       measurementTypes: Array.from(measurementSet),
+      distanceUnit,
+      timeUnit,
       difficulty: exercise.difficultyTier || 5,
       requiresWeight: exercise.requiresWeight || false,
       allowsWeight: exercise.allowsWeight || false,
@@ -323,6 +319,7 @@ export function Admin() {
     setExerciseEditDraft(formValue);
     setExerciseEditDescriptionOpen(Boolean(formValue.description));
     setExerciseDialogMode("edit");
+    setDetailExerciseId(exercise.id);
     setExerciseEditDialogOpen(true);
   };
 
@@ -331,6 +328,7 @@ export function Admin() {
     setExerciseEditDraft(null);
     setExerciseEditDescriptionOpen(false);
     setExerciseDialogMode("view");
+    setDetailExerciseId(exercise.id);
     setExerciseEditDialogOpen(true);
   };
 
@@ -339,22 +337,53 @@ export function Admin() {
     setExerciseEditTarget(null);
     setExerciseEditDraft(null);
     setExerciseEditDescriptionOpen(false);
-    setExerciseDialogMode("edit");
+    setExerciseDialogMode("view");
+    setDetailExerciseId(null);
   };
 
   const exerciseManagementHandleSave = async () => {
     if (!exerciseEditTarget || !exerciseEditDraft) return;
+    if (!exerciseEditDraft.category || !exerciseEditDraft.discipline || !exerciseEditDraft.movementPattern) {
+      toast({
+        title: t("common.error"),
+        description: t("exerciseLibrary.requiredFields", "Bitte fülle Kategorie, Disziplin und Bewegungsmuster aus."),
+        variant: "destructive",
+      });
+      return;
+    }
+    const measurementType = exerciseEditDraft.measurementTypes.includes("distance")
+      ? "distance"
+      : exerciseEditDraft.measurementTypes.includes("reps")
+        ? "reps"
+        : "time";
+    const distanceUnitOptions = [
+      { value: "km", label: t("training.form.units.kilometers") },
+      { value: "m", label: t("training.form.units.meters") },
+      { value: "miles", label: t("training.form.units.miles") },
+    ];
+    const timeUnitOptions = [
+      { value: "min", label: t("training.form.units.minutes", "Minuten") },
+      { value: "sec", label: t("training.form.units.seconds", "Sekunden") },
+    ];
+    const unitOptions = measurementType === "distance"
+      ? distanceUnitOptions
+      : measurementType === "time"
+        ? timeUnitOptions
+        : [];
+    const resolvedUnit = measurementType === "distance"
+      ? exerciseEditDraft.distanceUnit || (user?.preferences?.units?.distance || "km")
+      : measurementType === "time"
+        ? exerciseEditDraft.timeUnit || "min"
+        : "reps";
     const payload = {
       name: exerciseEditDraft.name,
       description: exerciseEditDraft.description,
       category: exerciseEditDraft.category,
       discipline: exerciseEditDraft.discipline,
       movementPattern: exerciseEditDraft.movementPattern,
-      measurementType: exerciseEditDraft.measurementTypes.includes("distance")
-        ? "distance"
-        : exerciseEditDraft.measurementTypes.includes("reps")
-          ? "reps"
-          : "time",
+      measurementType,
+      unit: resolvedUnit,
+      unitOptions,
       difficultyTier: exerciseEditDraft.difficulty,
       requiresWeight: exerciseEditDraft.requiresWeight,
       allowsWeight: exerciseEditDraft.allowsWeight,
@@ -377,6 +406,8 @@ export function Admin() {
       "discipline",
       "movementPattern",
       "measurementType",
+      "unit",
+      "unitOptions",
       "requiresWeight",
       "allowsWeight",
       "supportsSets",
@@ -539,6 +570,38 @@ export function Admin() {
     exerciseManagementSortDirection,
   ]);
 
+  const detailExercise = useMemo(
+    () => exerciseManagementFiltered.find((item) => item.id === detailExerciseId) || null,
+    [detailExerciseId, exerciseManagementFiltered]
+  );
+
+  const detailIndex = useMemo(
+    () => (detailExerciseId ? exerciseManagementFiltered.findIndex((item) => item.id === detailExerciseId) : -1),
+    [detailExerciseId, exerciseManagementFiltered]
+  );
+
+  const hasPrevDetail = detailIndex > 0;
+  const hasNextDetail = detailIndex >= 0 && detailIndex < exerciseManagementFiltered.length - 1;
+
+  const navigateExercise = (direction: "prev" | "next") => {
+    if (!detailExerciseId) return;
+    const index = exerciseManagementFiltered.findIndex((item) => item.id === detailExerciseId);
+    if (index < 0) return;
+    const nextIndex = direction === "prev" ? index - 1 : index + 1;
+    if (nextIndex < 0 || nextIndex >= exerciseManagementFiltered.length) return;
+    const nextExercise = exerciseManagementFiltered[nextIndex];
+    if (!nextExercise) return;
+    if (exerciseDialogMode === "edit") {
+      const formValue = exerciseManagementToFormValue(nextExercise);
+      setExerciseEditDraft(formValue);
+      setExerciseEditDescriptionOpen(Boolean(formValue.description));
+      setExerciseEditTarget(nextExercise);
+    } else {
+      setExerciseEditTarget(nextExercise);
+    }
+    setDetailExerciseId(nextExercise.id);
+  };
+
   useEffect(() => {
     const totalItems = exerciseManagementFiltered.length;
     const totalPages = Math.max(1, Math.ceil(totalItems / exerciseManagementPageSize));
@@ -565,28 +628,28 @@ export function Admin() {
       return value.join(", ");
     }
     if (value === null || value === undefined) return "-";
-    if (typeof value === "boolean") return value ? "Ja" : "Nein";
+    if (typeof value === "boolean") return value ? t("common.yes", "Ja") : t("common.no", "Nein");
     if (typeof value === "object") return JSON.stringify(value);
     return String(value);
   };
 
   const changeKeyLabels: Record<string, string> = {
-    name: "Name",
-    description: "Beschreibung",
-    category: "Kategorie",
-    discipline: "Disziplin",
-    movementPattern: "Movement",
-    measurementType: "Messung",
-    requiresWeight: "Gewicht erforderlich",
-    allowsWeight: "Gewicht optional",
-    supportsSets: "Sets/Reps",
-    supportsTime: "Zeit",
-    supportsDistance: "Distanz",
-    supportsGrade: "Route",
-    difficultyTier: "Schwierigkeit",
-    muscleGroups: "Muskelgruppen",
-    equipment: "Equipment",
-    unitOptions: "Einheiten",
+    name: t("exerciseLibrary.name", "Name"),
+    description: t("exerciseLibrary.description", "Beschreibung"),
+    category: t("exerciseLibrary.category", "Kategorie"),
+    discipline: t("exerciseLibrary.discipline", "Disziplin"),
+    movementPattern: t("exerciseLibrary.pattern", "Bewegungsmuster"),
+    measurementType: t("exerciseLibrary.measurement", "Einheiten"),
+    requiresWeight: t("exerciseLibrary.requiresWeight", "Gewicht erforderlich"),
+    allowsWeight: t("exerciseLibrary.allowsWeight", "Gewicht optional"),
+    supportsSets: t("exerciseLibrary.supportsSets", "Sets/Reps"),
+    supportsTime: t("exerciseLibrary.time", "Zeit"),
+    supportsDistance: t("exerciseLibrary.distance", "Distanz"),
+    supportsGrade: t("exerciseLibrary.route", "Route"),
+    difficultyTier: t("exerciseLibrary.difficulty", "Schwierigkeit"),
+    muscleGroups: t("exerciseLibrary.muscleGroups", "Muskelgruppen"),
+    equipment: t("exerciseLibrary.equipment", "Equipment"),
+    unitOptions: t("exerciseLibrary.measurement", "Einheiten"),
   };
 
   const ExerciseMergeSelect = ({
@@ -638,7 +701,12 @@ export function Admin() {
             <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[320px] p-0" align="start">
+        <PopoverContent
+          className="w-[var(--radix-popover-trigger-width)] max-w-[90vw] p-0"
+          align="start"
+          side="bottom"
+          sideOffset={4}
+        >
           <Command shouldFilter={false}>
             <div className="flex items-center gap-2 px-3 py-2 border-b">
               <Search className="h-4 w-4 text-muted-foreground" />
@@ -678,66 +746,6 @@ export function Admin() {
     );
   };
 
-  const MergeDialog = ({ sourceId }: { sourceId: string }) => {
-    const [open, setOpen] = useState(false);
-    const [targetId, setTargetId] = useState("");
-
-    useEffect(() => {
-      if (!open) {
-        setTargetId("");
-      }
-    }, [open]);
-
-    return (
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger asChild>
-          <Button variant="outline" size="sm">
-            Merge
-          </Button>
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Übung zusammenführen</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label>Ziel-Übung</Label>
-            <Select value={targetId} onValueChange={setTargetId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Ziel wählen" />
-              </SelectTrigger>
-              <SelectContent>
-                {exercises
-                  .filter((item) => item.id !== sourceId)
-                  .map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Alle Aktivitäten werden auf die Ziel‑Übung umgehängt.
-            </p>
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">Abbrechen</Button>
-            </DialogClose>
-            <Button
-              disabled={!targetId}
-              onClick={async () => {
-                await handleMergeExercise(sourceId, targetId);
-                setOpen(false);
-              }}
-            >
-              Zusammenführen
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
-  };
-
   const handleMergeExercise = async (sourceId: string, targetId: string) => {
     if (!targetId || sourceId === targetId) return;
     try {
@@ -755,18 +763,26 @@ export function Admin() {
       );
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Merge fehlgeschlagen.");
+        throw new Error(
+          errorData.error ||
+            t("admin.errors.mergeFailed", "Merge fehlgeschlagen.")
+        );
       }
       toast({
-        title: "Merge erfolgreich",
-        description: "Die Übung wurde zusammengeführt.",
+        title: t("admin.success.mergeTitle", "Merge erfolgreich"),
+        description: t(
+          "admin.success.mergeDescription",
+          "Die Übung wurde zusammengeführt."
+        ),
       });
       await loadExercises();
     } catch (error) {
       toast({
-        title: "Fehler",
+        title: t("admin.errors.title", "Fehler"),
         description:
-          error instanceof Error ? error.message : "Merge fehlgeschlagen.",
+          error instanceof Error
+            ? error.message
+            : t("admin.errors.mergeFailed", "Merge fehlgeschlagen."),
         variant: "destructive",
       });
     }
@@ -885,6 +901,32 @@ export function Admin() {
     }
   };
 
+  const loadOverviewStats = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/admin/overview-stats`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error("Failed to load overview stats");
+      }
+      const data = await response.json();
+      setOverviewStats(data);
+    } catch (error) {
+      console.error("Admin overview stats error:", error);
+      toast({
+        title: t("admin.errors.title", "Fehler"),
+        description: t(
+          "admin.errors.overviewLoad",
+          "Übersichtsdaten konnten nicht geladen werden."
+        ),
+        variant: "destructive",
+      });
+    }
+  };
+
   const loadMonitoringData = async () => {
     setIsLoadingMonitoring(true);
     try {
@@ -902,8 +944,11 @@ export function Admin() {
     } catch (error) {
       console.error("Error loading monitoring data:", error);
       toast({
-        title: "Fehler",
-        description: "Fehler beim Laden der Monitoring-Daten",
+        title: t("admin.errors.title", "Fehler"),
+        description: t(
+          "admin.errors.monitoringLoad",
+          "Fehler beim Laden der Monitoring-Daten"
+        ),
         variant: "destructive",
       });
     } finally {
@@ -923,15 +968,18 @@ export function Admin() {
 
       if (response.ok) {
         toast({
-          title: "Erfolg",
-          description: "Stuck Jobs wurden bereinigt",
+          title: t("admin.success.title", "Erfolg"),
+          description: t(
+            "admin.success.cleanupJobs",
+            "Stuck Jobs wurden bereinigt"
+          ),
         });
         await loadMonitoringData();
       }
     } catch (error) {
       toast({
-        title: "Fehler",
-        description: "Fehler beim Cleanup der Jobs",
+        title: t("admin.errors.title", "Fehler"),
+        description: t("admin.errors.cleanupJobs", "Fehler beim Cleanup der Jobs"),
         variant: "destructive",
       });
     }
@@ -945,11 +993,12 @@ export function Admin() {
         loadExercises(),
         loadExerciseReports(),
         loadExerciseEditRequests(),
+        loadOverviewStats(),
       ]);
     } catch (error) {
       toast({
-        title: "Fehler",
-        description: "Fehler beim Laden der Admin-Daten",
+        title: t("admin.errors.title", "Fehler"),
+        description: t("admin.errors.adminLoad", "Fehler beim Laden der Admin-Daten"),
         variant: "destructive",
       });
     } finally {
@@ -964,6 +1013,14 @@ export function Admin() {
     }
   }, [user?.role, loadAdminData]);
 
+  useEffect(() => {
+    if (user?.role === "admin" && activeTab === "monitoring") {
+      if (!monitoringData && !isLoadingMonitoring) {
+        loadMonitoringData();
+      }
+    }
+  }, [user?.role, activeTab, monitoringData, isLoadingMonitoring]);
+
   // Prüfe Admin-Rechte
   if (user?.role !== "admin") {
     return (
@@ -972,9 +1029,14 @@ export function Admin() {
           <Card className="max-w-md w-full">
             <CardContent className="p-6 text-center">
               <Shield className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h2 className="text-xl font-semibold mb-2">Zugriff verweigert</h2>
+              <h2 className="text-xl font-semibold mb-2">
+                {t("admin.accessDenied.title", "Zugriff verweigert")}
+              </h2>
               <p className="text-muted-foreground">
-                Sie haben keine Berechtigung, auf den Admin-Bereich zuzugreifen.
+                {t(
+                  "admin.accessDenied.body",
+                  "Sie haben keine Berechtigung, auf den Admin-Bereich zuzugreifen."
+                )}
               </p>
             </CardContent>
           </Card>
@@ -983,156 +1045,15 @@ export function Admin() {
     );
   }
 
-  const handleCreateExercise = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (
-      !exerciseForm.name ||
-      exerciseForm.pointsPerUnit <= 0
-    ) {
-      toast({
-        title: "Fehler",
-        description: "Bitte füllen Sie alle erforderlichen Felder aus.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${API_URL}/admin/exercises`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          id: exerciseForm.id
-            ? exerciseForm.id.toLowerCase().replace(/\s+/g, "-")
-            : undefined,
-          name: exerciseForm.name,
-          pointsPerUnit: exerciseForm.pointsPerUnit,
-          unit: exerciseForm.unit,
-          hasWeight: exerciseForm.hasWeight,
-          hasSetMode: exerciseForm.hasSetMode,
-          unitOptions: exerciseForm.hasSetMode
-            ? [
-              {
-                value: exerciseForm.unit,
-                label: exerciseForm.unit,
-                multiplier: 1,
-              },
-            ]
-            : [],
-          isActive: exerciseForm.isActive,
-        }),
-      });
-
-      if (response.ok) {
-        toast({
-          title: "Erfolg",
-          description: "Übung erfolgreich erstellt.",
-        });
-        resetExerciseForm();
-        await loadExercises();
-      } else {
-        const errorData = await response.json();
-        toast({
-          title: "Fehler",
-          description: errorData.error || "Fehler beim Erstellen der Übung",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Fehler",
-        description: "Fehler beim Erstellen der Übung",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleUpdateExercise = async (
-    exercise: Exercise,
-    field: keyof Exercise,
-    value: unknown
-  ) => {
-    try {
-      const token = localStorage.getItem("token");
-      const updateData: Partial<Exercise> = { [field]: value };
-
-      const response = await fetch(
-        `${API_URL}/admin/exercises/${exercise.id}`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(updateData),
-        }
-      );
-
-      if (response.ok) {
-        toast({
-          title: "Erfolg",
-          description: "Übung erfolgreich aktualisiert.",
-        });
-        await loadExercises();
-      } else {
-        const errorData = await response.json();
-        toast({
-          title: "Fehler",
-          description: errorData.error || "Fehler beim Aktualisieren der Übung",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Fehler",
-        description: "Fehler beim Aktualisieren der Übung",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const resetExerciseForm = () => {
-    setExerciseForm({
-      id: "",
-      name: "",
-      pointsPerUnit: 1,
-      unit: "Wiederholungen",
-      hasWeight: false,
-      hasSetMode: true,
-      isActive: true,
-    });
-    setIsExerciseFormOpen(false);
-    setEditingExercise(null);
-  };
-
-  const startEditExercise = (exercise: Exercise) => {
-    setEditingExercise(exercise);
-    setExerciseForm({
-      id: exercise.id,
-      name: exercise.name,
-      pointsPerUnit: exercise.pointsPerUnit,
-      unit: exercise.unit,
-      hasWeight: exercise.hasWeight,
-      hasSetMode: exercise.hasSetMode,
-      isActive: exercise.isActive,
-    });
-    setIsExerciseFormOpen(true);
-  };
-
   const formatDate = (dateString: string | null | undefined) => {
-    if (!dateString) return "Nie";
+    if (!dateString) return t("admin.date.never", "Nie");
 
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) {
-        return "Ungültiges Datum";
+        return t("admin.date.invalid", "Ungültiges Datum");
       }
-      return date.toLocaleString("de-DE", {
+      return date.toLocaleString(i18n.language || "de-DE", {
         year: "numeric",
         month: "2-digit",
         day: "2-digit",
@@ -1141,7 +1062,7 @@ export function Admin() {
       });
     } catch (error) {
       console.error("Date formatting error:", error, "Input:", dateString);
-      return "Ungültiges Datum";
+      return t("admin.date.invalid", "Ungültiges Datum");
     }
   };
 
@@ -1153,615 +1074,287 @@ export function Admin() {
 
   return (
     <PageTemplate
-      title="Admin Panel"
-      subtitle="Verwaltung der App-Einstellungen und Benutzer"
+      title={t("admin.title", "Admin Panel")}
+      subtitle={t(
+        "admin.subtitle",
+        "Verwaltung der App-Einstellungen und Benutzer"
+      )}
     >
       <div className="space-y-6">
-
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList>
-          <TabsTrigger value="overview">Übersicht</TabsTrigger>
-          <TabsTrigger value="users">Benutzerverwaltung</TabsTrigger>
-          <TabsTrigger value="scoring">Wertung</TabsTrigger>
-          <TabsTrigger value="exercise-management">Übungsverwaltung</TabsTrigger>
-          <TabsTrigger value="moderation">Moderation</TabsTrigger>
-          <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-6 mt-6">
-          {/* App Statistics */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="w-5 h-5" />
-                App-Statistiken
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 border rounded-lg">
-                  <p className="text-2xl font-bold text-primary">
-                    {users.length}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Registrierte Benutzer
-                  </p>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList>
+            <TabsTrigger value="overview">
+              {t("admin.tabs.overview", "Übersicht")}
+            </TabsTrigger>
+            <TabsTrigger value="users">
+              {t("admin.tabs.users", "Benutzerverwaltung")}
+            </TabsTrigger>
+            <TabsTrigger value="exercise-management">
+              {t("admin.tabs.exercises", "Übungsverwaltung")}
+            </TabsTrigger>
+            <TabsTrigger value="moderation">
+              {t("admin.tabs.moderation", "Moderation")}
+            </TabsTrigger>
+            <TabsTrigger value="monitoring">
+              {t("admin.tabs.monitoring", "Monitoring")}
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="overview" className="space-y-6">
+            {/* App Statistics */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="w-5 h-5" />
+                {t("admin.stats.title", "App-Statistiken")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="p-4 border rounded-lg">
+                    <p className="text-2xl font-bold text-primary">
+                      {overviewStats?.users ?? users.length}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                    {t("admin.stats.users", "Registrierte Benutzer")}
+                    </p>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <p className="text-2xl font-bold text-green-600">
+                      {users.filter((u) => u.isEmailVerified).length}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                    {t("admin.stats.verifiedEmails", "Verifizierte E-Mails")}
+                    </p>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <p className="text-2xl font-bold text-blue-600">
+                      {users.filter((u) => u.role === "admin").length}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                    {t("admin.stats.admins", "Administratoren")}
+                    </p>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <p className="text-2xl font-bold text-emerald-600">
+                      {overviewStats?.workouts ?? 0}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                    {t("admin.stats.workouts", "Durchgeführte Trainings")}
+                    </p>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <p className="text-2xl font-bold text-purple-600">
+                      {overviewStats?.templates ?? 0}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                    {t("admin.stats.templates", "Workout‑Vorlagen")}
+                    </p>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <p className="text-2xl font-bold text-orange-600">
+                      {overviewStats?.exercises ?? exercises.length}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                    {t("admin.stats.exercises", "Angelegte Übungen")}
+                    </p>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <p className="text-2xl font-bold text-sky-600">
+                      {overviewStats?.recoveryEntries ?? 0}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                    {t("admin.stats.recoveryEntries", "Erholungstagebuch‑Einträge")}
+                    </p>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <p className="text-2xl font-bold text-rose-600">
+                      {overviewStats?.badges ?? 0}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                    {t("admin.stats.badges", "Vergebene Badges")}
+                    </p>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <p className="text-2xl font-bold text-indigo-600">
+                      {overviewStats?.awards ?? 0}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                    {t("admin.stats.awards", "Vergebene Auszeichnungen")}
+                    </p>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <p className="text-2xl font-bold text-teal-600">
+                      {overviewStats?.workoutActivities ?? 0}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                    {t("admin.stats.activities", "Getrackte Aktivitäten")}
+                    </p>
+                  </div>
                 </div>
-                <div className="p-4 border rounded-lg">
-                  <p className="text-2xl font-bold text-green-600">
-                    {users.filter((u) => u.isEmailVerified).length}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Verifizierte E-Mails
-                  </p>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <p className="text-2xl font-bold text-blue-600">
-                    {users.filter((u) => u.role === "admin").length}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Administratoren
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-          <Button
-            onClick={loadAdminData}
-            variant="outline"
-            disabled={isLoading}
-            className="w-full"
-          >
-            {isLoading ? "Wird geladen..." : "Daten aktualisieren"}
-          </Button>
-        </TabsContent>
-
-        <TabsContent value="users" className="space-y-6 mt-6">
-          {/* User Management */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 justify-between">
-                <div className="flex items-center gap-2">
-                  <Users className="w-5 h-5" />
-                  Benutzer-Verwaltung
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowEmails(!showEmails)}
-                >
-                  {showEmails ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
-                  {showEmails ? "E-Mails verbergen" : "E-Mails anzeigen"}
-                </Button>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>E-Mail</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Erstellt</TableHead>
-                        <TableHead>Letzter Login</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {users.map((adminUser) => (
-                        <TableRow key={adminUser.id}>
-                          <TableCell>
-                            <div>
-                              <p className="font-medium">
-                                {adminUser.firstName} {adminUser.lastName}
-                              </p>
-                              {adminUser.nickname && (
-                                <p className="text-sm text-muted-foreground">
-                                  "{adminUser.nickname}"
+          <TabsContent value="users" className="space-y-6">
+            {/* User Management */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 justify-between">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                  {t("admin.users.title", "Benutzer-Verwaltung")}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowEmails(!showEmails)}
+                  >
+                    {showEmails ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  {showEmails
+                    ? t("admin.users.hideEmails", "E-Mails verbergen")
+                    : t("admin.users.showEmails", "E-Mails anzeigen")}
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="overflow-x-auto">
+                    <Table className="min-w-[720px]">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="sticky left-0 z-10 bg-background">
+                          {t("admin.users.table.name", "Name")}
+                          </TableHead>
+                        <TableHead>{t("admin.users.table.email", "E-Mail")}</TableHead>
+                        <TableHead>{t("admin.users.table.status", "Status")}</TableHead>
+                        <TableHead>{t("admin.users.table.created", "Erstellt")}</TableHead>
+                        <TableHead>{t("admin.users.table.lastLogin", "Letzter Login")}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {users.map((adminUser) => (
+                          <TableRow key={adminUser.id}>
+                            <TableCell className="sticky left-0 z-10 bg-background">
+                              <div>
+                                <p className="font-medium">
+                                  {adminUser.firstName} {adminUser.lastName}
                                 </p>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <p className="font-mono text-sm">
-                              {maskEmail(adminUser.email)}
-                            </p>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-col gap-1">
-                              {adminUser.role === "admin" && (
-                                <Badge variant="secondary">
-                                  <Shield className="w-3 h-3 mr-1" />
-                                  Admin
-                                </Badge>
-                              )}
-                              {adminUser.isEmailVerified && (
-                                <Badge
-                                  variant="outline"
-                                  className="text-green-600"
-                                >
-                                  ✓ Verifiziert
-                                </Badge>
-                              )}
-                              {adminUser.has2FA && (
-                                <Badge
-                                  variant="outline"
-                                  className="text-blue-600"
-                                >
-                                  🔒 2FA
-                                </Badge>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {formatDate(adminUser.createdAt)}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {formatDate(adminUser.lastLoginAt)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                {users.length === 0 && (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground">
-                      Keine Benutzer gefunden
-                    </p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Button
-            onClick={loadAdminData}
-            variant="outline"
-            disabled={isLoading}
-            className="w-full"
-          >
-            {isLoading ? "Wird geladen..." : "Daten aktualisieren"}
-          </Button>
-        </TabsContent>
-
-        <TabsContent value="scoring" className="space-y-6 mt-6">
-          {/* Exercise Management */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 justify-between">
-                <div className="flex items-center gap-2">
-                  <Trophy className="w-5 h-5" />
-                  Übungs-Wertung
-                </div>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => {
-                    resetExerciseForm();
-                    setIsExerciseFormOpen(true);
-                  }}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Neue Übung
-                </Button>
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Punkte pro Einheit definieren die Basiswertung. Einheit und Messung
-                kommen aus der Übung selbst.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex flex-col md:flex-row gap-3">
-                  <div className="flex-1">
-                    <Label>Suche</Label>
-                    <Input
-                      value={scoringQuery}
-                      onChange={(e) => setScoringQuery(e.target.value)}
-                      placeholder="Name oder ID"
-                      className="mt-1"
-                    />
-                  </div>
-                  <div className="w-full md:w-48">
-                    <Label>Kategorie</Label>
-                    <Select
-                      value={scoringCategory}
-                      onValueChange={setScoringCategory}
-                    >
-                      <SelectTrigger className="mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Alle</SelectItem>
-                        {scoringCategories.map((category) => (
-                          <SelectItem key={category} value={category}>
-                            {category}
-                          </SelectItem>
+                                {adminUser.nickname && (
+                                  <p className="text-sm text-muted-foreground">
+                                    "{adminUser.nickname}"
+                                  </p>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <p className="font-mono text-sm">
+                                {maskEmail(adminUser.email)}
+                              </p>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-col gap-1">
+                                {adminUser.role === "admin" && (
+                                  <Badge variant="secondary">
+                                    <Shield className="w-3 h-3 mr-1" />
+                                  {t("admin.users.badge.admin", "Admin")}
+                                  </Badge>
+                                )}
+                                {adminUser.isEmailVerified && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-green-600"
+                                  >
+                                  {t("admin.users.badge.verified", "✓ Verifiziert")}
+                                  </Badge>
+                                )}
+                                {adminUser.has2FA && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-blue-600"
+                                  >
+                                    🔒 2FA
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {formatDate(adminUser.createdAt)}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {formatDate(adminUser.lastLoginAt)}
+                            </TableCell>
+                          </TableRow>
                         ))}
-                      </SelectContent>
-                    </Select>
+                      </TableBody>
+                    </Table>
                   </div>
-                  <div className="w-full md:w-40">
-                    <Label>Status</Label>
-                    <Select
-                      value={scoringStatus}
-                      onValueChange={setScoringStatus}
-                    >
-                      <SelectTrigger className="mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Alle</SelectItem>
-                        <SelectItem value="active">Aktiv</SelectItem>
-                        <SelectItem value="inactive">Inaktiv</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
 
-                <Card className="border-dashed">
-                  <CardContent className="p-4 space-y-2 text-sm">
-                    <p className="font-medium">Wertungslogik</p>
+                  {users.length === 0 && (
+                    <div className="text-center py-8">
                     <p className="text-muted-foreground">
-                      Punkte = Basiswert pro Einheit × Menge. Bei Sets wird die Summe der
-                      Wiederholungen genutzt. Einheit und Messung kommen aus der Übung.
+                      {t("admin.users.empty", "Keine Benutzer gefunden")}
                     </p>
-                  </CardContent>
-                </Card>
-
-                {isExerciseFormOpen && (
-                  <Card className="border-2">
-                    <CardHeader>
-                      <CardTitle className="flex items-center justify-between">
-                        <span>
-                          {editingExercise
-                            ? "Übung bearbeiten"
-                            : "Neue Übung erstellen"}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={resetExerciseForm}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <form
-                        onSubmit={
-                          editingExercise
-                            ? async (e) => {
-                              e.preventDefault();
-                              await handleUpdateExercise(
-                                editingExercise,
-                                "name",
-                                exerciseForm.name
-                              );
-                              await handleUpdateExercise(
-                                editingExercise,
-                                "pointsPerUnit",
-                                exerciseForm.pointsPerUnit
-                              );
-                              await handleUpdateExercise(
-                                editingExercise,
-                                "unit",
-                                exerciseForm.unit
-                              );
-                              await handleUpdateExercise(
-                                editingExercise,
-                                "hasWeight",
-                                exerciseForm.hasWeight
-                              );
-                              await handleUpdateExercise(
-                                editingExercise,
-                                "hasSetMode",
-                                exerciseForm.hasSetMode
-                              );
-                              await handleUpdateExercise(
-                                editingExercise,
-                                "isActive",
-                                exerciseForm.isActive
-                              );
-                              resetExerciseForm();
-                            }
-                            : handleCreateExercise
-                        }
-                        className="space-y-4"
-                      >
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label htmlFor="exercise-name">Name</Label>
-                            <Input
-                              id="exercise-name"
-                              value={exerciseForm.name}
-                              onChange={(e) =>
-                                setExerciseForm((prev) => ({
-                                  ...prev,
-                                  name: e.target.value,
-                                }))
-                              }
-                              placeholder="Burpees"
-                              required
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label htmlFor="exercise-points">
-                              Punkte pro Einheit
-                            </Label>
-                            <Input
-                              id="exercise-points"
-                              type="number"
-                              step="0.1"
-                              min="0"
-                              value={exerciseForm.pointsPerUnit}
-                              onChange={(e) =>
-                                setExerciseForm((prev) => ({
-                                  ...prev,
-                                  pointsPerUnit:
-                                    parseFloat(e.target.value) || 0,
-                                }))
-                              }
-                              required
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="exercise-unit">Einheit</Label>
-                            <Input
-                              id="exercise-unit"
-                              value={exerciseForm.unit}
-                              onChange={(e) =>
-                                setExerciseForm((prev) => ({
-                                  ...prev,
-                                  unit: e.target.value,
-                                }))
-                              }
-                              placeholder="Wiederholungen"
-                              required
-                            />
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-6">
-                          <div className="flex items-center space-x-2">
-                            <Switch
-                              id="has-set-mode"
-                              checked={exerciseForm.hasSetMode}
-                              onCheckedChange={(checked) =>
-                                setExerciseForm((prev) => ({
-                                  ...prev,
-                                  hasSetMode: checked,
-                                }))
-                              }
-                            />
-                            <Label htmlFor="has-set-mode">Set-Modus</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Switch
-                              id="has-weight"
-                              checked={exerciseForm.hasWeight}
-                              onCheckedChange={(checked) =>
-                                setExerciseForm((prev) => ({
-                                  ...prev,
-                                  hasWeight: checked,
-                                }))
-                              }
-                            />
-                            <Label htmlFor="has-weight">Mit Gewicht</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Switch
-                              id="is-active"
-                              checked={exerciseForm.isActive}
-                              onCheckedChange={(checked) =>
-                                setExerciseForm((prev) => ({
-                                  ...prev,
-                                  isActive: checked,
-                                }))
-                              }
-                            />
-                            <Label htmlFor="is-active">Aktiv</Label>
-                          </div>
-                        </div>
-
-                        <div className="flex gap-2">
-                          <Button type="submit" className="flex-1">
-                            {editingExercise ? "Speichern" : "Erstellen"}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={resetExerciseForm}
-                          >
-                            Abbrechen
-                          </Button>
-                        </div>
-                      </form>
-                    </CardContent>
-                  </Card>
-                )}
-
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Punkte/Einheit</TableHead>
-                        <TableHead>Kategorie</TableHead>
-                        <TableHead>Messung</TableHead>
-                        <TableHead>Eigenschaften</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Aktionen</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredScoringExercises.map((exercise) => (
-                        <TableRow key={exercise.id}>
-                          <TableCell className="font-medium">
-                            {exercise.name}
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              step="0.1"
-                              min="0"
-                              value={exercise.pointsPerUnit}
-                              onChange={(e) =>
-                                handleUpdateExercise(
-                                  exercise,
-                                  "pointsPerUnit",
-                                  parseFloat(e.target.value) || 0
-                                )
-                              }
-                              className="w-24"
-                            />
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {exercise.unitOptions?.[0]?.label || exercise.unit}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {exercise.category || "-"}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {exercise.measurementType || "-"}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-col gap-1">
-                              {exercise.hasSetMode && (
-                                <Badge
-                                  variant="outline"
-                                  className="text-xs w-fit"
-                                >
-                                  Set-Modus
-                                </Badge>
-                              )}
-                              {exercise.hasWeight && (
-                                <Badge
-                                  variant="outline"
-                                  className="text-xs w-fit"
-                                >
-                                  Mit Gewicht
-                                </Badge>
-                              )}
-                              {exercise.supportsTime && (
-                                <Badge variant="outline" className="text-xs w-fit">
-                                  Zeit
-                                </Badge>
-                              )}
-                              {exercise.supportsDistance && (
-                                <Badge variant="outline" className="text-xs w-fit">
-                                  Distanz
-                                </Badge>
-                              )}
-                              {exercise.supportsGrade && (
-                                <Badge variant="outline" className="text-xs w-fit">
-                                  Route
-                                </Badge>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                exercise.isActive ? "default" : "secondary"
-                              }
-                            >
-                              {exercise.isActive ? "Aktiv" : "Inaktiv"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => startEditExercise(exercise)}
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <MergeDialog sourceId={exercise.id} />
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                    </div>
+                  )}
                 </div>
+              </CardContent>
+            </Card>
 
-                {filteredScoringExercises.length === 0 && (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground">
-                      Keine Übungen gefunden
-                    </p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+            <Button
+              onClick={loadAdminData}
+              variant="outline"
+              disabled={isLoading}
+              className="w-full"
+            >
+            {isLoading
+              ? t("admin.users.refreshLoading", "Wird geladen...")
+              : t("admin.users.refresh", "Daten aktualisieren")}
+            </Button>
+          </TabsContent>
 
-          <Button
-            onClick={loadExercises}
-            variant="outline"
-            disabled={isLoading}
-            className="w-full"
-          >
-            {isLoading ? "Wird geladen..." : "Übungen aktualisieren"}
-          </Button>
-        </TabsContent>
-
-        <TabsContent value="exercise-management" className="space-y-6 mt-6">
-          <Card>
-            <CardHeader className="space-y-4">
-              <CardTitle className="flex items-center gap-2">
-                <Edit className="h-5 w-5" />
-                Übungsverwaltung
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <Card>
+          <TabsContent value="exercise-management" className="space-y-6">
+            <div className="space-y-6">
+              <Card ref={mergeSectionRef}>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Zusammenführen</CardTitle>
+                  <CardTitle className="text-base">
+                    {t("admin.exercises.merge.title", "Zusammenführen")}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
                   <div>
-                    <Label>Quell‑Übung</Label>
+                    <Label>{t("admin.exercises.merge.source", "Quell‑Übung")}</Label>
                     <ExerciseMergeSelect
                       value={mergeSourceId}
                       onChange={setMergeSourceId}
-                      placeholder="Quelle wählen"
+                      placeholder={t("admin.exercises.merge.sourcePlaceholder", "Quelle wählen")}
                       options={exercises}
                     />
                   </div>
                   <div>
-                    <Label>Ziel‑Übung</Label>
+                    <Label>{t("admin.exercises.merge.target", "Ziel‑Übung")}</Label>
                     <ExerciseMergeSelect
                       value={mergeTargetId}
                       onChange={setMergeTargetId}
-                      placeholder="Ziel wählen"
+                      placeholder={t("admin.exercises.merge.targetPlaceholder", "Ziel wählen")}
                       options={exercises.filter((exercise) => exercise.id !== mergeSourceId)}
                     />
                   </div>
-                  <Button
-                    variant="outline"
-                    disabled={!mergeSourceId || !mergeTargetId}
-                    onClick={() => handleMergeExercise(mergeSourceId, mergeTargetId)}
-                  >
-                    Zusammenführen
-                  </Button>
+                    <Button
+                      variant="outline"
+                      disabled={!mergeSourceId || !mergeTargetId}
+                      onClick={() => handleMergeExercise(mergeSourceId, mergeTargetId)}
+                    >
+                    {t("admin.exercises.merge.action", "Zusammenführen")}
+                    </Button>
                 </CardContent>
               </Card>
 
-              <SearchFilterToolbar
+              <ExerciseBrowsePanel
+                title={t("exerciseLibrary.search", "Übungen durchsuchen")}
                 query={exerciseManagementQuery}
                 onQueryChange={(value) => {
                   setExerciseManagementQuery(value);
@@ -1773,790 +1366,752 @@ export function Admin() {
                 onToggleFilters={() => setExerciseManagementFiltersOpen((prev) => !prev)}
                 sortBy={exerciseManagementSortBy}
                 sortDirection={exerciseManagementSortDirection}
-                onSortByChange={(value) => {
-                  setExerciseManagementSortBy(value);
-                  setExerciseManagementSortDirection("asc");
-                }}
+                onSortByChange={setExerciseManagementSortBy}
                 onSortDirectionToggle={() =>
                   setExerciseManagementSortDirection((prev) =>
                     prev === "asc" ? "desc" : "asc"
                   )
                 }
                 sortOptions={exerciseManagementSortOptions}
-              />
-
-              {exerciseManagementFiltersOpen && (
-                <ExerciseFiltersPanel
-                  categoryOptions={exerciseManagementCategoryOptions}
-                  disciplineOptions={exerciseManagementDisciplineOptions}
-                  movementPatternOptions={movementPatternOptions}
-                  measurementOptions={measurementOptions}
-                  muscleGroups={muscleGroupTree}
-                  categoryFilter={exerciseManagementCategoryFilter}
-                  onCategoryFilterChange={(value) => {
-                    setExerciseManagementCategoryFilter(value);
-                    setExerciseManagementPage(1);
-                  }}
-                  disciplineFilter={exerciseManagementDisciplineFilter}
-                  onDisciplineFilterChange={(value) => {
-                    setExerciseManagementDisciplineFilter(value);
-                    setExerciseManagementPage(1);
-                  }}
-                  movementPatternFilter={exerciseManagementMovementPatternFilter}
-                  onMovementPatternFilterChange={(value) => {
-                    setExerciseManagementMovementPatternFilter(value);
-                    setExerciseManagementPage(1);
-                  }}
-                  measurementFilters={exerciseManagementMeasurementFilters}
-                  onMeasurementFiltersChange={(value) => {
-                    setExerciseManagementMeasurementFilters(value);
-                    setExerciseManagementPage(1);
-                  }}
-                  muscleFilters={exerciseManagementMuscleFilters}
-                  onMuscleFiltersChange={(value) => {
-                    setExerciseManagementMuscleFilters(value);
-                    setExerciseManagementPage(1);
-                  }}
-                  requiresWeightFilter={exerciseManagementRequiresWeightFilter}
-                  onRequiresWeightFilterChange={(value) => {
-                    setExerciseManagementRequiresWeightFilter(value);
-                    setExerciseManagementPage(1);
-                  }}
-                  difficultyRange={exerciseManagementDifficultyRange}
-                  onDifficultyRangeChange={(value) => {
-                    setExerciseManagementDifficultyRange(value);
-                    setExerciseManagementPage(1);
-                  }}
-                  onReset={() => {
-                    exerciseManagementResetFilters();
-                    setExerciseManagementPage(1);
-                  }}
-                />
-              )}
-
-              {exerciseManagementView === "grid" ? (
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {exerciseManagementPageItems.map((exercise) => (
-                    <Card
-                      key={exercise.id}
-                      className="flex h-full flex-col"
-                      onClick={() => exerciseManagementOpenView(exercise)}
-                    >
-                      <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="space-y-1">
-                            <CardTitle className="text-lg">{exercise.name}</CardTitle>
-                            <div className="text-xs text-muted-foreground">
-                              {exercise.category || "-"} • {exercise.discipline || "-"}
-                            </div>
-                          </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={(event) => event.stopPropagation()}
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onSelect={() => exerciseManagementOpenView(exercise)}>
-                                Anzeigen
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => exerciseManagementOpenEdit(exercise)}>
-                                Bearbeiten
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onSelect={() => {
-                                  setMergeSourceId(exercise.id);
-                                  toast({
-                                    title: "Quelle gesetzt",
-                                    description: `${exercise.name} als Quell‑Übung ausgewählt.`,
-                                  });
-                                }}
-                              >
-                                Zusammenführen
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="flex flex-1 flex-col gap-3">
-                        <div className="flex flex-wrap gap-2">
-                          {exercise.measurementType && (
-                            <Badge variant="secondary">{exercise.measurementType}</Badge>
-                          )}
-                          {exercise.supportsTime && <Badge variant="secondary">Zeit</Badge>}
-                          {exercise.supportsDistance && <Badge variant="secondary">Distanz</Badge>}
-                          {exercise.requiresWeight && (
-                            <Badge variant="outline">
-                              {t("exerciseLibrary.requiresWeight", "Gewicht erforderlich")}
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {t("exerciseLibrary.difficulty", "Schwierigkeit")}: {exercise.difficultyTier ?? "-"}
-                        </div>
-                        {exercise.muscleGroups && exercise.muscleGroups.length > 0 && (
-                          <div>
-                            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                              {t("exerciseLibrary.muscleGroups", "Muskelgruppen")}
-                            </div>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              {exercise.muscleGroups.slice(0, 4).map((group) => (
-                                <Badge key={group} variant="secondary">
-                                  {group}
-                                </Badge>
-                              ))}
-                              {exercise.muscleGroups.length > 4 && (
-                                <Badge variant="secondary">
-                                  +{exercise.muscleGroups.length - 4}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table className="min-w-[720px]">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="sticky left-0 z-10 bg-background">
-                          <button
-                            className="inline-flex items-center gap-1 text-left"
-                            onClick={() => exerciseManagementHandleSortClick("name")}
-                          >
-                            Name
-                            {exerciseManagementSortBy === "name" &&
-                              (exerciseManagementSortDirection === "asc" ? (
-                                <ArrowUp className="h-3 w-3" />
-                              ) : (
-                                <ArrowDown className="h-3 w-3" />
-                              ))}
-                          </button>
-                        </TableHead>
-                        <TableHead>
-                          <button
-                            className="inline-flex items-center gap-1 text-left"
-                            onClick={() => exerciseManagementHandleSortClick("category")}
-                          >
-                            Kategorie
-                            {exerciseManagementSortBy === "category" &&
-                              (exerciseManagementSortDirection === "asc" ? (
-                                <ArrowUp className="h-3 w-3" />
-                              ) : (
-                                <ArrowDown className="h-3 w-3" />
-                              ))}
-                          </button>
-                        </TableHead>
-                        <TableHead>
-                          <button
-                            className="inline-flex items-center gap-1 text-left"
-                            onClick={() => exerciseManagementHandleSortClick("discipline")}
-                          >
-                            Disziplin
-                            {exerciseManagementSortBy === "discipline" &&
-                              (exerciseManagementSortDirection === "asc" ? (
-                                <ArrowUp className="h-3 w-3" />
-                              ) : (
-                                <ArrowDown className="h-3 w-3" />
-                              ))}
-                          </button>
-                        </TableHead>
-                        <TableHead>
-                          <button
-                            className="inline-flex items-center gap-1 text-left"
-                            onClick={() => exerciseManagementHandleSortClick("measurement")}
-                          >
-                            Einheit
-                            {exerciseManagementSortBy === "measurement" &&
-                              (exerciseManagementSortDirection === "asc" ? (
-                                <ArrowUp className="h-3 w-3" />
-                              ) : (
-                                <ArrowDown className="h-3 w-3" />
-                              ))}
-                          </button>
-                        </TableHead>
-                        <TableHead>
-                          <button
-                            className="inline-flex items-center gap-1 text-left"
-                            onClick={() => exerciseManagementHandleSortClick("difficulty")}
-                          >
-                            Schwierigkeit
-                            {exerciseManagementSortBy === "difficulty" &&
-                              (exerciseManagementSortDirection === "asc" ? (
-                                <ArrowUp className="h-3 w-3" />
-                              ) : (
-                                <ArrowDown className="h-3 w-3" />
-                              ))}
-                          </button>
-                        </TableHead>
-                        <TableHead className="sticky right-0 z-10 bg-background text-right">
-                          Aktionen
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {exerciseManagementPageItems.map((exercise) => (
-                        <TableRow
-                          key={exercise.id}
-                          className="cursor-pointer"
-                          onClick={() => exerciseManagementOpenView(exercise)}
-                        >
-                          <TableCell className="font-medium sticky left-0 bg-background z-10">
-                            {exercise.name}
-                          </TableCell>
-                          <TableCell>{exercise.category || "-"}</TableCell>
-                          <TableCell>{exercise.discipline || "-"}</TableCell>
-                          <TableCell>{exercise.measurementType || "-"}</TableCell>
-                          <TableCell>{exercise.difficultyTier ?? "-"}</TableCell>
-                          <TableCell
-                            className="text-right sticky right-0 z-10 bg-background"
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onSelect={() => exerciseManagementOpenView(exercise)}>
-                                  Anzeigen
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onSelect={() => exerciseManagementOpenEdit(exercise)}>
-                                  Bearbeiten
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onSelect={() => {
-                                    setMergeSourceId(exercise.id);
-                                    toast({
-                                      title: "Quelle gesetzt",
-                                      description: `${exercise.name} als Quell‑Übung ausgewählt.`,
-                                    });
-                                  }}
-                                >
-                                  Zusammenführen
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-
-              {exerciseManagementPagination.totalPages > 1 && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm text-muted-foreground">
-                      {exerciseManagementPagination.totalItems > 0 &&
-                        t("exerciseLibrary.totalExercises", {
-                          count: exerciseManagementPagination.totalItems,
-                          defaultValue: `${exerciseManagementPagination.totalItems} Übungen gefunden`,
-                        })}
-                    </div>
-                    <PageSizeSelector
-                      pageSize={exerciseManagementPageSize}
-                      onPageSizeChange={(next) => {
-                        setExerciseManagementPageSize(next);
-                        setExerciseManagementPage(1);
-                      }}
-                      label={t("filters.itemsPerPage", "Pro Seite:")}
-                      options={[6, 12, 24, 48]}
-                    />
-                  </div>
-                  <PaginationControls
-                    pagination={exerciseManagementPagination}
-                    onPageChange={setExerciseManagementPage}
-                    pageSize={exerciseManagementPageSize}
-                    maxVisiblePages={7}
-                    labels={{
-                      page: (current, total) =>
-                        t("filters.pageLabel", { current, total, defaultValue: `${current}/${total}` }),
-                      summary: (start, end, total) =>
-                        t("filters.pageSummary", {
-                          start,
-                          end,
-                          total,
-                          defaultValue: `${start}–${end} / ${total}`,
-                        }),
-                      previous: t("filters.prev", "Zurück"),
-                      next: t("filters.next", "Weiter"),
+                filtersPanel={
+                  <ExerciseFiltersPanel
+                    categoryOptions={exerciseManagementCategoryOptions}
+                    disciplineOptions={exerciseManagementDisciplineOptions}
+                    movementPatternOptions={movementPatternOptions}
+                    measurementOptions={measurementOptions}
+                    muscleGroups={muscleGroupTree}
+                    categoryFilter={exerciseManagementCategoryFilter}
+                    onCategoryFilterChange={(value) => {
+                      setExerciseManagementCategoryFilter(value);
+                      setExerciseManagementPage(1);
+                    }}
+                    disciplineFilter={exerciseManagementDisciplineFilter}
+                    onDisciplineFilterChange={(value) => {
+                      setExerciseManagementDisciplineFilter(value);
+                      setExerciseManagementPage(1);
+                    }}
+                    movementPatternFilter={exerciseManagementMovementPatternFilter}
+                    onMovementPatternFilterChange={(value) => {
+                      setExerciseManagementMovementPatternFilter(value);
+                      setExerciseManagementPage(1);
+                    }}
+                    measurementFilters={exerciseManagementMeasurementFilters}
+                    onMeasurementFiltersChange={(value) => {
+                      setExerciseManagementMeasurementFilters(value);
+                      setExerciseManagementPage(1);
+                    }}
+                    muscleFilters={exerciseManagementMuscleFilters}
+                    onMuscleFiltersChange={(value) => {
+                      setExerciseManagementMuscleFilters(value);
+                      setExerciseManagementPage(1);
+                    }}
+                    requiresWeightFilter={exerciseManagementRequiresWeightFilter}
+                    onRequiresWeightFilterChange={(value) => {
+                      setExerciseManagementRequiresWeightFilter(value);
+                      setExerciseManagementPage(1);
+                    }}
+                    difficultyRange={exerciseManagementDifficultyRange}
+                    onDifficultyRangeChange={(value) => {
+                      setExerciseManagementDifficultyRange(value);
+                      setExerciseManagementPage(1);
+                    }}
+                    onReset={() => {
+                      exerciseManagementResetFilters();
+                      setExerciseManagementPage(1);
                     }}
                   />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Dialog open={exerciseEditDialogOpen} onOpenChange={(open) => (open ? null : exerciseManagementCloseEdit())}>
-            <DialogContent className="max-h-[90vh] w-full max-w-[720px] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>
-                  {exerciseDialogMode === "view" ? "Übung anzeigen" : "Übung bearbeiten"}
-                </DialogTitle>
-              </DialogHeader>
-              {exerciseDialogMode === "view" && exerciseEditTarget && (
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-lg font-semibold">{exerciseEditTarget.name}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {exerciseEditTarget.category || "-"} • {exerciseEditTarget.discipline || "-"}
-                    </p>
-                  </div>
-                  <div className="grid gap-2 text-sm">
-                    <div><strong>Bewegungsmuster:</strong> {exerciseEditTarget.movementPattern || "-"}</div>
-                    <div><strong>Einheit:</strong> {exerciseEditTarget.measurementType || "-"}</div>
-                    <div><strong>Schwierigkeit:</strong> {exerciseEditTarget.difficultyTier ?? "-"}</div>
-                    <div><strong>Sets/Reps:</strong> {exerciseEditTarget.supportsSets ? "Ja" : "Nein"}</div>
-                    <div><strong>Zeit:</strong> {exerciseEditTarget.supportsTime ? "Ja" : "Nein"}</div>
-                    <div><strong>Distanz:</strong> {exerciseEditTarget.supportsDistance ? "Ja" : "Nein"}</div>
-                    <div><strong>Gewicht erforderlich:</strong> {exerciseEditTarget.requiresWeight ? "Ja" : "Nein"}</div>
-                    <div><strong>Gewicht optional:</strong> {exerciseEditTarget.allowsWeight ? "Ja" : "Nein"}</div>
-                  </div>
-                  {exerciseEditTarget.muscleGroups && exerciseEditTarget.muscleGroups.length > 0 && (
-                    <div>
-                      <div className="text-xs font-medium text-muted-foreground">Muskelgruppen</div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {exerciseEditTarget.muscleGroups.map((group) => (
-                          <Badge key={group} variant="secondary">
-                            {group}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {exerciseEditTarget.equipment && exerciseEditTarget.equipment.length > 0 && (
-                    <div>
-                      <div className="text-xs font-medium text-muted-foreground">Equipment</div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {exerciseEditTarget.equipment.map((item) => (
-                          <Badge key={item} variant="secondary">
-                            {item}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {exerciseEditTarget.description && (
-                    <div className="rounded-md border bg-muted/20 p-3 text-sm text-muted-foreground">
-                      {exerciseEditTarget.description}
-                    </div>
-                  )}
-                  <div className="flex justify-end">
-                    <Button
-                      onClick={() => {
-                        if (exerciseEditTarget) {
-                          const formValue = exerciseManagementToFormValue(exerciseEditTarget);
-                          setExerciseEditDraft(formValue);
-                          setExerciseEditDescriptionOpen(Boolean(formValue.description));
-                          setExerciseDialogMode("edit");
-                        }
-                      }}
-                    >
-                      Bearbeiten
-                    </Button>
-                  </div>
-                </div>
-              )}
-              {exerciseDialogMode === "edit" && exerciseEditDraft && (
-                <ExerciseForm
-                  value={exerciseEditDraft}
-                  onChange={setExerciseEditDraft}
-                  onSubmit={exerciseManagementHandleSave}
-                  submitLabel="Änderungen speichern"
-                  submitDisabled={exerciseEditSaving}
-                  descriptionOpen={exerciseEditDescriptionOpen}
-                  onDescriptionToggle={setExerciseEditDescriptionOpen}
-                  showDescriptionToggle
-                />
-              )}
-            </DialogContent>
-          </Dialog>
-        </TabsContent>
-
-        <TabsContent value="moderation" className="space-y-6 mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5" />
-                Übungs-Reports
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {exerciseReports.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Keine offenen Reports
-                </p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Übung</TableHead>
-                        <TableHead>Grund</TableHead>
-                        <TableHead>Beschreibung</TableHead>
-                        <TableHead>Erstellt</TableHead>
-                        <TableHead>Aktionen</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {exerciseReports.map((report) => (
-                        <TableRow key={report.id}>
-                          <TableCell className="text-sm">
-                            {exerciseMap.get(report.exerciseId)?.name ||
-                              report.exerciseId}
-                          </TableCell>
-                          <TableCell>{report.reason}</TableCell>
-                          <TableCell className="text-xs">
-                            {report.description || "-"}
-                          </TableCell>
-                          <TableCell className="text-xs">
-                            {formatDate(report.createdAt)}
-                          </TableCell>
-                          <TableCell className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                resolveExerciseReport(report.id, "resolved")
-                              }
-                            >
-                              Erledigt
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() =>
-                                resolveExerciseReport(report.id, "dismissed")
-                              }
-                            >
-                              Ablehnen
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <RefreshCw className="w-5 h-5" />
-                Änderungsanfragen
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {exerciseEditRequests.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Keine offenen Änderungsanfragen
-                </p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Übung</TableHead>
-                        <TableHead>Änderungen</TableHead>
-                        <TableHead>Erstellt</TableHead>
-                        <TableHead>Aktionen</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {exerciseEditRequests.map((request) => (
-                        <TableRow key={request.id}>
-                          <TableCell className="text-sm">
-                            {exerciseMap.get(request.exerciseId)?.name ||
-                              request.exerciseId}
-                          </TableCell>
-                          <TableCell className="text-xs">
-                            <div className="space-y-1">
-                              {Object.entries(request.changeRequest || {}).map(
-                                ([key, value]) => {
-                                  const exercise = exerciseMap.get(
-                                    request.exerciseId
-                                  ) as any;
-                                  const oldValue =
-                                    exercise && key in exercise
-                                      ? formatChangeValue(exercise[key])
-                                      : null;
-                                  return (
-                                    <div key={key}>
-                                      <span className="font-medium">
-                                        {changeKeyLabels[key] || key}
-                                      </span>
-                                      :{" "}
-                                      {oldValue ? (
-                                        <>
-                                          <span className="line-through text-muted-foreground">
-                                            {oldValue}
-                                          </span>{" "}
-                                          → <span>{formatChangeValue(value)}</span>
-                                        </>
-                                      ) : (
-                                        <span>{formatChangeValue(value)}</span>
-                                      )}
-                                    </div>
-                                  );
+                }
+                loading={isLoading}
+                empty={exerciseManagementPagination.totalItems === 0}
+                emptyText={t("exerciseLibrary.empty", "Keine Übungen gefunden.")}
+                loadingText={t("common.loading", "Lade...")}
+                grid={
+                  <ExerciseBrowseGrid
+                    items={exerciseManagementPageItems}
+                    onSelect={(exercise) => exerciseManagementOpenView(exercise)}
+                    renderMenuItems={(exercise) => (
+                      <>
+                        <DropdownMenuItem onSelect={() => exerciseManagementOpenView(exercise)}>
+                          {t("admin.exercises.actions.details", "Details")}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => exerciseManagementOpenEdit(exercise)}>
+                          {t("admin.exercises.actions.edit", "Bearbeiten")}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() => {
+                            setMergeSourceId(exercise.id);
+                            toast({
+                              title: t("admin.exercises.merge.toastTitle", "Quelle gesetzt"),
+                              description: t(
+                                "admin.exercises.merge.toastDescription",
+                                {
+                                  name: exercise.name,
+                                  defaultValue: `${exercise.name} als Quell‑Übung ausgewählt.`,
                                 }
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-xs">
-                            {formatDate(request.createdAt)}
-                          </TableCell>
-                          <TableCell className="flex gap-2">
-                            <Button
-                              size="sm"
-                              onClick={() =>
-                                resolveEditRequest(request.id, "approved")
-                              }
-                            >
-                              Freigeben
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() =>
-                                resolveEditRequest(request.id, "rejected")
-                              }
-                            >
-                              Ablehnen
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="monitoring" className="space-y-6 mt-6">
-          <div className="flex items-center justify-between">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="w-5 h-5" />
-                System Monitoring
-              </CardTitle>
-            </CardHeader>
-            <Button
-              onClick={loadMonitoringData}
-              variant="outline"
-              disabled={isLoadingMonitoring}
-            >
-              <RefreshCw
-                className={`w-4 h-4 mr-2 ${isLoadingMonitoring ? "animate-spin" : ""}`}
+                              ),
+                            });
+                            requestAnimationFrame(() => {
+                              mergeSectionRef.current?.scrollIntoView({
+                                behavior: "smooth",
+                                block: "start",
+                              });
+                            });
+                          }}
+                        >
+                          {t("admin.exercises.actions.merge", "Zusammenführen")}
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                    labels={getExerciseBrowseLabels(t)}
+                  />
+                }
+                table={
+                  <ExerciseBrowseTable
+                    items={exerciseManagementPageItems}
+                    sortBy={exerciseManagementSortBy}
+                    sortDirection={exerciseManagementSortDirection}
+                    onSortClick={exerciseManagementHandleSortClick}
+                    onSelect={(exercise) => exerciseManagementOpenView(exercise)}
+                    renderMenuItems={(exercise) => (
+                      <>
+                        <DropdownMenuItem onSelect={() => exerciseManagementOpenView(exercise)}>
+                          {t("admin.exercises.actions.details", "Details")}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => exerciseManagementOpenEdit(exercise)}>
+                          {t("admin.exercises.actions.edit", "Bearbeiten")}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() => {
+                            setMergeSourceId(exercise.id);
+                            toast({
+                              title: t("admin.exercises.merge.toastTitle", "Quelle gesetzt"),
+                              description: t(
+                                "admin.exercises.merge.toastDescription",
+                                {
+                                  name: exercise.name,
+                                  defaultValue: `${exercise.name} als Quell‑Übung ausgewählt.`,
+                                }
+                              ),
+                            });
+                            requestAnimationFrame(() => {
+                              mergeSectionRef.current?.scrollIntoView({
+                                behavior: "smooth",
+                                block: "start",
+                              });
+                            });
+                          }}
+                        >
+                          {t("admin.exercises.actions.merge", "Zusammenführen")}
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                    labels={getExerciseBrowseLabels(t)}
+                  />
+                }
+                footer={
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-muted-foreground">
+                        {exerciseManagementPagination.totalItems > 0 &&
+                          t("exerciseLibrary.totalExercises", {
+                            count: exerciseManagementPagination.totalItems,
+                            defaultValue: `${exerciseManagementPagination.totalItems} Übungen gefunden`,
+                          })}
+                      </div>
+                      <PageSizeSelector
+                        pageSize={exerciseManagementPageSize}
+                        onPageSizeChange={(next) => {
+                          setExerciseManagementPageSize(next);
+                          setExerciseManagementPage(1);
+                        }}
+                        label={t("filters.itemsPerPage", "Pro Seite:")}
+                        options={[6, 12, 24, 48]}
+                      />
+                    </div>
+                    {exerciseManagementPagination.totalPages > 1 && (
+                      <PaginationControls
+                        pagination={exerciseManagementPagination}
+                        onPageChange={setExerciseManagementPage}
+                        pageSize={exerciseManagementPageSize}
+                        maxVisiblePages={7}
+                        labels={{
+                          page: (current, total) =>
+                            t("filters.pageLabel", { current, total, defaultValue: `${current}/${total}` }),
+                          summary: (start, end, total) =>
+                            t("filters.pageSummary", {
+                              start,
+                              end,
+                              total,
+                              defaultValue: `${start}–${end} / ${total}`,
+                            }),
+                          previous: t("filters.prev", "Zurück"),
+                          next: t("filters.next", "Weiter"),
+                        }}
+                      />
+                    )}
+                  </div>
+                }
               />
-              Aktualisieren
-            </Button>
-          </div>
+            </div>
 
-          {monitoringData && (
-            <>
-              {/* Job Stats */}
+            <Dialog open={exerciseEditDialogOpen} onOpenChange={(open) => (open ? null : exerciseManagementCloseEdit())}>
+              <DialogContent className="max-w-4xl overflow-y-auto max-h-[85vh]">
+                <DialogHeader className="pr-10">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <DialogTitle className="text-xl">
+                        {detailExercise?.name ||
+                          t("admin.exerciseDetail.exercise", "Übung")}
+                      </DialogTitle>
+                      {exerciseDialogMode === "view" && detailExercise && (
+                        <div className="mt-1 flex flex-wrap gap-2 text-sm text-muted-foreground">
+                          <span>{getExerciseCategoryLabel(detailExercise.category, t) || "-"}</span>
+                          <span>·</span>
+                          <span>{getExerciseDisciplineLabel(detailExercise.discipline, t) || "-"}</span>
+                          <span>·</span>
+                          <span>{detailExercise.measurementType || "-"}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="icon" onClick={() => navigateExercise("prev")} disabled={!hasPrevDetail}>
+                        <ArrowUp className="h-4 w-4 rotate-[-90deg]" />
+                      </Button>
+                      <Button variant="outline" size="icon" onClick={() => navigateExercise("next")} disabled={!hasNextDetail}>
+                        <ArrowDown className="h-4 w-4 rotate-[-90deg]" />
+                      </Button>
+                    </div>
+                  </div>
+                </DialogHeader>
+                {detailExercise && (
+                  <div className="space-y-6">
+                    {exerciseDialogMode === "view" && (
+                      <>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="space-y-2 rounded-lg border p-4">
+                          <div className="text-xs font-medium text-muted-foreground">
+                            {t("admin.exerciseDetail.title", "Details")}
+                          </div>
+                          <div className="space-y-1 text-sm">
+                            <div>
+                              <strong>{t("admin.exerciseDetail.discipline", "Disziplin")}:</strong>{" "}
+                              {getExerciseDisciplineLabel(detailExercise.discipline, t) || "-"}
+                            </div>
+                            <div>
+                              <strong>{t("admin.exerciseDetail.movementPattern", "Bewegungsmuster")}:</strong>{" "}
+                              {getExerciseMovementPatternLabel(detailExercise.movementPattern, t) || "-"}
+                            </div>
+                            <div>
+                              <strong>{t("admin.exerciseDetail.difficulty", "Schwierigkeit")}:</strong>{" "}
+                              {detailExercise.difficultyTier ?? "-"}
+                            </div>
+                            <div>
+                              <strong>{t("admin.exerciseDetail.unit", "Einheit")}:</strong>{" "}
+                              {detailExercise.unit || "-"}
+                            </div>
+                            <div>
+                              <strong>{t("admin.exerciseDetail.supportsSets", "Sets/Reps")}:</strong>{" "}
+                              {detailExercise.supportsSets
+                                ? t("admin.exerciseDetail.yes", "Ja")
+                                : t("admin.exerciseDetail.no", "Nein")}
+                            </div>
+                            <div>
+                              <strong>{t("admin.exerciseDetail.requiresWeight", "Gewicht erforderlich")}:</strong>{" "}
+                              {detailExercise.requiresWeight
+                                ? t("admin.exerciseDetail.yes", "Ja")
+                                : t("admin.exerciseDetail.no", "Nein")}
+                            </div>
+                            <div>
+                              <strong>{t("admin.exerciseDetail.allowsWeight", "Gewicht optional")}:</strong>{" "}
+                              {detailExercise.allowsWeight
+                                ? t("admin.exerciseDetail.yes", "Ja")
+                                : t("admin.exerciseDetail.no", "Nein")}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="space-y-2 rounded-lg border p-4">
+                          <div className="text-xs font-medium text-muted-foreground">
+                            {t("admin.exerciseDetail.muscleGroups", "Muskelgruppen")}
+                          </div>
+                            <div className="flex flex-wrap gap-2">
+                              {(detailExercise.muscleGroups || []).length > 0
+                                ? detailExercise.muscleGroups?.map((group) => (
+                                  <Badge key={group} variant="secondary">
+                                    {getExerciseMuscleGroupLabel(group, t)}
+                                  </Badge>
+                                ))
+                                : <span className="text-sm text-muted-foreground">-</span>}
+                            </div>
+                          <div className="mt-3 text-xs font-medium text-muted-foreground">
+                            {t("admin.exerciseDetail.equipment", "Equipment")}
+                          </div>
+                            <div className="flex flex-wrap gap-2">
+                              {(detailExercise.equipment || []).length > 0
+                                ? detailExercise.equipment?.map((item) => (
+                                  <Badge key={item} variant="outline">{item}</Badge>
+                                ))
+                                : <span className="text-sm text-muted-foreground">-</span>}
+                            </div>
+                          </div>
+                        </div>
+
+                        {detailExercise.description && (
+                          <div className="rounded-lg border p-4 text-sm text-muted-foreground">
+                            {detailExercise.description}
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant={exerciseDialogMode === "view" ? "default" : "outline"}
+                        onClick={() => setExerciseDialogMode("view")}
+                      >
+                      {t("admin.exercises.actions.details", "Details")}
+                      </Button>
+                      <Button
+                        variant={exerciseDialogMode === "edit" ? "default" : "outline"}
+                        onClick={() => {
+                          if (detailExercise) {
+                            const formValue = exerciseManagementToFormValue(detailExercise);
+                            setExerciseEditDraft(formValue);
+                            setExerciseEditDescriptionOpen(Boolean(formValue.description));
+                            setExerciseDialogMode("edit");
+                          }
+                        }}
+                      >
+                      {t("admin.exercises.actions.edit", "Bearbeiten")}
+                      </Button>
+                    </div>
+
+                    {exerciseDialogMode === "edit" && exerciseEditDraft && (
+                      <ExerciseForm
+                        value={exerciseEditDraft}
+                        onChange={setExerciseEditDraft}
+                        onSubmit={exerciseManagementHandleSave}
+                      submitLabel={t(
+                        "admin.exerciseDetail.saveChanges",
+                        "Änderungen speichern"
+                      )}
+                        submitDisabled={exerciseEditSaving}
+                        descriptionOpen={exerciseEditDescriptionOpen}
+                        onDescriptionToggle={setExerciseEditDescriptionOpen}
+                        showDescriptionToggle
+                        defaultDistanceUnit={user?.preferences?.units?.distance || "km"}
+                        defaultTimeUnit="min"
+                      />
+                    )}
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
+          </TabsContent>
+
+          <TabsContent value="moderation" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5" />
+                  {t("admin.moderation.reports.title", "Übungs-Reports")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {exerciseReports.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                  {t("admin.moderation.reports.empty", "Keine offenen Reports")}
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table className="min-w-[720px]">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="sticky left-0 z-10 bg-background">
+                          {t("admin.moderation.reports.table.exercise", "Übung")}
+                          </TableHead>
+                        <TableHead>{t("admin.moderation.reports.table.reason", "Grund")}</TableHead>
+                        <TableHead>{t("admin.moderation.reports.table.details", "Beschreibung")}</TableHead>
+                        <TableHead>{t("admin.moderation.reports.table.created", "Erstellt")}</TableHead>
+                        <TableHead className="sticky right-0 z-10 bg-background text-right">
+                          {t("admin.moderation.reports.table.actions", "Aktionen")}
+                        </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {exerciseReports.map((report) => (
+                          <TableRow key={report.id}>
+                            <TableCell className="sticky left-0 z-10 bg-background text-sm">
+                              {exerciseMap.get(report.exerciseId)?.name ||
+                                report.exerciseId}
+                            </TableCell>
+                            <TableCell>{report.reason}</TableCell>
+                            <TableCell className="text-xs">
+                              {report.description || "-"}
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              {formatDate(report.createdAt)}
+                            </TableCell>
+                            <TableCell className="sticky right-0 z-10 bg-background">
+                              <div className="flex gap-2 justify-end">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() =>
+                                    resolveExerciseReport(report.id, "resolved")
+                                  }
+                                >
+                                {t("admin.moderation.reports.actions.resolve", "Erledigt")}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() =>
+                                    resolveExerciseReport(report.id, "dismissed")
+                                  }
+                                >
+                                {t("admin.moderation.reports.actions.dismiss", "Ablehnen")}
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <RefreshCw className="w-5 h-5" />
+                  {t("admin.moderation.edits.title", "Änderungsanfragen")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {exerciseEditRequests.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                  {t("admin.moderation.edits.empty", "Keine offenen Änderungsanfragen")}
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table className="min-w-[860px]">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="sticky left-0 z-10 bg-background">
+                          {t("admin.moderation.edits.table.exercise", "Übung")}
+                          </TableHead>
+                        <TableHead>{t("admin.moderation.edits.table.changes", "Änderungen")}</TableHead>
+                        <TableHead>{t("admin.moderation.edits.table.created", "Erstellt")}</TableHead>
+                        <TableHead className="sticky right-0 z-10 bg-background text-right">
+                          {t("admin.moderation.edits.table.actions", "Aktionen")}
+                        </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {exerciseEditRequests.map((request) => (
+                          <TableRow key={request.id}>
+                            <TableCell className="sticky left-0 z-10 bg-background text-sm">
+                              {exerciseMap.get(request.exerciseId)?.name ||
+                                request.exerciseId}
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              <div className="space-y-1">
+                                {Object.entries(request.changeRequest || {}).map(
+                                  ([key, value]) => {
+                                    const exercise = exerciseMap.get(
+                                      request.exerciseId
+                                    ) as any;
+                                    const oldValue =
+                                      exercise && key in exercise
+                                        ? formatChangeValue(exercise[key])
+                                        : null;
+                                    return (
+                                      <div key={key}>
+                                        <span className="font-medium">
+                                          {changeKeyLabels[key] || key}
+                                        </span>
+                                        :{" "}
+                                        {oldValue ? (
+                                          <>
+                                            <span className="line-through text-muted-foreground">
+                                              {oldValue}
+                                            </span>{" "}
+                                            → <span>{formatChangeValue(value)}</span>
+                                          </>
+                                        ) : (
+                                          <span>{formatChangeValue(value)}</span>
+                                        )}
+                                      </div>
+                                    );
+                                  }
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              {formatDate(request.createdAt)}
+                            </TableCell>
+                            <TableCell className="sticky right-0 z-10 bg-background">
+                              <div className="flex gap-2 justify-end">
+                                <Button
+                                  size="sm"
+                                  onClick={() =>
+                                    resolveEditRequest(request.id, "approved")
+                                  }
+                                >
+                              {t("admin.moderation.edits.actions.approve", "Freigeben")}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() =>
+                                    resolveEditRequest(request.id, "rejected")
+                                  }
+                                >
+                              {t("admin.moderation.edits.actions.reject", "Ablehnen")}
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="monitoring" className="space-y-6">
+            <div className="flex items-center gap-2">
+              <Activity className="w-5 h-5" />
+              <h2 className="text-xl font-semibold">
+                {t("admin.monitoring.title", "Monitoring")}
+              </h2>
+            </div>
+
+            {isLoadingMonitoring && (
               <Card>
-                <CardHeader>
-                  <CardTitle>Job-Status</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {monitoringData.jobs.stuckJobs.length > 0 && (
-                    <Alert variant="destructive">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertDescription>
-                        {monitoringData.jobs.stuckJobs.length} stuck job(s)
-                        gefunden
+                <CardContent className="p-6 text-sm text-muted-foreground">
+                {t("admin.monitoring.loading", "Monitoring-Daten werden geladen...")}
+                </CardContent>
+              </Card>
+            )}
+
+            {!isLoadingMonitoring && !monitoringData && (
+              <Card>
+                <CardContent className="p-6 text-sm text-muted-foreground">
+                {t("admin.monitoring.empty", "Keine Monitoring-Daten verfügbar.")}
+                </CardContent>
+              </Card>
+            )}
+
+            {monitoringData && (
+              <>
+                {/* Job Stats */}
+                <Card>
+                  <CardHeader>
+                  <CardTitle>{t("admin.monitoring.jobs.title", "Job-Status")}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {monitoringData.jobs.stuckJobs.length > 0 && (
+                      <Alert variant="destructive">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription>
+                        {t("admin.monitoring.jobs.stuck", {
+                          count: monitoringData.jobs.stuckJobs.length,
+                          defaultValue: `${monitoringData.jobs.stuckJobs.length} stuck job(s) gefunden`,
+                        })}
                         <Button
                           onClick={handleCleanupJobs}
                           variant="outline"
                           size="sm"
                           className="ml-4"
                         >
-                          Cleanup durchführen
+                          {t("admin.monitoring.jobs.cleanup", "Cleanup durchführen")}
                         </Button>
-                      </AlertDescription>
-                    </Alert>
-                  )}
+                        </AlertDescription>
+                      </Alert>
+                    )}
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {monitoringData.jobs.stats.map((stat: any) => (
-                      <div
-                        key={`${stat.job_name}-${stat.status}`}
-                        className="p-4 border rounded-lg"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium">
-                              {stat.job_name}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {stat.status}
-                            </p>
-                          </div>
-                          <Badge
-                            variant={
-                              stat.status === "completed"
-                                ? "default"
-                                : stat.status === "failed"
-                                  ? "destructive"
-                                  : "secondary"
-                            }
-                          >
-                            {stat.count}
-                          </Badge>
-                        </div>
-                        {stat.last_run && (
-                          <p className="text-xs text-muted-foreground mt-2">
-                            Letzter Lauf:{" "}
-                            {new Date(stat.last_run).toLocaleString("de-DE")}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  {monitoringData.jobs.recentFailures.length > 0 && (
-                    <div className="mt-4">
-                      <h4 className="font-semibold mb-2">
-                        Fehler der letzten 7 Tage
-                      </h4>
-                      <div className="space-y-2">
-                        {monitoringData.jobs.recentFailures.map(
-                          (failure: any) => (
-                            <div
-                              key={failure.job_name}
-                              className="flex items-center justify-between p-2 bg-destructive/10 rounded"
-                            >
-                              <span className="text-sm">
-                                {failure.job_name}
-                              </span>
-                              <Badge variant="destructive">
-                                {failure.count}
-                              </Badge>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {monitoringData.jobs.stats.map((stat: any) => (
+                        <div
+                          key={`${stat.job_name}-${stat.status}`}
+                          className="p-4 border rounded-lg"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium">
+                                {stat.job_name}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {stat.status}
+                              </p>
                             </div>
-                          )
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Email Queue Stats */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>E-Mail-Warteschlange</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {monitoringData.emails.stats.map((stat: any) => (
-                      <div key={stat.status} className="p-4 border rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium">{stat.status}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {stat.status === "failed" &&
-                                stat.failed_after_retries > 0
-                                ? `${stat.failed_after_retries} nach Retries`
-                                : "Gesamt"}
-                            </p>
+                            <Badge
+                              variant={
+                                stat.status === "completed"
+                                  ? "default"
+                                  : stat.status === "failed"
+                                    ? "destructive"
+                                    : "secondary"
+                              }
+                            >
+                              {stat.count}
+                            </Badge>
                           </div>
-                          <Badge
-                            variant={
-                              stat.status === "sent"
-                                ? "default"
-                                : stat.status === "failed"
-                                  ? "destructive"
-                                  : "secondary"
-                            }
-                          >
-                            {stat.count}
-                          </Badge>
+                          {stat.last_run && (
+                            <p className="text-xs text-muted-foreground mt-2">
+                              {t("admin.monitoring.jobs.lastRun", "Letzter Lauf")}:{" "}
+                              {new Date(stat.last_run).toLocaleString(i18n.language || "de-DE")}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {monitoringData.jobs.recentFailures.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="font-semibold mb-2">
+                        {t("admin.monitoring.jobs.recentFailures", "Fehler der letzten 7 Tage")}
+                        </h4>
+                        <div className="space-y-2">
+                          {monitoringData.jobs.recentFailures.map(
+                            (failure: any) => (
+                              <div
+                                key={failure.job_name}
+                                className="flex items-center justify-between p-2 bg-destructive/10 rounded"
+                              >
+                                <span className="text-sm">
+                                  {failure.job_name}
+                                </span>
+                                <Badge variant="destructive">
+                                  {failure.count}
+                                </Badge>
+                              </div>
+                            )
+                          )}
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    )}
+                  </CardContent>
+                </Card>
 
-                  <div>
-                    <h4 className="font-semibold mb-2">Letzte E-Mails (24h)</h4>
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Empfänger</TableHead>
-                            <TableHead>Betreff</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Versuche</TableHead>
-                            <TableHead>Erstellt</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {monitoringData.emails.recent
-                            .slice(0, 10)
-                            .map((email: any) => (
-                              <TableRow key={email.id}>
-                                <TableCell className="font-mono text-xs">
-                                  {email.recipient}
-                                </TableCell>
-                                <TableCell className="max-w-xs truncate">
-                                  {email.subject}
-                                </TableCell>
-                                <TableCell>
-                                  <Badge
-                                    variant={
-                                      email.status === "sent"
-                                        ? "default"
-                                        : email.status === "failed"
-                                          ? "destructive"
-                                          : "secondary"
-                                    }
-                                  >
-                                    {email.status}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>{email.attempts}</TableCell>
-                                <TableCell className="text-xs">
-                                  {new Date(email.createdAt).toLocaleString(
-                                    "de-DE"
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                        </TableBody>
-                      </Table>
+                {/* Email Queue Stats */}
+                <Card>
+                  <CardHeader>
+                  <CardTitle>{t("admin.monitoring.emails.title", "E-Mail-Warteschlange")}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {monitoringData.emails.stats.map((stat: any) => (
+                        <div key={stat.status} className="p-4 border rounded-lg">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium">{stat.status}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {stat.status === "failed" &&
+                                  stat.failed_after_retries > 0
+                                  ? t("admin.monitoring.emails.stats.failedAfterRetries", {
+                                    count: stat.failed_after_retries,
+                                    defaultValue: `${stat.failed_after_retries} nach Retries`,
+                                  })
+                                  : t("admin.monitoring.emails.stats.total", "Gesamt")}
+                              </p>
+                            </div>
+                            <Badge
+                              variant={
+                                stat.status === "sent"
+                                  ? "default"
+                                  : stat.status === "failed"
+                                    ? "destructive"
+                                    : "secondary"
+                              }
+                            >
+                              {stat.count}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  </div>
+
+                    <div>
+                    <h4 className="font-semibold mb-2">
+                      {t("admin.monitoring.emails.recentTitle", "Letzte E-Mails (24h)")}
+                    </h4>
+                      <div className="overflow-x-auto">
+                        <Table className="min-w-[720px]">
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="sticky left-0 z-10 bg-background">
+                              {t("admin.monitoring.emails.table.recipient", "Empfänger")}
+                              </TableHead>
+                            <TableHead>{t("admin.monitoring.emails.table.subject", "Betreff")}</TableHead>
+                            <TableHead>{t("admin.monitoring.emails.table.status", "Status")}</TableHead>
+                            <TableHead>{t("admin.monitoring.emails.table.attempts", "Versuche")}</TableHead>
+                            <TableHead>{t("admin.monitoring.emails.table.created", "Erstellt")}</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {monitoringData.emails.recent
+                              .slice(0, 10)
+                              .map((email: any) => (
+                                <TableRow key={email.id}>
+                                  <TableCell className="sticky left-0 z-10 bg-background font-mono text-xs">
+                                    {email.recipient}
+                                  </TableCell>
+                                  <TableCell className="max-w-xs truncate">
+                                    {email.subject}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge
+                                      variant={
+                                        email.status === "sent"
+                                          ? "default"
+                                          : email.status === "failed"
+                                            ? "destructive"
+                                            : "secondary"
+                                      }
+                                    >
+                                      {email.status}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>{email.attempts}</TableCell>
+                                  <TableCell className="text-xs">
+                                    {new Date(email.createdAt).toLocaleString(
+                                      i18n.language || "de-DE"
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+
+            {!monitoringData && !isLoadingMonitoring && (
+              <Card>
+                <CardContent className="p-6 text-center">
+                  <p className="text-muted-foreground">
+                  {t(
+                    "admin.monitoring.refreshHint",
+                    t(
+                      "admin.monitoring.refreshHint",
+                      'Klicken Sie auf "Aktualisieren", um Monitoring-Daten zu laden'
+                    )
+                  )}
+                  </p>
                 </CardContent>
               </Card>
-            </>
-          )}
-
-          {!monitoringData && !isLoadingMonitoring && (
-            <Card>
-              <CardContent className="p-6 text-center">
-                <p className="text-muted-foreground">
-                  Klicken Sie auf "Aktualisieren", um Monitoring-Daten zu laden
-                </p>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-      </Tabs>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </PageTemplate>
   );

@@ -55,13 +55,10 @@ export function WeeklyPointsGoalDialog({
         <DialogHeader className="text-left">
           <DialogTitle className="flex items-center gap-2">
             <Trophy className="h-5 w-5 text-yellow-500" />
-            {t("weeklyGoals.pointsTitle", "Set weekly points goal")}
+            {t("weeklyGoals.pointsTitle")}
           </DialogTitle>
           <DialogDescription className="text-left">
-            {t(
-              "weeklyGoals.pointsDescription",
-              "Set your personal points goal for this week."
-            )}
+            {t("weeklyGoals.pointsDescription")}
           </DialogDescription>
         </DialogHeader>
 
@@ -73,7 +70,7 @@ export function WeeklyPointsGoalDialog({
                 id="points-goal-label"
                 className="text-base font-medium"
               >
-                {t("weeklyGoals.pointsLabel", "Punkte")}
+                {t("weeklyGoals.pointsLabel")}
               </Label>
               <div className="w-20">
                 <Input
@@ -98,10 +95,7 @@ export function WeeklyPointsGoalDialog({
               className="text-xs text-muted-foreground text-center"
               id="points-goal-hint"
             >
-              {t(
-                "weeklyGoals.pointsHint",
-                "Standard-Challenge ist meist 1500 Punkte."
-              )}
+              {t("weeklyGoals.pointsHint")}
             </p>
           </div>
         </div>
@@ -112,12 +106,12 @@ export function WeeklyPointsGoalDialog({
             onClick={() => onOpenChange(false)}
             disabled={isSaving}
           >
-            {t("common.cancel", "Abbrechen")}
+            {t("common.cancel")}
           </Button>
           <Button onClick={handleSave} disabled={isSaving}>
             {isSaving
-              ? t("common.saving", "Speichert...")
-              : t("common.save", "Speichern")}
+              ? t("common.saving")
+              : t("common.save")}
           </Button>
         </DialogFooter>
       </DialogContent>

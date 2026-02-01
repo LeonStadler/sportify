@@ -5,6 +5,7 @@ import { API_URL } from '@/lib/api';
 import { parseAvatarConfig } from '@/lib/avatar';
 import { Check, UserPlus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import NiceAvatar from 'react-nice-avatar';
 import { toast } from 'sonner';
@@ -16,6 +17,7 @@ interface InviterInfo {
 }
 
 export function Invite() {
+    const { t } = useTranslation();
     const { userId } = useParams<{ userId: string }>();
     const { user, isAuthenticated } = useAuth();
     const navigate = useNavigate();
@@ -43,7 +45,7 @@ export function Invite() {
             const inviteUserId = userId || localStorage.getItem('pendingInvite');
             
             if (!inviteUserId) {
-                toast.error('Ungültiger Einladungslink.');
+                toast.error(t('friends.invitePage.errors.invalidLink'));
                 navigate('/');
                 return;
             }
@@ -56,7 +58,7 @@ export function Invite() {
                 const response = await fetch(`${API_URL}/friends/invite/${inviteUserId}`);
 
                 if (!response.ok) {
-                    throw new Error('Einladungslink ungültig.');
+                    throw new Error(t('friends.invitePage.errors.invalidLink'));
                 }
 
                 const data = await response.json();
@@ -66,7 +68,7 @@ export function Invite() {
                 if (isAuthenticated && user) {
                     // Prüfe ob User sich selbst einlädt
                     if (user.id === inviteUserId) {
-                        toast.error('Du kannst dir selbst keine Freundschaftsanfrage senden.');
+                        toast.error(t('friends.invitePage.errors.selfInvite'));
                         localStorage.removeItem('pendingInvite');
                         navigate('/friends');
                         return;
@@ -74,7 +76,7 @@ export function Invite() {
                 }
             } catch (error) {
                 console.error('Error fetching inviter info:', error);
-                toast.error('Einladungslink ungültig oder abgelaufen.');
+                toast.error(t('friends.invitePage.errors.invalidOrExpired'));
                 localStorage.removeItem('pendingInvite');
                 navigate('/');
             } finally {
@@ -109,18 +111,22 @@ export function Invite() {
 
             if (!response.ok) {
                 const error = await response.json();
-                throw new Error(error.error || 'Fehler beim Senden der Freundschaftsanfrage.');
+                throw new Error(error.error || t('friends.invitePage.errors.sendRequest'));
             }
 
             const responseData = await response.json();
 
             if (responseData.type === 'accepted' || responseData.type === 'friendship_created') {
-                toast.success('Freundschaft erstellt', {
-                    description: responseData.message || `Ihr seid jetzt mit ${inviter?.displayName} befreundet.`,
+                toast.success(t('friends.invitePage.success.friendshipCreatedTitle'), {
+                    description:
+                        responseData.message ||
+                        t('friends.invitePage.success.friendshipCreatedDesc', { name: inviter?.displayName }),
                 });
             } else {
-                toast.success('Freundschaftsanfrage gesendet', {
-                    description: responseData.message || `Eine Freundschaftsanfrage wurde an ${inviter?.displayName} gesendet.`,
+                toast.success(t('friends.invitePage.success.requestSentTitle'), {
+                    description:
+                        responseData.message ||
+                        t('friends.invitePage.success.requestSentDesc', { name: inviter?.displayName }),
                 });
             }
 
@@ -132,8 +138,9 @@ export function Invite() {
                 navigate('/friends');
             }, 1500);
         } catch (error) {
-            toast.error('Fehler beim Senden der Freundschaftsanfrage', {
-                description: error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.',
+            toast.error(t('friends.invitePage.errors.sendRequestTitle'), {
+                description:
+                    error instanceof Error ? error.message : t('friends.invitePage.errors.unknown'),
             });
         } finally {
             setProcessing(false);
@@ -155,7 +162,7 @@ export function Invite() {
             <div className="min-h-screen flex items-center justify-center bg-background">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                    <p className="text-muted-foreground">Lade Einladung...</p>
+                    <p className="text-muted-foreground">{t('friends.invitePage.loading')}</p>
                 </div>
             </div>
         );
@@ -169,9 +176,9 @@ export function Invite() {
         <div className="min-h-screen flex items-center justify-center bg-background p-4">
             <Card className="w-full max-w-md">
                 <CardHeader className="text-center">
-                    <CardTitle className="text-2xl">Freundschaftseinladung</CardTitle>
+                    <CardTitle className="text-2xl">{t('friends.invitePage.title')}</CardTitle>
                     <CardDescription>
-                        {inviter.displayName} möchte dich zu seinen Freunden hinzufügen
+                        {t('friends.invitePage.description', { name: inviter.displayName })}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -200,7 +207,7 @@ export function Invite() {
                     {isAuthenticated ? (
                         <div className="space-y-3">
                             <p className="text-sm text-muted-foreground text-center">
-                                Möchtest du {inviter.displayName} als Freund hinzufügen?
+                                {t('friends.invitePage.promptAuthenticated', { name: inviter.displayName })}
                             </p>
                             <div className="flex gap-3">
                                 <Button
@@ -209,7 +216,7 @@ export function Invite() {
                                     className="flex-1"
                                 >
                                     <Check className="w-4 h-4 mr-2" />
-                                    {processing ? 'Wird gesendet...' : 'Annehmen'}
+                                    {processing ? t('friends.invitePage.sending') : t('friends.invitePage.accept')}
                                 </Button>
                                 <Button
                                     variant="outline"
@@ -218,17 +225,17 @@ export function Invite() {
                                     className="flex-1"
                                 >
                                     <X className="w-4 h-4 mr-2" />
-                                    Später
+                                    {t('friends.invitePage.later')}
                                 </Button>
                             </div>
                             <p className="text-xs text-muted-foreground text-center">
-                                Die Freundschaft wird direkt erstellt.
+                                {t('friends.invitePage.confirmInfo')}
                             </p>
                         </div>
                     ) : (
                         <div className="space-y-3">
                             <p className="text-sm text-muted-foreground text-center">
-                                Um {inviter.displayName} als Freund hinzuzufügen, musst du dich anmelden.
+                                {t('friends.invitePage.promptUnauthenticated', { name: inviter.displayName })}
                             </p>
                             <div className="space-y-2">
                                 <Button
@@ -236,18 +243,18 @@ export function Invite() {
                                     className="w-full"
                                 >
                                     <UserPlus className="w-4 h-4 mr-2" />
-                                    Anmelden
+                                    {t('friends.invitePage.login')}
                                 </Button>
                                 <Button
                                     variant="outline"
                                     onClick={handleRegister}
                                     className="w-full"
                                 >
-                                    Registrieren
+                                    {t('friends.invitePage.register')}
                                 </Button>
                             </div>
                             <p className="text-xs text-muted-foreground text-center">
-                                Falls du noch kein Konto hast, kannst du dich registrieren.
+                                {t('friends.invitePage.registerInfo')}
                             </p>
                         </div>
                     )}
@@ -256,4 +263,3 @@ export function Invite() {
         </div>
     );
 }
-

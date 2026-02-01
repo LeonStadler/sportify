@@ -83,6 +83,52 @@ export const createAdminRouter = (pool) => {
     }
   });
 
+  // GET /api/admin/overview-stats - Overview counts for admin dashboard
+  router.get(
+    "/overview-stats",
+    authMiddleware,
+    adminMiddleware,
+    async (req, res) => {
+      try {
+        const [
+          usersResult,
+          workoutsResult,
+          templatesResult,
+          exercisesResult,
+          journalResult,
+          awardsResult,
+          badgesResult,
+          activitiesResult,
+        ] = await Promise.all([
+          pool.query("SELECT COUNT(*)::int AS total FROM users"),
+          pool.query("SELECT COUNT(*)::int AS total FROM workouts"),
+          pool.query("SELECT COUNT(*)::int AS total FROM workouts WHERE is_template = true"),
+          pool.query("SELECT COUNT(*)::int AS total FROM exercises"),
+          pool.query("SELECT COUNT(*)::int AS total FROM training_journal_entries"),
+          pool.query("SELECT COUNT(*)::int AS total FROM awards"),
+          pool.query("SELECT COUNT(*)::int AS total FROM user_badges"),
+          pool.query("SELECT COUNT(*)::int AS total FROM workout_activities"),
+        ]);
+
+        res.json({
+          users: usersResult.rows[0]?.total || 0,
+          workouts: workoutsResult.rows[0]?.total || 0,
+          templates: templatesResult.rows[0]?.total || 0,
+          exercises: exercisesResult.rows[0]?.total || 0,
+          recoveryEntries: journalResult.rows[0]?.total || 0,
+          awards: awardsResult.rows[0]?.total || 0,
+          badges: badgesResult.rows[0]?.total || 0,
+          workoutActivities: activitiesResult.rows[0]?.total || 0,
+        });
+      } catch (error) {
+        console.error("Admin overview stats error:", error);
+        res.status(500).json({
+          error: "Serverfehler beim Laden der Admin-Übersicht.",
+        });
+      }
+    }
+  );
+
   // GET /api/admin/exercises - Get all exercises (optional filters)
   router.get(
     "/exercises",

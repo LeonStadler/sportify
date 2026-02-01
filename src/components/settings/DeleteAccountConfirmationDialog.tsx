@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertTriangle } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface DeleteAccountConfirmationDialogProps {
   open: boolean;
@@ -18,15 +19,15 @@ interface DeleteAccountConfirmationDialogProps {
   onConfirm: () => void;
 }
 
-const CONFIRMATION_TEXT = "LÖSCHEN";
-
 export function DeleteAccountConfirmationDialog({
   open,
   onOpenChange,
   onConfirm,
 }: DeleteAccountConfirmationDialogProps) {
+  const { t } = useTranslation();
   const [confirmationText, setConfirmationText] = useState("");
   const confirmationInputRef = useRef<HTMLInputElement>(null);
+  const confirmationValue = t("profile.deleteAccountConfirmText");
 
   // Reset state when dialog opens/closes
   useEffect(() => {
@@ -39,7 +40,7 @@ export function DeleteAccountConfirmationDialog({
     }
   }, [open]);
 
-  const canConfirm = confirmationText === CONFIRMATION_TEXT;
+  const canConfirm = confirmationText === confirmationValue;
 
   const handleCancel = () => {
     setConfirmationText("");
@@ -49,7 +50,7 @@ export function DeleteAccountConfirmationDialog({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (confirmationText !== CONFIRMATION_TEXT) {
+    if (confirmationText !== confirmationValue) {
       return;
     }
 
@@ -66,16 +67,15 @@ export function DeleteAccountConfirmationDialog({
     <Dialog open={open} onOpenChange={handleCancel}>
       <DialogContent
         onKeyDown={handleKeyDown}
-        className="sm:max-w-[500px]"
+        className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto"
       >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-destructive">
             <AlertTriangle className="w-5 h-5" />
-            Konto löschen
+            {t("profile.deleteAccountDialogTitle")}
           </DialogTitle>
           <DialogDescription>
-            Möchtest du dein Konto wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
-            Alle deine Daten werden unwiderruflich gelöscht.
+            {t("profile.deleteAccountDialogDesc")}
           </DialogDescription>
         </DialogHeader>
 
@@ -84,22 +84,23 @@ export function DeleteAccountConfirmationDialog({
             <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 space-y-3">
               <div>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Wenn du dein Konto löschst, werden alle deine Daten unwiderruflich gelöscht.
-                  Diese Aktion kann nicht rückgängig gemacht werden.
+                  {t("profile.deleteAccountWarning")}
                 </p>
                 <ul className="text-sm text-muted-foreground space-y-1 mb-4 list-disc list-inside">
-                  <li>Alle deine Trainingsdaten werden gelöscht</li>
-                  <li>Deine Erfolge und Statistiken gehen verloren</li>
-                  <li>Alle Freundschaften werden beendet</li>
-                  <li>Dein Profil ist nicht mehr erreichbar</li>
-                  <li>Diese Aktion ist dauerhaft und kann nicht rückgängig gemacht werden</li>
+                  <li>{t("profile.deleteAccountList.data")}</li>
+                  <li>{t("profile.deleteAccountList.achievements")}</li>
+                  <li>{t("profile.deleteAccountList.friendships")}</li>
+                  <li>{t("profile.deleteAccountList.profile")}</li>
+                  <li>{t("profile.deleteAccountList.irreversible")}</li>
                 </ul>
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="confirmation-input">
-                Gib <span className="font-mono font-bold">{CONFIRMATION_TEXT}</span> ein, um fortzufahren:
+                {t("profile.deleteAccountDialogPrompt", {
+                  text: confirmationValue,
+                })}
               </Label>
               <Input
                 id="confirmation-input"
@@ -109,14 +110,17 @@ export function DeleteAccountConfirmationDialog({
                 onChange={(e) => {
                   setConfirmationText(e.target.value);
                 }}
-                placeholder={CONFIRMATION_TEXT}
+                placeholder={confirmationValue}
                 autoComplete="off"
                 className="font-mono"
-                aria-invalid={confirmationText.length > 0 && confirmationText !== CONFIRMATION_TEXT}
+                aria-invalid={confirmationText.length > 0 && confirmationText !== confirmationValue}
               />
-              {confirmationText.length > 0 && confirmationText !== CONFIRMATION_TEXT && (
+              {confirmationText.length > 0 &&
+                confirmationText !== confirmationValue && (
                 <p className="text-xs text-muted-foreground">
-                  Bitte gib genau "{CONFIRMATION_TEXT}" ein (Großbuchstaben erforderlich).
+                  {t("profile.deleteAccountDialogHint", {
+                    text: confirmationValue,
+                  })}
                 </p>
               )}
             </div>
@@ -128,14 +132,14 @@ export function DeleteAccountConfirmationDialog({
               variant="outline"
               onClick={handleCancel}
             >
-              Abbrechen
+              {t("common.cancel")}
             </Button>
             <Button
               type="submit"
               variant="destructive"
               disabled={!canConfirm}
             >
-              Weiter
+              {t("profile.deleteAccountDialogContinue")}
             </Button>
           </DialogFooter>
         </form>
@@ -143,4 +147,3 @@ export function DeleteAccountConfirmationDialog({
     </Dialog>
   );
 }
-

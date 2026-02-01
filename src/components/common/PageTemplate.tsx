@@ -19,7 +19,7 @@ export function PageTemplate({
     headerClassName,
 }: PageTemplateProps) {
     return (
-        <div className={cn("space-y-4 md:space-y-6 pb-20 md:pb-6", className)}>
+        <div className={cn("space-y-4 md:space-y-6 pb-20 md:pb-6 min-w-0", className)}>
             {/* Header Section */}
             <div className={cn(
                 "px-4 md:px-0 space-y-2",
@@ -45,10 +45,9 @@ export function PageTemplate({
             </div>
 
             {/* Content Section */}
-            <div className="px-4 md:px-0">
+            <div className="px-4 md:px-0 min-w-0">
                 {children}
             </div>
         </div>
     );
 }
-

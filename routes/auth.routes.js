@@ -31,7 +31,7 @@ export const createAuthRouter = (pool) => {
       const userQuery = `
                 SELECT u.id, u.email, u.first_name, u.last_name, u.nickname, u.display_preference, u.avatar_url,
                        u.is_email_verified, u.has_2fa, u.theme_preference, u.language_preference,
-                       u.preferences, u.created_at, u.last_login_at, u.role, u.two_factor_enabled_at, u.password_changed_at,
+                       u.preferences, u.show_in_global_rankings, u.created_at, u.last_login_at, u.role, u.two_factor_enabled_at, u.password_changed_at,
                        (SELECT MIN(created_at) FROM user_backup_codes WHERE user_id = u.id) as backup_codes_created_at
                 FROM users u
                 WHERE u.id = $1
@@ -484,7 +484,7 @@ Dein Sportify-Team`;
         `
                 SELECT u.id, u.email, u.first_name, u.last_name, u.nickname, u.display_preference, u.avatar_url,
                        u.is_email_verified, u.has_2fa, u.theme_preference, u.language_preference,
-                       u.preferences, u.created_at, u.last_login_at, u.role, u.two_factor_enabled_at, u.password_changed_at,
+                       u.preferences, u.show_in_global_rankings, u.created_at, u.last_login_at, u.role, u.two_factor_enabled_at, u.password_changed_at,
                        (SELECT MIN(created_at) FROM user_backup_codes WHERE user_id = u.id) as backup_codes_created_at
                 FROM users u
                 WHERE u.id = $1

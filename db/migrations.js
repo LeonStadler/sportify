@@ -76,6 +76,36 @@ const ensureCoreSchema = async (pool) => {
         'CREATE INDEX IF NOT EXISTS idx_workout_activities_workout_id ON workout_activities(workout_id)'
     );
 
+    // Legacy schema compatibility: some databases still have activity_type as enum.
+    // We need text/varchar to store DB exercise UUIDs as activity identifiers.
+    try {
+        const { rows: activityTypeRows } = await pool.query(`
+            SELECT data_type, udt_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'workout_activities'
+              AND column_name = 'activity_type'
+            LIMIT 1
+        `);
+        const activityTypeColumn = activityTypeRows[0];
+        if (
+            activityTypeColumn &&
+            (String(activityTypeColumn.data_type).toUpperCase() === 'USER-DEFINED' ||
+                activityTypeColumn.udt_name === 'activity_type')
+        ) {
+            await pool.query(`
+                ALTER TABLE workout_activities
+                ALTER COLUMN activity_type TYPE VARCHAR(100)
+                USING activity_type::text
+            `);
+        }
+    } catch (error) {
+        console.warn(
+            '[Migration] Konnte workout_activities.activity_type nicht auf VARCHAR migrieren:',
+            error.message
+        );
+    }
+
     // Übungen/Konfiguration
     await pool.query(`
         CREATE TABLE IF NOT EXISTS exercises (

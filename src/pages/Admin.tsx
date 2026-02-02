@@ -121,6 +121,7 @@ interface ExerciseReport {
   reportedBy: string;
   reason: string;
   description?: string;
+  details?: string;
   status: string;
   createdAt: string;
 }
@@ -1763,7 +1764,7 @@ export function Admin() {
                             </TableCell>
                             <TableCell>{report.reason}</TableCell>
                             <TableCell className="text-xs">
-                              {report.description || "-"}
+                              {report.description || report.details || "-"}
                             </TableCell>
                             <TableCell className="text-xs">
                               {formatDate(report.createdAt)}

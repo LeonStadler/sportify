@@ -5,6 +5,40 @@ import { applyDisplayName, toCamelCase } from "../utils/helpers.js";
 
 export const createWorkoutsRouter = (pool) => {
   const router = express.Router();
+  const UUID_REGEX =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  let activityTypeColumnChecked = false;
+
+  const ensureActivityTypeColumnCompatible = async (client) => {
+    if (activityTypeColumnChecked) return;
+
+    const { rows } = await client.query(`
+      SELECT data_type, udt_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'workout_activities'
+        AND column_name = 'activity_type'
+      LIMIT 1
+    `);
+
+    const column = rows[0];
+    if (
+      column &&
+      (column.data_type === "USER-DEFINED" ||
+        column.udt_name === "activity_type")
+    ) {
+      await client.query(`
+        ALTER TABLE workout_activities
+        ALTER COLUMN activity_type TYPE VARCHAR(100)
+        USING activity_type::text
+      `);
+      console.log(
+        "[Workout] workout_activities.activity_type wurde auf VARCHAR migriert."
+      );
+    }
+
+    activityTypeColumnChecked = true;
+  };
 
   // GET /api/workouts - Get user workouts with pagination and filtering
   router.get("/", authMiddleware, async (req, res) => {
@@ -374,6 +408,7 @@ export const createWorkoutsRouter = (pool) => {
           u.last_name,
           u.nickname,
           u.display_preference,
+          COALESCE(usage_stats.usage_count, 0)::int AS usage_count,
           COALESCE(mg.muscle_groups, ARRAY[]::text[]) AS muscle_groups,
           COALESCE(
             JSON_AGG(
@@ -397,6 +432,12 @@ export const createWorkoutsRouter = (pool) => {
         JOIN users u ON u.id = w.user_id
         LEFT JOIN workout_activities wa ON w.id = wa.workout_id
         LEFT JOIN LATERAL (
+          SELECT COUNT(*)::int AS usage_count
+          FROM workouts used_workout
+          WHERE used_workout.source_template_id = w.id
+            AND used_workout.is_template = false
+        ) usage_stats ON true
+        LEFT JOIN LATERAL (
           SELECT COALESCE(array_agg(DISTINCT mg), ARRAY[]::text[]) AS muscle_groups
           FROM workout_activities wa2
           JOIN exercises e ON e.id::text = wa2.activity_type::text
@@ -405,7 +446,7 @@ export const createWorkoutsRouter = (pool) => {
         ) mg ON true
         WHERE w.is_template = true
           AND ${buildTemplateAccessClause(1)}
-        GROUP BY w.id, u.id, mg.muscle_groups
+        GROUP BY w.id, u.id, mg.muscle_groups, usage_stats.usage_count
         ORDER BY w.updated_at DESC
         LIMIT $2 OFFSET $3;
       `;
@@ -484,6 +525,7 @@ export const createWorkoutsRouter = (pool) => {
           w.is_template,
           w.created_at,
           w.updated_at,
+          COALESCE(usage_stats.usage_count, 0)::int AS usage_count,
           COALESCE(mg.muscle_groups, ARRAY[]::text[]) AS muscle_groups,
           COALESCE(
             JSON_AGG(
@@ -506,6 +548,12 @@ export const createWorkoutsRouter = (pool) => {
         FROM workouts w
         LEFT JOIN workout_activities wa ON w.id = wa.workout_id
         LEFT JOIN LATERAL (
+          SELECT COUNT(*)::int AS usage_count
+          FROM workouts used_workout
+          WHERE used_workout.source_template_id = w.id
+            AND used_workout.is_template = false
+        ) usage_stats ON true
+        LEFT JOIN LATERAL (
           SELECT COALESCE(array_agg(DISTINCT mg), ARRAY[]::text[]) AS muscle_groups
           FROM workout_activities wa2
           JOIN exercises e ON e.id::text = wa2.activity_type::text
@@ -513,7 +561,7 @@ export const createWorkoutsRouter = (pool) => {
           WHERE wa2.workout_id = w.id
         ) mg ON true
         WHERE w.id = $1 AND w.is_template = true AND ${buildTemplateAccessClause(2)}
-        GROUP BY w.id, mg.muscle_groups
+        GROUP BY w.id, mg.muscle_groups, usage_stats.usage_count
       `;
       const { rows } = await pool.query(query, [templateId, req.user.id]);
       if (rows.length === 0) {
@@ -574,6 +622,7 @@ export const createWorkoutsRouter = (pool) => {
         discipline,
         movementPattern,
         movementPatterns,
+        sourceTemplateId,
       } = req.body;
 
       const parsePositiveInt = (value) => {
@@ -602,6 +651,11 @@ export const createWorkoutsRouter = (pool) => {
       const normalizedRestBetweenRoundsSeconds = parseNonNegativeInt(
         restBetweenRoundsSeconds
       );
+      const rawSourceTemplateId =
+        typeof sourceTemplateId === "string" && sourceTemplateId.trim().length > 0
+          ? sourceTemplateId.trim()
+          : null;
+      let normalizedSourceTemplateId = null;
 
       console.log("Received workout data:", {
         title,
@@ -694,13 +748,14 @@ export const createWorkoutsRouter = (pool) => {
 
       try {
         await client.query("BEGIN");
+        await ensureActivityTypeColumnCompatible(client);
 
         // First check if workouts table has required columns, add if missing
         const checkColumnsQuery = `
                     SELECT column_name, data_type
                     FROM information_schema.columns 
                     WHERE table_name = 'workouts' 
-                    AND column_name IN ('duration', 'start_time', 'use_end_time', 'category', 'discipline', 'movement_pattern', 'movement_patterns');
+                    AND column_name IN ('duration', 'start_time', 'use_end_time', 'category', 'discipline', 'movement_pattern', 'movement_patterns', 'source_template_id');
                 `;
         const { rows: columnRows } = await client.query(checkColumnsQuery);
         const existingColumns = columnRows.map((row) => row.column_name);
@@ -750,6 +805,33 @@ export const createWorkoutsRouter = (pool) => {
         }
         if (!existingColumns.includes("movement_patterns")) {
           await client.query("ALTER TABLE workouts ADD COLUMN movement_patterns TEXT[];");
+        }
+        if (!existingColumns.includes("source_template_id")) {
+          await client.query(
+            "ALTER TABLE workouts ADD COLUMN source_template_id UUID REFERENCES workouts(id) ON DELETE SET NULL;"
+          );
+        }
+
+        if (
+          rawSourceTemplateId &&
+          !Boolean(isTemplate) &&
+          UUID_REGEX.test(rawSourceTemplateId)
+        ) {
+          const sourceTemplateCheckQuery = `
+            SELECT w.id
+            FROM workouts w
+            WHERE w.id = $1
+              AND w.is_template = true
+              AND ${buildTemplateAccessClause(2)}
+            LIMIT 1;
+          `;
+          const { rows: sourceTemplateRows } = await client.query(
+            sourceTemplateCheckQuery,
+            [rawSourceTemplateId, req.user.id]
+          );
+          if (sourceTemplateRows.length > 0) {
+            normalizedSourceTemplateId = sourceTemplateRows[0].id;
+          }
         }
 
         // Kombiniere workoutDate und startTime zu start_time (TIMESTAMPTZ)
@@ -815,11 +897,12 @@ export const createWorkoutsRouter = (pool) => {
                       discipline,
                       movement_pattern,
                       movement_patterns,
+                      source_template_id,
                       visibility,
                       is_template
                     )
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
-                    RETURNING id, title, description, start_time, duration, use_end_time, difficulty, session_type, rounds, rest_between_sets_seconds, rest_between_activities_seconds, rest_between_rounds_seconds, category, discipline, movement_pattern, movement_patterns, visibility, is_template, created_at, updated_at;
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+                    RETURNING id, title, description, start_time, duration, use_end_time, difficulty, session_type, rounds, rest_between_sets_seconds, rest_between_activities_seconds, rest_between_rounds_seconds, category, discipline, movement_pattern, movement_patterns, source_template_id, visibility, is_template, created_at, updated_at;
                 `;
         const { rows: workoutRows } = await client.query(workoutQuery, [
           req.user.id,
@@ -844,6 +927,7 @@ export const createWorkoutsRouter = (pool) => {
                 ? [movementPattern]
                 : null
             : null,
+          Boolean(isTemplate) ? null : normalizedSourceTemplateId,
           normalizedVisibility,
           Boolean(isTemplate),
         ]);
@@ -1441,6 +1525,7 @@ export const createWorkoutsRouter = (pool) => {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
+        await ensureActivityTypeColumnCompatible(client);
 
         const checkQuery =
           "SELECT id FROM workouts WHERE id = $1 AND user_id = $2";

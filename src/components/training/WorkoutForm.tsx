@@ -249,6 +249,7 @@ export function WorkoutForm({
   const [restBetweenActivitiesSeconds, setRestBetweenActivitiesSeconds] = useState<string>("");
   const [visibility, setVisibility] = useState<"private" | "friends" | "public">("private");
   const [isTemplate, setIsTemplate] = useState<boolean>(defaultIsTemplate ?? false);
+  const [sourceTemplateId, setSourceTemplateId] = useState<string | null>(null);
   const [templateCategory, setTemplateCategory] = useState<string>("");
   const [templateDiscipline, setTemplateDiscipline] = useState<string>("");
   const [templateMovementPatterns, setTemplateMovementPatterns] = useState<string[]>([]);
@@ -590,6 +591,7 @@ export function WorkoutForm({
       );
       setVisibility(workout.visibility ?? "private");
       setIsTemplate(isTemplateLocked ? true : Boolean(workout.isTemplate));
+      setSourceTemplateId(workout.sourceTemplateId ?? null);
       isTitleInitialized.current = true;
     } else {
       // Wenn kein Workout vorhanden ist und Titel noch nicht initialisiert wurde, Standard-Titel setzen
@@ -599,6 +601,7 @@ export function WorkoutForm({
       }
       setVisibility("private");
       setIsTemplate(isTemplateLocked ? true : false);
+      setSourceTemplateId(null);
       setDescriptionOpen(false);
     }
   }, [workout, getDefaultTitle, isTemplateLocked]);
@@ -635,6 +638,7 @@ export function WorkoutForm({
       );
       setVisibility("private");
       setIsTemplate(isTemplateLocked ? true : false);
+      setSourceTemplateId(prefillWorkout.isTemplate ? prefillWorkout.id : null);
       setActivities(
         prefillWorkout.activities.map((a) => ({
           activityType: a.activityType,
@@ -1312,6 +1316,7 @@ export function WorkoutForm({
           useEndTime: useEndTime,
           visibility: isTemplate ? visibility : "private",
           isTemplate,
+          sourceTemplateId: isTemplate ? null : sourceTemplateId,
           difficulty: isTemplate ? difficulty : null,
           category: isTemplate ? templateCategory || null : null,
           discipline: isTemplate ? templateDiscipline || null : null,
@@ -1380,6 +1385,7 @@ export function WorkoutForm({
       setTemplateCategory("");
       setTemplateDiscipline("");
       setTemplateMovementPatterns([]);
+      setSourceTemplateId(null);
       setRestBetweenActivitiesSeconds("");
       setActivities([
         {

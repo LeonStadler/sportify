@@ -1,6 +1,20 @@
 import { PageTemplate } from "@/components/common/PageTemplate";
+import { PageSizeSelector } from "@/components/common/pagination/PageSizeSelector";
 import { PaginationControls } from "@/components/common/pagination/PaginationControls";
+import { ExerciseBrowsePanel } from "@/components/exercises/ExerciseBrowsePanel";
+import {
+  categoryOptions as defaultCategoryOptions,
+  disciplineOptions as defaultDisciplineOptions,
+  movementPatternOptions as defaultMovementPatternOptions,
+  muscleGroupTree,
+} from "@/components/exercises/exerciseOptions";
+import {
+  getExerciseMovementPatternLabel,
+  getExerciseMuscleGroupLabel,
+} from "@/components/exercises/exerciseLabels";
 import { TimeRangeFilter } from "@/components/filters/TimeRangeFilter";
+import { TemplateBrowseGrid, TemplateBrowseTable, type TemplateBrowseItem } from "@/components/training/TemplateBrowseList";
+import { TemplateFiltersPanel } from "@/components/training/TemplateFiltersPanel";
 import { TrainingDiarySection } from "@/components/training/TrainingDiarySection";
 import { WorkoutForm } from "@/components/training/WorkoutForm";
 import {
@@ -16,15 +30,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -45,7 +58,7 @@ import { API_URL } from "@/lib/api";
 import type { Workout } from "@/types/workout";
 import { getNormalizedRange, getRangeForPeriod, toDateParam } from "@/utils/dateRanges";
 import { convertDistance, convertWeightFromKg } from "@/utils/units";
-import { Info } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, Eye, Info, Pencil, Play, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { useTranslation } from "react-i18next";
@@ -91,6 +104,43 @@ const getVisibilityBadgeClass = (value?: string) => {
   }
 };
 
+const getTemplateOwnerName = (template: Workout) => {
+  const owner = template.owner;
+  if (!owner) return "-";
+  const firstName = owner.firstName || "";
+  const lastName = owner.lastName || "";
+  const nickname = owner.nickname || "";
+
+  switch (owner.displayPreference) {
+    case "nickname":
+      return nickname.trim() || `${firstName} ${lastName}`.trim() || "-";
+    case "fullName":
+      return `${firstName} ${lastName}`.trim() || nickname || "-";
+    case "firstName":
+    default:
+      return firstName || nickname || `${firstName} ${lastName}`.trim() || "-";
+  }
+};
+
+const getTemplateRelevanceScore = (template: Workout, query: string) => {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return 0;
+
+  const title = (template.title || "").toLowerCase();
+  const description = (template.description || "").toLowerCase();
+  const ownerName = getTemplateOwnerName(template).toLowerCase();
+  const muscles = (template.muscleGroups || []).join(" ").toLowerCase();
+
+  let score = 0;
+  if (title === normalized) score += 30;
+  if (title.startsWith(normalized)) score += 20;
+  if (title.includes(normalized)) score += 12;
+  if (description.includes(normalized)) score += 6;
+  if (ownerName.includes(normalized)) score += 5;
+  if (muscles.includes(normalized)) score += 4;
+  return score;
+};
+
 export function Training() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
@@ -123,8 +173,22 @@ export function Training() {
   const [templates, setTemplates] = useState<Workout[]>([]);
   const [prefillWorkout, setPrefillWorkout] = useState<Workout | null>(null);
   const [templateSearch, setTemplateSearch] = useState("");
-  const [templateScope, setTemplateScope] = useState("all");
+  const [templateSourceFilter, setTemplateSourceFilter] = useState("all");
+  const [templateCategoryFilter, setTemplateCategoryFilter] = useState("all");
+  const [templateDisciplineFilter, setTemplateDisciplineFilter] = useState("all");
+  const [templateMovementPatternFilter, setTemplateMovementPatternFilter] = useState("all");
+  const [templateMuscleFilters, setTemplateMuscleFilters] = useState<string[]>([]);
+  const [templateDifficultyRange, setTemplateDifficultyRange] = useState<[number, number]>([1, 10]);
+  const [templateViewMode, setTemplateViewMode] = useState<"grid" | "table">("grid");
+  const [templateFiltersOpen, setTemplateFiltersOpen] = useState(false);
+  const [templateSortBy, setTemplateSortBy] = useState("relevance");
+  const [templateSortDirection, setTemplateSortDirection] = useState<"asc" | "desc">("desc");
+  const [templateCurrentPage, setTemplateCurrentPage] = useState(1);
+  const [templatePageSize, setTemplatePageSize] = useState(12);
   const [templateCreateOpen, setTemplateCreateOpen] = useState(false);
+  const [templateCreatePrefill, setTemplateCreatePrefill] = useState<Workout | null>(null);
+  const [templateDetailId, setTemplateDetailId] = useState<string | null>(null);
+  const [templateDetailMode, setTemplateDetailMode] = useState<"view" | "edit">("view");
   const workoutFormRef = useRef<HTMLDivElement | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -291,54 +355,355 @@ export function Training() {
   const handleTemplateCreated = () => {
     loadTemplates();
     setTemplateCreateOpen(false);
+    setTemplateCreatePrefill(null);
+    setTemplateDetailMode("view");
   };
 
   const handleUseTemplate = (template: Workout) => {
     setEditingWorkout(null);
     setPrefillWorkout(template);
+    setTemplateDetailId(null);
+    setTemplateDetailMode("view");
     setActiveTab("trainings");
+    requestAnimationFrame(() => {
+      workoutFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   };
 
-  const scopedTemplates = useMemo(() => {
+  const templateSortOptions = useMemo(
+    () => [
+      { value: "relevance", label: t("training.templateSort.relevance", "Relevanz") },
+      { value: "title", label: t("training.templateSort.title", "Titel") },
+      { value: "difficulty", label: t("training.templateSort.difficulty", "Schwierigkeit") },
+      { value: "usage", label: t("training.templateSort.usage", "Nutzung") },
+      { value: "updatedAt", label: t("training.templateSort.updatedAt", "Zuletzt aktualisiert") },
+      { value: "owner", label: t("training.templateSort.owner", "Ersteller") },
+    ],
+    [t]
+  );
+
+  const templateCategoryOptions = useMemo(() => {
+    const options = new Set(defaultCategoryOptions);
+    templates.forEach((template) => {
+      if (template.category) options.add(template.category);
+    });
+    return Array.from(options).filter(Boolean);
+  }, [templates]);
+
+  const templateDisciplineOptions = useMemo(() => {
+    const options = new Set(defaultDisciplineOptions);
+    templates.forEach((template) => {
+      if (template.discipline) options.add(template.discipline);
+    });
+    return Array.from(options).filter(Boolean);
+  }, [templates]);
+
+  const templateMovementPatternOptions = useMemo(() => {
+    const known = new Map(
+      defaultMovementPatternOptions.map((option) => [
+        option.value,
+        getExerciseMovementPatternLabel(option.value, t),
+      ])
+    );
+
+    templates.forEach((template) => {
+      const patterns =
+        template.movementPatterns && template.movementPatterns.length > 0
+          ? template.movementPatterns
+          : template.movementPattern
+            ? [template.movementPattern]
+            : [];
+      patterns.forEach((pattern) => {
+        if (pattern && !known.has(pattern)) {
+          known.set(pattern, pattern);
+        }
+      });
+    });
+
+    return Array.from(known.entries()).map(([value, label]) => ({ value, label }));
+  }, [templates, t]);
+
+  const templateFilteredSorted = useMemo(() => {
     const query = templateSearch.trim().toLowerCase();
-    return templates.filter((template) => {
-      if (templateScope === "own" && template.owner?.id !== user?.id) {
+
+    const filtered = templates.filter((template) => {
+      const ownerId = template.owner?.id || null;
+      const ownerName = getTemplateOwnerName(template).toLowerCase();
+      const muscleString = (template.muscleGroups || []).join(" ").toLowerCase();
+      const patterns =
+        template.movementPatterns && template.movementPatterns.length > 0
+          ? template.movementPatterns
+          : template.movementPattern
+            ? [template.movementPattern]
+            : [];
+
+      if (templateSourceFilter === "own" && ownerId !== user?.id) return false;
+      if (templateSourceFilter === "friends" && template.visibility !== "friends") return false;
+      if (templateSourceFilter === "public" && template.visibility !== "public") return false;
+
+      if (templateCategoryFilter !== "all" && template.category !== templateCategoryFilter) {
         return false;
       }
-      if (templateScope === "friends" && template.visibility !== "friends") {
+      if (
+        templateDisciplineFilter !== "all" &&
+        template.discipline !== templateDisciplineFilter
+      ) {
         return false;
       }
-      if (templateScope === "public" && template.visibility !== "public") {
+      if (
+        templateMovementPatternFilter !== "all" &&
+        !patterns.includes(templateMovementPatternFilter)
+      ) {
         return false;
       }
+      if (templateMuscleFilters.length > 0) {
+        const muscleSet = new Set(template.muscleGroups || []);
+        const hasAnyMuscle = templateMuscleFilters.some((muscle) => muscleSet.has(muscle));
+        if (!hasAnyMuscle) return false;
+      }
+
+      const difficulty = Number(template.difficulty ?? 0);
+      if (difficulty > 0) {
+        if (difficulty < templateDifficultyRange[0] || difficulty > templateDifficultyRange[1]) {
+          return false;
+        }
+      }
+
       if (!query) return true;
-      const ownerName = [
-        template.owner?.firstName,
-        template.owner?.lastName,
-        template.owner?.nickname,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
       return (
         template.title.toLowerCase().includes(query) ||
         (template.description || "").toLowerCase().includes(query) ||
-        ownerName.includes(query)
+        ownerName.includes(query) ||
+        (template.category || "").toLowerCase().includes(query) ||
+        (template.discipline || "").toLowerCase().includes(query) ||
+        muscleString.includes(query)
       );
     });
-  }, [templateScope, templateSearch, templates, user?.id]);
 
-  const ownTemplates = useMemo(
-    () => templates.filter((template) => template.owner?.id === user?.id),
-    [templates, user?.id]
+    const direction = templateSortDirection === "asc" ? 1 : -1;
+    const sorted = [...filtered].sort((a, b) => {
+      if (templateSortBy === "relevance") {
+        const scoreA = getTemplateRelevanceScore(a, query);
+        const scoreB = getTemplateRelevanceScore(b, query);
+        if (scoreA !== scoreB) return (scoreA - scoreB) * direction;
+        const usageDelta = (a.usageCount || 0) - (b.usageCount || 0);
+        if (usageDelta !== 0) return usageDelta * direction;
+        return (
+          (new Date(a.updatedAt || 0).getTime() - new Date(b.updatedAt || 0).getTime()) *
+          direction
+        );
+      }
+      if (templateSortBy === "title") {
+        return a.title.localeCompare(b.title) * direction;
+      }
+      if (templateSortBy === "owner") {
+        return getTemplateOwnerName(a).localeCompare(getTemplateOwnerName(b)) * direction;
+      }
+      if (templateSortBy === "difficulty") {
+        return (Number(a.difficulty || 0) - Number(b.difficulty || 0)) * direction;
+      }
+      if (templateSortBy === "usage") {
+        return (Number(a.usageCount || 0) - Number(b.usageCount || 0)) * direction;
+      }
+      if (templateSortBy === "updatedAt") {
+        return (
+          (new Date(a.updatedAt || 0).getTime() - new Date(b.updatedAt || 0).getTime()) *
+          direction
+        );
+      }
+      return 0;
+    });
+
+    return sorted;
+  }, [
+    templateSearch,
+    templates,
+    templateSourceFilter,
+    templateCategoryFilter,
+    templateDisciplineFilter,
+    templateMovementPatternFilter,
+    templateMuscleFilters,
+    templateDifficultyRange,
+    templateSortDirection,
+    templateSortBy,
+    user?.id,
+  ]);
+
+  const templateTotalPages = Math.max(
+    1,
+    Math.ceil(templateFilteredSorted.length / templatePageSize)
   );
-  const friendTemplates = useMemo(
-    () => templates.filter((template) => template.visibility === "friends"),
-    [templates]
+
+  useEffect(() => {
+    if (templateCurrentPage > templateTotalPages) {
+      setTemplateCurrentPage(templateTotalPages);
+    }
+  }, [templateCurrentPage, templateTotalPages]);
+
+  const templatePaginated = useMemo(() => {
+    const start = (templateCurrentPage - 1) * templatePageSize;
+    return templateFilteredSorted.slice(start, start + templatePageSize);
+  }, [templateCurrentPage, templateFilteredSorted, templatePageSize]);
+
+  const templatePaginationMeta = useMemo(
+    () => ({
+      currentPage: templateCurrentPage,
+      totalPages: templateTotalPages,
+      totalItems: templateFilteredSorted.length,
+      hasPrev: templateCurrentPage > 1,
+      hasNext: templateCurrentPage < templateTotalPages,
+    }),
+    [templateCurrentPage, templateFilteredSorted.length, templateTotalPages]
   );
-  const publicTemplates = useMemo(
-    () => templates.filter((template) => template.visibility === "public"),
-    [templates]
+
+  const templateBrowseItems = useMemo<TemplateBrowseItem[]>(
+    () =>
+      templatePaginated.map((template) => ({
+        id: template.id,
+        title: template.title,
+        description: template.description || null,
+        category: template.category || null,
+        discipline: template.discipline || null,
+        movementPattern:
+          template.movementPatterns?.[0] || template.movementPattern || null,
+        visibility: template.visibility,
+        difficulty: template.difficulty ?? null,
+        muscleGroups: template.muscleGroups || [],
+        activitiesCount: template.activities?.length || 0,
+        usageCount: Number(template.usageCount || 0),
+        ownerName: getTemplateOwnerName(template),
+        isOwn: template.owner?.id === user?.id,
+        updatedAt: template.updatedAt,
+      })),
+    [templatePaginated, user?.id]
+  );
+
+  const templateDetail = useMemo(
+    () => templates.find((template) => template.id === templateDetailId) || null,
+    [templateDetailId, templates]
+  );
+
+  const openTemplateDetails = (
+    template: Workout,
+    mode: "view" | "edit" = "view"
+  ) => {
+    setTemplateDetailId(template.id);
+    setTemplateDetailMode(mode);
+  };
+
+  const closeTemplateDetails = () => {
+    setTemplateDetailId(null);
+    setTemplateDetailMode("view");
+  };
+
+  const navigateTemplateDetails = (direction: "prev" | "next") => {
+    if (!templateDetailId || templateFilteredSorted.length === 0) return;
+    const index = templateFilteredSorted.findIndex((item) => item.id === templateDetailId);
+    if (index < 0) return;
+    const nextIndex =
+      direction === "prev"
+        ? (index - 1 + templateFilteredSorted.length) % templateFilteredSorted.length
+        : (index + 1) % templateFilteredSorted.length;
+    const nextTemplate = templateFilteredSorted[nextIndex];
+    if (nextTemplate) {
+      setTemplateDetailId(nextTemplate.id);
+      setTemplateDetailMode("view");
+    }
+  };
+
+  const handleTemplateSortClick = (next: string) => {
+    if (templateSortBy !== next) {
+      setTemplateSortBy(next);
+      setTemplateSortDirection("asc");
+      return;
+    }
+    if (templateSortDirection === "asc") {
+      setTemplateSortDirection("desc");
+      return;
+    }
+    setTemplateSortBy("relevance");
+    setTemplateSortDirection("desc");
+  };
+
+  const openTemplateCreate = (prefill?: Workout | null) => {
+    setTemplateCreatePrefill(prefill || null);
+    setTemplateCreateOpen(true);
+  };
+
+  const handleDuplicateTemplate = (template: Workout) => {
+    openTemplateCreate(template);
+  };
+
+  const handleTemplateDelete = async (template: Workout) => {
+    if (template.owner?.id !== user?.id) return;
+    const confirmed = window.confirm(
+      t(
+        "training.templateDeleteConfirm",
+        "Möchtest du diese Vorlage wirklich löschen?"
+      )
+    );
+    if (!confirmed) return;
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/workouts/${template.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Delete failed");
+      loadTemplates();
+      closeTemplateDetails();
+      toast({
+        title: t("training.templateDeleted", "Vorlage gelöscht"),
+      });
+    } catch (error) {
+      console.error("Delete template error:", error);
+      toast({
+        title: t("common.error"),
+        description: t("training.templateDeleteError", "Vorlage konnte nicht gelöscht werden."),
+        variant: "destructive",
+      });
+    }
+  };
+
+  useEffect(() => {
+    setTemplateCurrentPage(1);
+  }, [
+    templateSearch,
+    templateSourceFilter,
+    templateCategoryFilter,
+    templateDisciplineFilter,
+    templateMovementPatternFilter,
+    templateMuscleFilters,
+    templateDifficultyRange,
+    templateSortBy,
+    templateSortDirection,
+    templatePageSize,
+  ]);
+
+  useEffect(() => {
+    if (!templateDetailId) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "ArrowLeft") navigateTemplateDetails("prev");
+      if (event.key === "ArrowRight") navigateTemplateDetails("next");
+      if (event.key === "Escape") closeTemplateDetails();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [templateDetailId, templateFilteredSorted]);
+
+  const templateBrowseLabels = useMemo(
+    () => ({
+      title: t("training.templateTitle", "Titel"),
+      owner: t("training.templateOwner", "Ersteller"),
+      visibility: t("training.templateVisibility", "Sichtbarkeit"),
+      category: t("exerciseLibrary.category", "Kategorie"),
+      discipline: t("exerciseLibrary.discipline", "Disziplin"),
+      difficulty: t("exerciseLibrary.difficulty", "Schwierigkeit"),
+      muscleGroups: t("exerciseLibrary.muscleGroups", "Muskelgruppen"),
+      usageCount: t("training.templateUsageCount", "Nutzungen"),
+      activities: t("training.templateActivities", "Aktivitäten"),
+    }),
+    [t]
   );
 
   const handleRecoveryDialogConfirm = () => {
@@ -620,103 +985,9 @@ export function Training() {
                   {t("training.newWorkoutHint", "Füge dein Training hinzu oder nutze eine Vorlage.")}
                 </p>
               </div>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="outline">
-                    {t("training.useTemplate", "Vorlage nutzen")}
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[720px] max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>{t("training.templates", "Workout Vorlagen")}</DialogTitle>
-                  </DialogHeader>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <Label>{t("exerciseLibrary.searchLabel", "Suche")}</Label>
-                      <Input
-                        value={templateSearch}
-                        onChange={(e) => setTemplateSearch(e.target.value)}
-                        placeholder={t("training.searchTemplates", "Vorlagen durchsuchen")}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label>{t("filters.filter", "Filter")}</Label>
-                      <Select value={templateScope} onValueChange={setTemplateScope}>
-                        <SelectTrigger className="mt-1">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">{t("filters.all", "Alle")}</SelectItem>
-                          <SelectItem value="own">Eigene</SelectItem>
-                          <SelectItem value="friends">Friends</SelectItem>
-                          <SelectItem value="public">Public</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  {scopedTemplates.length === 0 ? (
-                    <Card className="border-dashed mt-4">
-                      <CardContent className="p-4 text-sm text-muted-foreground text-center">
-                        {t("training.noTemplates", "Keine Vorlagen gefunden.")}
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <div className="space-y-2 mt-4">
-                      {scopedTemplates.map((template) => (
-                        <div
-                          key={template.id}
-                          className="border rounded-lg p-3 flex flex-col gap-2"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-sm">
-                                {template.title}
-                              </span>
-                              <Badge
-                                variant="secondary"
-                                className={`text-xs ${getVisibilityBadgeClass(
-                                  template.visibility
-                                )}`}
-                              >
-                                {getVisibilityLabel(template.visibility)}
-                              </Badge>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleUseTemplate(template)}
-                            >
-                              {t("training.useTemplate", "Vorlage nutzen")}
-                            </Button>
-                          </div>
-                          {template.description && (
-                            <p className="text-xs text-muted-foreground line-clamp-2">
-                              {template.description}
-                            </p>
-                          )}
-                          <div className="flex flex-wrap gap-1">
-                            {template.activities.slice(0, 4).map((activity) => (
-                              <Badge
-                                key={activity.id}
-                                variant="outline"
-                                className="text-xs"
-                              >
-                                {getActivityName(activity.activityType)}
-                              </Badge>
-                            ))}
-                            {template.activities.length > 4 && (
-                              <span className="text-xs text-muted-foreground">
-                                +{template.activities.length - 4}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </DialogContent>
-              </Dialog>
+              <Button variant="outline" onClick={() => setActiveTab("templates")}>
+                {t("training.useTemplate", "Vorlage nutzen")}
+              </Button>
             </div>
 
             <div ref={workoutFormRef}>
@@ -1141,162 +1412,395 @@ export function Training() {
         </TabsContent>
 
         <TabsContent value="templates" className="space-y-6 mt-6">
-          <Card>
-            <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <CardTitle>{t("training.templates", "Workout Vorlagen")}</CardTitle>
-              <Dialog open={templateCreateOpen} onOpenChange={setTemplateCreateOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    {t("training.createTemplate", "Vorlage erstellen")}
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>{t("training.createTemplate", "Vorlage erstellen")}</DialogTitle>
-                  </DialogHeader>
-                  <WorkoutForm
-                    defaultIsTemplate
-                    forceTemplate
-                    hideTemplateToggle
-                    onWorkoutCreated={handleTemplateCreated}
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">
+              {t("training.templates", "Workout Vorlagen")}
+            </h2>
+            <Button onClick={() => openTemplateCreate(null)}>
+              {t("training.createTemplate", "Vorlage erstellen")}
+            </Button>
+          </div>
+
+          <ExerciseBrowsePanel
+            title={t("training.templatesBrowse", "Vorlagen durchsuchen")}
+            query={templateSearch}
+            onQueryChange={setTemplateSearch}
+            viewMode={templateViewMode}
+            onViewModeChange={setTemplateViewMode}
+            filtersOpen={templateFiltersOpen}
+            onToggleFilters={() => setTemplateFiltersOpen((open) => !open)}
+            sortBy={templateSortBy}
+            sortDirection={templateSortDirection}
+            onSortByChange={setTemplateSortBy}
+            onSortDirectionToggle={() =>
+              setTemplateSortDirection((prev) => (prev === "asc" ? "desc" : "asc"))
+            }
+            sortOptions={templateSortOptions}
+            filtersPanel={
+              <TemplateFiltersPanel
+                sourceFilter={templateSourceFilter}
+                onSourceFilterChange={setTemplateSourceFilter}
+                categoryOptions={templateCategoryOptions}
+                categoryFilter={templateCategoryFilter}
+                onCategoryFilterChange={setTemplateCategoryFilter}
+                disciplineOptions={templateDisciplineOptions}
+                disciplineFilter={templateDisciplineFilter}
+                onDisciplineFilterChange={setTemplateDisciplineFilter}
+                movementPatternOptions={templateMovementPatternOptions}
+                movementPatternFilter={templateMovementPatternFilter}
+                onMovementPatternFilterChange={setTemplateMovementPatternFilter}
+                muscleFilters={templateMuscleFilters}
+                onMuscleFiltersChange={setTemplateMuscleFilters}
+                muscleGroups={muscleGroupTree}
+                difficultyRange={templateDifficultyRange}
+                onDifficultyRangeChange={setTemplateDifficultyRange}
+                onReset={() => {
+                  setTemplateSearch("");
+                  setTemplateSourceFilter("all");
+                  setTemplateCategoryFilter("all");
+                  setTemplateDisciplineFilter("all");
+                  setTemplateMovementPatternFilter("all");
+                  setTemplateMuscleFilters([]);
+                  setTemplateDifficultyRange([1, 10]);
+                }}
+              />
+            }
+            loading={false}
+            empty={templateFilteredSorted.length === 0}
+            emptyText={t("training.noTemplates", "Keine Vorlagen gefunden.")}
+            loadingText={t("common.loading", "Lade...")}
+            grid={
+              <TemplateBrowseGrid
+                items={templateBrowseItems}
+                onSelect={(item) => {
+                  const template = templates.find((entry) => entry.id === item.id);
+                  if (template) openTemplateDetails(template, "view");
+                }}
+                renderMenuItems={(item) => {
+                  const template = templates.find((entry) => entry.id === item.id);
+                  if (!template) return null;
+                  return (
+                    <>
+                      <DropdownMenuItem onSelect={() => openTemplateDetails(template, "view")}>
+                        <Eye className="mr-2 h-4 w-4" />
+                        {t("exerciseLibrary.details", "Details anzeigen")}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => handleUseTemplate(template)}>
+                        <Play className="mr-2 h-4 w-4" />
+                        {t("training.useTemplate", "Vorlage nutzen")}
+                      </DropdownMenuItem>
+                      {template.owner?.id === user?.id ? (
+                        <>
+                          <DropdownMenuItem onSelect={() => openTemplateDetails(template, "edit")}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            {t("training.editTemplate", "Vorlage bearbeiten")}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onSelect={() => handleTemplateDelete(template)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            {t("training.deleteTemplate", "Vorlage löschen")}
+                          </DropdownMenuItem>
+                        </>
+                      ) : (
+                        <DropdownMenuItem onSelect={() => handleDuplicateTemplate(template)}>
+                          <Copy className="mr-2 h-4 w-4" />
+                          {t("training.duplicateTemplate", "Duplizieren")}
+                        </DropdownMenuItem>
+                      )}
+                    </>
+                  );
+                }}
+                labels={templateBrowseLabels}
+              />
+            }
+            table={
+              <TemplateBrowseTable
+                items={templateBrowseItems}
+                sortBy={templateSortBy}
+                sortDirection={templateSortDirection}
+                onSortClick={handleTemplateSortClick}
+                onSelect={(item) => {
+                  const template = templates.find((entry) => entry.id === item.id);
+                  if (template) openTemplateDetails(template, "view");
+                }}
+                renderMenuItems={(item) => {
+                  const template = templates.find((entry) => entry.id === item.id);
+                  if (!template) return null;
+                  return (
+                    <>
+                      <DropdownMenuItem onSelect={() => openTemplateDetails(template, "view")}>
+                        <Eye className="mr-2 h-4 w-4" />
+                        {t("exerciseLibrary.details", "Details anzeigen")}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => handleUseTemplate(template)}>
+                        <Play className="mr-2 h-4 w-4" />
+                        {t("training.useTemplate", "Vorlage nutzen")}
+                      </DropdownMenuItem>
+                      {template.owner?.id === user?.id ? (
+                        <>
+                          <DropdownMenuItem onSelect={() => openTemplateDetails(template, "edit")}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            {t("training.editTemplate", "Vorlage bearbeiten")}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onSelect={() => handleTemplateDelete(template)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            {t("training.deleteTemplate", "Vorlage löschen")}
+                          </DropdownMenuItem>
+                        </>
+                      ) : (
+                        <DropdownMenuItem onSelect={() => handleDuplicateTemplate(template)}>
+                          <Copy className="mr-2 h-4 w-4" />
+                          {t("training.duplicateTemplate", "Duplizieren")}
+                        </DropdownMenuItem>
+                      )}
+                    </>
+                  );
+                }}
+                labels={templateBrowseLabels}
+              />
+            }
+            footer={
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm text-muted-foreground">
+                    {t("training.templatesFound", {
+                      count: templateFilteredSorted.length,
+                      defaultValue: `${templateFilteredSorted.length} Vorlagen gefunden`,
+                    })}
+                  </div>
+                  <PageSizeSelector
+                    pageSize={templatePageSize}
+                    onPageSizeChange={setTemplatePageSize}
+                    label={t("filters.itemsPerPage", "Pro Seite:")}
+                    options={[6, 12, 24, 48]}
                   />
-                </DialogContent>
-              </Dialog>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <Label>{t("exerciseLibrary.searchLabel", "Suche")}</Label>
-                  <Input
-                    value={templateSearch}
-                    onChange={(e) => setTemplateSearch(e.target.value)}
-                    placeholder={t("training.searchTemplates", "Vorlagen durchsuchen")}
-                    className="mt-1"
+                </div>
+                {templatePaginationMeta.totalPages > 1 && (
+                  <PaginationControls
+                    pagination={templatePaginationMeta}
+                    onPageChange={setTemplateCurrentPage}
+                    pageSize={templatePageSize}
+                    maxVisiblePages={7}
+                    labels={{
+                      previous: t("filters.previous", "Zurück"),
+                      next: t("filters.next", "Weiter"),
+                      page: (current, total) =>
+                        t("filters.pageLabel", { current, total }),
+                      summary: (start, end, total) =>
+                        t("filters.itemSummary", {
+                          start,
+                          end,
+                          total: total ?? end,
+                        }),
+                    }}
                   />
-                </div>
-                <div>
-                  <Label>{t("filters.filter", "Filter")}</Label>
-                  <Select value={templateScope} onValueChange={setTemplateScope}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{t("filters.all", "Alle")}</SelectItem>
-                      <SelectItem value="own">Eigene</SelectItem>
-                      <SelectItem value="friends">Friends</SelectItem>
-                      <SelectItem value="public">Public</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                )}
               </div>
+            }
+          />
 
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-sm font-semibold mb-2">
-                    {t("training.templatesOwn", "Deine Vorlagen")}
-                  </h3>
-                  {ownTemplates.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      {t("training.noTemplates", "Keine Vorlagen gefunden.")}
-                    </p>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {ownTemplates.map((template) => (
-                        <Card key={template.id}>
-                          <CardContent className="p-4 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="font-medium">{template.title}</span>
-                              <Badge
-                                variant="secondary"
-                                className={`text-xs ${getVisibilityBadgeClass(
-                                  template.visibility
-                                )}`}
-                              >
-                                {getVisibilityLabel(template.visibility)}
-                              </Badge>
+          <Dialog
+            open={templateCreateOpen}
+            onOpenChange={(open) => {
+              setTemplateCreateOpen(open);
+              if (!open) setTemplateCreatePrefill(null);
+            }}
+          >
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>
+                  {templateCreatePrefill
+                    ? t("training.duplicateTemplate", "Vorlage duplizieren")
+                    : t("training.createTemplate", "Vorlage erstellen")}
+                </DialogTitle>
+                <DialogDescription>
+                  {t(
+                    "training.templateCreateHint",
+                    "Du kannst Vorlagen später in der Übersicht bearbeiten."
+                  )}
+                </DialogDescription>
+              </DialogHeader>
+              <WorkoutForm
+                defaultIsTemplate
+                forceTemplate
+                hideTemplateToggle
+                prefillWorkout={templateCreatePrefill}
+                onPrefillConsumed={() => setTemplateCreatePrefill(null)}
+                onWorkoutCreated={handleTemplateCreated}
+              />
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={Boolean(templateDetailId)} onOpenChange={(open) => (open ? null : closeTemplateDetails())}>
+            <DialogContent className="max-w-4xl overflow-y-auto max-h-[85vh]">
+              <DialogHeader className="pr-10">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <DialogTitle className="text-xl">
+                      {templateDetail?.title || t("training.templates", "Workout Vorlage")}
+                    </DialogTitle>
+                    {templateDetail && templateDetailMode === "view" && (
+                      <div className="mt-1 flex flex-wrap gap-2 text-sm text-muted-foreground">
+                        <span>{getTemplateOwnerName(templateDetail)}</span>
+                        <span>·</span>
+                        <span>{getVisibilityLabel(templateDetail.visibility)}</span>
+                        {templateDetail.difficulty ? (
+                          <>
+                            <span>·</span>
+                            <span>
+                              {t("exerciseLibrary.difficulty", "Schwierigkeit")}:{" "}
+                              {templateDetail.difficulty}
+                            </span>
+                          </>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="icon" onClick={() => navigateTemplateDetails("prev")}>
+                      <ArrowUp className="h-4 w-4 rotate-[-90deg]" />
+                    </Button>
+                    <Button variant="outline" size="icon" onClick={() => navigateTemplateDetails("next")}>
+                      <ArrowDown className="h-4 w-4 rotate-[-90deg]" />
+                    </Button>
+                  </div>
+                </div>
+              </DialogHeader>
+
+              {templateDetail && (
+                <div className="space-y-5">
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant={templateDetailMode === "view" ? "default" : "outline"}
+                      onClick={() => setTemplateDetailMode("view")}
+                    >
+                      {t("exerciseLibrary.details", "Details anzeigen")}
+                    </Button>
+                    <Button variant="outline" onClick={() => handleUseTemplate(templateDetail)}>
+                      {t("training.useTemplate", "Vorlage nutzen")}
+                    </Button>
+                    {templateDetail.owner?.id === user?.id ? (
+                      <Button
+                        variant={templateDetailMode === "edit" ? "default" : "outline"}
+                        onClick={() => setTemplateDetailMode("edit")}
+                      >
+                        {t("training.editTemplate", "Vorlage bearbeiten")}
+                      </Button>
+                    ) : (
+                      <Button variant="outline" onClick={() => handleDuplicateTemplate(templateDetail)}>
+                        {t("training.duplicateTemplate", "Duplizieren")}
+                      </Button>
+                    )}
+                    {templateDetail.owner?.id === user?.id && (
+                      <Button
+                        variant="destructive"
+                        onClick={() => handleTemplateDelete(templateDetail)}
+                      >
+                        {t("training.deleteTemplate", "Vorlage löschen")}
+                      </Button>
+                    )}
+                  </div>
+
+                  {templateDetailMode === "view" && (
+                    <div className="space-y-4">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2 rounded-lg border p-4">
+                          <div className="text-xs font-medium text-muted-foreground">
+                            {t("exerciseLibrary.details", "Details")}
+                          </div>
+                          <div className="space-y-1 text-sm">
+                            <div>
+                              <strong>{t("exerciseLibrary.category", "Kategorie")}:</strong>{" "}
+                              {templateDetail.category || "-"}
                             </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleUseTemplate(template)}
-                            >
-                              {t("training.useTemplate", "Vorlage nutzen")}
-                            </Button>
-                          </CardContent>
-                        </Card>
-                      ))}
+                            <div>
+                              <strong>{t("exerciseLibrary.discipline", "Disziplin")}:</strong>{" "}
+                              {templateDetail.discipline || "-"}
+                            </div>
+                            <div>
+                              <strong>{t("exerciseLibrary.movementPattern", "Bewegungsmuster")}:</strong>{" "}
+                              {(templateDetail.movementPatterns && templateDetail.movementPatterns.length > 0
+                                ? templateDetail.movementPatterns
+                                : templateDetail.movementPattern
+                                  ? [templateDetail.movementPattern]
+                                  : []
+                              )
+                                .map((pattern) => getExerciseMovementPatternLabel(pattern, t))
+                                .join(", ") || "-"}
+                            </div>
+                            <div>
+                              <strong>{t("training.templateUsageCount", "Nutzungen")}:</strong>{" "}
+                              {templateDetail.usageCount || 0}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="space-y-2 rounded-lg border p-4">
+                          <div className="text-xs font-medium text-muted-foreground">
+                            {t("exerciseLibrary.muscleGroups", "Muskelgruppen")}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {(templateDetail.muscleGroups || []).length > 0
+                              ? templateDetail.muscleGroups?.map((group) => (
+                                <Badge key={group} variant="secondary">
+                                  {getExerciseMuscleGroupLabel(group, t)}
+                                </Badge>
+                              ))
+                              : <span className="text-sm text-muted-foreground">-</span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      {templateDetail.description && (
+                        <div className="rounded-lg border p-4 text-sm text-muted-foreground">
+                          {templateDetail.description}
+                        </div>
+                      )}
+
+                      <div className="rounded-lg border p-4">
+                        <div className="text-xs font-medium text-muted-foreground mb-2">
+                          {t("training.templateActivities", "Aktivitäten")}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {(templateDetail.activities || []).map((activity) => (
+                            <Badge key={activity.id} variant="outline">
+                              {getActivityName(activity.activityType)}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {templateDetailMode === "edit" && templateDetail.owner?.id === user?.id && (
+                    <WorkoutForm
+                      workout={templateDetail}
+                      forceTemplate
+                      hideTemplateToggle
+                      onWorkoutUpdated={() => {
+                        loadTemplates();
+                        setTemplateDetailMode("view");
+                      }}
+                      onCancelEdit={() => setTemplateDetailMode("view")}
+                    />
+                  )}
+
+                  {templateDetailMode === "edit" && templateDetail.owner?.id !== user?.id && (
+                    <div className="rounded-lg border p-4 text-sm text-muted-foreground">
+                      {t(
+                        "training.templateEditForbidden",
+                        "Diese Vorlage kannst du nicht direkt bearbeiten. Du kannst sie aber duplizieren."
+                      )}
                     </div>
                   )}
                 </div>
-
-                <div>
-                  <h3 className="text-sm font-semibold mb-2">
-                    {t("training.templatesFriends", "Vorlagen von Freunden")}
-                  </h3>
-                  {friendTemplates.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      {t("training.noTemplates", "Keine Vorlagen gefunden.")}
-                    </p>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {friendTemplates.map((template) => (
-                        <Card key={template.id}>
-                          <CardContent className="p-4 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="font-medium">{template.title}</span>
-                              <Badge variant="outline" className="text-xs">
-                                Friends
-                              </Badge>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleUseTemplate(template)}
-                            >
-                              {t("training.useTemplate", "Vorlage nutzen")}
-                            </Button>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-semibold mb-2">
-                    {t("training.templatesPublic", "Öffentliche Vorlagen")}
-                  </h3>
-                  {publicTemplates.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      {t("training.noTemplates", "Keine Vorlagen gefunden.")}
-                    </p>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {publicTemplates.map((template) => (
-                        <Card key={template.id}>
-                          <CardContent className="p-4 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="font-medium">{template.title}</span>
-                              <Badge variant="outline" className="text-xs">
-                                Public
-                              </Badge>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleUseTemplate(template)}
-                            >
-                              {t("training.useTemplate", "Vorlage nutzen")}
-                            </Button>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              )}
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         <TabsContent value="recovery" className="space-y-4 md:space-y-6">

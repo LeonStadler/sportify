@@ -75,6 +75,8 @@ export interface Workout {
   muscleGroups?: string[] | null;
   visibility?: "private" | "friends" | "public";
   isTemplate?: boolean;
+  sourceTemplateId?: string | null;
+  usageCount?: number;
   owner?: {
     id: string;
     firstName?: string;

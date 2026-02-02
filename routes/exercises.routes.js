@@ -355,12 +355,42 @@ export const createExercisesRouter = (pool) => {
         return res.status(400).json({ error: "Grund ist erforderlich." });
       }
 
-      const { rows } = await pool.query(
-        `INSERT INTO exercise_reports (id, exercise_id, reported_by, reason, details)
-         VALUES (gen_random_uuid(), $1, $2, $3, $4)
-         RETURNING *`,
-        [id, req.user.id, String(reason).trim(), details || null]
+      const { rows: exerciseRows } = await pool.query(
+        "SELECT id FROM exercises WHERE id = $1 AND is_active = true",
+        [id]
       );
+      if (exerciseRows.length === 0) {
+        return res.status(404).json({ error: "Übung nicht gefunden." });
+      }
+
+      const reportId = randomUUID();
+      const normalizedReason = String(reason).trim();
+      const normalizedDetails =
+        details && String(details).trim().length > 0
+          ? String(details).trim()
+          : null;
+
+      let rows;
+      try {
+        // Newer schema
+        ({ rows } = await pool.query(
+          `INSERT INTO exercise_reports (id, exercise_id, reported_by, reason, details)
+           VALUES ($1, $2, $3, $4, $5)
+           RETURNING *`,
+          [reportId, id, req.user.id, normalizedReason, normalizedDetails]
+        ));
+      } catch (insertError) {
+        if (insertError?.code !== "42703") {
+          throw insertError;
+        }
+        // Legacy schema fallback (column was named "description")
+        ({ rows } = await pool.query(
+          `INSERT INTO exercise_reports (id, exercise_id, reported_by, reason, description)
+           VALUES ($1, $2, $3, $4, $5)
+           RETURNING *`,
+          [reportId, id, req.user.id, normalizedReason, normalizedDetails]
+        ));
+      }
       res.status(201).json(toCamelCase(rows[0]));
     } catch (error) {
       console.error("Exercise report error:", error);

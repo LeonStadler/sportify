@@ -571,7 +571,15 @@ export const createAdminRouter = (pool) => {
           `SELECT * FROM exercise_reports WHERE status = $1 ORDER BY created_at DESC`,
           [status]
         );
-        res.json(rows.map((row) => toCamelCase(row)));
+        res.json(
+          rows.map((row) => {
+            const normalized = toCamelCase(row);
+            if (!normalized.description && normalized.details) {
+              normalized.description = normalized.details;
+            }
+            return normalized;
+          })
+        );
       } catch (error) {
         console.error("Admin exercise reports error:", error);
         res

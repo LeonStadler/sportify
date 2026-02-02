@@ -5,6 +5,7 @@ import {
   DEFAULT_WEEKLY_POINT_CHALLENGE,
   DEFAULT_WEEKLY_POINTS_GOAL,
 } from "../config/badges.js";
+import { createSummaryUnsubscribeUrl } from "./emailPreferencesService.js";
 import { sendJobFailureAlert } from "./alertService.js";
 import {
   grantCategoryRankAward,
@@ -39,6 +40,39 @@ const ACTIVITY_LABELS = {
 const parseNumber = (value, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const parsePreferences = (value) => {
+  if (!value) return {};
+  if (typeof value === "object" && !Array.isArray(value)) return value;
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? parsed
+        : {};
+    } catch (_error) {
+      return {};
+    }
+  }
+
+  return {};
+};
+
+const hasSummaryEmailsEnabled = (preferences) =>
+  preferences?.notifications?.email !== false;
+
+const getSummaryUnsubscribeUrl = (userId) => {
+  try {
+    return createSummaryUnsubscribeUrl({ userId });
+  } catch (error) {
+    console.error(
+      `Could not create summary unsubscribe URL for user ${userId}:`,
+      error
+    );
+    return null;
+  }
 };
 
 const getOffsetMinutes = () => {
@@ -198,6 +232,7 @@ export const processWeeklyEvents = async (
                 u.last_name,
                 u.nickname,
                 u.display_preference,
+                u.preferences,
                 u.weekly_goals,
                 u.show_in_global_rankings,
                 COALESCE(SUM(wa.points_earned), 0) AS total_points,
@@ -256,6 +291,9 @@ export const processWeeklyEvents = async (
         lastName: row.last_name,
         nickname: row.nickname,
         displayPreference: row.display_preference,
+        summaryEmailsEnabled: hasSummaryEmailsEnabled(
+          parsePreferences(row.preferences)
+        ),
         showInGlobalRankings: row.show_in_global_rankings,
         weeklyGoals: parseWeeklyGoals(row.weekly_goals),
         totalsByType,
@@ -412,12 +450,28 @@ export const processWeeklyEvents = async (
     // Process emails with individual error handling to prevent partial failures
     const emailResults = [];
     for (const summary of summaries) {
-      if (!summary.email) continue;
+      if (!summary.email) {
+        emailResults.push({
+          userId: summary.userId,
+          status: "skipped",
+          reason: "missing-recipient-email",
+        });
+        continue;
+      }
+      if (!summary.summaryEmailsEnabled) {
+        emailResults.push({
+          userId: summary.userId,
+          status: "skipped",
+          reason: "email-notifications-disabled",
+        });
+        continue;
+      }
       try {
         const badges = weeklyBadgesMap.get(summary.userId) || [];
         const awards = weeklyAwardsMap.get(summary.userId) || [];
         const evaluation = goalEvaluationMap.get(summary.userId);
         const leaderboard = leaderboardEvaluations.get(summary.userId);
+        const unsubscribeUrl = getSummaryUnsubscribeUrl(summary.userId);
 
         const activityLines = Object.entries(summary.totalsByType)
           .map(([type, amount]) => {
@@ -456,6 +510,11 @@ export const processWeeklyEvents = async (
             ? `• Neue Auszeichnungen: ${awards.map((a) => a.label).join(", ")}`
             : null,
           "",
+          unsubscribeUrl
+            ? "Wenn du diese Zusammenfassung nicht mehr erhalten möchtest, kannst du sie hier abbestellen:"
+            : null,
+          unsubscribeUrl || null,
+          unsubscribeUrl ? "" : null,
           "Bleib dran und viel Erfolg für die nächste Woche!",
         ].filter((line) => line !== null && line !== undefined);
 
@@ -555,6 +614,7 @@ export const processMonthlyEvents = async (
                 u.first_name,
                 u.last_name,
                 u.nickname,
+                u.preferences,
                 u.show_in_global_rankings,
                 COALESCE(SUM(wa.points_earned), 0) AS total_points
             FROM users u
@@ -598,6 +658,9 @@ export const processMonthlyEvents = async (
       email: row.email,
       firstName: row.first_name,
       lastName: row.last_name,
+      summaryEmailsEnabled: hasSummaryEmailsEnabled(
+        parsePreferences(row.preferences)
+      ),
       totalPoints: parseNumber(row.total_points, 0),
       totalsByType: activityTotalsMap.get(row.user_id) ?? {},
       showInGlobalRankings: row.show_in_global_rankings !== false, // default true
@@ -796,12 +859,28 @@ export const processMonthlyEvents = async (
     // Process emails with individual error handling to prevent partial failures
     const emailResults = [];
     for (const summary of summaries) {
-      if (!summary.email) continue;
+      if (!summary.email) {
+        emailResults.push({
+          userId: summary.userId,
+          status: "skipped",
+          reason: "missing-recipient-email",
+        });
+        continue;
+      }
+      if (!summary.summaryEmailsEnabled) {
+        emailResults.push({
+          userId: summary.userId,
+          status: "skipped",
+          reason: "email-notifications-disabled",
+        });
+        continue;
+      }
       try {
         const awards = monthlyAwardsMap.get(summary.userId) || [];
         const badges = monthlyBadgesMap.get(summary.userId) || [];
         const challengeMet =
           summary.totalPoints >= DEFAULT_MONTHLY_POINT_CHALLENGE;
+        const unsubscribeUrl = getSummaryUnsubscribeUrl(summary.userId);
 
         // Build Ranking Strings for Email
         const rankingLines = [];
@@ -860,6 +939,11 @@ export const processMonthlyEvents = async (
             ? `• Neue Auszeichnungen: ${awards.map((a) => a.label).join(", ")}`
             : null,
           "",
+          unsubscribeUrl
+            ? "Wenn du diese Zusammenfassung nicht mehr erhalten möchtest, kannst du sie hier abbestellen:"
+            : null,
+          unsubscribeUrl || null,
+          unsubscribeUrl ? "" : null,
           "Großartige Arbeit in diesem Monat – weiter so!",
         ].filter((line) => line !== null && line !== undefined);
 

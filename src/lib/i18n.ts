@@ -902,6 +902,11 @@ const resources = {
         awardLabel: "Auszeichnung",
         joinedSince: "Mitglied seit {{date}}",
         backToFriends: "Zurück zu Freunden",
+        notFriends: {
+          title: "Nur für Freunde",
+          description: "Dieses Profil ist nur für Freunde sichtbar.",
+          backToFriends: "Zu den Freunden",
+        },
         errors: {
           missingId: "Keine Freundes-ID angegeben.",
           loadFailed: "Profil konnte nicht geladen werden.",
@@ -3780,6 +3785,11 @@ const resources = {
         awardLabel: "Award",
         joinedSince: "Member since {{date}}",
         backToFriends: "Back to Friends",
+        notFriends: {
+          title: "Friends only",
+          description: "This profile is visible to friends only.",
+          backToFriends: "Back to friends",
+        },
         errors: {
           missingId: "No friend ID provided.",
           loadFailed: "Profile could not be loaded.",

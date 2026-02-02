@@ -8,7 +8,7 @@ import { parseAvatarConfig } from "@/lib/avatar";
 import { getBadgeText } from "@/lib/badges";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
-import { ArrowLeft, Award, Dumbbell, Medal } from "lucide-react";
+import { ArrowLeft, Award, Dumbbell, Home, Medal, UserX } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import NiceAvatar from "react-nice-avatar";
@@ -141,12 +141,16 @@ export function FriendProfile() {
   const [profile, setProfile] = useState<FriendProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<"not-friends" | "generic" | null>(
+    null
+  );
 
   useEffect(() => {
     const controller = new AbortController();
 
     const loadProfile = async () => {
       if (!friendId) {
+        setErrorKind("generic");
         setError(t("friendProfile.errors.missingId"));
         setLoading(false);
         return;
@@ -154,6 +158,8 @@ export function FriendProfile() {
 
       setLoading(true);
       setError(null);
+      setErrorKind(null);
+      let nextErrorKind: "not-friends" | "generic" = "generic";
 
       try {
         const response = await fetch(`${API_URL}/profile/friends/${friendId}`, {
@@ -165,6 +171,12 @@ export function FriendProfile() {
           const payload = await response.json().catch(() => ({}));
           const message =
             payload?.error || t("friendProfile.errors.loadFailed");
+          if (
+            response.status === 403 &&
+            /nicht befreundet|not friends/i.test(message)
+          ) {
+            nextErrorKind = "not-friends";
+          }
           throw new Error(message);
         }
 
@@ -172,6 +184,7 @@ export function FriendProfile() {
         setProfile(data);
       } catch (fetchError) {
         if (controller.signal.aborted) return;
+        setErrorKind(nextErrorKind);
         setError(
           fetchError instanceof Error
             ? fetchError.message
@@ -234,6 +247,51 @@ export function FriendProfile() {
     }
 
     if (error) {
+      if (errorKind === "not-friends") {
+        return (
+          <div className="min-h-[60vh] flex items-center justify-center bg-background">
+            <div className="text-center max-w-md mx-auto px-4">
+              <h1 className="text-8xl md:text-9xl font-bold mb-4 text-primary">
+                403
+              </h1>
+              <h2 className="text-2xl font-semibold mb-2 text-foreground">
+                {t("friendProfile.notFriends.title", "Nur für Freunde")}
+              </h2>
+              <p className="text-lg text-muted-foreground mb-8">
+                {t(
+                  "friendProfile.notFriends.description",
+                  "Dieses Profil ist nur für Freunde sichtbar."
+                )}
+              </p>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <Button
+                  asChild
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                  size="lg"
+                >
+                  <Link
+                    to="/friends"
+                    className="inline-flex items-center gap-2"
+                  >
+                    <UserX className="w-5 h-5" />
+                    {t(
+                      "friendProfile.notFriends.backToFriends",
+                      "Zu den Freunden"
+                    )}
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="lg">
+                  <Link to="/" className="inline-flex items-center gap-2">
+                    <Home className="w-5 h-5" />
+                    {t("notFound.backHome", "Zur Startseite")}
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <Card>
           <CardContent className="p-8 text-center text-destructive">

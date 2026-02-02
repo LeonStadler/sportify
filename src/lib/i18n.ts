@@ -364,6 +364,10 @@ const resources = {
         nicknameLabel: "Spitzname",
         nicknameRequired:
           "Wenn 'Spitzname' als Anzeigename gewählt ist, muss ein Spitzname angegeben werden.",
+        nicknameNoSpaces: "Ein Spitzname darf keine Leerzeichen enthalten.",
+        nicknameInvalidFormat:
+          "Ein Spitzname darf nur Buchstaben, Zahlen und Unterstriche enthalten.",
+        nicknameTaken: "Dieser Spitzname ist bereits vergeben.",
         firstNamePlaceholder: "Vorname",
         lastNamePlaceholder: "Nachname",
         nicknamePlaceholder: "Spitzname",
@@ -1140,6 +1144,7 @@ const resources = {
         templatesOwn: "Deine Vorlagen",
         templatesFriends: "Vorlagen von Freunden",
         templatesPublic: "Öffentliche Vorlagen",
+        sourceTemplateCredit: "Vorlage von {{name}}",
         previous: "Vorherige",
         next: "Nächste",
         unknownDate: "Unbekanntes Datum",
@@ -3257,6 +3262,10 @@ const resources = {
         nicknameLabel: "Nickname",
         nicknameRequired:
           "If 'Nickname' is selected as display name, a nickname must be provided.",
+        nicknameNoSpaces: "A nickname must not contain spaces.",
+        nicknameInvalidFormat:
+          "A nickname may only contain letters, numbers, and underscores.",
+        nicknameTaken: "This nickname is already taken.",
         firstNamePlaceholder: "First Name",
         lastNamePlaceholder: "Last Name",
         nicknamePlaceholder: "Nickname",
@@ -4019,6 +4028,7 @@ const resources = {
         templatesOwn: "Your templates",
         templatesFriends: "Friends' templates",
         templatesPublic: "Public templates",
+        sourceTemplateCredit: "Template by {{name}}",
         viewAllWorkouts: "View All",
         previous: "Previous",
         next: "Next",

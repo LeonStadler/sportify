@@ -151,6 +151,44 @@ export const createAuthRouter = (pool) => {
         .json({ error: "Passwort muss mindestens 8 Zeichen lang sein." });
     }
 
+    const normalizedNickname =
+      nickname && String(nickname).trim().length > 0
+        ? String(nickname).trim()
+        : null;
+    if (normalizedNickname && /\s/.test(normalizedNickname)) {
+      return res
+        .status(400)
+        .json({ error: "Spitzname darf keine Leerzeichen enthalten." });
+    }
+    if (normalizedNickname && !/^[A-Za-z0-9_]+$/.test(normalizedNickname)) {
+      return res.status(400).json({
+        error:
+          "Spitzname darf nur Buchstaben, Zahlen und Unterstriche enthalten.",
+      });
+    }
+    if (displayPreference === "nickname" && !normalizedNickname) {
+      return res.status(400).json({
+        error:
+          "Wenn 'Spitzname' als Anzeigename gewählt ist, muss ein Spitzname angegeben werden.",
+      });
+    }
+
+    if (normalizedNickname) {
+      const { rows: duplicateNicknameRows } = await pool.query(
+        `SELECT id
+         FROM users
+         WHERE nickname IS NOT NULL
+           AND LOWER(nickname) = LOWER($1)
+         LIMIT 1`,
+        [normalizedNickname]
+      );
+      if (duplicateNicknameRows.length > 0) {
+        return res.status(409).json({
+          error: "Dieser Spitzname ist bereits vergeben.",
+        });
+      }
+    }
+
     let invitedBy = null;
     let invitationId = null;
 
@@ -237,7 +275,7 @@ export const createAuthRouter = (pool) => {
         password_hash,
         firstName,
         lastName,
-        nickname,
+        normalizedNickname,
         displayPreference || "firstName",
         "{}",
       ];
@@ -315,10 +353,25 @@ Dein Sportify-Team`;
       res.status(201).json({ user, token, invitedBy: invitedBy || undefined });
     } catch (error) {
       console.error("Registration error:", error.message);
+      if (
+        error.code === "23505" &&
+        typeof error.constraint === "string" &&
+        error.constraint.includes("nickname")
+      ) {
+        return res.status(409).json({
+          error: "Dieser Spitzname ist bereits vergeben.",
+        });
+      }
       if (error.code === "23505") {
         // Unique violation
         return res.status(409).json({
           error: "Ein Benutzer mit dieser E-Mail-Adresse existiert bereits.",
+        });
+      }
+      if (error.code === "23514" && error.constraint === "nickname_format") {
+        return res.status(400).json({
+          error:
+            "Spitzname darf nur Buchstaben, Zahlen und Unterstriche enthalten.",
         });
       }
       const errorMessage =

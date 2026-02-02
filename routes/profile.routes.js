@@ -35,6 +35,60 @@ export const createProfileRouter = (pool) => {
           .json({ error: "Vorname und Nachname sind erforderlich." });
       }
 
+      const normalizedNickname =
+        nickname && String(nickname).trim().length > 0
+          ? String(nickname).trim()
+          : null;
+      if (normalizedNickname && /\s/.test(normalizedNickname)) {
+        return res.status(400).json({
+          error: "Spitzname darf keine Leerzeichen enthalten.",
+        });
+      }
+      if (normalizedNickname && !/^[A-Za-z0-9_]+$/.test(normalizedNickname)) {
+        return res.status(400).json({
+          error:
+            "Spitzname darf nur Buchstaben, Zahlen und Unterstriche enthalten.",
+        });
+      }
+
+      const allowedDisplayPreferences = new Set([
+        "firstName",
+        "fullName",
+        "nickname",
+      ]);
+      const normalizedDisplayPreference = allowedDisplayPreferences.has(
+        displayPreference
+      )
+        ? displayPreference
+        : "firstName";
+
+      if (
+        normalizedDisplayPreference === "nickname" &&
+        !normalizedNickname
+      ) {
+        return res.status(400).json({
+          error:
+            "Wenn 'Spitzname' als Anzeigename gewählt ist, muss ein Spitzname angegeben werden.",
+        });
+      }
+
+      if (normalizedNickname) {
+        const { rows: duplicateNicknameRows } = await pool.query(
+          `SELECT id
+           FROM users
+           WHERE id <> $1
+             AND nickname IS NOT NULL
+             AND LOWER(nickname) = LOWER($2)
+           LIMIT 1`,
+          [req.user.id, normalizedNickname]
+        );
+        if (duplicateNicknameRows.length > 0) {
+          return res.status(409).json({
+            error: "Dieser Spitzname ist bereits vergeben.",
+          });
+        }
+      }
+
       const updateQuery = `
                 UPDATE users
                 SET first_name = $1,
@@ -55,8 +109,8 @@ export const createProfileRouter = (pool) => {
       const { rows } = await pool.query(updateQuery, [
         firstName.trim(),
         lastName.trim(),
-        nickname ? nickname.trim() : null,
-        displayPreference || "firstName",
+        normalizedNickname,
+        normalizedDisplayPreference,
         languagePreference || "de",
         preferences ? JSON.stringify(preferences) : "{}",
         avatar
@@ -93,6 +147,23 @@ export const createProfileRouter = (pool) => {
       res.json(user);
     } catch (error) {
       console.error("Update profile error:", error);
+
+      if (error?.code === "23514" && error?.constraint === "nickname_format") {
+        return res.status(400).json({
+          error:
+            "Spitzname darf nur Buchstaben, Zahlen und Unterstriche enthalten.",
+        });
+      }
+      if (
+        error?.code === "23505" &&
+        typeof error?.constraint === "string" &&
+        error.constraint.includes("nickname")
+      ) {
+        return res.status(409).json({
+          error: "Dieser Spitzname ist bereits vergeben.",
+        });
+      }
+
       res
         .status(500)
         .json({ error: "Serverfehler beim Aktualisieren des Profils." });

@@ -561,16 +561,21 @@ export function Profile() {
   };
 
   // Auto-Save für einzelne Profilfelder
-  const saveProfileField = async (fieldName: string) => {
+  const saveProfileField = async (
+    fieldName: string,
+    profileOverride?: typeof profileForm
+  ) => {
+    const currentProfileForm = profileOverride ?? profileForm;
+
     // Validierung
-    if (fieldName === "firstName" && !profileForm.firstName?.trim()) {
+    if (fieldName === "firstName" && !currentProfileForm.firstName?.trim()) {
       setValidationErrors((prev) => ({
         ...prev,
         firstName: t("profile.firstNameRequired"),
       }));
       return;
     }
-    if (fieldName === "lastName" && !profileForm.lastName?.trim()) {
+    if (fieldName === "lastName" && !currentProfileForm.lastName?.trim()) {
       setValidationErrors((prev) => ({
         ...prev,
         lastName: t("profile.lastNameRequired"),
@@ -578,10 +583,36 @@ export function Profile() {
       return;
     }
 
+    if (currentProfileForm.nickname?.trim() && /\s/.test(currentProfileForm.nickname.trim())) {
+      toast({
+        title: t("common.error"),
+        description: t(
+          "profile.nicknameNoSpaces",
+          "Ein Spitzname darf keine Leerzeichen enthalten."
+        ),
+        variant: "destructive",
+      });
+      return;
+    }
+    if (
+      currentProfileForm.nickname?.trim() &&
+      !/^[A-Za-z0-9_]+$/.test(currentProfileForm.nickname.trim())
+    ) {
+      toast({
+        title: t("common.error"),
+        description: t(
+          "profile.nicknameInvalidFormat",
+          "Ein Spitzname darf nur Buchstaben, Zahlen und Unterstriche enthalten."
+        ),
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Check if displayPreference is 'nickname' but no nickname is provided
     if (
-      profileForm.displayPreference === "nickname" &&
-      (!profileForm.nickname || profileForm.nickname.trim() === "")
+      currentProfileForm.displayPreference === "nickname" &&
+      (!currentProfileForm.nickname || currentProfileForm.nickname.trim() === "")
     ) {
       toast({
         title: t("common.error"),
@@ -594,7 +625,7 @@ export function Profile() {
     try {
       await updateProfile(
         {
-          ...profileForm,
+          ...currentProfileForm,
           avatar: user?.avatar || undefined,
           showInGlobalRankings,
         },
@@ -1131,18 +1162,55 @@ export function Profile() {
                     <Select
                       value={profileForm.displayPreference}
                       onValueChange={(value) => {
-                        setProfileForm((prev) => ({
-                          ...prev,
+                        if (
+                          value === "nickname" &&
+                          (!profileForm.nickname ||
+                            profileForm.nickname.trim() === "")
+                        ) {
+                          toast({
+                            title: t("common.error"),
+                            description: t("profile.nicknameRequired"),
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        if (
+                          value === "nickname" &&
+                          /\s/.test(profileForm.nickname.trim())
+                        ) {
+                          toast({
+                            title: t("common.error"),
+                            description: t(
+                              "profile.nicknameNoSpaces",
+                              "Ein Spitzname darf keine Leerzeichen enthalten."
+                            ),
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        if (
+                          value === "nickname" &&
+                          !/^[A-Za-z0-9_]+$/.test(profileForm.nickname.trim())
+                        ) {
+                          toast({
+                            title: t("common.error"),
+                            description: t(
+                              "profile.nicknameInvalidFormat",
+                              "Ein Spitzname darf nur Buchstaben, Zahlen und Unterstriche enthalten."
+                            ),
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        const nextProfileForm = {
+                          ...profileForm,
                           displayPreference: value as
                             | "nickname"
                             | "firstName"
                             | "fullName",
-                        }));
-                        // Speichere sofort bei Select-Änderung
-                        setTimeout(
-                          () => saveProfileField("displayPreference"),
-                          0
-                        );
+                        };
+                        setProfileForm(nextProfileForm);
+                        void saveProfileField("displayPreference", nextProfileForm);
                       }}
                     >
                       <SelectTrigger>
@@ -1159,7 +1227,9 @@ export function Profile() {
                           value="nickname"
                           disabled={
                             !profileForm.nickname ||
-                            profileForm.nickname.trim() === ""
+                            profileForm.nickname.trim() === "" ||
+                            /\s/.test(profileForm.nickname.trim()) ||
+                            !/^[A-Za-z0-9_]+$/.test(profileForm.nickname.trim())
                           }
                         >
                           {t("profile.nicknameOption")}{" "}

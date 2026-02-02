@@ -76,6 +76,13 @@ export interface Workout {
   visibility?: "private" | "friends" | "public";
   isTemplate?: boolean;
   sourceTemplateId?: string | null;
+  sourceTemplateTitle?: string | null;
+  sourceTemplateOwnerId?: string | null;
+  sourceTemplateOwnerDisplayName?: string | null;
+  sourceTemplateRootId?: string | null;
+  sourceTemplateRootTitle?: string | null;
+  sourceTemplateRootOwnerId?: string | null;
+  sourceTemplateRootOwnerDisplayName?: string | null;
   usageCount?: number;
   owner?: {
     id: string;

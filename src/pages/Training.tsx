@@ -58,12 +58,13 @@ import { API_URL } from "@/lib/api";
 import type { Workout } from "@/types/workout";
 import { getNormalizedRange, getRangeForPeriod, toDateParam } from "@/utils/dateRanges";
 import { convertDistance, convertWeightFromKg } from "@/utils/units";
-import { ArrowDown, ArrowUp, Copy, Eye, Info, Pencil, Play, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, Copy, Eye, Info, Pencil, Play, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 interface WorkoutResponse {
   workouts: Workout[];
   pagination: {
@@ -77,6 +78,10 @@ interface WorkoutResponse {
 
 interface TemplateResponse {
   templates: Workout[];
+}
+
+interface TemplateFetchOptions {
+  silent?: boolean;
 }
 
 const WORKOUTS_PER_PAGE = 10;
@@ -187,8 +192,14 @@ export function Training() {
   const [templatePageSize, setTemplatePageSize] = useState(12);
   const [templateCreateOpen, setTemplateCreateOpen] = useState(false);
   const [templateCreatePrefill, setTemplateCreatePrefill] = useState<Workout | null>(null);
+  const [templateCreateMode, setTemplateCreateMode] = useState<"create" | "duplicate">(
+    "create"
+  );
   const [templateDetailId, setTemplateDetailId] = useState<string | null>(null);
   const [templateDetailMode, setTemplateDetailMode] = useState<"view" | "edit">("view");
+  const [templateLineage, setTemplateLineage] = useState<Workout[]>([]);
+  const [templateLineageLoading, setTemplateLineageLoading] = useState(false);
+  const [templateDuplicatesOpen, setTemplateDuplicatesOpen] = useState(false);
   const workoutFormRef = useRef<HTMLDivElement | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -572,6 +583,17 @@ export function Training() {
         activitiesCount: template.activities?.length || 0,
         usageCount: Number(template.usageCount || 0),
         ownerName: getTemplateOwnerName(template),
+        ownerId: template.owner?.id || null,
+        sourceTemplateId: template.sourceTemplateId || null,
+        sourceTemplateTitle: template.sourceTemplateTitle || null,
+        sourceTemplateOwnerId: template.sourceTemplateOwnerId || null,
+        sourceTemplateOwnerDisplayName:
+          template.sourceTemplateOwnerDisplayName || null,
+        sourceTemplateRootId: template.sourceTemplateRootId || null,
+        sourceTemplateRootTitle: template.sourceTemplateRootTitle || null,
+        sourceTemplateRootOwnerId: template.sourceTemplateRootOwnerId || null,
+        sourceTemplateRootOwnerDisplayName:
+          template.sourceTemplateRootOwnerDisplayName || null,
         isOwn: template.owner?.id === user?.id,
         updatedAt: template.updatedAt,
       })),
@@ -627,12 +649,68 @@ export function Training() {
 
   const openTemplateCreate = (prefill?: Workout | null) => {
     setTemplateCreatePrefill(prefill || null);
+    setTemplateCreateMode(prefill ? "duplicate" : "create");
     setTemplateCreateOpen(true);
   };
 
   const handleDuplicateTemplate = (template: Workout) => {
+    // Ensure duplicate form opens cleanly even when a details dialog is currently open.
+    setTemplateDetailId(null);
+    setTemplateDetailMode("view");
     openTemplateCreate(template);
   };
+
+  const fetchTemplateById = useCallback(
+    async (templateId: string, options?: TemplateFetchOptions) => {
+      const localMatch = templates.find((entry) => entry.id === templateId);
+      if (localMatch) return localMatch;
+
+      try {
+        const token = localStorage.getItem("token");
+        const response = await fetch(`${API_URL}/workouts/templates/${templateId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Template not accessible");
+        }
+
+        const template: Workout = await response.json();
+        setTemplates((prev) =>
+          prev.some((entry) => entry.id === template.id) ? prev : [template, ...prev]
+        );
+        return template;
+      } catch (error) {
+        if (!options?.silent) {
+          console.error("Template fetch error:", error);
+          toast({
+            title: t("common.error"),
+            description: t(
+              "training.sourceTemplateUnavailable",
+              "Original-Vorlage ist nicht verfuegbar (ggf. privat oder keine Freundschaft)."
+            ),
+            variant: "destructive",
+          });
+        }
+        return null;
+      }
+    },
+    [templates, t, toast]
+  );
+
+  const openSourceTemplate = useCallback(
+    async (templateId?: string | null) => {
+      if (!templateId) return;
+
+      const template = await fetchTemplateById(templateId);
+      if (!template) return;
+      setActiveTab("templates");
+      openTemplateDetails(template, "view");
+    },
+    [fetchTemplateById]
+  );
 
   const handleTemplateDelete = async (template: Workout) => {
     if (template.owner?.id !== user?.id) return;
@@ -691,6 +769,67 @@ export function Training() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [templateDetailId, templateFilteredSorted]);
 
+  useEffect(() => {
+    setTemplateDuplicatesOpen(false);
+  }, [templateDetailId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const buildLineage = async () => {
+      if (!templateDetail) {
+        setTemplateLineage([]);
+        return;
+      }
+
+      setTemplateLineageLoading(true);
+      const chain: Workout[] = [templateDetail];
+      const visited = new Set<string>([templateDetail.id]);
+      let cursor: Workout | null = templateDetail;
+
+      while (cursor?.sourceTemplateId) {
+        const parentId = cursor.sourceTemplateId;
+        if (!parentId || visited.has(parentId)) break;
+        visited.add(parentId);
+
+        const parent =
+          templates.find((entry) => entry.id === parentId) ||
+          (await fetchTemplateById(parentId, { silent: true }));
+        if (!parent) break;
+        chain.unshift(parent);
+        cursor = parent;
+
+        if (chain.length >= 12) break;
+      }
+
+      if (!cancelled) {
+        setTemplateLineage(chain);
+        setTemplateLineageLoading(false);
+      }
+    };
+
+    buildLineage();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [templateDetail, templates, fetchTemplateById]);
+
+  const templateRootId = useMemo(
+    () =>
+      templateDetail
+        ? templateDetail.sourceTemplateRootId || templateDetail.id
+        : null,
+    [templateDetail]
+  );
+
+  const templateRootDuplicates = useMemo(() => {
+    if (!templateRootId) return [];
+    return templates.filter(
+      (entry) => (entry.sourceTemplateRootId || entry.id) === templateRootId
+    );
+  }, [templates, templateRootId]);
+
   const templateBrowseLabels = useMemo(
     () => ({
       title: t("training.templateTitle", "Titel"),
@@ -702,6 +841,8 @@ export function Training() {
       muscleGroups: t("exerciseLibrary.muscleGroups", "Muskelgruppen"),
       usageCount: t("training.templateUsageCount", "Nutzungen"),
       activities: t("training.templateActivities", "Aktivitäten"),
+      sourceTemplateCredit: t("training.templateOriginalBy", "Original von"),
+      duplicateOf: t("training.templateDuplicateOf", "Duplikat von"),
     }),
     [t]
   );
@@ -931,6 +1072,68 @@ export function Training() {
     }
   };
 
+  const getSourceTemplateCredit = (workout: Workout) => {
+    if (!workout.sourceTemplateRootOwnerDisplayName) {
+      return null;
+    }
+    if (
+      workout.sourceTemplateRootOwnerId &&
+      user?.id &&
+      workout.sourceTemplateRootOwnerId === user.id
+    ) {
+      return null;
+    }
+    return t("training.templateOriginalByName", {
+      name: workout.sourceTemplateRootOwnerDisplayName,
+      defaultValue: "Original von {{name}}",
+    });
+  };
+
+  const getTemplateSourceCredit = (template: Workout) => {
+    if (!template.sourceTemplateRootOwnerDisplayName) {
+      return null;
+    }
+    if (
+      template.sourceTemplateRootOwnerId &&
+      template.owner?.id &&
+      template.sourceTemplateRootOwnerId === template.owner.id
+    ) {
+      return null;
+    }
+    return t("training.templateOriginalByName", {
+      name: template.sourceTemplateRootOwnerDisplayName,
+      defaultValue: "Original von {{name}}",
+    });
+  };
+
+  const getTemplateDuplicateLabel = (template: Workout) => {
+    if (!template.sourceTemplateId) {
+      return null;
+    }
+    const sourceName =
+      template.sourceTemplateTitle ||
+      template.sourceTemplateOwnerDisplayName ||
+      t("training.templates", "Workout Vorlage");
+    return t("training.templateDuplicateOfTitle", {
+      title: sourceName,
+      defaultValue: "Duplikat von {{title}}",
+    });
+  };
+
+  const getTemplateParentName = (template: Workout) =>
+    template.sourceTemplateId
+      ? template.sourceTemplateTitle ||
+        template.sourceTemplateOwnerDisplayName ||
+        t("training.templates", "Workout Vorlage")
+      : null;
+
+  const getTemplateRootName = (template: Workout) =>
+    template.sourceTemplateRootId
+      ? template.sourceTemplateRootTitle ||
+        template.sourceTemplateRootOwnerDisplayName ||
+        t("training.templates", "Workout Vorlage")
+      : null;
+
   const formatDuration = (minutes?: number) => {
     if (!minutes) return null;
     const hours = Math.floor(minutes / 60);
@@ -1136,6 +1339,18 @@ export function Training() {
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                               <span>📅 {formatWorkoutDateTime(workout)}</span>
                             </div>
+                            {getSourceTemplateCredit(workout) && (
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                ⭐{" "}
+                                <button
+                                  type="button"
+                                  className="underline underline-offset-2 hover:text-foreground"
+                                  onClick={() => openSourceTemplate(workout.sourceTemplateId)}
+                                >
+                                  {getSourceTemplateCredit(workout)}
+                                </button>
+                              </div>
+                            )}
                           </div>
                           <div className="flex gap-2">
                             {isWorkoutEditable(workout) && (
@@ -1350,6 +1565,18 @@ export function Training() {
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <span>📅 {formatWorkoutDateTime(workout)}</span>
                           </div>
+                          {getSourceTemplateCredit(workout) && (
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              ⭐{" "}
+                              <button
+                                type="button"
+                                className="underline underline-offset-2 hover:text-foreground"
+                                onClick={() => openSourceTemplate(workout.sourceTemplateId)}
+                              >
+                                {getSourceTemplateCredit(workout)}
+                              </button>
+                            </div>
+                          )}
                         </div>
                         <div className="flex gap-2">
                           {isWorkoutEditable(workout) && (
@@ -1476,6 +1703,10 @@ export function Training() {
                   const template = templates.find((entry) => entry.id === item.id);
                   if (template) openTemplateDetails(template, "view");
                 }}
+                onSourceTemplateClick={(item) => openSourceTemplate(item.sourceTemplateId)}
+                onRootTemplateClick={(item) =>
+                  openSourceTemplate(item.sourceTemplateRootId)
+                }
                 renderMenuItems={(item) => {
                   const template = templates.find((entry) => entry.id === item.id);
                   if (!template) return null;
@@ -1489,24 +1720,23 @@ export function Training() {
                         <Play className="mr-2 h-4 w-4" />
                         {t("training.useTemplate", "Vorlage nutzen")}
                       </DropdownMenuItem>
-                      {template.owner?.id === user?.id ? (
-                        <>
-                          <DropdownMenuItem onSelect={() => openTemplateDetails(template, "edit")}>
-                            <Pencil className="mr-2 h-4 w-4" />
-                            {t("training.editTemplate", "Vorlage bearbeiten")}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onSelect={() => handleTemplateDelete(template)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            {t("training.deleteTemplate", "Vorlage löschen")}
-                          </DropdownMenuItem>
-                        </>
-                      ) : (
-                        <DropdownMenuItem onSelect={() => handleDuplicateTemplate(template)}>
-                          <Copy className="mr-2 h-4 w-4" />
-                          {t("training.duplicateTemplate", "Duplizieren")}
+                      {template.owner?.id === user?.id && (
+                        <DropdownMenuItem onSelect={() => openTemplateDetails(template, "edit")}>
+                          <Pencil className="mr-2 h-4 w-4" />
+                          {t("training.editTemplate", "Vorlage bearbeiten")}
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem onSelect={() => handleDuplicateTemplate(template)}>
+                        <Copy className="mr-2 h-4 w-4" />
+                        {t("training.duplicateTemplate", "Duplizieren")}
+                      </DropdownMenuItem>
+                      {template.owner?.id === user?.id && (
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onSelect={() => handleTemplateDelete(template)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          {t("training.deleteTemplate", "Vorlage löschen")}
                         </DropdownMenuItem>
                       )}
                     </>
@@ -1525,6 +1755,10 @@ export function Training() {
                   const template = templates.find((entry) => entry.id === item.id);
                   if (template) openTemplateDetails(template, "view");
                 }}
+                onSourceTemplateClick={(item) => openSourceTemplate(item.sourceTemplateId)}
+                onRootTemplateClick={(item) =>
+                  openSourceTemplate(item.sourceTemplateRootId)
+                }
                 renderMenuItems={(item) => {
                   const template = templates.find((entry) => entry.id === item.id);
                   if (!template) return null;
@@ -1538,24 +1772,23 @@ export function Training() {
                         <Play className="mr-2 h-4 w-4" />
                         {t("training.useTemplate", "Vorlage nutzen")}
                       </DropdownMenuItem>
-                      {template.owner?.id === user?.id ? (
-                        <>
-                          <DropdownMenuItem onSelect={() => openTemplateDetails(template, "edit")}>
-                            <Pencil className="mr-2 h-4 w-4" />
-                            {t("training.editTemplate", "Vorlage bearbeiten")}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onSelect={() => handleTemplateDelete(template)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            {t("training.deleteTemplate", "Vorlage löschen")}
-                          </DropdownMenuItem>
-                        </>
-                      ) : (
-                        <DropdownMenuItem onSelect={() => handleDuplicateTemplate(template)}>
-                          <Copy className="mr-2 h-4 w-4" />
-                          {t("training.duplicateTemplate", "Duplizieren")}
+                      {template.owner?.id === user?.id && (
+                        <DropdownMenuItem onSelect={() => openTemplateDetails(template, "edit")}>
+                          <Pencil className="mr-2 h-4 w-4" />
+                          {t("training.editTemplate", "Vorlage bearbeiten")}
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem onSelect={() => handleDuplicateTemplate(template)}>
+                        <Copy className="mr-2 h-4 w-4" />
+                        {t("training.duplicateTemplate", "Duplizieren")}
+                      </DropdownMenuItem>
+                      {template.owner?.id === user?.id && (
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onSelect={() => handleTemplateDelete(template)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          {t("training.deleteTemplate", "Vorlage löschen")}
                         </DropdownMenuItem>
                       )}
                     </>
@@ -1608,21 +1841,37 @@ export function Training() {
             open={templateCreateOpen}
             onOpenChange={(open) => {
               setTemplateCreateOpen(open);
-              if (!open) setTemplateCreatePrefill(null);
+              if (!open) {
+                setTemplateCreatePrefill(null);
+                setTemplateCreateMode("create");
+              }
             }}
           >
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
-                  {templateCreatePrefill
+                  {templateCreateMode === "duplicate"
                     ? t("training.duplicateTemplate", "Vorlage duplizieren")
                     : t("training.createTemplate", "Vorlage erstellen")}
                 </DialogTitle>
                 <DialogDescription>
-                  {t(
-                    "training.templateCreateHint",
-                    "Du kannst Vorlagen später in der Übersicht bearbeiten."
-                  )}
+                  {templateCreateMode === "duplicate" && templateCreatePrefill
+                    ? templateCreatePrefill.owner?.id === user?.id
+                      ? t("training.templateDuplicateHintOwn", {
+                          source: templateCreatePrefill.title,
+                          defaultValue:
+                            "Dupliziere '{{source}}'. Du kannst danach alles anpassen.",
+                        })
+                      : t("training.templateDuplicateHint", {
+                          source: templateCreatePrefill.title,
+                          owner: getTemplateOwnerName(templateCreatePrefill),
+                          defaultValue:
+                            "Dupliziere '{{source}}' von {{owner}}. Du kannst danach alles anpassen.",
+                        })
+                    : t(
+                        "training.templateCreateHint",
+                        "Du kannst Vorlagen später in der Übersicht bearbeiten."
+                      )}
                 </DialogDescription>
               </DialogHeader>
               <WorkoutForm
@@ -1639,24 +1888,68 @@ export function Training() {
           <Dialog open={Boolean(templateDetailId)} onOpenChange={(open) => (open ? null : closeTemplateDetails())}>
             <DialogContent className="max-w-4xl overflow-y-auto max-h-[85vh]">
               <DialogHeader className="pr-10">
+                <DialogDescription className="sr-only">
+                  {t(
+                    "training.templateDetailsDescription",
+                    "Details und Aktionen fuer die ausgewaehlte Workout-Vorlage."
+                  )}
+                </DialogDescription>
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <DialogTitle className="text-xl">
                       {templateDetail?.title || t("training.templates", "Workout Vorlage")}
                     </DialogTitle>
                     {templateDetail && templateDetailMode === "view" && (
-                      <div className="mt-1 flex flex-wrap gap-2 text-sm text-muted-foreground">
-                        <span>{getTemplateOwnerName(templateDetail)}</span>
-                        <span>·</span>
-                        <span>{getVisibilityLabel(templateDetail.visibility)}</span>
-                        {templateDetail.difficulty ? (
-                          <>
-                            <span>·</span>
-                            <span>
-                              {t("exerciseLibrary.difficulty", "Schwierigkeit")}:{" "}
-                              {templateDetail.difficulty}
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                        <span className="text-muted-foreground">
+                          {getTemplateOwnerName(templateDetail)}
+                        </span>
+                        {getTemplateParentName(templateDetail) ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-900 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-100">
+                            <Copy className="h-3 w-3" />
+                            <span className="text-[11px] font-medium">
+                              {t("training.templateDuplicateOfShort", "Duplikat von")}
                             </span>
-                          </>
+                            <button
+                              type="button"
+                              className="text-[11px] font-semibold hover:underline"
+                              onClick={() =>
+                                openSourceTemplate(templateDetail.sourceTemplateId)
+                              }
+                            >
+                              {getTemplateParentName(templateDetail)}
+                            </button>
+                          </span>
+                        ) : null}
+                        {getTemplateRootName(templateDetail) &&
+                        getTemplateSourceCredit(templateDetail) ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-100">
+                            <Info className="h-3 w-3" />
+                            <span className="text-[11px] font-medium">
+                              {t("training.templateOriginalShort", "Original von")}
+                            </span>
+                            <button
+                              type="button"
+                              className="text-[11px] font-semibold hover:underline"
+                              onClick={() =>
+                                openSourceTemplate(
+                                  templateDetail.sourceTemplateRootId ??
+                                    templateDetail.sourceTemplateId
+                                )
+                              }
+                            >
+                              {getTemplateRootName(templateDetail)}
+                            </button>
+                          </span>
+                        ) : null}
+                        <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-muted-foreground">
+                          {getVisibilityLabel(templateDetail.visibility)}
+                        </span>
+                        {templateDetail.difficulty ? (
+                          <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-muted-foreground">
+                            {t("exerciseLibrary.difficulty", "Schwierigkeit")}:{" "}
+                            {templateDetail.difficulty}
+                          </span>
                         ) : null}
                       </div>
                     )}
@@ -1684,18 +1977,17 @@ export function Training() {
                     <Button variant="outline" onClick={() => handleUseTemplate(templateDetail)}>
                       {t("training.useTemplate", "Vorlage nutzen")}
                     </Button>
-                    {templateDetail.owner?.id === user?.id ? (
+                    {templateDetail.owner?.id === user?.id && (
                       <Button
                         variant={templateDetailMode === "edit" ? "default" : "outline"}
                         onClick={() => setTemplateDetailMode("edit")}
                       >
                         {t("training.editTemplate", "Vorlage bearbeiten")}
                       </Button>
-                    ) : (
-                      <Button variant="outline" onClick={() => handleDuplicateTemplate(templateDetail)}>
-                        {t("training.duplicateTemplate", "Duplizieren")}
-                      </Button>
                     )}
+                    <Button variant="outline" onClick={() => handleDuplicateTemplate(templateDetail)}>
+                      {t("training.duplicateTemplate", "Duplizieren")}
+                    </Button>
                     {templateDetail.owner?.id === user?.id && (
                       <Button
                         variant="destructive"
@@ -1733,6 +2025,22 @@ export function Training() {
                                 .map((pattern) => getExerciseMovementPatternLabel(pattern, t))
                                 .join(", ") || "-"}
                             </div>
+                            {templateDetail.sourceTemplateRootId && (
+                              <div>
+                                <strong>{t("training.templateOriginal", "Original")}:</strong>{" "}
+                                <button
+                                  type="button"
+                                  className="underline underline-offset-2 hover:text-foreground"
+                                  onClick={() =>
+                                    openSourceTemplate(templateDetail.sourceTemplateRootId)
+                                  }
+                                >
+                                  {templateDetail.sourceTemplateRootTitle ||
+                                    templateDetail.sourceTemplateRootOwnerDisplayName ||
+                                    getTemplateOwnerName(templateDetail)}
+                                </button>
+                              </div>
+                            )}
                             <div>
                               <strong>{t("training.templateUsageCount", "Nutzungen")}:</strong>{" "}
                               {templateDetail.usageCount || 0}
@@ -1773,6 +2081,79 @@ export function Training() {
                           ))}
                         </div>
                       </div>
+
+                      {templateRootDuplicates.length > 1 && (
+                        <Collapsible
+                          open={templateDuplicatesOpen}
+                          onOpenChange={setTemplateDuplicatesOpen}
+                        >
+                          <div className="rounded-lg border">
+                            <CollapsibleTrigger asChild>
+                              <button
+                                type="button"
+                                className="flex w-full items-center justify-between px-4 py-3 text-xs font-medium text-muted-foreground"
+                              >
+                                {t("training.templateRootDuplicates", "Weitere Ableitungen")}
+                                <ChevronDown
+                                  className={`h-4 w-4 transition-transform ${
+                                    templateDuplicatesOpen ? "rotate-180" : ""
+                                  }`}
+                                />
+                              </button>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <div className="px-4 pb-4 flex flex-wrap items-center gap-2 text-sm">
+                                {templateRootDuplicates
+                                  .filter((entry) => entry.id !== templateDetail.id)
+                                  .map((entry) => (
+                                    <button
+                                      key={entry.id}
+                                      type="button"
+                                      className="rounded-md border px-2 py-1 text-left hover:bg-muted"
+                                      onClick={() => openTemplateDetails(entry, "view")}
+                                    >
+                                      <span className="font-medium">{entry.title}</span>
+                                      <span className="ml-1 text-xs text-muted-foreground">
+                                        ({getTemplateOwnerName(entry)})
+                                      </span>
+                                    </button>
+                                  ))}
+                              </div>
+                            </CollapsibleContent>
+                          </div>
+                        </Collapsible>
+                      )}
+
+                      {(templateLineageLoading || templateLineage.length > 1) && (
+                        <div className="rounded-lg border p-4">
+                          <div className="text-xs font-medium text-muted-foreground mb-2">
+                            {t("training.templateLineage", "Vorlagen-Kette")}
+                          </div>
+                          {templateLineageLoading ? (
+                            <div className="text-sm text-muted-foreground">
+                              {t("common.loading", "Lade...")}
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap items-center gap-2 text-sm">
+                              {templateLineage.map((node, index) => (
+                                <div key={`${node.id}-${index}`} className="inline-flex items-center gap-2">
+                                  {index > 0 && <span className="text-muted-foreground">→</span>}
+                                  <button
+                                    type="button"
+                                    className="rounded-md border px-2 py-1 text-left hover:bg-muted"
+                                    onClick={() => openTemplateDetails(node, "view")}
+                                  >
+                                    <span className="font-medium">{node.title}</span>
+                                    <span className="ml-1 text-xs text-muted-foreground">
+                                      ({getTemplateOwnerName(node)})
+                                    </span>
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 

@@ -102,7 +102,7 @@ export const createAdminRouter = (pool) => {
         ] = await Promise.all([
           pool.query("SELECT COUNT(*)::int AS total FROM users"),
           pool.query("SELECT COUNT(*)::int AS total FROM workouts"),
-          pool.query("SELECT COUNT(*)::int AS total FROM workouts WHERE is_template = true"),
+          pool.query("SELECT COUNT(*)::int AS total FROM workout_templates"),
           pool.query("SELECT COUNT(*)::int AS total FROM exercises"),
           pool.query("SELECT COUNT(*)::int AS total FROM training_journal_entries"),
           pool.query("SELECT COUNT(*)::int AS total FROM awards"),

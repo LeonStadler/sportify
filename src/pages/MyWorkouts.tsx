@@ -147,6 +147,19 @@ const formatDuration = (minutes?: number, t?: (key: string, params?: Record<stri
   return `${minutes}min`;
 };
 
+const getSourceTemplateCredit = (
+  workout: Workout,
+  t: (key: string, options?: Record<string, unknown>) => string
+) => {
+  if (!workout.sourceTemplateId || !workout.sourceTemplateOwnerDisplayName) {
+    return null;
+  }
+  return t("training.sourceTemplateCredit", {
+    name: workout.sourceTemplateOwnerDisplayName,
+    defaultValue: "Vorlage von {{name}}",
+  });
+};
+
 const getVisibilityLabel = (value?: string) => {
   switch (value) {
     case "public":
@@ -453,6 +466,11 @@ export function MyWorkouts() {
                         )}
                       </span>
                     </div>
+                    {getSourceTemplateCredit(workout, t) && (
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        ⭐ {getSourceTemplateCredit(workout, t)}
+                      </div>
+                    )}
                   </div>
                 </div>
 

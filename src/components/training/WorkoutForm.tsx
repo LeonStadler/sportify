@@ -450,7 +450,7 @@ export function WorkoutForm({
     >;
   }>({});
   const isTitleInitialized = useRef(false);
-  const lastPrefillId = useRef<string | null>(null);
+  const prefillAppliedRef = useRef(false);
 
   useEffect(() => {
     if (isTemplateLocked && !isTemplate) {
@@ -503,20 +503,42 @@ export function WorkoutForm({
     }
   };
 
+  const toValidDate = (value: unknown): Date | null => {
+    if (!value) return null;
+    const parsed =
+      value instanceof Date
+        ? new Date(value.getTime())
+        : typeof value === "string" || typeof value === "number"
+          ? new Date(value)
+          : null;
+    if (!parsed || Number.isNaN(parsed.getTime())) return null;
+    return parsed;
+  };
+
   // Initialwerte setzen oder aktualisieren wenn ein Workout editiert wird
   useEffect(() => {
     if (workout) {
+      prefillAppliedRef.current = false;
       setTitle(workout.title);
       setDescription(workout.description || "");
       setDescriptionOpen(Boolean(workout.description));
-      const date = new Date(workout.workoutDate);
+      const date =
+        toValidDate(workout.workoutDate) ||
+        toValidDate(workout.startTimeTimestamp) ||
+        toValidDate(workout.startTime) ||
+        toValidDate(workout.createdAt) ||
+        new Date();
       setWorkoutDate(date);
       
       // Startzeit setzen (aus workout.startTime oder workout.workoutDate extrahieren)
-      if (workout.startTime) {
+      if (
+        workout.startTime &&
+        typeof workout.startTime === "string" &&
+        /^\d{2}:\d{2}$/.test(workout.startTime)
+      ) {
         setWorkoutTime(workout.startTime);
       } else {
-          setWorkoutTime(format(date, "HH:mm"));
+        setWorkoutTime(format(date, "HH:mm"));
       }
       
       // useEndTime aus Workout lesen
@@ -594,6 +616,9 @@ export function WorkoutForm({
       setSourceTemplateId(workout.sourceTemplateId ?? null);
       isTitleInitialized.current = true;
     } else {
+      if (prefillWorkout || prefillAppliedRef.current) {
+        return;
+      }
       // Wenn kein Workout vorhanden ist und Titel noch nicht initialisiert wurde, Standard-Titel setzen
       if (!isTitleInitialized.current) {
         setTitle(isTemplateLocked ? "" : getDefaultTitle());
@@ -604,18 +629,23 @@ export function WorkoutForm({
       setSourceTemplateId(null);
       setDescriptionOpen(false);
     }
-  }, [workout, getDefaultTitle, isTemplateLocked]);
+  }, [workout, prefillWorkout, getDefaultTitle, isTemplateLocked]);
 
   useEffect(() => {
-    if (!workout && prefillWorkout && prefillWorkout.id !== lastPrefillId.current) {
+    if (!workout && prefillWorkout) {
+      prefillAppliedRef.current = true;
       setTitle(prefillWorkout.title || getDefaultTitle());
       setDescription(prefillWorkout.description || "");
       setDescriptionOpen(Boolean(prefillWorkout.description));
       setWorkoutDate(new Date());
       setWorkoutTime(format(new Date(), "HH:mm"));
-      setDuration("");
+      setDuration(
+        prefillWorkout.duration !== undefined && prefillWorkout.duration !== null
+          ? String(prefillWorkout.duration)
+          : ""
+      );
       setEndTime("");
-      setUseEndTime(false);
+      setUseEndTime(Boolean(prefillWorkout.useEndTime));
       setDifficulty(prefillWorkout.difficulty ?? 5);
       setRestBetweenSetsSeconds(
         prefillWorkout.restBetweenSetsSeconds !== undefined && prefillWorkout.restBetweenSetsSeconds !== null
@@ -638,7 +668,9 @@ export function WorkoutForm({
       );
       setVisibility("private");
       setIsTemplate(isTemplateLocked ? true : false);
-      setSourceTemplateId(prefillWorkout.isTemplate ? prefillWorkout.id : null);
+      setSourceTemplateId(
+        prefillWorkout.id ?? null
+      );
       setActivities(
         prefillWorkout.activities.map((a) => ({
           activityType: a.activityType,
@@ -671,7 +703,6 @@ export function WorkoutForm({
           notes: a.notes || "",
         }))
       );
-      lastPrefillId.current = prefillWorkout.id;
       onPrefillConsumed?.();
     }
   }, [prefillWorkout, workout, getDefaultTitle, onPrefillConsumed, isTemplateLocked]);
@@ -1198,8 +1229,19 @@ export function WorkoutForm({
       
       // Datum und Uhrzeit kombinieren
       const [hours, minutes] = workoutTime.split(":").map(Number);
-      const workoutDateTime = new Date(workoutDate);
-      workoutDateTime.setHours(hours, minutes, 0, 0);
+      let workoutDateTime =
+        workoutDate instanceof Date
+          ? new Date(workoutDate.getTime())
+          : new Date();
+      if (Number.isNaN(workoutDateTime.getTime())) {
+        workoutDateTime = new Date();
+      }
+      if (Number.isFinite(hours) && Number.isFinite(minutes)) {
+        workoutDateTime.setHours(hours, minutes, 0, 0);
+      } else {
+        const now = new Date();
+        workoutDateTime.setHours(now.getHours(), now.getMinutes(), 0, 0);
+      }
 
       // Berechne duration oder endTime basierend auf useEndTime
       let finalDuration: number | null = null;
@@ -1316,7 +1358,7 @@ export function WorkoutForm({
           useEndTime: useEndTime,
           visibility: isTemplate ? visibility : "private",
           isTemplate,
-          sourceTemplateId: isTemplate ? null : sourceTemplateId,
+          sourceTemplateId: sourceTemplateId,
           difficulty: isTemplate ? difficulty : null,
           category: isTemplate ? templateCategory || null : null,
           discipline: isTemplate ? templateDiscipline || null : null,
@@ -1371,6 +1413,7 @@ export function WorkoutForm({
       });
 
       // Form zurücksetzen
+      prefillAppliedRef.current = false;
       isTitleInitialized.current = false;
       setTitle(isTemplateLocked ? "" : getDefaultTitle());
       setDescription("");

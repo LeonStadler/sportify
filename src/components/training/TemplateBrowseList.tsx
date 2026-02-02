@@ -30,6 +30,15 @@ export interface TemplateBrowseItem {
   activitiesCount: number;
   usageCount: number;
   ownerName: string;
+  ownerId?: string | null;
+  sourceTemplateId?: string | null;
+  sourceTemplateTitle?: string | null;
+  sourceTemplateOwnerId?: string | null;
+  sourceTemplateOwnerDisplayName?: string | null;
+  sourceTemplateRootId?: string | null;
+  sourceTemplateRootTitle?: string | null;
+  sourceTemplateRootOwnerId?: string | null;
+  sourceTemplateRootOwnerDisplayName?: string | null;
   isOwn: boolean;
   updatedAt?: string;
 }
@@ -44,13 +53,50 @@ export interface TemplateBrowseLabels {
   muscleGroups: string;
   usageCount: string;
   activities: string;
+  sourceTemplateCredit: string;
+  duplicateOf: string;
 }
+
+const hasDuplicateMeta = (template: TemplateBrowseItem) =>
+  Boolean(
+    template.sourceTemplateId ||
+      template.sourceTemplateTitle ||
+      template.sourceTemplateOwnerDisplayName ||
+      template.sourceTemplateRootId ||
+      template.sourceTemplateRootTitle ||
+      template.sourceTemplateRootOwnerDisplayName
+  );
+
+const getSourceTemplateLabel = (template: TemplateBrowseItem) =>
+  template.sourceTemplateTitle ||
+  template.sourceTemplateOwnerDisplayName ||
+  template.sourceTemplateId ||
+  template.id;
+
+const getRootTemplateLabel = (template: TemplateBrowseItem) =>
+  template.sourceTemplateRootTitle ||
+  template.sourceTemplateRootOwnerDisplayName ||
+  template.sourceTemplateRootId ||
+  template.sourceTemplateId ||
+  template.id;
+
+const shouldShowRootOwnerCredit = (template: TemplateBrowseItem) => {
+  if (!template.sourceTemplateRootOwnerDisplayName) {
+    return false;
+  }
+  if (!template.sourceTemplateRootOwnerId || !template.ownerId) {
+    return true;
+  }
+  return template.sourceTemplateRootOwnerId !== template.ownerId;
+};
 
 interface TemplateBrowseGridProps {
   items: TemplateBrowseItem[];
   onSelect: (item: TemplateBrowseItem) => void;
   renderMenuItems: (item: TemplateBrowseItem) => ReactNode;
   labels: TemplateBrowseLabels;
+  onSourceTemplateClick?: (item: TemplateBrowseItem) => void;
+  onRootTemplateClick?: (item: TemplateBrowseItem) => void;
 }
 
 const visibilityBadgeClass = (visibility?: string) => {
@@ -80,6 +126,8 @@ export function TemplateBrowseGrid({
   onSelect,
   renderMenuItems,
   labels,
+  onSourceTemplateClick,
+  onRootTemplateClick,
 }: TemplateBrowseGridProps) {
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -95,6 +143,51 @@ export function TemplateBrowseGrid({
               <div className="text-xs text-muted-foreground truncate">
                 {template.ownerName}
               </div>
+              {hasDuplicateMeta(template) ? (
+                <div className="text-[11px] text-muted-foreground truncate">
+                  {template.sourceTemplateId ? (
+                    <>
+                      {labels.duplicateOf}:{" "}
+                      {onSourceTemplateClick ? (
+                        <button
+                          type="button"
+                          className="underline underline-offset-2 hover:text-foreground"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onSourceTemplateClick(template);
+                          }}
+                        >
+                          {getSourceTemplateLabel(template)}
+                        </button>
+                      ) : (
+                        getSourceTemplateLabel(template)
+                      )}
+                    </>
+                  ) : null}
+                  {shouldShowRootOwnerCredit(template) ? (
+                    <>
+                      {template.sourceTemplateId ? (
+                        <span> · </span>
+                      ) : null}
+                      <span>{labels.sourceTemplateCredit}: </span>
+                      {template.sourceTemplateRootId && onRootTemplateClick ? (
+                        <button
+                          type="button"
+                          className="underline underline-offset-2 hover:text-foreground"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onRootTemplateClick(template);
+                          }}
+                        >
+                          {getRootTemplateLabel(template)}
+                        </button>
+                      ) : (
+                        getRootTemplateLabel(template)
+                      )}
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
             <div onClick={(event) => event.stopPropagation()}>
               <DropdownMenu>
@@ -120,6 +213,9 @@ export function TemplateBrowseGrid({
               <Badge variant="outline">
                 {labels.difficulty}: {template.difficulty}
               </Badge>
+            )}
+            {template.sourceTemplateId && (
+              <Badge variant="outline">{labels.duplicateOf}</Badge>
             )}
           </div>
 
@@ -164,6 +260,8 @@ interface TemplateBrowseTableProps {
   onSelect: (item: TemplateBrowseItem) => void;
   renderMenuItems: (item: TemplateBrowseItem) => ReactNode;
   labels: TemplateBrowseLabels;
+  onSourceTemplateClick?: (item: TemplateBrowseItem) => void;
+  onRootTemplateClick?: (item: TemplateBrowseItem) => void;
 }
 
 export function TemplateBrowseTable({
@@ -174,6 +272,8 @@ export function TemplateBrowseTable({
   onSelect,
   renderMenuItems,
   labels,
+  onSourceTemplateClick,
+  onRootTemplateClick,
 }: TemplateBrowseTableProps) {
   const sortIcon = sortDirection === "asc" ? (
     <ArrowUp className="h-3 w-3" />
@@ -254,7 +354,54 @@ export function TemplateBrowseTable({
               <TableCell className="font-medium sticky left-0 bg-background z-10">
                 {template.title}
               </TableCell>
-              <TableCell>{template.ownerName}</TableCell>
+              <TableCell>
+                <div className="text-sm">{template.ownerName}</div>
+                {hasDuplicateMeta(template) ? (
+                  <div className="text-xs text-muted-foreground">
+                    {template.sourceTemplateId ? (
+                      <>
+                        {labels.duplicateOf}:{" "}
+                        {onSourceTemplateClick ? (
+                          <button
+                            type="button"
+                            className="underline underline-offset-2 hover:text-foreground"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onSourceTemplateClick(template);
+                            }}
+                          >
+                            {getSourceTemplateLabel(template)}
+                          </button>
+                        ) : (
+                          getSourceTemplateLabel(template)
+                        )}
+                      </>
+                    ) : null}
+                    {shouldShowRootOwnerCredit(template) ? (
+                      <>
+                        {template.sourceTemplateId ? (
+                          <span> · </span>
+                        ) : null}
+                        <span>{labels.sourceTemplateCredit}: </span>
+                        {template.sourceTemplateRootId && onRootTemplateClick ? (
+                          <button
+                            type="button"
+                            className="underline underline-offset-2 hover:text-foreground"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onRootTemplateClick(template);
+                            }}
+                          >
+                            {getRootTemplateLabel(template)}
+                          </button>
+                        ) : (
+                          getRootTemplateLabel(template)
+                        )}
+                      </>
+                    ) : null}
+                  </div>
+                ) : null}
+              </TableCell>
               <TableCell>
                 <Badge variant="secondary" className={visibilityBadgeClass(template.visibility)}>
                   {visibilityLabel(template.visibility)}

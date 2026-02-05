@@ -9,7 +9,8 @@ import {
 } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { API_URL } from "@/lib/api";
-import { Info } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { ChevronLeft, ChevronRight, Info } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Skeleton } from "../ui/skeleton";
@@ -95,20 +96,23 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
   if (isLoading) {
     return (
       <Card
-        className={className}
+        className={cn("overflow-hidden transition-shadow", className)}
         role="region"
         aria-labelledby={titleId}
         tabIndex={0}
       >
-        <CardHeader className="pb-4">
-          <CardTitle className="text-lg md:text-xl" id={titleId}>
+        <CardHeader className="p-4 sm:p-5 md:p-6 pb-2">
+          <CardTitle
+            className="text-base sm:text-lg md:text-xl font-semibold truncate"
+            id={titleId}
+          >
             {t("dashboard.monthlyGoal", "Monthly goal")}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="p-4 sm:p-5 md:p-6 pt-0 space-y-4">
           <div className="space-y-2">
-            <Skeleton className="h-4 w-48" />
-            <Skeleton className="h-2 w-full" />
+            <Skeleton className="h-10 w-full max-w-[200px] rounded-lg" />
+            <Skeleton className="h-3 w-full rounded-full" />
           </div>
         </CardContent>
       </Card>
@@ -117,14 +121,17 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
 
   return (
     <Card
-      className={className}
+      className={cn("overflow-hidden transition-shadow hover:shadow-md", className)}
       role="region"
       aria-labelledby={titleId}
       tabIndex={0}
     >
-      <CardHeader className="pb-4">
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-lg md:text-xl" id={titleId}>
+      <CardHeader className="p-4 sm:p-5 md:p-6 pb-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
+          <CardTitle
+            className="text-base sm:text-lg md:text-xl font-semibold leading-tight min-w-0 truncate"
+            id={titleId}
+          >
             {t("dashboard.monthlyGoal", "Monthly goal")}
           </CardTitle>
           <TooltipProvider delayDuration={150}>
@@ -134,7 +141,7 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+                  className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/80"
                   title={t("dashboard.monthlyGoalAutoAdjust")}
                 >
                   <Info className="h-4 w-4" />
@@ -154,56 +161,69 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
           </TooltipProvider>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center justify-between">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={monthOffset >= maxOffset}
-              onClick={() =>
-                setMonthOffset((prev) => Math.min(maxOffset, prev + 1))
-              }
-            >
-              {t("common.previous", "Zurück")}
-            </Button>
-            <span className="text-sm font-semibold tabular-nums text-foreground">
-              {labelDate}
-            </span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={monthOffset === 0}
-              onClick={() => setMonthOffset((prev) => Math.max(0, prev - 1))}
-            >
-              {t("common.next", "Weiter")}
-            </Button>
-          </div>
+      <CardContent className="p-4 sm:p-5 md:p-6 pt-0 space-y-4">
+        {/* Month navigation: wraps on very narrow, stays one row otherwise */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-9 w-9 shrink-0 rounded-full border-muted"
+            disabled={monthOffset >= maxOffset}
+            onClick={() =>
+              setMonthOffset((prev) => Math.min(maxOffset, prev + 1))
+            }
+            aria-label={t("common.previous", "Zurück")}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span
+            className="flex-1 min-w-0 text-center text-sm sm:text-base font-semibold tabular-nums text-foreground px-2"
+            aria-live="polite"
+          >
+            {labelDate}
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-9 w-9 shrink-0 rounded-full border-muted"
+            disabled={monthOffset === 0}
+            onClick={() => setMonthOffset((prev) => Math.max(0, prev - 1))}
+            aria-label={t("common.next", "Weiter")}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
         </div>
-        <div>
-          <div className="flex justify-between text-sm mb-2">
-            <span>
-              {t("dashboard.points", "Punkte")} (
-              {t("dashboard.goal", "Ziel")}: {target.toLocaleString()})
+
+        {/* Points and progress: labels and values wrap cleanly */}
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <span className="text-sm text-muted-foreground">
+              {t("dashboard.points", "Punkte")}{" "}
+              <span className="text-foreground/80">
+                ({t("dashboard.goal", "Ziel")}: {target.toLocaleString()})
+              </span>
             </span>
-            <span className="font-medium">
-              {(stats.periodPoints ?? 0).toLocaleString()}/
-              {target.toLocaleString()}
+            <span className="text-sm font-semibold tabular-nums text-foreground shrink-0">
+              {(stats.periodPoints ?? 0).toLocaleString()}
+              <span className="text-muted-foreground font-normal">
+                /{target.toLocaleString()}
+              </span>
             </span>
           </div>
           <Progress
             value={progressPercentage}
-            className="h-2"
+            className="h-2.5 rounded-full"
             aria-label={`${t("dashboard.points", "Punkte")}: ${(stats.periodPoints ?? 0).toLocaleString()} von ${target.toLocaleString()} ${t("dashboard.goal", "Ziel")} erreicht`}
             role="progressbar"
             aria-valuenow={stats.periodPoints ?? 0}
             aria-valuemin={0}
             aria-valuemax={target}
           />
-          <p className="text-xs text-muted-foreground mt-2">
-            +{(stats.periodPoints ?? 0).toLocaleString()}{" "}
+          <p className="text-xs text-muted-foreground">
+            {(stats.periodPoints ?? 0).toLocaleString()}{" "}
+            {t("dashboard.points", "Punkte")}{" "}
             {t("dashboard.thisMonth", "diesen Monat")}
           </p>
         </div>

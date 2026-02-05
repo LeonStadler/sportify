@@ -90,6 +90,7 @@
     "date-fns": "^3.6.0",
     "dotenv": "^16.5.0",
     "embla-carousel-react": "^8.3.0",
+    "exceljs": "^4.4.0",
     "express": "^5.1.0",
     "i18next": "^23.7.16",
     "i18next-browser-languagedetector": "^7.2.0",

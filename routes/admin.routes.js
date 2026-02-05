@@ -15,6 +15,8 @@ import { getFrontendUrl, toCamelCase } from "../utils/helpers.js";
 import { slugifyExerciseName } from "../utils/exerciseUtils.js";
 import { computePointsPerUnit } from "../utils/scoring.js";
 import { randomUUID } from "crypto";
+import ExcelJS from "exceljs";
+import multer from "multer";
 
 export const createAdminRouter = (pool) => {
   const router = express.Router();
@@ -35,7 +37,388 @@ export const createAdminRouter = (pool) => {
     "equipment",
     "aliases",
   ];
+  const EXERCISE_IMPORT_OPTIONS = {
+    categories: ["Kraft", "Ausdauer", "Mobility", "Skills", "Functional"],
+    disciplines: [
+      "Calisthenics/Bodyweight",
+      "Yoga/Stretching",
+      "Weights/Gym",
+      "Running",
+      "Cycling",
+      "Swimming",
+    ],
+    movementPatterns: [
+      "push",
+      "pull",
+      "squat",
+      "hinge",
+      "carry",
+      "rotation",
+      "isometric",
+    ],
+    measurementTypes: ["reps", "time", "distance", "reps,time", "time,distance"],
+    distanceUnits: ["km", "m", "miles"],
+    timeUnits: ["min", "sec"],
+    booleanValues: ["true", "false"],
+  };
   const adminMiddleware = createAdminMiddleware(pool);
+  const upload = multer({ storage: multer.memoryStorage() });
+
+  const buildExerciseImportMeta = () => ({
+    required: [
+      "name",
+      "category",
+      "discipline",
+      "movementPattern",
+      "measurementTypes",
+      "difficultyTier",
+      "muscleGroups",
+      "equipment",
+    ],
+    allowedValues: {
+      category: EXERCISE_IMPORT_OPTIONS.categories,
+      discipline: EXERCISE_IMPORT_OPTIONS.disciplines,
+      movementPattern: EXERCISE_IMPORT_OPTIONS.movementPatterns,
+      measurementTypes: EXERCISE_IMPORT_OPTIONS.measurementTypes,
+      distanceUnit: EXERCISE_IMPORT_OPTIONS.distanceUnits,
+      timeUnit: EXERCISE_IMPORT_OPTIONS.timeUnits,
+      boolean: EXERCISE_IMPORT_OPTIONS.booleanValues,
+    },
+    rules: [
+      "measurementTypes ist eine kommaseparierte Liste. Erlaubt: reps, time, distance, reps,time, time,distance.",
+      "Kombination reps,distance ist nicht erlaubt.",
+      "muscleGroups, equipment und aliases werden kommasepariert angegeben.",
+      "requiresWeight/allowsWeight/supportsSets akzeptieren true/false.",
+    ],
+  });
+
+  const buildExerciseExampleRow = () => ({
+    name: "Pull-Ups",
+    category: "Kraft",
+    discipline: "Calisthenics/Bodyweight",
+    movementPattern: "pull",
+    difficultyTier: 6,
+    measurementTypes: "reps",
+    requiresWeight: true,
+    allowsWeight: false,
+    supportsSets: true,
+    muscleGroups: "Latissimus, Bizeps",
+    equipment: "Bodyweight, Pull-up Bar",
+    distanceUnit: "km",
+    timeUnit: "min",
+    aliases: "Pull-up, Klimmzug",
+    description: "Klassische Klimmzüge an der Stange",
+  });
+
+  const processExerciseImport = async (rawExercises, userId) => {
+    const results = {
+      imported: 0,
+      skipped: 0,
+      errors: [],
+    };
+
+    for (const raw of rawExercises) {
+      const name = String(raw?.name || "").trim();
+      const category = String(raw?.category || "").trim();
+      const discipline = String(raw?.discipline || "").trim();
+      const movementPattern = String(raw?.movementPattern || "").trim();
+      const difficultyTier = Number(raw?.difficultyTier ?? raw?.difficulty ?? NaN);
+      const measurementTypesRaw = raw?.measurementTypes ?? raw?.measurementType ?? "";
+      const measurementTypes = Array.isArray(measurementTypesRaw)
+        ? measurementTypesRaw
+        : String(measurementTypesRaw)
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean);
+      const hasDistance = measurementTypes.includes("distance");
+      const hasTime = measurementTypes.includes("time");
+      const hasReps = measurementTypes.includes("reps");
+      const measurementType =
+        String(raw?.measurementType || "") ||
+        (hasDistance
+          ? "distance"
+          : hasReps && hasTime
+            ? "mixed"
+            : hasReps
+              ? "reps"
+              : "time");
+      const requiresWeight =
+        raw?.requiresWeight === true ||
+        String(raw?.requiresWeight).toLowerCase() === "true";
+      const allowsWeight =
+        raw?.allowsWeight === true || String(raw?.allowsWeight).toLowerCase() === "true";
+      const supportsSets =
+        raw?.supportsSets !== undefined
+          ? raw.supportsSets === true || String(raw.supportsSets).toLowerCase() === "true"
+          : hasReps || hasTime;
+      const supportsTime =
+        raw?.supportsTime !== undefined
+          ? raw.supportsTime === true || String(raw.supportsTime).toLowerCase() === "true"
+          : hasTime;
+      const supportsDistance =
+        raw?.supportsDistance !== undefined
+          ? raw.supportsDistance === true || String(raw.supportsDistance).toLowerCase() === "true"
+          : hasDistance;
+      const muscleGroups = Array.isArray(raw?.muscleGroups)
+        ? raw.muscleGroups
+        : String(raw?.muscleGroups || "")
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean);
+      const equipment = Array.isArray(raw?.equipment)
+        ? raw.equipment
+        : String(raw?.equipment || "")
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean);
+      const aliasList = Array.isArray(raw?.aliases)
+        ? raw.aliases
+        : String(raw?.aliases || "")
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean);
+
+      const distanceUnit = String(raw?.distanceUnit || "km");
+      const timeUnit = String(raw?.timeUnit || "min");
+
+      const requiredOk =
+        name &&
+        category &&
+        discipline &&
+        movementPattern &&
+        measurementType &&
+        Number.isFinite(difficultyTier) &&
+        muscleGroups.length > 0 &&
+        equipment.length > 0;
+
+      if (!requiredOk) {
+        results.skipped += 1;
+        continue;
+      }
+
+      const slug = slugifyExerciseName(name);
+      if (!slug) {
+        results.skipped += 1;
+        continue;
+      }
+
+      const { rows: existing } = await pool.query(
+        "SELECT id FROM exercises WHERE LOWER(name) = LOWER($1) OR slug = $2",
+        [name, slug]
+      );
+      if (existing.length > 0) {
+        results.skipped += 1;
+        continue;
+      }
+
+      const normalizedPointsSource = "auto";
+      const resolvedPointsPerUnit = computePointsPerUnit({
+        measurementType,
+        difficultyTier,
+      });
+
+      const resolvedUnit = hasDistance ? distanceUnit : hasTime ? timeUnit : "reps";
+
+      const unitOptions = hasDistance
+        ? [
+            { value: "km", label: "Kilometer" },
+            { value: "m", label: "Meter" },
+            { value: "miles", label: "Miles" },
+          ]
+        : hasTime
+          ? [
+              { value: "min", label: "Minuten" },
+              { value: "sec", label: "Sekunden" },
+            ]
+          : [];
+
+      const exerciseId = randomUUID();
+      await pool.query(
+        `
+          INSERT INTO exercises (
+            id,
+            name,
+            slug,
+            description,
+            category,
+            discipline,
+            movement_pattern,
+            measurement_type,
+            points_per_unit,
+            points_source,
+            unit,
+            requires_weight,
+            allows_weight,
+            supports_sets,
+            supports_time,
+            supports_distance,
+            supports_grade,
+            difficulty_tier,
+            muscle_groups,
+            equipment,
+            unit_options,
+            status,
+            approved_by,
+            is_active
+          )
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21::jsonb,$22,$23,$24)
+        `,
+        [
+          exerciseId,
+          name,
+          slug,
+          raw?.description ? String(raw.description).trim() : null,
+          category,
+          discipline,
+          movementPattern,
+          measurementType,
+          Number.isFinite(resolvedPointsPerUnit) ? resolvedPointsPerUnit : 1,
+          normalizedPointsSource,
+          resolvedUnit,
+          requiresWeight,
+          allowsWeight,
+          supportsSets,
+          supportsTime,
+          supportsDistance,
+          false,
+          difficultyTier,
+          muscleGroups,
+          equipment,
+          JSON.stringify(unitOptions),
+          "approved",
+          userId,
+          true,
+        ]
+      );
+
+      if (aliasList.length > 0) {
+        for (const alias of aliasList) {
+          const aliasSlug = slugifyExerciseName(alias);
+          if (!aliasSlug) continue;
+          await pool.query(
+            `INSERT INTO exercise_aliases (exercise_id, alias, alias_slug, created_by)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (alias_slug) DO NOTHING`,
+            [exerciseId, alias, aliasSlug, userId]
+          );
+        }
+      }
+
+      results.imported += 1;
+    }
+
+    return results;
+  };
+
+  const buildExerciseTemplateWorkbook = () => {
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "Sportify";
+    workbook.created = new Date();
+    const sheet = workbook.addWorksheet("Exercises");
+    sheet.views = [{ state: "frozen", ySplit: 1 }];
+
+    sheet.columns = EXERCISE_IMPORT_COLUMNS.map((key) => ({
+      header: key,
+      key,
+      width: key === "description" ? 36 : 22,
+    }));
+
+    sheet.getRow(1).font = { bold: true };
+
+    const example = buildExerciseExampleRow();
+    sheet.addRow(
+      EXERCISE_IMPORT_COLUMNS.map((key) => example[key] ?? "")
+    );
+
+    const optionsSheet = workbook.addWorksheet("Options");
+    optionsSheet.state = "veryHidden";
+
+    const setOptionColumn = (columnIndex, title, values) => {
+      optionsSheet.getCell(1, columnIndex).value = title;
+      values.forEach((value, idx) => {
+        optionsSheet.getCell(idx + 2, columnIndex).value = value;
+      });
+      const startRow = 2;
+      const endRow = values.length + 1;
+      return { columnIndex, startRow, endRow };
+    };
+
+    const categoryRange = setOptionColumn(
+      1,
+      "categories",
+      EXERCISE_IMPORT_OPTIONS.categories
+    );
+    const disciplineRange = setOptionColumn(
+      2,
+      "disciplines",
+      EXERCISE_IMPORT_OPTIONS.disciplines
+    );
+    const patternRange = setOptionColumn(
+      3,
+      "movementPatterns",
+      EXERCISE_IMPORT_OPTIONS.movementPatterns
+    );
+    const measurementRange = setOptionColumn(
+      4,
+      "measurementTypes",
+      EXERCISE_IMPORT_OPTIONS.measurementTypes
+    );
+    const distanceRange = setOptionColumn(
+      5,
+      "distanceUnits",
+      EXERCISE_IMPORT_OPTIONS.distanceUnits
+    );
+    const timeRange = setOptionColumn(
+      6,
+      "timeUnits",
+      EXERCISE_IMPORT_OPTIONS.timeUnits
+    );
+    const booleanRange = setOptionColumn(
+      7,
+      "boolean",
+      EXERCISE_IMPORT_OPTIONS.booleanValues
+    );
+
+    const toColumnLetter = (column) => {
+      let result = "";
+      let col = column;
+      while (col > 0) {
+        const mod = (col - 1) % 26;
+        result = String.fromCharCode(65 + mod) + result;
+        col = Math.floor((col - 1) / 26);
+      }
+      return result;
+    };
+
+    const addValidation = (columnKey, range) => {
+      const columnIndex = EXERCISE_IMPORT_COLUMNS.indexOf(columnKey);
+      if (columnIndex < 0) return;
+      const columnLetter = toColumnLetter(columnIndex + 1);
+      const formula = `=Options!$${toColumnLetter(range.columnIndex)}$${range.startRow}:$${toColumnLetter(
+        range.columnIndex
+      )}$${range.endRow}`;
+      sheet.dataValidations.add(`${columnLetter}2:${columnLetter}1000`, {
+        type: "list",
+        allowBlank: true,
+        formulae: [formula],
+        showErrorMessage: true,
+        errorTitle: "Ungültiger Wert",
+        error: "Bitte wähle einen Wert aus der Liste.",
+      });
+    };
+
+    addValidation("category", categoryRange);
+    addValidation("discipline", disciplineRange);
+    addValidation("movementPattern", patternRange);
+    addValidation("measurementTypes", measurementRange);
+    addValidation("distanceUnit", distanceRange);
+    addValidation("timeUnit", timeRange);
+    addValidation("requiresWeight", booleanRange);
+    addValidation("allowsWeight", booleanRange);
+    addValidation("supportsSets", booleanRange);
+
+    return workbook;
+  };
 
   router.get("/users", adminMiddleware, async (req, res) => {
     try {
@@ -234,16 +617,39 @@ export const createAdminRouter = (pool) => {
     async (req, res) => {
       try {
         const format = String(req.query.format || "csv").toLowerCase();
+        if (format === "xlsx" || format === "excel") {
+          const workbook = buildExerciseTemplateWorkbook();
+          res.setHeader(
+            "Content-Type",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          );
+          res.setHeader(
+            "Content-Disposition",
+            "attachment; filename=exercise-import-template.xlsx"
+          );
+          await workbook.xlsx.write(res);
+          return res.end();
+        }
         if (format === "json") {
-          return res.json({ columns: EXERCISE_IMPORT_COLUMNS, exercises: [] });
+          return res.json({
+            columns: EXERCISE_IMPORT_COLUMNS,
+            meta: buildExerciseImportMeta(),
+            exercises: [buildExerciseExampleRow()],
+            examples: [buildExerciseExampleRow()],
+          });
         }
         const csvHeader = `${EXERCISE_IMPORT_COLUMNS.join(",")}\n`;
+        const example = buildExerciseExampleRow();
+        const exampleRow = EXERCISE_IMPORT_COLUMNS.map((key) => {
+          const value = example[key] ?? "";
+          return typeof value === "string" ? value : String(value ?? "");
+        }).join(",");
         res.setHeader("Content-Type", "text/csv; charset=utf-8");
         res.setHeader(
           "Content-Disposition",
           "attachment; filename=exercise-import-template.csv"
         );
-        return res.send(csvHeader);
+        return res.send(`${csvHeader}${exampleRow}\n`);
       } catch (error) {
         console.error("Admin exercises export error:", error);
         res.status(500).json({ error: "Serverfehler beim Export." });
@@ -262,201 +668,90 @@ export const createAdminRouter = (pool) => {
         if (!Array.isArray(exercises)) {
           return res.status(400).json({ error: "Keine Übungen angegeben." });
         }
-
-        const results = {
-          imported: 0,
-          skipped: 0,
-          errors: [],
-        };
-
-        for (const raw of exercises) {
-          const name = String(raw?.name || "").trim();
-          const category = String(raw?.category || "").trim();
-          const discipline = String(raw?.discipline || "").trim();
-          const movementPattern = String(raw?.movementPattern || "").trim();
-          const difficultyTier = Number(raw?.difficultyTier ?? raw?.difficulty ?? NaN);
-          const measurementTypesRaw = raw?.measurementTypes ?? raw?.measurementType ?? "";
-          const measurementTypes = Array.isArray(measurementTypesRaw)
-            ? measurementTypesRaw
-            : String(measurementTypesRaw)
-                .split(",")
-                .map((item) => item.trim())
-                .filter(Boolean);
-          const hasDistance = measurementTypes.includes("distance");
-          const hasTime = measurementTypes.includes("time");
-          const hasReps = measurementTypes.includes("reps");
-          const measurementType =
-            String(raw?.measurementType || "") ||
-            (hasDistance ? "distance" : hasReps && hasTime ? "mixed" : hasReps ? "reps" : "time");
-          const requiresWeight = raw?.requiresWeight === true || String(raw?.requiresWeight).toLowerCase() === "true";
-          const allowsWeight = raw?.allowsWeight === true || String(raw?.allowsWeight).toLowerCase() === "true";
-          const supportsSets =
-            raw?.supportsSets !== undefined
-              ? raw.supportsSets === true || String(raw.supportsSets).toLowerCase() === "true"
-              : hasReps || hasTime;
-          const supportsTime =
-            raw?.supportsTime !== undefined
-              ? raw.supportsTime === true || String(raw.supportsTime).toLowerCase() === "true"
-              : hasTime;
-          const supportsDistance =
-            raw?.supportsDistance !== undefined
-              ? raw.supportsDistance === true || String(raw.supportsDistance).toLowerCase() === "true"
-              : hasDistance;
-          const muscleGroups = Array.isArray(raw?.muscleGroups)
-            ? raw.muscleGroups
-            : String(raw?.muscleGroups || "")
-                .split(",")
-                .map((item) => item.trim())
-                .filter(Boolean);
-          const equipment = Array.isArray(raw?.equipment)
-            ? raw.equipment
-            : String(raw?.equipment || "")
-                .split(",")
-                .map((item) => item.trim())
-                .filter(Boolean);
-          const aliasList = Array.isArray(raw?.aliases)
-            ? raw.aliases
-            : String(raw?.aliases || "")
-                .split(",")
-                .map((item) => item.trim())
-                .filter(Boolean);
-
-          const distanceUnit = String(raw?.distanceUnit || "km");
-          const timeUnit = String(raw?.timeUnit || "min");
-
-          const requiredOk =
-            name &&
-            category &&
-            discipline &&
-            movementPattern &&
-            measurementType &&
-            Number.isFinite(difficultyTier) &&
-            muscleGroups.length > 0 &&
-            equipment.length > 0;
-
-          if (!requiredOk) {
-            results.skipped += 1;
-            continue;
-          }
-
-          const slug = slugifyExerciseName(name);
-          if (!slug) {
-            results.skipped += 1;
-            continue;
-          }
-
-          const { rows: existing } = await pool.query(
-            "SELECT id FROM exercises WHERE LOWER(name) = LOWER($1) OR slug = $2",
-            [name, slug]
-          );
-          if (existing.length > 0) {
-            results.skipped += 1;
-            continue;
-          }
-
-          const normalizedPointsSource = "auto";
-          const resolvedPointsPerUnit = computePointsPerUnit({
-            measurementType,
-            difficultyTier,
-          });
-
-          const resolvedUnit = hasDistance
-            ? distanceUnit
-            : hasTime
-              ? timeUnit
-              : "reps";
-
-          const unitOptions = hasDistance
-            ? [
-                { value: "km", label: "Kilometer" },
-                { value: "m", label: "Meter" },
-                { value: "miles", label: "Miles" },
-              ]
-            : hasTime
-              ? [
-                  { value: "min", label: "Minuten" },
-                  { value: "sec", label: "Sekunden" },
-                ]
-              : [];
-
-          const exerciseId = randomUUID();
-          await pool.query(
-            `
-              INSERT INTO exercises (
-                id,
-                name,
-                slug,
-                description,
-                category,
-                discipline,
-                movement_pattern,
-                measurement_type,
-                points_per_unit,
-                points_source,
-                unit,
-                requires_weight,
-                allows_weight,
-                supports_sets,
-                supports_time,
-                supports_distance,
-                supports_grade,
-                difficulty_tier,
-                muscle_groups,
-                equipment,
-                unit_options,
-                status,
-                approved_by,
-                is_active
-              )
-              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21::jsonb,$22,$23,$24)
-            `,
-            [
-              exerciseId,
-              name,
-              slug,
-              raw?.description ? String(raw.description).trim() : null,
-              category,
-              discipline,
-              movementPattern,
-              measurementType,
-              Number.isFinite(resolvedPointsPerUnit) ? resolvedPointsPerUnit : 1,
-              normalizedPointsSource,
-              resolvedUnit,
-              requiresWeight,
-              allowsWeight,
-              supportsSets,
-              supportsTime,
-              supportsDistance,
-              false,
-              difficultyTier,
-              muscleGroups,
-              equipment,
-              JSON.stringify(unitOptions),
-              "approved",
-              req.user.id,
-              true,
-            ]
-          );
-
-          if (aliasList.length > 0) {
-            for (const alias of aliasList) {
-              const aliasSlug = slugifyExerciseName(alias);
-              if (!aliasSlug) continue;
-              await pool.query(
-                `INSERT INTO exercise_aliases (exercise_id, alias, alias_slug, created_by)
-                 VALUES ($1, $2, $3, $4)
-                 ON CONFLICT (alias_slug) DO NOTHING`,
-                [exerciseId, alias, aliasSlug, req.user.id]
-              );
-            }
-          }
-
-          results.imported += 1;
-        }
-
+        const results = await processExerciseImport(exercises, req.user.id);
         res.json(results);
       } catch (error) {
         console.error("Admin exercises import error:", error);
+        res.status(500).json({ error: "Serverfehler beim Import." });
+      }
+    }
+  );
+
+  // POST /api/admin/exercises/import-file - Import exercises from XLSX
+  router.post(
+    "/exercises/import-file",
+    authMiddleware,
+    adminMiddleware,
+    upload.single("file"),
+    async (req, res) => {
+      try {
+        if (!req.file) {
+          return res.status(400).json({ error: "Keine Datei angegeben." });
+        }
+        const filename = req.file.originalname?.toLowerCase() || "";
+        if (!filename.endsWith(".xlsx")) {
+          return res.status(400).json({ error: "Nur .xlsx Dateien werden unterstützt." });
+        }
+
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(req.file.buffer);
+        const sheet = workbook.worksheets[0];
+        if (!sheet) {
+          return res.status(400).json({ error: "Keine Arbeitsmappe gefunden." });
+        }
+
+        const headerRow = sheet.getRow(1);
+        const headers = headerRow.values
+          .slice(1)
+          .map((value) => String(value || "").trim())
+          .filter(Boolean);
+
+        if (headers.length === 0) {
+          return res.status(400).json({ error: "Keine Spaltenüberschriften gefunden." });
+        }
+
+        const exercises = [];
+        const extractCellValue = (cell) => {
+          const value = cell?.value;
+          if (value === null || value === undefined) return "";
+          if (typeof value === "object") {
+            if (value.text) return value.text;
+            if (Array.isArray(value.richText)) {
+              return value.richText.map((item) => item.text).join("");
+            }
+            if (value.result !== undefined) return value.result;
+            if (value.formula) return value.formula;
+            if (value.hyperlink) return value.text || value.hyperlink;
+            if (value instanceof Date) return value.toISOString();
+          }
+          return value;
+        };
+
+        sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+          if (rowNumber === 1) return;
+          const record = {};
+          let hasValue = false;
+          headers.forEach((header, index) => {
+            const cell = row.getCell(index + 1);
+            const cellValue = extractCellValue(cell);
+            if (
+              cellValue !== null &&
+              cellValue !== undefined &&
+              String(cellValue).trim() !== ""
+            ) {
+              hasValue = true;
+            }
+            record[header] = cellValue ?? "";
+          });
+          if (hasValue) {
+            exercises.push(record);
+          }
+        });
+
+        const results = await processExerciseImport(exercises, req.user.id);
+        res.json(results);
+      } catch (error) {
+        console.error("Admin exercises import-file error:", error);
         res.status(500).json({ error: "Serverfehler beim Import." });
       }
     }

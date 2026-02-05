@@ -67,7 +67,6 @@ import {
   EyeOff,
   MoreHorizontal,
   RefreshCw,
-  Search,
   Settings,
   Shield,
   Users
@@ -348,7 +347,7 @@ export function Admin() {
     window.URL.revokeObjectURL(url);
   };
 
-  const handleExerciseExport = async (format: "csv" | "json") => {
+  const handleExerciseExport = async (format: "csv" | "json" | "xlsx") => {
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(
@@ -367,7 +366,9 @@ export function Admin() {
         blob,
         format === "json"
           ? "exercise-import-template.json"
-          : "exercise-import-template.csv"
+          : format === "xlsx"
+            ? "exercise-import-template.xlsx"
+            : "exercise-import-template.csv"
       );
     } catch (error) {
       toast({
@@ -384,35 +385,55 @@ export function Admin() {
   const handleExerciseImport = async (file: File) => {
     setExerciseImporting(true);
     try {
-      const content = await file.text();
-      let parsed: Array<Record<string, unknown>> = [];
-      if (file.name.toLowerCase().endsWith(".json")) {
-        const json = JSON.parse(content);
-        parsed = Array.isArray(json) ? json : Array.isArray(json.exercises) ? json.exercises : [];
+      const token = localStorage.getItem("token");
+      let response: Response;
+
+      if (file.name.toLowerCase().endsWith(".xlsx")) {
+        const formData = new FormData();
+        formData.append("file", file);
+        response = await fetch(`${API_URL}/admin/exercises/import-file`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        });
       } else {
-        const rows = parseCsvText(content);
-        if (rows.length === 0) {
-          throw new Error(t("admin.errors.importEmpty", "Keine Daten gefunden."));
-        }
-        const [header, ...dataRows] = rows;
-        parsed = dataRows.map((row) => {
-          const record: Record<string, unknown> = {};
-          header.forEach((key, index) => {
-            record[key] = row[index] ?? "";
+        const content = await file.text();
+        let parsed: Array<Record<string, unknown>> = [];
+        if (file.name.toLowerCase().endsWith(".json")) {
+          const json = JSON.parse(content);
+          parsed = Array.isArray(json)
+            ? json
+            : Array.isArray(json.exercises)
+              ? json.exercises
+              : Array.isArray(json.examples)
+                ? json.examples
+                : [];
+        } else {
+          const rows = parseCsvText(content);
+          if (rows.length === 0) {
+            throw new Error(t("admin.errors.importEmpty", "Keine Daten gefunden."));
+          }
+          const [header, ...dataRows] = rows;
+          parsed = dataRows.map((row) => {
+            const record: Record<string, unknown> = {};
+            header.forEach((key, index) => {
+              record[key] = row[index] ?? "";
+            });
+            return record;
           });
-          return record;
+        }
+
+        response = await fetch(`${API_URL}/admin/exercises/import`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ exercises: parsed }),
         });
       }
-
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${API_URL}/admin/exercises/import`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ exercises: parsed }),
-      });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
@@ -928,7 +949,6 @@ export function Admin() {
         >
           <Command shouldFilter={false}>
             <div className="flex items-center gap-2 px-3 py-2 border-b">
-              <Search className="h-4 w-4 text-muted-foreground" />
               <CommandInput
                 placeholder={t("common.search", "Suche")}
                 value={query}
@@ -1044,6 +1064,20 @@ export function Admin() {
     }
     setMergeSourceId(exerciseId);
     return "source";
+  };
+
+  const handleMergeSourceChange = (nextId: string) => {
+    setMergeSourceId(nextId);
+    if (mergeTargetId === nextId) {
+      setMergeTargetId("");
+    }
+  };
+
+  const handleMergeTargetChange = (nextId: string) => {
+    setMergeTargetId(nextId);
+    if (mergeSourceId === nextId) {
+      setMergeSourceId("");
+    }
   };
 
   const handleDeactivateExercise = async (exerciseId: string) => {
@@ -1651,17 +1685,26 @@ export function Admin() {
                     >
                       {t("admin.exercises.importExport.exportJson", "JSON-Vorlage exportieren")}
                     </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleExerciseExport("xlsx")}
+                    >
+                      {t(
+                        "admin.exercises.importExport.exportXlsx",
+                        "Excel-Vorlage exportieren"
+                      )}
+                    </Button>
                   </div>
                   <div className="flex flex-col gap-2 text-sm text-muted-foreground">
                     <span>
                       {t(
                         "admin.exercises.importExport.note",
-                        "Pflichtfelder sind alle Spalten außer Beschreibung. Ungültige Einträge werden übersprungen."
+                        "Pflichtfelder sind alle Spalten außer Beschreibung. Ungültige Einträge werden übersprungen. Die Excel-Vorlage enthält Auswahlfelder."
                       )}
                     </span>
                     <Input
                       type="file"
-                      accept=".csv,.json,application/json,text/csv"
+                      accept=".csv,.json,.xlsx,application/json,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                       disabled={exerciseImporting}
                       onChange={(event) => {
                         const file = event.target.files?.[0];
@@ -1686,7 +1729,7 @@ export function Admin() {
                     <Label>{t("admin.exercises.merge.source", "Quell‑Übung")}</Label>
                     <ExerciseMergeSelect
                       value={mergeSourceId}
-                      onChange={setMergeSourceId}
+                      onChange={handleMergeSourceChange}
                       placeholder={t("admin.exercises.merge.sourcePlaceholder", "Quelle wählen")}
                       options={exercises}
                     />
@@ -1695,7 +1738,7 @@ export function Admin() {
                     <Label>{t("admin.exercises.merge.target", "Ziel‑Übung")}</Label>
                     <ExerciseMergeSelect
                       value={mergeTargetId}
-                      onChange={setMergeTargetId}
+                      onChange={handleMergeTargetChange}
                       placeholder={t("admin.exercises.merge.targetPlaceholder", "Ziel wählen")}
                       options={exercises.filter((exercise) => exercise.id !== mergeSourceId)}
                     />

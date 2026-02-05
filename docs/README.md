@@ -1,66 +1,57 @@
 # Dokumentation Übersicht
 
-Willkommen zur Sportify-Dokumentation! Diese Dokumentation bietet eine umfassende Übersicht über alle Aspekte der Anwendung.
+Willkommen zur Sportify-Dokumentation. Diese Dokumentation beschreibt Architektur, Entwicklung, Betrieb und alle Features/Endpunkte.
 
-## Verfügbare Dokumentation
+## Architektur & Design
 
-### Architektur & Design
+- **[Architektur](architecture.md)** – Systemübersicht, Datenflüsse und Diagramme
+- **[Frontend](frontend.md)** – UI-Struktur, Pages, State, i18n
+- **[Backend](backend.md)** – Server, Services, Jobs, Auth
 
-- **[Architektur](architecture.md)** - Systemarchitektur, Design-Entscheidungen und technische Übersicht
-- **[Frontend](frontend.md)** - Frontend-Struktur, Komponenten und Patterns
-- **[Backend](backend.md)** - Backend-Struktur, Services und API-Design
+## Entwicklung & Betrieb
 
-### Entwicklung & Deployment
+- **[Entwicklung](development.md)** – Setup, Workflows, Tests
+- **[Deployment](deployment.md)** – Build/Deploy, Vercel
+- **[Datenbank](database.md)** – Schema, Migrationen
+- **[Konfiguration](development.md#umgebungsvariablen)** – Env‑Vars & Secrets
 
-- **[Entwicklung](development.md)** - Entwicklungshinweise, Best Practices und Workflows
-- **[Deployment](deployment.md)** - Deployment-Anleitung für verschiedene Plattformen
-- **[Datenbank](database.md)** - Datenbank-Schema, Migrationen und Datenmodell
+## Features & Implementierung
 
-### Features & Implementierung
+- **[Feature-Übersicht](features.md)** – Funktionsumfang, Zuordnung UI/API
+- **[E-Mail-System](email/README.md)** – Templates, Versand, Queue
+- **[PWA](pwa.md)** – Offline, Install, Service Worker
+- **[PWA Implementation](pwa-implementation.md)** – Implementierungsdetails
+- **[PWA Testing](pwa-testing.md)** – Testhinweise
+- **[Scoring](scoring.md)** – Punkteberechnung
+- **[Exercise System Analysis](exercise-system-analysis.md)** – Übungssystem Analyse
+- **[Exercise System Implementation](exercise-system-implementation.md)** – Übungssystem Implementierung
+- **[Exercise Workout Plan](exercise-workout-plan.md)** – Workout-Planung
 
-- **[E-Mail-System](email/README.md)** - Komplettes E-Mail-System mit Templates, Tests und Konfiguration
-- **[PWA](pwa.md)** - Progressive Web App Features und Implementierung
-- **[PWA Implementation](pwa-implementation.md)** - Implementierungsdetails für PWA-Features
-- **[PWA Testing](pwa-testing.md)** - Testing-Guide für PWA-Features
-- **[Exercise System Analysis](exercise-system-analysis.md)** - Analyse des Übungssystems
-- **[Exercise System Implementation](exercise-system-implementation.md)** - Implementierungsplan für Übungssystem
+## API-Dokumentation
 
-### API-Dokumentation
-
-- **[API Übersicht](api/README.md)** - Übersicht über alle API-Endpunkte
-- **[Authentication API](api/authentication.md)** - Authentifizierungs-Endpunkte
-- **[Workouts API](api/workouts.md)** - Workout-Management Endpunkte
-- **[Users API](api/users.md)** - Benutzer-Endpunkte
-
-### Sonstiges
-
-- **[TODO](todo.md)** - Aktuelle Aufgaben und Roadmap
+- **[API Übersicht](api/README.md)** – Einstieg
+- **[Authentication API](api/authentication.md)**
+- **[Profile API](api/profile.md)**
+- **[Users API](api/users.md)**
+- **[Workouts API](api/workouts.md)**
+- **[Exercises API](api/exercises.md)**
+- **[Training Journal API](api/training-journal.md)**
+- **[Goals API](api/goals.md)**
+- **[Challenges API](api/challenges.md)**
+- **[Friends API](api/friends.md)**
+- **[Feed API](api/feed.md)**
+- **[Reactions API](api/reactions.md)**
+- **[Scoreboard API](api/scoreboard.md)**
+- **[Stats API](api/stats.md)**
+- **[Recent Workouts API](api/recent-workouts.md)**
+- **[Notifications API](api/notifications.md)**
+- **[Events API](api/events.md)**
+- **[Contact API](api/contact.md)**
+- **[Admin API](api/admin.md)**
 
 ## Schnellstart
 
-### Für Entwickler
-
 1. Lies die [Entwicklung](development.md) Dokumentation
-2. Setze die Entwicklungsumgebung auf (siehe [README](../README.md))
+2. Richte die Umgebung ein (siehe [README](../README.md))
 3. Verstehe die [Architektur](architecture.md)
-4. Konsultiere die [API-Dokumentation](api/README.md) bei Bedarf
-
-### Für Deployment
-
-1. Lies die [Deployment](deployment.md) Dokumentation
-2. Konfiguriere Umgebungsvariablen
-3. Führe Datenbank-Migrationen aus (siehe [Datenbank](database.md))
-
-## Beitragen
-
-Wenn du zur Dokumentation beitragen möchtest:
-
-1. Erstelle oder aktualisiere die entsprechende Markdown-Datei
-2. Halte die Dokumentation aktuell und präzise
-3. Verwende klare Strukturierung und Code-Beispiele
-4. Teste alle Code-Beispiele vor dem Commit
-
-## Feedback
-
-Bei Fragen oder Anmerkungen zur Dokumentation, erstelle ein Issue oder kontaktiere den Maintainer.
-
+4. Nutze die [API-Dokumentation](api/README.md)

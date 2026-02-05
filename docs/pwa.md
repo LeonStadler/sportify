@@ -43,6 +43,22 @@ Der Service Worker implementiert folgende Strategien:
 - Automatische Synchronisation wenn wieder online
 - Retry-Mechanismus (max. 3 Versuche)
 
+**Datenfluss (Offline‑Sync):**
+
+```mermaid
+sequenceDiagram
+  participant UI as App (UI)
+  participant Queue as Offline-Queue
+  participant SW as Service Worker
+  participant API as API
+
+  UI->>Queue: Aktion speichern (offline)
+  UI->>SW: Cache lesen/schreiben
+  Queue-->>UI: Bestätigung (lokal)
+  UI->>API: Sync sobald online
+  API-->>UI: Erfolg/Fehler
+```
+
 ### 3. Install Prompt
 
 **Komponente**: `src/components/InstallPrompt.tsx`
@@ -114,6 +130,22 @@ Ermöglicht es, dass Sportify als Ziel für Share-Aktionen von anderen Apps verw
 - Hook `usePushNotifications` (siehe `src/hooks/usePushNotifications.ts`) übernimmt Permission-Handling, Subscription-Registrierung und Sync.
 - `src/components/Notifications.tsx` blendet einen CTA ein, um Push-Benachrichtigungen zu aktivieren. Auf mobilen PWA-Installationen erscheinen Mitteilungen in der System-Mitteilungszentrale.
 - Service Worker (`public/sw.js`) verarbeitet `push` und `notificationclick`, zeigt das Badge/Icon `icon-192x192.png` an und fokussiert vorhandene Clients.
+
+**Datenfluss (Push):**
+
+```mermaid
+sequenceDiagram
+  participant Client
+  participant API
+  participant Push as Web Push
+  participant SW as Service Worker
+
+  Client->>API: POST /notifications/subscriptions
+  API-->>Client: OK
+  API->>Push: sendNotification
+  Push->>SW: push event
+  SW-->>Client: Notification anzeigen
+```
 
 **Konfiguration** (Environment Variablen):
 

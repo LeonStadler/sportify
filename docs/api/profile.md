@@ -4,8 +4,6 @@ Profilverwaltung, Einladungen und Achievements.
 
 ## PUT /api/profile/update
 
-Aktualisiert das Profil.
-
 **Auth:** erforderlich
 
 **Body (JSON):**
@@ -18,20 +16,14 @@ Aktualisiert das Profil.
   "displayPreference": "firstName|fullName|nickname",
   "languagePreference": "de|en",
   "preferences": { "...": "..." },
-  "avatar": "optional (URL oder JSON)",
+  "avatar": "optional",
   "showInGlobalRankings": true
 }
 ```
 
-**Antwort (200):** Aktualisiertes Benutzerobjekt.
-
 ## POST /api/profile/change-password
 
-Ändert das Passwort.
-
 **Auth:** erforderlich
-
-**Body (JSON):**
 
 ```json
 { "currentPassword": "alt", "newPassword": "neu" }
@@ -39,23 +31,15 @@ Aktualisiert das Profil.
 
 ## GET /api/profile/friends/:friendId
 
-Gibt das Profil eines Freundes aus (inkl. statischer Infos).
-
-**Auth:** erforderlich
+Profil eines Freundes.
 
 ## GET /api/profile/achievements
 
-Lädt Achievements/Badges des Users.
-
-**Auth:** erforderlich
+Achievements/Badges des Users.
 
 ## DELETE /api/profile/account
 
-Löscht das Konto.
-
 **Auth:** erforderlich
-
-**Body (JSON):**
 
 ```json
 { "password": "aktuelles-passwort" }
@@ -63,11 +47,7 @@ Löscht das Konto.
 
 ## POST /api/profile/invite-friend
 
-Sendet eine Einladung per E‑Mail.
-
-**Auth:** erforderlich
-
-**Body (JSON):**
+Sendet Einladung per E‑Mail.
 
 ```json
 { "email": "friend@example.com" }
@@ -75,18 +55,12 @@ Sendet eine Einladung per E‑Mail.
 
 ## GET /api/profile/invitations
 
-Listet Einladungen des Users.
-
-**Auth:** erforderlich
+Listet Einladungen.
 
 ## POST /api/profile/invitations/:id/resend
 
-Versendet eine Einladung erneut.
-
-**Auth:** erforderlich
+Einladung erneut senden.
 
 ## DELETE /api/profile/invitations/:id
 
-Widerruft eine Einladung.
-
-**Auth:** erforderlich
+Einladung löschen.

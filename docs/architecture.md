@@ -7,26 +7,26 @@ Diese Dokumentation beschreibt die Systemarchitektur von Sportify.
 ```mermaid
 flowchart LR
   subgraph Client
-    UI[React App (Vite)]
-    PWA[Service Worker / PWA]
+    UI["React App (Vite)"]
+    PWA["Service Worker / PWA"]
   end
 
   subgraph Server
-    API[Express API]
-    Jobs[Event Jobs / Cron]
+    API["Express API"]
+    Jobs["Event Jobs / Cron"]
   end
 
   subgraph Daten
-    DB[(PostgreSQL)]
+    DB[("PostgreSQL")]
   end
 
   subgraph Drittanbieter
-    Mail[Nodemailer / SMTP]
-    Push[Web Push]
+    Mail["Nodemailer / SMTP"]
+    Push["Web Push"]
   end
 
-  UI -->|REST/JSON| API
-  PWA -->|Offline Cache| UI
+  UI -->|"REST/JSON"| API
+  PWA -->|"Offline Cache"| UI
   API --> DB
   API --> Mail
   API --> Push
@@ -39,7 +39,7 @@ flowchart LR
 - React 18 + Vite
 - Routing via React Router
 - Datenzugriff via TanStack Query
-- UI via Tailwind + shadcn
+- UI via Tailwind + shadcn/ui
 - i18n via i18next
 - PWA/Offline via Service Worker
 
@@ -48,7 +48,7 @@ flowchart LR
 ```
 src/
 ├── pages/         # Screens
-├── components/    # UI-Komponenten
+├── components/    # UI/Feature-Komponenten
 ├── features/      # Feature-Module
 ├── services/      # API-Clients
 ├── contexts/      # Auth/Theme

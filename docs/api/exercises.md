@@ -22,13 +22,13 @@ Listet Übungen mit Filtern.
 - `difficultyMin`, `difficultyMax`
 - `sortBy` (name|category|discipline|measurement|weight|difficulty|newest)
 - `sortDirection` (asc|desc)
-- `includeMeta` (true|false) – Favoriten + Nutzungsstatistiken
+- `includeMeta` (true|false) – Favoriten + Nutzung
 
-**Antwort (200):**
+**Antwort (200, Auszug):**
 
 ```json
 {
-  "data": [ { "id": "...", "name": "..." } ],
+  "data": [ { "id": "...", "name": "...", "measurementType": "reps" } ],
   "meta": {
     "totalItems": 123,
     "facets": { "categories": [], "muscleGroups": [], "equipment": [] }
@@ -40,25 +40,17 @@ Listet Übungen mit Filtern.
 
 Lädt eine Übung.
 
-**Auth:** erforderlich
-
 ## GET /api/exercises/favorites/list
 
 Listet Favoriten des Users.
-
-**Auth:** erforderlich
 
 ## POST /api/exercises/:id/favorite
 
 Toggle Favorit (setzt oder entfernt).
 
-**Auth:** erforderlich
-
 ## POST /api/exercises
 
-Erstellt einen Übungs‑Vorschlag (Edit/Neue Übung).
-
-**Auth:** erforderlich
+Erstellt einen Übungs‑Vorschlag.
 
 **Body (JSON, Auszug):**
 
@@ -80,19 +72,15 @@ Erstellt einen Übungs‑Vorschlag (Edit/Neue Übung).
 
 Meldet eine Übung (Fehler, Duplikat, etc.).
 
-**Auth:** erforderlich
-
 **Body (JSON):**
 
 ```json
-{ "reason": "Text" }
+{ "reason": "duplicate|incorrect_scoring|inappropriate|other", "details": "optional" }
 ```
 
 ## POST /api/exercises/:id/edit-request
 
-Stellt einen Änderungsantrag für eine Übung.
-
-**Auth:** erforderlich
+Stellt einen Änderungsantrag.
 
 **Body (JSON):**
 

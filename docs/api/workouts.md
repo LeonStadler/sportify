@@ -1,6 +1,6 @@
 # Workouts API
 
-Workout-Management und Templates.
+Workout‑Management und Templates.
 
 ## GET /api/workouts
 
@@ -8,14 +8,29 @@ Listet Workouts des Users.
 
 **Auth:** erforderlich
 
-**Query (Auszug):**
+**Query:**
 
-- `limit`, `offset`
-- `startDate`, `endDate` (YYYY-MM-DD)
-- `visibility` (private|friends|public)
-- `includeActivities` (true|false)
+- `page` (default 1)
+- `limit` (default 10, max 50)
+- `type` (activity_type filter)
+- `startDate`, `endDate` (Datum, YYYY‑MM‑DD)
 
-**Antwort (200):** Liste von Workouts.
+**Antwort (200):**
+
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "title": "...",
+      "startTime": "2025-01-01T10:00:00.000Z",
+      "duration": 60,
+      "visibility": "private"
+    }
+  ],
+  "pagination": { "currentPage": 1, "totalPages": 5, "totalItems": 50 }
+}
+```
 
 ## GET /api/workouts/:id
 
@@ -29,7 +44,7 @@ Erstellt ein Workout oder Template.
 
 **Auth:** erforderlich
 
-**Body (JSON):**
+**Body (JSON, Auszug):**
 
 ```json
 {
@@ -71,7 +86,7 @@ Erstellt ein Workout oder Template.
 
 **Hinweise:**
 
-- `quantity` ist das aktuelle Feld, `amount` wird aus Legacy-Gründen akzeptiert.
+- `quantity` ist das aktuelle Feld, `amount` wird aus Legacy‑Gründen akzeptiert.
 - Für Sets wird die Gesamtmenge aus den Sets summiert.
 
 ## PUT /api/workouts/:id
@@ -90,12 +105,8 @@ Löscht ein Workout.
 
 ### GET /api/workouts/templates
 
-Listet Workout-Templates.
-
-**Auth:** erforderlich
+Listet Workout‑Templates.
 
 ### GET /api/workouts/templates/:id
 
 Lädt ein Template inkl. Aktivitäten.
-
-**Auth:** erforderlich

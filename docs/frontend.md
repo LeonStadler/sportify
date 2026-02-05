@@ -15,6 +15,22 @@ src/
 └── utils/         # Helpers
 ```
 
+## Design‑System
+
+Siehe [design/README.md](design/README.md) für Farben, Typografie, Layout und Komponenten.
+
+## Layout‑Prinzipien
+
+- Mobile‑first
+- Grid‑basierte Layouts
+- Konsistente Spacing‑Scale
+
+## UI‑States
+
+- Loading: Skeletons oder Spinner
+- Empty: klare Empty‑States
+- Error: user‑freundliche Fehler
+
 ## Screens (Auszug)
 
 - `Landing`, `Index`, `Dashboard`
@@ -23,7 +39,7 @@ src/
 - `Stats`, `Scoreboard`
 - `Friends`, `FriendsActivities`, `FriendProfile`
 - `Profile`, `Admin`
-- `Contact`, `Imprint`, `Privacy`, `Terms`
+- `Contact`, `Imprint`, `Privacy`, `Terms`, `Changelog`, `Share`, `Invite`
 
 ## State & Daten
 

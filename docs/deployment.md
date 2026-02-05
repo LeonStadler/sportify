@@ -1,59 +1,78 @@
 # Deployment
 
-## Vercel
+## Überblick
 
-Sportify ist für Vercel optimiert und nutzt Express für die API.
+Sportify besteht aus zwei Build‑Artefakten:
 
-### Voraussetzungen
+- **App**: Vite Build nach `dist/`
+- **Docs**: Docusaurus Build nach `docs-site/build`, wird nach `dist/docs` kopiert
 
-- Vercel Account
-- Vercel CLI (`npm i -g vercel`)
+Damit ist die Dokumentation unter `domain/docs` im gleichen Deployment erreichbar.
 
-### Schritte
+## Build‑Pipeline (App + Docs)
 
-1. `vercel login`
-2. `vercel link`
-3. Umgebungsvariablen setzen (siehe unten)
-4. `vercel` (Preview) oder `vercel --prod`
+1. Docs synchronisieren:
 
-### Umgebungsvariablen (Backend)
+```
+npm run docs:sync
+```
 
-- `DATABASE_URL`
-- `JWT_SECRET`
-- `FRONTEND_URL`
-- `DATABASE_SSL_ENABLED`, `DATABASE_SSL_REJECT_UNAUTHORIZED`
-- `CORS_ALLOW_ORIGINS`
-- `SMTP_*` (falls E‑Mails aktiv)
-- `EVENTS_CRON_SECRET` / `CRON_SECRET`
-- `EVENTS_BASE_URL`
-- `EMAIL_PREFERENCES_SECRET`, `EMAIL_PREFERENCES_TOKEN_TTL`
-- `VAPID_*` oder `WEB_PUSH_*`
+2. Docs bauen:
 
-### Frontend (Vite)
+```
+npm run docs:build
+```
 
-- `VITE_FRONTEND_URL`
-- `VITE_CONTACT_*`
+3. App bauen:
 
-## Event‑Scheduling (GitHub Actions)
+```
+npm run build
+```
 
-Im Free‑Plan werden Jobs über GitHub Actions getriggert:
+4. Docs in App‑Build integrieren:
 
-- Workflow: `.github/workflows/events-scheduler.yml`
-- Secrets:
-  - `EVENTS_BASE_URL`
-  - `EVENTS_CRON_SECRET`
+```
+node scripts/copy-docs-build.js
+```
 
-## Migrationen
+Alternativ alles in einem Schritt:
 
-Migrationen laufen beim Server‑Start. Optional bei Vercel pro Request:
+```
+npm run build:with-docs
+```
 
-- `RUN_MIGRATIONS_ON_REQUEST=true`
+## Docusaurus‑Sync
 
-Status prüfen:
+Die Inhalte werden aus `docs/` nach `docs-site/docs/` kopiert. Das passiert **automatisiert** über `docs:sync` und sollte nicht manuell editiert werden.
 
-- `GET /api/health` → `migrations` Feld
+Quelle der Wahrheit:
 
-## Build
+- `docs/`
 
-- `npm run build` (TypeScript + Vite)
-- Output: `dist/`
+Generierte Kopie:
+
+- `docs-site/docs/`
+
+## Vercel Setup
+
+- Root‑Projekt: App + Docs in einem Deployment
+- `buildCommand`: `npm run build:with-docs`
+- `outputDirectory`: `dist`
+- Dokumentation wird in `dist/docs` ausgeliefert
+
+## Domain
+
+- Hauptdomain zeigt auf die App (Root)
+- Dokumentation läuft unter `/docs`
+- Bei eigener Domain nur ein Projekt nötig
+
+## CI/CD
+
+- Push in `main` triggert Vercel Build
+- Preview‑Deployments für PRs möglich (Vercel Standard)
+
+## Preview vs. Production
+
+- Preview: automatische Deploys pro Branch/PR
+- Production: Deploy aus `main`
+- Docs werden immer im gleichen Build wie die App veröffentlicht

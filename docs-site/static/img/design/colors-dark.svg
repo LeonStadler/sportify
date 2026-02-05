@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="420" viewBox="0 0 960 420">
+  <rect width="960" height="420" fill="hsl(224 71.4% 4.1%)"/>
+  <text x="40" y="36" font-family="Inter, Arial, sans-serif" font-size="20" fill="hsl(210 20% 98%)">Sportify Farbpalette (Dark)</text>
+
+  <g font-family="Inter, Arial, sans-serif" font-size="14" fill="hsl(210 20% 98%)">
+    <rect x="40" y="60" width="280" height="80" rx="12" fill="hsl(24.6 95% 53.1%)"/>
+    <text x="40" y="160">Primary  hsl(24.6 95% 53.1%)</text>
+
+    <rect x="340" y="60" width="280" height="80" rx="12" fill="hsl(224 71.4% 4.1%)" stroke="hsl(215 27.9% 16.9%)"/>
+    <text x="340" y="160">Background  hsl(224 71.4% 4.1%)</text>
+
+    <rect x="640" y="60" width="280" height="80" rx="12" fill="hsl(215 27.9% 16.9%)"/>
+    <text x="640" y="160">Secondary/Muted  hsl(215 27.9% 16.9%)</text>
+
+    <rect x="40" y="200" width="280" height="80" rx="12" fill="hsl(210 20% 98%)"/>
+    <text x="40" y="300">Foreground  hsl(210 20% 98%)</text>
+
+    <rect x="340" y="200" width="280" height="80" rx="12" fill="hsl(215 27.9% 16.9%)"/>
+    <text x="340" y="300">Border/Input  hsl(215 27.9% 16.9%)</text>
+
+    <rect x="640" y="200" width="280" height="80" rx="12" fill="hsl(0 62.8% 30.6%)"/>
+    <text x="640" y="300">Destructive  hsl(0 62.8% 30.6%)</text>
+  </g>
+</svg>

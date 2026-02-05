@@ -151,6 +151,14 @@ export function PublicFooter({ onNavigateToSection }: PublicFooterProps) {
                                     </Link>
                                 </li>
                             ))}
+                            <li>
+                                <a
+                                    href="/docs/overview"
+                                    className="text-sm text-muted-foreground hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded"
+                                >
+                                    {t("landing.footer.legalLinks.documentation", "Dokumentation")}
+                                </a>
+                            </li>
                         </ul>
                     </nav>
                 </div>
@@ -164,5 +172,4 @@ export function PublicFooter({ onNavigateToSection }: PublicFooterProps) {
         </footer>
     );
 }
-
 

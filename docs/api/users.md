@@ -2,13 +2,25 @@
 
 ## GET /api/users/search
 
-Suche nach Benutzern.
+Suche nach Benutzern (für Freundschaftsanfragen).
 
 **Auth:** erforderlich
 
-**Query:**
+**Query (wichtigste Felder):**
 
-- `query`: Suchstring (E‑Mail, Name, Spitzname)
-- `limit`, `offset`: Pagination
+- `query` (min. 2 Zeichen)
+- `page`, `limit`
 
-**Antwort (200):** Liste von Benutzern (reduzierte Felder).
+**Response (Beispiel):**
+
+```json
+[
+  { "id": "uuid", "displayName": "Max", "avatarUrl": "...", "email": "..." }
+]
+```
+
+**Fehlerfälle:**
+
+- `500` Serverfehler
+
+**Hinweis:** aktuelle Freunde und offene Anfragen werden ausgeschlossen.

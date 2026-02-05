@@ -11,7 +11,11 @@ export interface AnalyticsRange {
 }
 
 export interface AnalyticsActivityBreakdownEntry {
-  activity: string;
+  activityId: string;
+  label: string;
+  measurementType?: "reps" | "time" | "distance" | null;
+  supportsTime?: boolean | null;
+  supportsDistance?: boolean | null;
   total: number | null;
   percentage: number;
 }
@@ -21,11 +25,7 @@ export interface AnalyticsWorkoutDay {
   workouts: number;
   durationMinutes: number;
   points: number;
-  pullups: number;
-  pushups: number;
-  running: number;
-  cycling: number;
-  situps: number;
+  activities?: Record<string, number>;
 }
 
 export interface AnalyticsLongestWorkout {
@@ -40,16 +40,18 @@ export interface AnalyticsWorkoutsData {
     workouts: number;
     durationMinutes: number;
     points: number;
-    pullups: number;
-    pushups: number;
-    running: number;
-    cycling: number;
-    situps: number;
     activeDays: number;
     averageDurationPerWorkout: number | null;
     averagePointsPerWorkout: number | null;
     consistency: number | null;
   };
+  activityMetrics?: Array<{
+    key: string;
+    label: string;
+    measurementType?: "reps" | "time" | "distance" | null;
+    supportsTime?: boolean | null;
+    supportsDistance?: boolean | null;
+  }>;
   timeline: AnalyticsWorkoutDay[];
   activityBreakdown: AnalyticsActivityBreakdownEntry[];
   highlights: {

@@ -31,6 +31,13 @@ import { useTranslation } from "react-i18next";
 export type ExerciseFormValue = {
   name: string;
   description: string;
+  nameVariants: {
+    deSingular: string;
+    dePlural: string;
+    enSingular: string;
+    enPlural: string;
+    other: string;
+  };
   category: string;
   discipline: string;
   movementPattern: string;
@@ -88,6 +95,16 @@ export function ExerciseForm({
 
   const setField = (field: keyof ExerciseFormValue, fieldValue: ExerciseFormValue[keyof ExerciseFormValue]) => {
     onChange({ ...value, [field]: fieldValue });
+  };
+
+  const updateNameVariant = (key: keyof ExerciseFormValue["nameVariants"], fieldValue: string) => {
+    onChange({
+      ...value,
+      nameVariants: {
+        ...value.nameVariants,
+        [key]: fieldValue,
+      },
+    });
   };
 
   const categoryOptionsWithValue = useMemo(() => {
@@ -186,8 +203,8 @@ export function ExerciseForm({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-4">
-        <div className="flex-1 min-w-[240px]">
+      <div className="grid gap-4 md:grid-cols-2">
+        <div>
           <div className="flex items-center gap-2">
             <Label>{t("exerciseLibrary.name")}</Label>
             <TooltipProvider delayDuration={150}>
@@ -212,8 +229,8 @@ export function ExerciseForm({
             onChange={(e) => setField("name", e.target.value)}
             placeholder={t("exerciseLibrary.namePlaceholder", "z.B. Pull-Ups")}
           />
-          <div className="mt-2 min-h-[32px] space-y-2">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="mt-2 min-h-[60px] rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 space-y-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2">
               <span
                 className={`h-2 w-2 rounded-full ${
                   nameStatus === "exact"
@@ -237,17 +254,15 @@ export function ExerciseForm({
               </span>
             </div>
             {nameStatus === "similar" && nameSuggestions && nameSuggestions.length > 0 && (
-              <div className="space-y-1 text-xs text-muted-foreground">
-                <div className="flex flex-wrap gap-1">
-                  {nameSuggestions.map((name) => (
-                    <span
-                      key={name}
-                      className="rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground"
-                    >
-                      {name}
-                    </span>
-                  ))}
-                </div>
+              <div className="flex flex-wrap gap-1">
+                {nameSuggestions.map((name) => (
+                  <span
+                    key={name}
+                    className="rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground"
+                  >
+                    {name}
+                  </span>
+                ))}
               </div>
             )}
             {nameStatus === "similar" && onConfirmSimilarChange && (
@@ -264,7 +279,7 @@ export function ExerciseForm({
             )}
           </div>
         </div>
-        <div className="flex-1 min-w-[220px]">
+        <div>
           <Label>{t("exerciseLibrary.category")}</Label>
           <Select value={value.category} onValueChange={(next) => setField("category", next)}>
             <SelectTrigger className={cn("mt-1", !value.category && "text-muted-foreground")}>
@@ -279,7 +294,7 @@ export function ExerciseForm({
             </SelectContent>
           </Select>
         </div>
-        <div className="flex-1 min-w-[220px]">
+        <div>
           <Label>{t("exerciseLibrary.discipline")}</Label>
           <Select value={value.discipline} onValueChange={(next) => setField("discipline", next)}>
             <SelectTrigger className={cn("mt-1", !value.discipline && "text-muted-foreground")}>
@@ -294,7 +309,7 @@ export function ExerciseForm({
             </SelectContent>
           </Select>
         </div>
-        <div className="flex-1 min-w-[220px]">
+        <div>
           <Label>{t("exerciseLibrary.pattern")}</Label>
           <Select value={value.movementPattern} onValueChange={(next) => setField("movementPattern", next)}>
             <SelectTrigger className={cn("mt-1", !value.movementPattern && "text-muted-foreground")}>
@@ -310,6 +325,58 @@ export function ExerciseForm({
           </Select>
         </div>
       </div>
+
+      <Accordion type="single" collapsible className="rounded-md border border-border">
+        <AccordionItem value="names" className="border-none">
+          <AccordionTrigger className="px-4 py-3 text-sm">
+            {t("exerciseLibrary.moreNames", "Weitere Namen (optional)")}
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>{t("exerciseLibrary.nameDeSingular", "Deutsch (Singular)")}</Label>
+                <Input
+                  value={value.nameVariants.deSingular}
+                  onChange={(e) => updateNameVariant("deSingular", e.target.value)}
+                  placeholder={t("exerciseLibrary.nameDeSingularPlaceholder", "z.B. Klimmzug")}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{t("exerciseLibrary.nameDePlural", "Deutsch (Plural)")}</Label>
+                <Input
+                  value={value.nameVariants.dePlural}
+                  onChange={(e) => updateNameVariant("dePlural", e.target.value)}
+                  placeholder={t("exerciseLibrary.nameDePluralPlaceholder", "z.B. Klimmzüge")}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{t("exerciseLibrary.nameEnSingular", "Englisch (Singular)")}</Label>
+                <Input
+                  value={value.nameVariants.enSingular}
+                  onChange={(e) => updateNameVariant("enSingular", e.target.value)}
+                  placeholder={t("exerciseLibrary.nameEnSingularPlaceholder", "e.g. Pull-up")}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{t("exerciseLibrary.nameEnPlural", "Englisch (Plural)")}</Label>
+                <Input
+                  value={value.nameVariants.enPlural}
+                  onChange={(e) => updateNameVariant("enPlural", e.target.value)}
+                  placeholder={t("exerciseLibrary.nameEnPluralPlaceholder", "e.g. Pull-ups")}
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label>{t("exerciseLibrary.nameAliases", "Weitere Synonyme")}</Label>
+                <Input
+                  value={value.nameVariants.other}
+                  onChange={(e) => updateNameVariant("other", e.target.value)}
+                  placeholder={t("exerciseLibrary.nameAliasesPlaceholder", "Weitere Namen, getrennt durch Komma")}
+                />
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       <div className="space-y-2">
         <Label>{t("exerciseLibrary.measurement")}</Label>

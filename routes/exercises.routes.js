@@ -1,6 +1,7 @@
 import express from "express";
 import authMiddleware from "../middleware/authMiddleware.js";
 import { slugifyExerciseName } from "../utils/exerciseUtils.js";
+import { computePointsPerUnit } from "../utils/scoring.js";
 import { toCamelCase } from "../utils/helpers.js";
 import { randomUUID } from "crypto";
 
@@ -49,6 +50,7 @@ export const createExercisesRouter = (pool) => {
         difficultyMax,
         sortBy = "name",
         sortDirection = "asc",
+        includeMeta,
       } = req.query || {};
 
       const filters = ["is_active = true", "merged_into IS NULL"];
@@ -160,7 +162,12 @@ export const createExercisesRouter = (pool) => {
       const facetsResult = await pool.query(facetsQuery, params);
 
       const sql = `
-        SELECT *
+        SELECT
+          exercises.*,
+          COALESCE(
+            (SELECT array_agg(alias) FROM exercise_aliases ea WHERE ea.exercise_id = exercises.id),
+            '{}'::text[]
+          ) AS aliases
         FROM exercises
         WHERE ${whereClause}
         ORDER BY ${sortColumn} ${sortDir}
@@ -170,11 +177,67 @@ export const createExercisesRouter = (pool) => {
       params.push(Number(offset));
 
       const { rows } = await pool.query(sql, params);
-      const exercises = rows.map((row) => {
+      let exercises = rows.map((row) => {
         const exercise = toCamelCase(row);
         exercise.unitOptions = row.unit_options || [];
         return exercise;
       });
+
+      const wantsMeta = String(includeMeta).toLowerCase() === "true";
+      if (wantsMeta && exercises.length > 0) {
+        const exerciseIds = exercises.map((exercise) => exercise.id);
+        const [favoritesResult, usageResult] = await Promise.all([
+          pool.query(
+            `
+              SELECT exercise_id
+              FROM exercise_favorites
+              WHERE user_id = $1
+                AND exercise_id = ANY($2)
+            `,
+            [req.user.id, exerciseIds]
+          ),
+          pool.query(
+            `
+              SELECT
+                wa.activity_type AS exercise_id,
+                COUNT(*)::int AS usage_count,
+                COALESCE(SUM(wa.points_earned), 0)::numeric AS usage_points
+              FROM workout_activities wa
+              JOIN workouts w ON w.id = wa.workout_id
+              WHERE w.user_id = $1
+                AND wa.activity_type = ANY($2)
+              GROUP BY wa.activity_type
+            `,
+            [req.user.id, exerciseIds]
+          ),
+        ]);
+
+        const favoriteSet = new Set(
+          favoritesResult.rows.map((row) => row.exercise_id)
+        );
+        const usageMap = new Map(
+          usageResult.rows.map((row) => [
+            row.exercise_id,
+            {
+              usageCount: Number(row.usage_count || 0),
+              usagePoints: Number(row.usage_points || 0),
+            },
+          ])
+        );
+
+        exercises = exercises.map((exercise) => {
+          const usage = usageMap.get(exercise.id) || {
+            usageCount: 0,
+            usagePoints: 0,
+          };
+          return {
+            ...exercise,
+            isFavorite: favoriteSet.has(exercise.id),
+            usageCount: usage.usageCount,
+            usagePoints: usage.usagePoints,
+          };
+        });
+      }
 
       const currentPage = Number(limit) > 0 ? Math.floor(Number(offset) / Number(limit)) + 1 : 1;
       const totalPages = Number(limit) > 0 ? Math.max(1, Math.ceil(totalItems / Number(limit))) : 1;
@@ -215,6 +278,63 @@ export const createExercisesRouter = (pool) => {
     }
   });
 
+  router.get("/favorites/list", authMiddleware, async (req, res) => {
+    try {
+      const { rows } = await pool.query(
+        `
+          SELECT exercise_id
+          FROM exercise_favorites
+          WHERE user_id = $1
+          ORDER BY created_at DESC
+        `,
+        [req.user.id]
+      );
+      res.json({ favorites: rows.map((row) => row.exercise_id) });
+    } catch (error) {
+      console.error("Exercise favorites error:", error);
+      res.status(500).json({ error: "Serverfehler beim Laden der Favoriten." });
+    }
+  });
+
+  router.post("/:id/favorite", authMiddleware, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const shouldFavorite = Boolean(req.body?.favorite);
+
+      const { rows: exerciseRows } = await pool.query(
+        "SELECT id FROM exercises WHERE id = $1 AND is_active = true",
+        [id]
+      );
+      if (exerciseRows.length === 0) {
+        return res.status(404).json({ error: "Übung nicht gefunden." });
+      }
+
+      if (shouldFavorite) {
+        await pool.query(
+          `
+            INSERT INTO exercise_favorites (user_id, exercise_id)
+            VALUES ($1, $2)
+            ON CONFLICT (user_id, exercise_id) DO NOTHING
+          `,
+          [req.user.id, id]
+        );
+      } else {
+        await pool.query(
+          `
+            DELETE FROM exercise_favorites
+            WHERE user_id = $1 AND exercise_id = $2
+          `,
+          [req.user.id, id]
+        );
+      }
+
+      res.json({ exerciseId: id, favorite: shouldFavorite });
+    } catch (error) {
+      console.error("Exercise favorite update error:", error);
+      res.status(500).json({ error: "Serverfehler beim Speichern des Favoriten." });
+    }
+  });
+
   router.post("/", authMiddleware, async (req, res) => {
     try {
       const {
@@ -233,8 +353,10 @@ export const createExercisesRouter = (pool) => {
         supportsTime,
         supportsDistance,
         supportsGrade,
+        aliases,
         unitOptions,
         pointsPerUnit,
+        pointsSource,
         unit,
         confirmSimilar,
       } = req.body || {};
@@ -274,6 +396,16 @@ export const createExercisesRouter = (pool) => {
 
       const exerciseId = randomUUID();
 
+      const normalizedPointsSource =
+        pointsSource === "manual" ? "manual" : "auto";
+      const resolvedPointsPerUnit =
+        normalizedPointsSource === "manual" && pointsPerUnit !== undefined
+          ? Number(pointsPerUnit)
+          : computePointsPerUnit({
+              measurementType: measurementType || "reps",
+              difficultyTier,
+            });
+
       const insertQuery = `
         INSERT INTO exercises (
           id,
@@ -285,6 +417,7 @@ export const createExercisesRouter = (pool) => {
           movement_pattern,
           measurement_type,
           points_per_unit,
+          points_source,
           unit,
           requires_weight,
           allows_weight,
@@ -300,7 +433,7 @@ export const createExercisesRouter = (pool) => {
           created_by,
           is_active
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20::jsonb,$21,$22,$23)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21::jsonb,$22,$23,$24)
         RETURNING *
       `;
 
@@ -321,7 +454,8 @@ export const createExercisesRouter = (pool) => {
         discipline || null,
         movementPattern || null,
         measurementType || null,
-        pointsPerUnit ?? 1,
+        Number.isFinite(resolvedPointsPerUnit) ? resolvedPointsPerUnit : 1,
+        normalizedPointsSource,
         resolvedUnit,
         Boolean(requiresWeight),
         Boolean(allowsWeight),
@@ -338,8 +472,25 @@ export const createExercisesRouter = (pool) => {
         true,
       ]);
 
+      const aliasList = Array.isArray(aliases)
+        ? aliases.map((alias) => String(alias).trim()).filter(Boolean)
+        : [];
+      if (aliasList.length > 0) {
+        for (const alias of aliasList) {
+          const aliasSlug = slugifyExerciseName(alias);
+          if (!aliasSlug) continue;
+          await pool.query(
+            `INSERT INTO exercise_aliases (exercise_id, alias, alias_slug, created_by)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (alias_slug) DO NOTHING`,
+            [exerciseId, alias, aliasSlug, req.user.id]
+          );
+        }
+      }
+
       const exercise = toCamelCase(rows[0]);
       exercise.unitOptions = rows[0].unit_options || [];
+      exercise.aliases = aliasList;
       res.status(201).json(exercise);
     } catch (error) {
       console.error("Create exercise error:", error);

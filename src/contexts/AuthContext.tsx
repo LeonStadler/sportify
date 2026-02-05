@@ -25,7 +25,7 @@ export interface User {
     timeFormat: "12h" | "24h";
     units: {
       distance: "km" | "m" | "miles" | "yards";
-      weight: "kg" | "lbs" | "stone";
+      weight: "kg" | "lbs";
       temperature: "celsius" | "fahrenheit";
     };
     notifications: {
@@ -40,6 +40,18 @@ export interface User {
       showNames: boolean;
     };
     theme: "light" | "dark" | "system";
+    metrics?: {
+      bodyWeightKg?: number | null;
+      activityLevel?: "low" | "medium" | "high";
+    };
+    exercises?: {
+      scoreboard?: {
+        pinnedExerciseIds?: string[];
+      };
+      stats?: {
+        pinnedExerciseIds?: string[];
+      };
+    };
   };
 }
 

@@ -32,6 +32,8 @@ import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
 import { getUserInitials, parseAvatarConfig } from "@/lib/avatar";
 import { getBadgeText } from "@/lib/badges";
+import type { Exercise } from "@/types/exercise";
+import { convertWeightFromKg, convertWeightToKg } from "@/utils/units";
 import { format } from "date-fns";
 import { de, enUS } from "date-fns/locale";
 import {
@@ -165,7 +167,7 @@ export function Profile() {
     timeFormat: "12h" | "24h";
     units: {
       distance: "km" | "m" | "miles" | "yards";
-      weight: "kg" | "lbs" | "stone";
+      weight: "kg" | "lbs";
       temperature: "celsius" | "fahrenheit";
     };
     notifications: {
@@ -180,6 +182,10 @@ export function Profile() {
       showNames: boolean;
     };
     theme: "light" | "dark" | "system";
+    metrics: {
+      bodyWeightKg: number | null;
+      activityLevel: "low" | "medium" | "high";
+    };
   }>({
     languagePreference: user?.languagePreference || "de",
     timeFormat: user?.preferences?.timeFormat || "24h",
@@ -203,6 +209,10 @@ export function Profile() {
       (theme && (theme === "light" || theme === "dark" || theme === "system")
         ? theme
         : "system") || "system",
+    metrics: {
+      bodyWeightKg: user?.preferences?.metrics?.bodyWeightKg ?? null,
+      activityLevel: user?.preferences?.metrics?.activityLevel ?? "medium",
+    },
   });
 
   // Password change state
@@ -234,15 +244,12 @@ export function Profile() {
   const [recoveryCodesDialogOpen, setRecoveryCodesDialogOpen] = useState(false);
   const [newRecoveryCodes, setNewRecoveryCodes] = useState<string[]>([]);
   const defaultGoals: WeeklyGoals = {
-    pullups: { target: 100, current: 0 },
-    pushups: { target: 400, current: 0 },
-    situps: { target: 200, current: 0 },
-    running: { target: 25, current: 0 },
-    cycling: { target: 100, current: 0 },
     points: { target: DEFAULT_WEEKLY_POINTS_GOAL, current: 0 },
+    exercises: [],
   };
   const [goals, setGoals] = useState<WeeklyGoals>(defaultGoals);
   const [goalsForm, setGoalsForm] = useState<WeeklyGoals>(defaultGoals);
+  const [goalExercises, setGoalExercises] = useState<Exercise[]>([]);
   const [loadingGoals, setLoadingGoals] = useState(false);
   const [savingGoals, setSavingGoals] = useState(false);
   const [achievements, setAchievements] = useState<AchievementsData>({
@@ -290,9 +297,25 @@ export function Profile() {
     if (user) {
       loadInvitations();
       loadGoals();
+      loadGoalExercises();
       loadAchievements();
     }
   }, [user, loadInvitations, loadAchievements]);
+
+  const loadGoalExercises = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      const response = await fetch(`${API_URL}/exercises?limit=500`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      setGoalExercises(Array.isArray(data.exercises) ? data.exercises : []);
+    } catch (error) {
+      console.error("Error loading exercises:", error);
+    }
+  };
 
   const loadGoals = async () => {
     try {
@@ -307,30 +330,11 @@ export function Profile() {
       if (response.ok) {
         const data = await response.json();
         const mergedGoals: WeeklyGoals = {
-          pullups: {
-            target: data.pullups?.target ?? defaultGoals.pullups.target,
-            current: data.pullups?.current ?? defaultGoals.pullups.current,
-          },
-          pushups: {
-            target: data.pushups?.target ?? defaultGoals.pushups.target,
-            current: data.pushups?.current ?? defaultGoals.pushups.current,
-          },
-          running: {
-            target: data.running?.target ?? defaultGoals.running.target,
-            current: data.running?.current ?? defaultGoals.running.current,
-          },
-          cycling: {
-            target: data.cycling?.target ?? defaultGoals.cycling.target,
-            current: data.cycling?.current ?? defaultGoals.cycling.current,
-          },
-          situps: {
-            target: data.situps?.target ?? defaultGoals.situps.target,
-            current: data.situps?.current ?? defaultGoals.situps.current,
-          },
           points: {
             target: data.points?.target ?? defaultGoals.points.target,
             current: data.points?.current ?? defaultGoals.points.current,
           },
+          exercises: Array.isArray(data.exercises) ? data.exercises : [],
         };
         setGoals(mergedGoals);
         setGoalsForm(mergedGoals);
@@ -369,30 +373,13 @@ export function Profile() {
 
       const updatedGoals = (await response.json()) || {};
       const mergedGoals: WeeklyGoals = {
-        pullups: {
-          target: updatedGoals.pullups?.target ?? newGoals.pullups?.target ?? defaultGoals.pullups.target,
-          current: updatedGoals.pullups?.current ?? newGoals.pullups?.current ?? goals.pullups?.current ?? 0,
-        },
-        pushups: {
-          target: updatedGoals.pushups?.target ?? newGoals.pushups?.target ?? defaultGoals.pushups.target,
-          current: updatedGoals.pushups?.current ?? newGoals.pushups?.current ?? goals.pushups?.current ?? 0,
-        },
-        situps: {
-          target: updatedGoals.situps?.target ?? newGoals.situps?.target ?? defaultGoals.situps.target,
-          current: updatedGoals.situps?.current ?? newGoals.situps?.current ?? goals.situps?.current ?? 0,
-        },
-        running: {
-          target: updatedGoals.running?.target ?? newGoals.running?.target ?? defaultGoals.running.target,
-          current: updatedGoals.running?.current ?? newGoals.running?.current ?? goals.running?.current ?? 0,
-        },
-        cycling: {
-          target: updatedGoals.cycling?.target ?? newGoals.cycling?.target ?? defaultGoals.cycling.target,
-          current: updatedGoals.cycling?.current ?? newGoals.cycling?.current ?? goals.cycling?.current ?? 0,
-        },
         points: {
           target: updatedGoals.points?.target ?? newGoals.points?.target ?? defaultGoals.points.target,
           current: updatedGoals.points?.current ?? newGoals.points?.current ?? goals.points?.current ?? 0,
         },
+        exercises: Array.isArray(updatedGoals.exercises)
+          ? updatedGoals.exercises
+          : newGoals.exercises,
       };
 
       setGoals(mergedGoals);
@@ -1247,6 +1234,53 @@ export function Profile() {
                         </p>
                       )}
                   </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">
+                      {t("profile.bodyWeightOptional", "Körpergewicht (optional)")}
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        value={
+                          preferencesForm.metrics.bodyWeightKg
+                            ? convertWeightFromKg(
+                                preferencesForm.metrics.bodyWeightKg,
+                                preferencesForm.units.weight
+                              ).toFixed(1)
+                            : ""
+                        }
+                        onChange={(e) => {
+                          const raw = parseFloat(e.target.value);
+                          const kgValue = Number.isFinite(raw)
+                            ? convertWeightToKg(raw, preferencesForm.units.weight)
+                            : null;
+                          savePreference(
+                            {
+                              metrics: {
+                                ...preferencesForm.metrics,
+                                bodyWeightKg:
+                                  kgValue && kgValue > 0 ? kgValue : null,
+                              },
+                            },
+                            t("profile.bodyWeightOptional", "Körpergewicht")
+                          );
+                        }}
+                        placeholder={t("profile.bodyWeightPlaceholder", "z. B. 72")}
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        {preferencesForm.units.weight}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {t(
+                        "profile.bodyWeightHint",
+                        "Optional: verbessert die Genauigkeit der Punkteberechnung. Ohne Angabe bleibt alles fair."
+                      )}
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1771,7 +1805,7 @@ export function Profile() {
                         {
                           units: {
                             ...preferencesForm.units,
-                            weight: value as "kg" | "lbs" | "stone",
+                            weight: value as "kg" | "lbs",
                           },
                         },
                         t("profile.weight")
@@ -1784,9 +1818,6 @@ export function Profile() {
                     <SelectContent>
                       <SelectItem value="kg">{t("profile.weightKg")}</SelectItem>
                       <SelectItem value="lbs">{t("profile.weightLbs")}</SelectItem>
-                      <SelectItem value="stone">
-                        {t("profile.weightStone")}
-                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1978,10 +2009,40 @@ export function Profile() {
                 <form onSubmit={handleGoalsSubmit}>
                   <WeeklyGoalsForm
                     goals={goalsForm}
-                    onChange={(key, target) => {
+                    exercises={goalExercises}
+                    onChangePoints={(target) => {
                       setGoalsForm((prev) => ({
                         ...prev,
-                        [key]: { ...prev[key], target: Math.max(0, target) },
+                        points: { ...prev.points, target: Math.max(0, target) },
+                      }));
+                    }}
+                    onChangeExercise={(index, exerciseId) => {
+                      setGoalsForm((prev) => {
+                        const next = [...prev.exercises];
+                        next[index] = { ...next[index], exerciseId };
+                        return { ...prev, exercises: next };
+                      });
+                    }}
+                    onChangeExerciseTarget={(index, target) => {
+                      setGoalsForm((prev) => {
+                        const next = [...prev.exercises];
+                        next[index] = { ...next[index], target: Math.max(0, target) };
+                        return { ...prev, exercises: next };
+                      });
+                    }}
+                    onAddExercise={() => {
+                      setGoalsForm((prev) => ({
+                        ...prev,
+                        exercises:
+                          prev.exercises.length >= 5
+                            ? prev.exercises
+                            : [...prev.exercises, { exerciseId: "", target: 0 }],
+                      }));
+                    }}
+                    onRemoveExercise={(index) => {
+                      setGoalsForm((prev) => ({
+                        ...prev,
+                        exercises: prev.exercises.filter((_, idx) => idx !== index),
                       }));
                     }}
                   />
@@ -2006,6 +2067,60 @@ export function Profile() {
                   </div>
                 </form>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("profile.monthlyGoalTitle", "Monatsziel")}</CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                {t(
+                  "profile.monthlyGoalDesc",
+                  "Lege dein Aktivitätsniveau fest, damit dein Monatsziel realistisch bleibt."
+                )}
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">
+                  {t("profile.activityLevelLabel", "Aktivitätsniveau")}
+                </Label>
+                <Select
+                  value={preferencesForm.metrics.activityLevel}
+                  onValueChange={(value) =>
+                    savePreference(
+                      {
+                        metrics: {
+                          ...preferencesForm.metrics,
+                          activityLevel: value as "low" | "medium" | "high",
+                        },
+                      },
+                      t("profile.activityLevelLabel", "Aktivitätsniveau")
+                    )
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">
+                      {t("profile.activityLevelLow", "Einsteiger")}
+                    </SelectItem>
+                    <SelectItem value="medium">
+                      {t("profile.activityLevelMedium", "Fortgeschritten")}
+                    </SelectItem>
+                    <SelectItem value="high">
+                      {t("profile.activityLevelHigh", "Sehr aktiv")}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {t(
+                    "profile.activityLevelHint",
+                    "Das beeinflusst das automatische Monatsziel, besonders wenn dir noch keine Trainingshistorie vorliegt."
+                  )}
+                </p>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

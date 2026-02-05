@@ -39,6 +39,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -58,7 +71,7 @@ import { API_URL } from "@/lib/api";
 import type { Workout } from "@/types/workout";
 import { getNormalizedRange, getRangeForPeriod, toDateParam } from "@/utils/dateRanges";
 import { convertDistance, convertWeightFromKg } from "@/utils/units";
-import { ArrowDown, ArrowUp, ChevronDown, Copy, Eye, Info, Pencil, Play, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, Copy, Eye, Info, Pencil, Play, Search, Star, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { useTranslation } from "react-i18next";
@@ -149,6 +162,7 @@ const getTemplateRelevanceScore = (template: Workout, query: string) => {
 export function Training() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
+  const { user, updateProfile } = useAuth();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [recentWorkouts, setRecentWorkouts] = useState<Workout[]>([]);
@@ -178,6 +192,16 @@ export function Training() {
   const [templates, setTemplates] = useState<Workout[]>([]);
   const [prefillWorkout, setPrefillWorkout] = useState<Workout | null>(null);
   const [templateSearch, setTemplateSearch] = useState("");
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const [templatePickerQuery, setTemplatePickerQuery] = useState("");
+  const [favoriteTemplateIds, setFavoriteTemplateIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    const nextFavorites =
+      user.preferences?.workouts?.favoriteTemplateIds ?? [];
+    setFavoriteTemplateIds(nextFavorites);
+  }, [user]);
   const [templateSourceFilter, setTemplateSourceFilter] = useState("all");
   const [templateCategoryFilter, setTemplateCategoryFilter] = useState("all");
   const [templateDisciplineFilter, setTemplateDisciplineFilter] = useState("all");
@@ -202,7 +226,6 @@ export function Training() {
   const [templateDuplicatesOpen, setTemplateDuplicatesOpen] = useState(false);
   const workoutFormRef = useRef<HTMLDivElement | null>(null);
   const { toast } = useToast();
-  const { user } = useAuth();
   const weightUnit = user?.preferences?.units?.weight || "kg";
   const distanceUnit = user?.preferences?.units?.distance || "km";
 
@@ -540,6 +563,59 @@ export function Training() {
     user?.id,
   ]);
 
+  const templatePickerOptions = useMemo(() => {
+    const query = templatePickerQuery.trim().toLowerCase();
+    const filtered = templates.filter((template) => {
+      if (!query) return true;
+      const title = (template.title || "").toLowerCase();
+      const owner = (template.owner?.displayName || "").toLowerCase();
+      return title.includes(query) || owner.includes(query);
+    });
+    const favoriteSet = new Set(favoriteTemplateIds);
+    return filtered.sort((a, b) => {
+      const aFav = favoriteSet.has(a.id) ? 1 : 0;
+      const bFav = favoriteSet.has(b.id) ? 1 : 0;
+      if (aFav !== bFav) return bFav - aFav;
+      return (a.title || "").localeCompare(b.title || "");
+    });
+  }, [templates, templatePickerQuery, favoriteTemplateIds]);
+
+  const handleToggleFavoriteTemplate = async (
+    templateId: string,
+    nextValue: boolean
+  ) => {
+    if (!user) return;
+    const nextIds = nextValue
+      ? Array.from(new Set([...favoriteTemplateIds, templateId]))
+      : favoriteTemplateIds.filter((id) => id !== templateId);
+    setFavoriteTemplateIds(nextIds);
+    try {
+      const nextPreferences = {
+        ...user.preferences,
+        workouts: {
+          ...user.preferences?.workouts,
+          favoriteTemplateIds: nextIds,
+        },
+      };
+      await updateProfile(
+        {
+          firstName: user.firstName || "",
+          lastName: user.lastName || "",
+          nickname: user.nickname || "",
+          displayPreference: user.displayPreference || "firstName",
+          languagePreference: user.languagePreference || "de",
+          preferences: nextPreferences,
+        },
+        true
+      );
+    } catch (error) {
+      console.error("Failed to update favorite templates", error);
+      setFavoriteTemplateIds(
+        user.preferences?.workouts?.favoriteTemplateIds ?? []
+      );
+    }
+  };
+
   const templateTotalPages = Math.max(
     1,
     Math.ceil(templateFilteredSorted.length / templatePageSize)
@@ -595,9 +671,10 @@ export function Training() {
         sourceTemplateRootOwnerDisplayName:
           template.sourceTemplateRootOwnerDisplayName || null,
         isOwn: template.owner?.id === user?.id,
+        isFavorite: favoriteTemplateIds.includes(template.id),
         updatedAt: template.updatedAt,
       })),
-    [templatePaginated, user?.id]
+    [templatePaginated, user?.id, favoriteTemplateIds]
   );
 
   const templateDetail = useMemo(
@@ -1188,9 +1265,69 @@ export function Training() {
                   {t("training.newWorkoutHint", "Füge dein Training hinzu oder nutze eine Vorlage.")}
                 </p>
               </div>
-              <Button variant="outline" onClick={() => setActiveTab("templates")}>
-                {t("training.useTemplate", "Vorlage nutzen")}
-              </Button>
+              <Popover open={templatePickerOpen} onOpenChange={setTemplatePickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline">
+                    {t("training.useTemplate", "Vorlage nutzen")}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[320px] p-0" align="end">
+                  <Command>
+                    <div className="flex items-center gap-2 px-3 py-2 border-b">
+                      <Search className="h-4 w-4 text-muted-foreground" />
+                      <CommandInput
+                        placeholder={t("training.searchTemplates", "Vorlagen durchsuchen")}
+                        value={templatePickerQuery}
+                        onValueChange={setTemplatePickerQuery}
+                      />
+                    </div>
+                    <CommandList className="max-h-[260px] overflow-y-auto">
+                      <CommandEmpty>
+                        {t("training.noTemplates", "Keine Vorlagen gefunden.")}
+                      </CommandEmpty>
+                      <CommandGroup>
+                        {templatePickerOptions.map((template) => (
+                          <CommandItem
+                            key={template.id}
+                            value={template.id}
+                            onSelect={() => {
+                              handleUseTemplate(template);
+                              setTemplatePickerOpen(false);
+                            }}
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-medium flex items-center gap-2">
+                                {favoriteTemplateIds.includes(template.id) && (
+                                  <Star className="h-3.5 w-3.5 text-yellow-500" />
+                                )}
+                                {template.title}
+                              </span>
+                              {template.owner?.displayName && (
+                                <span className="text-xs text-muted-foreground">
+                                  {template.owner.displayName}
+                                </span>
+                              )}
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                    <div className="border-t px-3 py-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-center"
+                        onClick={() => {
+                          setTemplatePickerOpen(false);
+                          setActiveTab("templates");
+                        }}
+                      >
+                        {t("training.templatesBrowse", "Vorlagen durchsuchen")}
+                      </Button>
+                    </div>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div ref={workoutFormRef}>
@@ -1444,14 +1581,6 @@ export function Training() {
                   onOffsetChange={handleOffsetChange}
                   t={t}
                   locale={user?.languagePreference || "de"}
-                  presets={[
-                    { value: "week", label: t("filters.period.week") },
-                    { value: "month", label: t("filters.period.month") },
-                    { value: "quarter", label: t("filters.period.quarter") },
-                    { value: "year", label: t("filters.period.year") },
-                    { value: "all", label: t("filters.period.all") },
-                    { value: "custom", label: t("filters.period.custom") },
-                  ]}
                   formatDate={(date) =>
                     date.toLocaleDateString(
                       user?.languagePreference === "en" ? "en-US" : "de-DE"
@@ -1703,6 +1832,7 @@ export function Training() {
                   const template = templates.find((entry) => entry.id === item.id);
                   if (template) openTemplateDetails(template, "view");
                 }}
+                onToggleFavorite={handleToggleFavoriteTemplate}
                 onSourceTemplateClick={(item) => openSourceTemplate(item.sourceTemplateId)}
                 onRootTemplateClick={(item) =>
                   openSourceTemplate(item.sourceTemplateRootId)
@@ -1755,6 +1885,7 @@ export function Training() {
                   const template = templates.find((entry) => entry.id === item.id);
                   if (template) openTemplateDetails(template, "view");
                 }}
+                onToggleFavorite={handleToggleFavoriteTemplate}
                 onSourceTemplateClick={(item) => openSourceTemplate(item.sourceTemplateId)}
                 onRootTemplateClick={(item) =>
                   openSourceTemplate(item.sourceTemplateRootId)

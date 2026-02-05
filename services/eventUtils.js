@@ -58,6 +58,7 @@ export const evaluateWeeklyGoals = ({
     totalPoints,
     defaultPointsGoal,
     challengeThreshold,
+    distanceUnit = "km",
 }) => {
     const normalized = weeklyGoals && typeof weeklyGoals === 'object' ? weeklyGoals : {};
     const pointsTarget = Number(normalized?.points?.target ?? normalized?.points?.value ?? defaultPointsGoal ?? 0);
@@ -66,13 +67,24 @@ export const evaluateWeeklyGoals = ({
 
     let hasExerciseGoals = false;
     let exerciseGoalsMet = true;
-    const entries = Object.entries(normalized).filter(([key]) => key !== 'points');
-    for (const [activityType, goal] of entries) {
+    const exerciseGoals = Array.isArray(normalized?.exercises) ? normalized.exercises : [];
+    for (const goal of exerciseGoals) {
+        const exerciseId = goal?.exerciseId;
         const target = Number(goal?.target ?? goal?.value ?? 0);
-        if (target > 0) {
+        if (exerciseId && target > 0) {
             hasExerciseGoals = true;
-            const totalQuantity = Number(activityTotals?.[activityType] ?? 0);
-            if (totalQuantity < target) {
+            const totals = activityTotals?.[exerciseId] || {};
+            const unit = goal?.unit || "reps";
+            const value =
+                unit === "time"
+                    ? Number(totals.duration || 0) / 60
+                    : unit === "distance"
+                      ? distanceUnit === "miles"
+                        ? Number(totals.distance || 0) / 1.60934
+                        : Number(totals.distance || 0)
+                      : Number(totals.reps || 0);
+
+            if (value < target) {
                 exerciseGoalsMet = false;
             }
         }

@@ -10,11 +10,6 @@ export const getOverviewStats = async (pool, userId, requestedPeriod) => {
         SELECT
             COUNT(DISTINCT w.id) as total_workouts,
             COALESCE(SUM(wa.points_earned), 0) as total_points,
-            COALESCE(SUM(CASE WHEN wa.activity_type = 'pullups' THEN wa.quantity ELSE 0 END), 0) as total_pullups,
-            COALESCE(SUM(CASE WHEN wa.activity_type = 'pushups' THEN wa.quantity ELSE 0 END), 0) as total_pushups,
-            COALESCE(SUM(CASE WHEN wa.activity_type = 'running' THEN wa.quantity ELSE 0 END), 0) as total_running,
-            COALESCE(SUM(CASE WHEN wa.activity_type = 'cycling' THEN wa.quantity ELSE 0 END), 0) as total_cycling,
-            COALESCE(SUM(CASE WHEN wa.activity_type = 'situps' THEN wa.quantity ELSE 0 END), 0) as total_situps,
             COALESCE(AVG(w.duration), 0) as avg_workout_duration
         FROM workouts w
         LEFT JOIN workout_activities wa ON w.id = wa.workout_id
@@ -24,16 +19,35 @@ export const getOverviewStats = async (pool, userId, requestedPeriod) => {
     const periodQuery = `
         SELECT
             COALESCE(SUM(wa.points_earned), 0) as period_points,
-            COALESCE(SUM(CASE WHEN wa.activity_type = 'pullups' THEN wa.quantity ELSE 0 END), 0) as period_pullups,
-            COALESCE(SUM(CASE WHEN wa.activity_type = 'pushups' THEN wa.quantity ELSE 0 END), 0) as period_pushups,
-            COALESCE(SUM(CASE WHEN wa.activity_type = 'running' THEN wa.quantity ELSE 0 END), 0) as period_running,
-            COALESCE(SUM(CASE WHEN wa.activity_type = 'cycling' THEN wa.quantity ELSE 0 END), 0) as period_cycling,
-            COALESCE(SUM(CASE WHEN wa.activity_type = 'situps' THEN wa.quantity ELSE 0 END), 0) as period_situps,
             COUNT(DISTINCT w.id) as period_workouts
         FROM workouts w
         LEFT JOIN workout_activities wa ON w.id = wa.workout_id
         WHERE w.user_id = $1
           AND ${periodCondition}
+    `;
+
+    const activityQuery = `
+        SELECT
+            wa.activity_type,
+            COALESCE(SUM(wa.points_earned), 0) as total_points,
+            COALESCE(SUM(wa.points_earned) FILTER (WHERE ${periodCondition}), 0) as period_points,
+            COALESCE(SUM(wa.reps), 0) as total_reps,
+            COALESCE(SUM(wa.reps) FILTER (WHERE ${periodCondition}), 0) as period_reps,
+            COALESCE(SUM(wa.duration), 0) as total_duration,
+            COALESCE(SUM(wa.duration) FILTER (WHERE ${periodCondition}), 0) as period_duration,
+            COALESCE(SUM(wa.distance), 0) as total_distance,
+            COALESCE(SUM(wa.distance) FILTER (WHERE ${periodCondition}), 0) as period_distance,
+            ex.name as exercise_name,
+            ex.measurement_type,
+            ex.supports_time,
+            ex.supports_distance
+        FROM workouts w
+        LEFT JOIN workout_activities wa ON w.id = wa.workout_id
+        LEFT JOIN exercises ex ON ex.id = wa.activity_type
+        WHERE w.user_id = $1
+        GROUP BY wa.activity_type, ex.name, ex.measurement_type, ex.supports_time, ex.supports_distance
+        ORDER BY period_points DESC NULLS LAST, total_points DESC NULLS LAST
+        LIMIT 10
     `;
 
     const rankQuery = `
@@ -59,15 +73,32 @@ export const getOverviewStats = async (pool, userId, requestedPeriod) => {
         WHERE id = $1
     `;
 
-    const [totalResult, periodResult, rankResult] = await Promise.all([
+    const [totalResult, periodResult, rankResult, activityResult] = await Promise.all([
         pool.query(totalQuery, [userId]),
         pool.query(periodQuery, [userId]),
-        pool.query(rankQuery, [userId])
+        pool.query(rankQuery, [userId]),
+        pool.query(activityQuery, [userId])
     ]);
 
     const totalStats = toCamelCase(totalResult.rows[0] || {});
     const periodStats = toCamelCase(periodResult.rows[0] || {});
     const rankData = rankResult.rows[0] || { rank: 1, total_users: 1 };
+
+    const activities = (activityResult.rows || []).map((row) => ({
+        id: row.activity_type,
+        name: row.exercise_name || row.activity_type,
+        measurementType: row.measurement_type,
+        supportsTime: row.supports_time,
+        supportsDistance: row.supports_distance,
+        totalPoints: toNumber(row.total_points),
+        periodPoints: toNumber(row.period_points),
+        totalReps: toNumber(row.total_reps),
+        periodReps: toNumber(row.period_reps),
+        totalDuration: toNumber(row.total_duration),
+        periodDuration: toNumber(row.period_duration),
+        totalDistance: toNumber(row.total_distance),
+        periodDistance: toNumber(row.period_distance),
+    }));
 
     return {
         totalPoints: toNumber(totalStats.totalPoints),
@@ -77,27 +108,6 @@ export const getOverviewStats = async (pool, userId, requestedPeriod) => {
         userRank: toNumber(rankData.rank || 1),
         totalUsers: toNumber(rankData.total_users || 1),
         period: window.period,
-        activities: {
-            pullups: {
-                total: toNumber(totalStats.totalPullups),
-                period: toNumber(periodStats.periodPullups)
-            },
-            pushups: {
-                total: toNumber(totalStats.totalPushups),
-                period: toNumber(periodStats.periodPushups)
-            },
-            situps: {
-                total: toNumber(totalStats.totalSitups),
-                period: toNumber(periodStats.periodSitups)
-            },
-            running: {
-                total: toNumber(totalStats.totalRunning),
-                period: toNumber(periodStats.periodRunning)
-            },
-            cycling: {
-                total: toNumber(totalStats.totalCycling),
-                period: toNumber(periodStats.periodCycling)
-            }
-        }
+        activities
     };
 };

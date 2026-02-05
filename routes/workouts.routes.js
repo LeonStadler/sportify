@@ -2,12 +2,39 @@ import express from "express";
 import authMiddleware from "../middleware/authMiddleware.js";
 import { badgeService } from "../services/badgeService.js";
 import { applyDisplayName, toCamelCase } from "../utils/helpers.js";
+import {
+  computePersonalFactor,
+  normalizeDistanceToKm,
+  normalizeDurationToSeconds,
+} from "../utils/scoring.js";
 
 export const createWorkoutsRouter = (pool) => {
   const router = express.Router();
   const UUID_REGEX =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   let activityTypeColumnChecked = false;
+
+  const parsePreferences = (value) => {
+    if (!value) return {};
+    if (typeof value === "object" && !Array.isArray(value)) return value;
+    if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value);
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+          ? parsed
+          : {};
+      } catch (_error) {
+        return {};
+      }
+    }
+    return {};
+  };
+
+  const getBodyWeightKg = (preferences) => {
+    const raw = preferences?.metrics?.bodyWeightKg ?? preferences?.bodyWeightKg;
+    const value = Number(raw);
+    return Number.isFinite(value) && value > 0 ? value : null;
+  };
 
   const ensureActivityTypeColumnCompatible = async (client) => {
     if (activityTypeColumnChecked) return;
@@ -1172,38 +1199,83 @@ export const createWorkoutsRouter = (pool) => {
 
         const workoutId = workoutRows[0].id;
 
+        const { rows: userRows } = await client.query(
+          `SELECT preferences FROM users WHERE id = $1`,
+          [req.user.id]
+        );
+        const userPreferences = parsePreferences(userRows[0]?.preferences);
+        const bodyWeightKg = getBodyWeightKg(userPreferences);
+
         // Load exercises with points from database
         const { rows: exerciseRows } = await client.query(`
-                    SELECT id, points_per_unit, is_active
+                    SELECT id,
+                           points_per_unit,
+                           measurement_type,
+                           supports_time,
+                           supports_distance,
+                           requires_weight,
+                           allows_weight,
+                           unit,
+                           is_active
                     FROM exercises
                     WHERE is_active = true
                 `);
 
-        const exercisePointsMap = {};
+        const exerciseMap = new Map();
         exerciseRows.forEach((ex) => {
-          exercisePointsMap[ex.id] = parseFloat(ex.points_per_unit) || 0;
+          exerciseMap.set(ex.id, {
+            pointsPerUnit: parseFloat(ex.points_per_unit) || 0,
+            measurementType: ex.measurement_type || "reps",
+            supportsTime: Boolean(ex.supports_time),
+            supportsDistance: Boolean(ex.supports_distance),
+            requiresWeight: Boolean(ex.requires_weight),
+            allowsWeight: Boolean(ex.allows_weight),
+            unit: ex.unit,
+          });
         });
 
-        // Calculate points based on activity type and amount from database
-        const calculateActivityPoints = (activityType, amount) => {
-          if (exercisePointsMap[activityType] !== undefined) {
-            return amount * exercisePointsMap[activityType];
+        const calculateActivityScore = ({
+          activityType,
+          activityAmount,
+          unit,
+          totalReps,
+          totalDurationSec,
+          totalDistanceKm,
+          maxWeightKg,
+          measurementType,
+        }) => {
+          const exercise = exerciseMap.get(activityType);
+          if (!exercise) {
+            return 0;
           }
-          // Fallback for legacy exercises not in database
-          switch (activityType) {
-            case "pullups":
-              return amount * 3;
-            case "pushups":
-              return amount * 1;
-            case "situps":
-              return amount * 1;
-            case "running":
-              return amount * 10;
-            case "cycling":
-              return amount * 5;
-            default:
-              return 0;
+
+          let normalizedAmount = 0;
+          if (measurementType === "time") {
+            normalizedAmount =
+              totalDurationSec ||
+              normalizeDurationToSeconds(activityAmount, unit);
+          } else if (measurementType === "distance") {
+            normalizedAmount =
+              totalDistanceKm || normalizeDistanceToKm(activityAmount, unit);
+          } else {
+            normalizedAmount = totalReps || Number(activityAmount) || 0;
           }
+
+          const basePoints = normalizedAmount * (exercise.pointsPerUnit || 0);
+          if (!Number.isFinite(basePoints) || basePoints <= 0) {
+            return 0;
+          }
+
+          const personalFactor =
+            !isTemplateRequest && bodyWeightKg
+              ? computePersonalFactor({
+                  bodyWeightKg,
+                  extraWeightKg: maxWeightKg,
+                  maxDeviation: 0.2,
+                })
+              : 1;
+
+          return Number((basePoints * personalFactor).toFixed(2));
         };
 
         if (!isTemplateRequest) {
@@ -1253,6 +1325,13 @@ export const createWorkoutsRouter = (pool) => {
           // Berechne Gesamtmenge: Wenn Sets vorhanden sind, summiere alle Reps
           let activityAmount = activity.quantity || activity.amount;
           let setsToStore = null;
+          let totalReps = 0;
+          let totalDurationSec = 0;
+          let totalDistanceKm = 0;
+          let maxWeightKg = 0;
+          const exercise = exerciseMap.get(activity.activityType);
+          const measurementType =
+            exercise?.measurementType || "reps";
 
           if (
             activity.sets &&
@@ -1268,10 +1347,28 @@ export const createWorkoutsRouter = (pool) => {
                   (set.duration || 0) > 0 ||
                   (set.distance || 0) > 0)
             );
-            const totalFromSets = validSets.reduce(
-              (sum, set) => sum + (set.reps || 0),
-              0
-            );
+            validSets.forEach((set) => {
+              const reps = Number(set.reps) || 0;
+              const durationSec = normalizeDurationToSeconds(
+                set.duration,
+                activity.unit
+              );
+              const distanceKm = normalizeDistanceToKm(
+                set.distance,
+                activity.unit
+              );
+              const weight = Number(set.weight) || 0;
+              totalReps += reps;
+              totalDurationSec += durationSec;
+              totalDistanceKm += distanceKm;
+              if (weight > maxWeightKg) maxWeightKg = weight;
+            });
+            const totalFromSets =
+              measurementType === "time"
+                ? totalDurationSec
+                : measurementType === "distance"
+                  ? totalDistanceKm
+                  : totalReps;
 
             // Verwende die berechnete Summe aus Sets, falls sie größer ist
             if (totalFromSets > 0) {
@@ -1281,10 +1378,32 @@ export const createWorkoutsRouter = (pool) => {
             }
           }
 
-          const points = calculateActivityPoints(
-            activity.activityType,
-            activityAmount
-          );
+          if (!setsToStore) {
+            if (measurementType === "time") {
+              totalDurationSec = normalizeDurationToSeconds(
+                activityAmount,
+                activity.unit
+              );
+            } else if (measurementType === "distance") {
+              totalDistanceKm = normalizeDistanceToKm(
+                activityAmount,
+                activity.unit
+              );
+            } else {
+              totalReps = Number(activityAmount) || 0;
+            }
+          }
+
+          const points = calculateActivityScore({
+            activityType: activity.activityType,
+            activityAmount,
+            unit: activity.unit,
+            totalReps,
+            totalDurationSec,
+            totalDistanceKm,
+            maxWeightKg,
+            measurementType,
+          });
 
           const activityQuery = `
                         INSERT INTO ${activityTable} (
@@ -1292,6 +1411,12 @@ export const createWorkoutsRouter = (pool) => {
                           activity_type,
                           quantity,
                           points_earned,
+                          exercise_id,
+                          measurement_type,
+                          reps,
+                          duration,
+                          distance,
+                          weight,
                           notes,
                           order_index,
                           sets_data,
@@ -1301,7 +1426,7 @@ export const createWorkoutsRouter = (pool) => {
                           effort,
                           superset_group
                         )
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
                         RETURNING id, activity_type, quantity, points_earned, notes, order_index, sets_data, unit, rest_between_sets_seconds, rest_after_seconds, effort, superset_group;
                     `;
 
@@ -1336,6 +1461,14 @@ export const createWorkoutsRouter = (pool) => {
               activity.activityType,
               activityAmount,
               points,
+              UUID_REGEX.test(activity.activityType)
+                ? activity.activityType
+                : null,
+              measurementType || null,
+              totalReps || null,
+              totalDurationSec || null,
+              totalDistanceKm || null,
+              maxWeightKg || null,
               activity.notes ? activity.notes.trim() : null,
               i,
               setsDataValue,
@@ -2019,38 +2152,83 @@ export const createWorkoutsRouter = (pool) => {
           [workoutId]
         );
 
+        const { rows: userRows } = await client.query(
+          `SELECT preferences FROM users WHERE id = $1`,
+          [req.user.id]
+        );
+        const userPreferences = parsePreferences(userRows[0]?.preferences);
+        const bodyWeightKg = getBodyWeightKg(userPreferences);
+
         // Load exercises with points from database
         const { rows: exerciseRows } = await client.query(`
-                    SELECT id, points_per_unit, is_active
+                    SELECT id,
+                           points_per_unit,
+                           measurement_type,
+                           supports_time,
+                           supports_distance,
+                           requires_weight,
+                           allows_weight,
+                           unit,
+                           is_active
                     FROM exercises
                     WHERE is_active = true
                 `);
 
-        const exercisePointsMap = {};
+        const exerciseMap = new Map();
         exerciseRows.forEach((ex) => {
-          exercisePointsMap[ex.id] = parseFloat(ex.points_per_unit) || 0;
+          exerciseMap.set(ex.id, {
+            pointsPerUnit: parseFloat(ex.points_per_unit) || 0,
+            measurementType: ex.measurement_type || "reps",
+            supportsTime: Boolean(ex.supports_time),
+            supportsDistance: Boolean(ex.supports_distance),
+            requiresWeight: Boolean(ex.requires_weight),
+            allowsWeight: Boolean(ex.allows_weight),
+            unit: ex.unit,
+          });
         });
 
-        // Calculate points based on activity type and amount from database
-        const calculateActivityPoints = (activityType, amount) => {
-          if (exercisePointsMap[activityType] !== undefined) {
-            return amount * exercisePointsMap[activityType];
+        const calculateActivityScore = ({
+          activityType,
+          activityAmount,
+          unit,
+          totalReps,
+          totalDurationSec,
+          totalDistanceKm,
+          maxWeightKg,
+          measurementType,
+        }) => {
+          const exercise = exerciseMap.get(activityType);
+          if (!exercise) {
+            return 0;
           }
-          // Fallback for legacy exercises not in database
-          switch (activityType) {
-            case "pullups":
-              return amount * 3;
-            case "pushups":
-              return amount * 1;
-            case "situps":
-              return amount * 1;
-            case "running":
-              return amount * 10;
-            case "cycling":
-              return amount * 5;
-            default:
-              return 0;
+
+          let normalizedAmount = 0;
+          if (measurementType === "time") {
+            normalizedAmount =
+              totalDurationSec ||
+              normalizeDurationToSeconds(activityAmount, unit);
+          } else if (measurementType === "distance") {
+            normalizedAmount =
+              totalDistanceKm || normalizeDistanceToKm(activityAmount, unit);
+          } else {
+            normalizedAmount = totalReps || Number(activityAmount) || 0;
           }
+
+          const basePoints = normalizedAmount * (exercise.pointsPerUnit || 0);
+          if (!Number.isFinite(basePoints) || basePoints <= 0) {
+            return 0;
+          }
+
+          const personalFactor =
+            !isTemplateRecord && bodyWeightKg
+              ? computePersonalFactor({
+                  bodyWeightKg,
+                  extraWeightKg: maxWeightKg,
+                  maxDeviation: 0.2,
+                })
+              : 1;
+
+          return Number((basePoints * personalFactor).toFixed(2));
         };
 
         const activitiesData = [];
@@ -2060,6 +2238,13 @@ export const createWorkoutsRouter = (pool) => {
           // Berechne Gesamtmenge: Wenn Sets vorhanden sind, summiere alle Reps
           let activityAmount = activity.quantity || activity.amount;
           let setsToStore = null;
+          let totalReps = 0;
+          let totalDurationSec = 0;
+          let totalDistanceKm = 0;
+          let maxWeightKg = 0;
+          const exercise = exerciseMap.get(activity.activityType);
+          const measurementType =
+            exercise?.measurementType || "reps";
 
           if (
             activity.sets &&
@@ -2075,10 +2260,28 @@ export const createWorkoutsRouter = (pool) => {
                   (set.duration || 0) > 0 ||
                   (set.distance || 0) > 0)
             );
-            const totalFromSets = validSets.reduce(
-              (sum, set) => sum + (set.reps || 0),
-              0
-            );
+            validSets.forEach((set) => {
+              const reps = Number(set.reps) || 0;
+              const durationSec = normalizeDurationToSeconds(
+                set.duration,
+                activity.unit
+              );
+              const distanceKm = normalizeDistanceToKm(
+                set.distance,
+                activity.unit
+              );
+              const weight = Number(set.weight) || 0;
+              totalReps += reps;
+              totalDurationSec += durationSec;
+              totalDistanceKm += distanceKm;
+              if (weight > maxWeightKg) maxWeightKg = weight;
+            });
+            const totalFromSets =
+              measurementType === "time"
+                ? totalDurationSec
+                : measurementType === "distance"
+                  ? totalDistanceKm
+                  : totalReps;
 
             // Verwende die berechnete Summe aus Sets, falls sie größer ist
             if (totalFromSets > 0) {
@@ -2088,16 +2291,44 @@ export const createWorkoutsRouter = (pool) => {
             }
           }
 
-          const points = calculateActivityPoints(
-            activity.activityType,
-            activityAmount
-          );
+          if (!setsToStore) {
+            if (measurementType === "time") {
+              totalDurationSec = normalizeDurationToSeconds(
+                activityAmount,
+                activity.unit
+              );
+            } else if (measurementType === "distance") {
+              totalDistanceKm = normalizeDistanceToKm(
+                activityAmount,
+                activity.unit
+              );
+            } else {
+              totalReps = Number(activityAmount) || 0;
+            }
+          }
+
+          const points = calculateActivityScore({
+            activityType: activity.activityType,
+            activityAmount,
+            unit: activity.unit,
+            totalReps,
+            totalDurationSec,
+            totalDistanceKm,
+            maxWeightKg,
+            measurementType,
+          });
           const activityQuery = `
                         INSERT INTO ${activityTable} (
                           ${activityParentColumn},
                           activity_type,
                           quantity,
                           points_earned,
+                          exercise_id,
+                          measurement_type,
+                          reps,
+                          duration,
+                          distance,
+                          weight,
                           notes,
                           order_index,
                           sets_data,
@@ -2107,7 +2338,7 @@ export const createWorkoutsRouter = (pool) => {
                           effort,
                           superset_group
                         )
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
                         RETURNING id, activity_type, quantity, points_earned, notes, order_index, sets_data, unit, rest_between_sets_seconds, rest_after_seconds, effort, superset_group;
                     `;
 
@@ -2136,6 +2367,14 @@ export const createWorkoutsRouter = (pool) => {
             activity.activityType,
             activityAmount,
             points,
+            UUID_REGEX.test(activity.activityType)
+              ? activity.activityType
+              : null,
+            measurementType || null,
+            totalReps || null,
+            totalDurationSec || null,
+            totalDistanceKm || null,
+            maxWeightKg || null,
             activity.notes ? activity.notes.trim() : null,
             i,
             setsDataValue,

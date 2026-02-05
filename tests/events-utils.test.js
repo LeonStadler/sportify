@@ -33,13 +33,19 @@ describe("eventUtils.evaluateWeeklyGoals", () => {
     const evaluation = evaluateWeeklyGoals({
       weeklyGoals: {
         points: { target: DEFAULT_WEEKLY_POINTS_GOAL * 2 },
-        pushups: { target: 100 },
-        running: { target: 10 },
+        exercises: [
+          { exerciseId: "pushups", target: 100, unit: "reps" },
+          { exerciseId: "running", target: 10, unit: "distance" },
+        ],
       },
-      activityTotals: { pushups: 120, running: 8 },
+      activityTotals: {
+        pushups: { reps: 120 },
+        running: { distance: 8 },
+      },
       totalPoints: DEFAULT_WEEKLY_POINT_CHALLENGE + 50,
       defaultPointsGoal: DEFAULT_WEEKLY_POINTS_GOAL,
       challengeThreshold: DEFAULT_WEEKLY_POINT_CHALLENGE,
+      distanceUnit: "km",
     });
 
     assert.equal(evaluation.pointsTarget, DEFAULT_WEEKLY_POINTS_GOAL * 2);

@@ -72,6 +72,7 @@ const buildEditChanges = (original: Exercise, draft: Partial<Exercise>) => {
   const fields: Array<keyof Exercise> = [
     "name",
     "description",
+    "aliases",
     "category",
     "discipline",
     "movementPattern",
@@ -155,6 +156,13 @@ export function Exercises() {
   const [formValue, setFormValue] = useState<ExerciseFormValue>({
     name: "",
     description: "",
+    nameVariants: {
+      deSingular: "",
+      dePlural: "",
+      enSingular: "",
+      enPlural: "",
+      other: "",
+    },
     category: "",
     discipline: "",
     movementPattern: "",
@@ -181,6 +189,7 @@ export function Exercises() {
   const [nameCheckLoading, setNameCheckLoading] = useState(false);
   const [nameExactMatch, setNameExactMatch] = useState(false);
   const [confirmSimilar, setConfirmSimilar] = useState(false);
+  const [favoriteUpdating, setFavoriteUpdating] = useState<string | null>(null);
 
   const sortOptions = [
     { value: "none", label: t("filters.sortNone", "Keine") },
@@ -198,6 +207,63 @@ export function Exercises() {
     return Array.from(combined).filter(Boolean);
   }, [facets.categories]);
 
+  useEffect(() => {
+    const name = formValue.name.trim();
+    if (!name) {
+      setNameSuggestions([]);
+      setNameExactMatch(false);
+      setConfirmSimilar(false);
+      setNameCheckLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        setNameCheckLoading(true);
+        const token = localStorage.getItem("token");
+        const params = new URLSearchParams({
+          query: name,
+          limit: "8",
+        });
+        const response = await fetch(`${API_URL}/exercises?${params}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          setNameSuggestions([]);
+          setNameExactMatch(false);
+          return;
+        }
+        const data: ExerciseListResponse = await response.json();
+        const matches = Array.isArray(data.exercises) ? data.exercises : [];
+        const exact = matches.some(
+          (exercise) => exercise.name?.toLowerCase() === name.toLowerCase()
+        );
+        const suggestions = matches
+          .map((exercise) => exercise.name)
+          .filter((item): item is string => Boolean(item))
+          .filter((item) => item.toLowerCase() !== name.toLowerCase())
+          .slice(0, 5);
+        setNameExactMatch(exact);
+        setNameSuggestions(suggestions);
+        if (suggestions.length === 0) {
+          setConfirmSimilar(false);
+        }
+      } catch (error) {
+        if ((error as Error).name !== "AbortError") {
+          console.error("Name check error:", error);
+        }
+      } finally {
+        setNameCheckLoading(false);
+      }
+    }, 400);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [formValue.name]);
+
 
   const normalizeMeasurementFilters = (next: string[]) => {
     const added = next.find((item) => !measurementFilters.includes(item));
@@ -209,6 +275,21 @@ export function Exercises() {
           : result.filter((item) => item !== "reps");
     }
     return result;
+  };
+
+  const buildAliasList = (input: ExerciseFormValue) => {
+    const candidates = [
+      input.nameVariants?.deSingular,
+      input.nameVariants?.dePlural,
+      input.nameVariants?.enSingular,
+      input.nameVariants?.enPlural,
+      ...(input.nameVariants?.other || "").split(","),
+    ]
+      .map((item) => (item || "").trim())
+      .filter(Boolean)
+      .filter((item) => item.toLowerCase() !== input.name.trim().toLowerCase());
+
+    return Array.from(new Set(candidates));
   };
 
 
@@ -272,7 +353,8 @@ export function Exercises() {
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
-      const params = buildExercisesParams(currentPage);
+    const params = buildExercisesParams(currentPage);
+    params.set("includeMeta", "true");
       const response = await fetch(`${API_URL}/exercises?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -319,6 +401,41 @@ export function Exercises() {
     sortBy,
     sortDirection,
   ]);
+
+  const handleToggleFavorite = async (exerciseId: string, nextValue: boolean) => {
+    if (!user) return;
+    setFavoriteUpdating(exerciseId);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/exercises/${exerciseId}/favorite`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ favorite: nextValue }),
+      });
+      if (!response.ok) {
+        throw new Error("Favorite update failed");
+      }
+      setExercises((prev) =>
+        prev.map((exercise) =>
+          exercise.id === exerciseId
+            ? { ...exercise, isFavorite: nextValue }
+            : exercise
+        )
+      );
+    } catch (error) {
+      console.error("Favorite update error:", error);
+      toast({
+        variant: "destructive",
+        title: t("common.error", "Fehler"),
+        description: t("exerciseLibrary.favoriteError", "Favorit konnte nicht gespeichert werden."),
+      });
+    } finally {
+      setFavoriteUpdating(null);
+    }
+  };
 
   useEffect(() => {
     loadExercises();
@@ -486,6 +603,7 @@ export function Exercises() {
       const payload = {
         name: formValue.name.trim(),
         description: formValue.description.trim() || null,
+        aliases: buildAliasList(formValue),
         category: formValue.category,
         discipline: formValue.discipline || null,
         movementPattern: formValue.movementPattern,
@@ -531,12 +649,19 @@ export function Exercises() {
         throw new Error("Create failed");
       }
       await loadExercises();
-      setFormValue({
-        name: "",
-        description: "",
-        category: "",
-        discipline: "",
-        movementPattern: "",
+    setFormValue({
+      name: "",
+      description: "",
+      nameVariants: {
+        deSingular: "",
+        dePlural: "",
+        enSingular: "",
+        enPlural: "",
+        other: "",
+      },
+      category: "",
+      discipline: "",
+      movementPattern: "",
         measurementTypes: ["reps"],
         distanceUnit: user?.preferences?.units?.distance || "km",
         timeUnit: "min",
@@ -646,6 +771,7 @@ export function Exercises() {
     const changePayload = {
       name: editDraft.name,
       description: editDraft.description,
+      aliases: buildAliasList(editDraft),
       category: editDraft.category,
       discipline: editDraft.discipline,
       movementPattern: editDraft.movementPattern,
@@ -782,9 +908,18 @@ export function Exercises() {
       unitOptionsValues.find((value) => ["min", "sec"].includes(value)) ||
       "min";
 
+    const aliasList = Array.isArray(exercise.aliases) ? exercise.aliases : [];
+
     setEditDraft({
       name: exercise.name,
       description: exercise.description || "",
+      nameVariants: {
+        deSingular: "",
+        dePlural: "",
+        enSingular: "",
+        enPlural: "",
+        other: aliasList.join(", "),
+      },
       category: exercise.category || "Kraft",
       discipline: exercise.discipline || "",
       movementPattern: exercise.movementPattern || "push",
@@ -905,6 +1040,9 @@ export function Exercises() {
             <ExerciseBrowseGrid
               items={paginatedExercises}
               onSelect={(exercise) => openExerciseDetails(exercise, "view")}
+              onToggleFavorite={(exercise, next) =>
+                handleToggleFavorite(exercise.id, next)
+              }
               renderMenuItems={(exercise) => (
                 <>
                   <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "view")}>
@@ -928,6 +1066,9 @@ export function Exercises() {
               sortDirection={sortDirection}
               onSortClick={handleSortClick}
               onSelect={(exercise) => openExerciseDetails(exercise, "view")}
+              onToggleFavorite={(exercise, next) =>
+                handleToggleFavorite(exercise.id, next)
+              }
               renderMenuItems={(exercise) => (
                 <>
                   <DropdownMenuItem onSelect={() => openExerciseDetails(exercise, "view")}>

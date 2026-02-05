@@ -19,6 +19,7 @@ interface WeeklyPointsGoalDialogProps {
   onOpenChange: (open: boolean) => void;
   currentGoal: number;
   onSave: (points: number) => Promise<void>;
+  defaultGoal?: number;
 }
 
 export function WeeklyPointsGoalDialog({
@@ -26,6 +27,7 @@ export function WeeklyPointsGoalDialog({
   onOpenChange,
   currentGoal,
   onSave,
+  defaultGoal = 0,
 }: WeeklyPointsGoalDialogProps) {
   const { t } = useTranslation();
   const [points, setPoints] = useState(currentGoal);
@@ -44,6 +46,18 @@ export function WeeklyPointsGoalDialog({
       onOpenChange(false);
     } catch (error) {
       console.error("Failed to save points goal", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleReset = async () => {
+    setIsSaving(true);
+    try {
+      await onSave(defaultGoal);
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Failed to reset points goal", error);
     } finally {
       setIsSaving(false);
     }
@@ -101,6 +115,13 @@ export function WeeklyPointsGoalDialog({
         </div>
 
         <DialogFooter>
+          <Button
+            variant="secondary"
+            onClick={handleReset}
+            disabled={isSaving}
+          >
+            {t("common.reset")}
+          </Button>
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}

@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowDown, ArrowUp, MoreHorizontal } from "lucide-react";
+import { ArrowDown, ArrowUp, MoreHorizontal, Star } from "lucide-react";
 
 export interface TemplateBrowseItem {
   id: string;
@@ -40,6 +41,7 @@ export interface TemplateBrowseItem {
   sourceTemplateRootOwnerId?: string | null;
   sourceTemplateRootOwnerDisplayName?: string | null;
   isOwn: boolean;
+  isFavorite?: boolean;
   updatedAt?: string;
 }
 
@@ -93,6 +95,7 @@ const shouldShowRootOwnerCredit = (template: TemplateBrowseItem) => {
 interface TemplateBrowseGridProps {
   items: TemplateBrowseItem[];
   onSelect: (item: TemplateBrowseItem) => void;
+  onToggleFavorite?: (id: string, next: boolean) => void;
   renderMenuItems: (item: TemplateBrowseItem) => ReactNode;
   labels: TemplateBrowseLabels;
   onSourceTemplateClick?: (item: TemplateBrowseItem) => void;
@@ -124,11 +127,13 @@ const visibilityLabel = (visibility: string | undefined) => {
 export function TemplateBrowseGrid({
   items,
   onSelect,
+  onToggleFavorite,
   renderMenuItems,
   labels,
   onSourceTemplateClick,
   onRootTemplateClick,
 }: TemplateBrowseGridProps) {
+  const { t } = useTranslation();
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {items.map((template) => (
@@ -189,7 +194,31 @@ export function TemplateBrowseGrid({
                 </div>
               ) : null}
             </div>
-            <div onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center gap-1" onClick={(event) => event.stopPropagation()}>
+              {onToggleFavorite && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() =>
+                    onToggleFavorite(template.id, !template.isFavorite)
+                  }
+                  title={
+                    template.isFavorite
+                      ? t("training.favorites.remove", "Favorit entfernen")
+                      : t("training.favorites.add", "Favorit hinzufügen")
+                  }
+                >
+                  <Star
+                    className={
+                      template.isFavorite
+                        ? "h-4 w-4 text-yellow-500"
+                        : "h-4 w-4 text-muted-foreground"
+                    }
+                    fill={template.isFavorite ? "currentColor" : "none"}
+                  />
+                </Button>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -258,6 +287,7 @@ interface TemplateBrowseTableProps {
   sortDirection: "asc" | "desc";
   onSortClick: (value: string) => void;
   onSelect: (item: TemplateBrowseItem) => void;
+  onToggleFavorite?: (id: string, next: boolean) => void;
   renderMenuItems: (item: TemplateBrowseItem) => ReactNode;
   labels: TemplateBrowseLabels;
   onSourceTemplateClick?: (item: TemplateBrowseItem) => void;
@@ -270,11 +300,13 @@ export function TemplateBrowseTable({
   sortDirection,
   onSortClick,
   onSelect,
+  onToggleFavorite,
   renderMenuItems,
   labels,
   onSourceTemplateClick,
   onRootTemplateClick,
 }: TemplateBrowseTableProps) {
+  const { t } = useTranslation();
   const sortIcon = sortDirection === "asc" ? (
     <ArrowUp className="h-3 w-3" />
   ) : (
@@ -352,7 +384,34 @@ export function TemplateBrowseTable({
               onClick={() => onSelect(template)}
             >
               <TableCell className="font-medium sticky left-0 bg-background z-10">
-                {template.title}
+                <div className="flex items-center gap-2">
+                  {onToggleFavorite && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onToggleFavorite(template.id, !template.isFavorite);
+                      }}
+                      title={
+                        template.isFavorite
+                          ? t("training.favorites.remove", "Favorit entfernen")
+                          : t("training.favorites.add", "Favorit hinzufügen")
+                      }
+                    >
+                      <Star
+                        className={
+                          template.isFavorite
+                            ? "h-4 w-4 text-yellow-500"
+                            : "h-4 w-4 text-muted-foreground"
+                        }
+                        fill={template.isFavorite ? "currentColor" : "none"}
+                      />
+                    </Button>
+                  )}
+                  <span className="truncate">{template.title}</span>
+                </div>
               </TableCell>
               <TableCell>
                 <div className="text-sm">{template.ownerName}</div>

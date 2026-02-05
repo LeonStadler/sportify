@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -74,6 +75,73 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+const EXERCISE_IMPORT_COLUMNS = [
+  "name",
+  "description",
+  "category",
+  "discipline",
+  "movementPattern",
+  "measurementTypes",
+  "distanceUnit",
+  "timeUnit",
+  "difficultyTier",
+  "requiresWeight",
+  "allowsWeight",
+  "supportsSets",
+  "muscleGroups",
+  "equipment",
+  "aliases",
+];
+
+const parseCsvText = (text: string) => {
+  const rows: string[][] = [];
+  let current = "";
+  let row: string[] = [];
+  let inQuotes = false;
+
+  const pushCell = () => {
+    row.push(current);
+    current = "";
+  };
+
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    const next = text[i + 1];
+    if (char === "\"") {
+      if (inQuotes && next === "\"") {
+        current += "\"";
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+    if (char === "," && !inQuotes) {
+      pushCell();
+      continue;
+    }
+    if ((char === "\n" || char === "\r") && !inQuotes) {
+      if (char === "\r" && next === "\n") {
+        i += 1;
+      }
+      pushCell();
+      if (row.some((value) => value.trim().length > 0)) {
+        rows.push(row);
+      }
+      row = [];
+      continue;
+    }
+    current += char;
+  }
+  if (current.length > 0 || row.length > 0) {
+    pushCell();
+    if (row.some((value) => value.trim().length > 0)) {
+      rows.push(row);
+    }
+  }
+  return rows;
+};
+
 interface AdminUser {
   id: string;
   email: string;
@@ -108,6 +176,7 @@ interface Exercise {
   difficultyTier?: number | null;
   muscleGroups?: string[];
   equipment?: string[];
+  aliases?: string[];
   unitOptions: Array<{ value: string; label: string; multiplier: number }>;
   status?: string;
   isActive: boolean;
@@ -184,6 +253,7 @@ export function Admin() {
     hasNext: false,
     hasPrev: false,
   });
+  const [exerciseImporting, setExerciseImporting] = useState(false);
   const [exerciseEditDialogOpen, setExerciseEditDialogOpen] = useState(false);
   const [exerciseEditTarget, setExerciseEditTarget] = useState<Exercise | null>(null);
   const [exerciseEditDraft, setExerciseEditDraft] = useState<ExerciseFormValue | null>(null);
@@ -267,6 +337,115 @@ export function Admin() {
     setExerciseManagementDifficultyRange([1, 10]);
   };
 
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleExerciseExport = async (format: "csv" | "json") => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `${API_URL}/admin/exercises/export?format=${format}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      if (!response.ok) {
+        throw new Error(t("admin.errors.exportFailed", "Export fehlgeschlagen."));
+      }
+      const blob = await response.blob();
+      downloadBlob(
+        blob,
+        format === "json"
+          ? "exercise-import-template.json"
+          : "exercise-import-template.csv"
+      );
+    } catch (error) {
+      toast({
+        title: t("admin.errors.title", "Fehler"),
+        description:
+          error instanceof Error
+            ? error.message
+            : t("admin.errors.exportFailed", "Export fehlgeschlagen."),
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleExerciseImport = async (file: File) => {
+    setExerciseImporting(true);
+    try {
+      const content = await file.text();
+      let parsed: Array<Record<string, unknown>> = [];
+      if (file.name.toLowerCase().endsWith(".json")) {
+        const json = JSON.parse(content);
+        parsed = Array.isArray(json) ? json : Array.isArray(json.exercises) ? json.exercises : [];
+      } else {
+        const rows = parseCsvText(content);
+        if (rows.length === 0) {
+          throw new Error(t("admin.errors.importEmpty", "Keine Daten gefunden."));
+        }
+        const [header, ...dataRows] = rows;
+        parsed = dataRows.map((row) => {
+          const record: Record<string, unknown> = {};
+          header.forEach((key, index) => {
+            record[key] = row[index] ?? "";
+          });
+          return record;
+        });
+      }
+
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/admin/exercises/import`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ exercises: parsed }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.error || t("admin.errors.importFailed", "Import fehlgeschlagen.")
+        );
+      }
+      const result = await response.json();
+      toast({
+        title: t("admin.success.importTitle", "Import abgeschlossen"),
+        description: t(
+          "admin.success.importDescription",
+          "Importiert: {{imported}} · Übersprungen: {{skipped}}",
+          {
+            imported: result.imported ?? 0,
+            skipped: result.skipped ?? 0,
+          }
+        ),
+      });
+      await loadExercises();
+    } catch (error) {
+      toast({
+        title: t("admin.errors.title", "Fehler"),
+        description:
+          error instanceof Error
+            ? error.message
+            : t("admin.errors.importFailed", "Import fehlgeschlagen."),
+        variant: "destructive",
+      });
+    } finally {
+      setExerciseImporting(false);
+    }
+  };
+
   const exerciseManagementToFormValue = (exercise: Exercise): ExerciseFormValue => {
     const measurementSet = new Set<string>();
     if (exercise.measurementType) measurementSet.add(exercise.measurementType);
@@ -290,6 +469,13 @@ export function Admin() {
     return {
       name: exercise.name,
       description: exercise.description || "",
+      nameVariants: {
+        deSingular: "",
+        dePlural: "",
+        enSingular: "",
+        enPlural: "",
+        other: Array.isArray(exercise.aliases) ? exercise.aliases.join(", ") : "",
+      },
       category: exercise.category || "Kraft",
       discipline: exercise.discipline || "",
       movementPattern: exercise.movementPattern || "push",
@@ -303,6 +489,21 @@ export function Admin() {
       muscleGroups: exercise.muscleGroups || [],
       equipment: (exercise.equipment || []).join(", "),
     };
+  };
+
+  const buildAliasList = (input: ExerciseFormValue) => {
+    const candidates = [
+      input.nameVariants?.deSingular,
+      input.nameVariants?.dePlural,
+      input.nameVariants?.enSingular,
+      input.nameVariants?.enPlural,
+      ...(input.nameVariants?.other || "").split(","),
+    ]
+      .map((item) => (item || "").trim())
+      .filter(Boolean)
+      .filter((item) => item.toLowerCase() !== input.name.trim().toLowerCase());
+
+    return Array.from(new Set(candidates));
   };
 
   const exerciseManagementOpenDetails = (
@@ -377,6 +578,7 @@ export function Admin() {
     const payload = {
       name: exerciseEditDraft.name,
       description: exerciseEditDraft.description,
+      aliases: buildAliasList(exerciseEditDraft),
       category: exerciseEditDraft.category,
       discipline: exerciseEditDraft.discipline,
       movementPattern: exerciseEditDraft.movementPattern,
@@ -401,6 +603,7 @@ export function Admin() {
     const fields: Array<keyof Exercise> = [
       "name",
       "description",
+      "aliases",
       "category",
       "discipline",
       "movementPattern",
@@ -732,7 +935,7 @@ export function Admin() {
                 onValueChange={setQuery}
               />
             </div>
-            <CommandList className="max-h-[260px]">
+            <CommandList className="max-h-[260px] overflow-y-auto">
               <CommandEmpty>{t("common.noResults", "Keine Treffer")}</CommandEmpty>
               <CommandGroup>
                 {displayOptions.map((exercise) => (
@@ -763,7 +966,17 @@ export function Admin() {
   };
 
   const handleMergeExercise = async (sourceId: string, targetId: string) => {
-    if (!targetId || sourceId === targetId) return;
+    if (!sourceId || !targetId || sourceId === targetId) {
+      toast({
+        title: t("admin.errors.title", "Fehler"),
+        description: t(
+          "admin.exercises.merge.validation",
+          "Bitte wähle unterschiedliche Quell- und Ziel-Übungen."
+        ),
+        variant: "destructive",
+      });
+      return;
+    }
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(
@@ -774,7 +987,7 @@ export function Admin() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ targetId }),
+          body: JSON.stringify({ targetExerciseId: targetId }),
         }
       );
       if (!response.ok) {
@@ -799,6 +1012,82 @@ export function Admin() {
           error instanceof Error
             ? error.message
             : t("admin.errors.mergeFailed", "Merge fehlgeschlagen."),
+        variant: "destructive",
+      });
+    }
+  };
+
+  const applyMergeSelection = (exerciseId: string) => {
+    if (mergeSourceId && !mergeTargetId) {
+      if (mergeSourceId === exerciseId) {
+        return "source";
+      }
+      setMergeTargetId(exerciseId);
+      return "target";
+    }
+    if (mergeTargetId && !mergeSourceId) {
+      if (mergeTargetId === exerciseId) {
+        return "target";
+      }
+      setMergeSourceId(exerciseId);
+      return "source";
+    }
+    if (mergeSourceId && mergeTargetId) {
+      if (mergeSourceId === exerciseId) {
+        return "source";
+      }
+      if (mergeTargetId === exerciseId) {
+        return "target";
+      }
+      setMergeSourceId(exerciseId);
+      return "source";
+    }
+    setMergeSourceId(exerciseId);
+    return "source";
+  };
+
+  const handleDeactivateExercise = async (exerciseId: string) => {
+    if (!exerciseId) return;
+    const confirmed = window.confirm(
+      t(
+        "admin.exercises.deleteConfirm",
+        "Möchtest du diese Übung wirklich löschen?"
+      )
+    );
+    if (!confirmed) return;
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `${API_URL}/admin/exercises/${exerciseId}/deactivate`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.error ||
+            t("admin.errors.deleteFailed", "Löschen fehlgeschlagen.")
+        );
+      }
+      toast({
+        title: t("admin.success.deleteTitle", "Übung gelöscht"),
+        description: t(
+          "admin.success.deleteDescription",
+          "Die Übung wurde deaktiviert."
+        ),
+      });
+      await loadExercises();
+    } catch (error) {
+      toast({
+        title: t("admin.errors.title", "Fehler"),
+        description:
+          error instanceof Error
+            ? error.message
+            : t("admin.errors.deleteFailed", "Löschen fehlgeschlagen."),
         variant: "destructive",
       });
     }
@@ -1342,6 +1631,50 @@ export function Admin() {
 
           <TabsContent value="exercise-management" className="space-y-6">
             <div className="space-y-6">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">
+                    {t("admin.exercises.importExport.title", "Import & Export")}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => handleExerciseExport("csv")}
+                    >
+                      {t("admin.exercises.importExport.exportCsv", "CSV-Vorlage exportieren")}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleExerciseExport("json")}
+                    >
+                      {t("admin.exercises.importExport.exportJson", "JSON-Vorlage exportieren")}
+                    </Button>
+                  </div>
+                  <div className="flex flex-col gap-2 text-sm text-muted-foreground">
+                    <span>
+                      {t(
+                        "admin.exercises.importExport.note",
+                        "Pflichtfelder sind alle Spalten außer Beschreibung. Ungültige Einträge werden übersprungen."
+                      )}
+                    </span>
+                    <Input
+                      type="file"
+                      accept=".csv,.json,application/json,text/csv"
+                      disabled={exerciseImporting}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) {
+                          handleExerciseImport(file);
+                        }
+                        event.currentTarget.value = "";
+                      }}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card ref={mergeSectionRef}>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">
@@ -1374,6 +1707,12 @@ export function Admin() {
                     >
                     {t("admin.exercises.merge.action", "Zusammenführen")}
                     </Button>
+                  <div className="md:col-span-3 text-xs text-muted-foreground">
+                    {t(
+                      "admin.exercises.merge.helper",
+                      "Die Quell‑Übung wird in die Ziel‑Übung übernommen. Alle Verknüpfungen werden auf die Ziel‑Übung verschoben, die Quell‑Übung wird deaktiviert."
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 
@@ -1474,14 +1813,20 @@ export function Admin() {
                         <DropdownMenuItem
                           onSelect={(event) => {
                             event.preventDefault();
-                            setMergeSourceId(exercise.id);
+                            const target = applyMergeSelection(exercise.id);
                             toast({
-                              title: t("admin.exercises.merge.toastTitle", "Quelle gesetzt"),
+                              title: t(
+                                "admin.exercises.merge.toastTitle",
+                                target === "target" ? "Ziel gesetzt" : "Quelle gesetzt"
+                              ),
                               description: t(
                                 "admin.exercises.merge.toastDescription",
                                 {
                                   name: exercise.name,
-                                  defaultValue: `${exercise.name} als Quell‑Übung ausgewählt.`,
+                                  defaultValue:
+                                    target === "target"
+                                      ? `${exercise.name} als Ziel‑Übung ausgewählt.`
+                                      : `${exercise.name} als Quell‑Übung ausgewählt.`,
                                 }
                               ),
                             });
@@ -1494,6 +1839,15 @@ export function Admin() {
                           }}
                         >
                           {t("admin.exercises.actions.merge", "Zusammenführen")}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            handleDeactivateExercise(exercise.id);
+                          }}
+                        >
+                          {t("admin.exercises.actions.delete", "Löschen")}
                         </DropdownMenuItem>
                       </>
                     )}
@@ -1528,14 +1882,20 @@ export function Admin() {
                         <DropdownMenuItem
                           onSelect={(event) => {
                             event.preventDefault();
-                            setMergeSourceId(exercise.id);
+                            const target = applyMergeSelection(exercise.id);
                             toast({
-                              title: t("admin.exercises.merge.toastTitle", "Quelle gesetzt"),
+                              title: t(
+                                "admin.exercises.merge.toastTitle",
+                                target === "target" ? "Ziel gesetzt" : "Quelle gesetzt"
+                              ),
                               description: t(
                                 "admin.exercises.merge.toastDescription",
                                 {
                                   name: exercise.name,
-                                  defaultValue: `${exercise.name} als Quell‑Übung ausgewählt.`,
+                                  defaultValue:
+                                    target === "target"
+                                      ? `${exercise.name} als Ziel‑Übung ausgewählt.`
+                                      : `${exercise.name} als Quell‑Übung ausgewählt.`,
                                 }
                               ),
                             });
@@ -1548,6 +1908,15 @@ export function Admin() {
                           }}
                         >
                           {t("admin.exercises.actions.merge", "Zusammenführen")}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            handleDeactivateExercise(exercise.id);
+                          }}
+                        >
+                          {t("admin.exercises.actions.delete", "Löschen")}
                         </DropdownMenuItem>
                       </>
                     )}

@@ -2,7 +2,6 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -30,7 +29,7 @@ import type { Workout } from "@/types/workout";
 import { convertWeightFromKg, convertWeightToKg } from "@/utils/units";
 import { format } from "date-fns";
 import { de, enUS } from "date-fns/locale";
-import { CalendarIcon, Check, ChevronDown, Clock, Plus, Search, Trash2, AlertTriangle } from "lucide-react";
+import { CalendarIcon, Clock, Plus, Trash2, AlertTriangle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -38,6 +37,7 @@ import {
   getExerciseDisciplineLabel,
   getExerciseMuscleGroupLabel,
 } from "@/components/exercises/exerciseLabels";
+import { ExercisePicker } from "@/components/exercises/ExercisePicker";
 import {
   categoryOptions as exerciseCategoryOptions,
   disciplineOptions as exerciseDisciplineOptions,
@@ -188,7 +188,7 @@ export function WorkoutForm({
   const loadExercises = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${API_URL}/exercises?limit=500`, {
+      const response = await fetch(`${API_URL}/exercises?limit=500&includeMeta=true`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -391,6 +391,48 @@ export function WorkoutForm({
     const totalReps = sets.reduce((sum, set) => sum + (set.reps || 0), 0);
     if (totalReps > 0) return totalReps;
     return 0;
+  };
+
+  const getEstimatedPoints = (
+    activity: WorkoutActivity,
+    exercise?: Exercise | null
+  ) => {
+    if (!exercise || !exercise.pointsPerUnit) return null;
+    const measurementType = exercise.measurementType || "reps";
+    const unit = activity.unit;
+    const amountFromSets = getSetTotalAmountForExercise(
+      activity.sets,
+      exercise,
+      unit
+    );
+    const baseAmount = amountFromSets || activity.totalAmount || 0;
+    if (!baseAmount || baseAmount <= 0) return null;
+
+    let normalizedAmount = baseAmount;
+    if (measurementType === "time") {
+      if (unit === "min") normalizedAmount = baseAmount * 60;
+      else if (unit === "sec") normalizedAmount = baseAmount;
+    } else if (measurementType === "distance") {
+      if (unit === "m") normalizedAmount = baseAmount / 1000;
+      else if (unit === "miles") normalizedAmount = baseAmount * 1.60934;
+      else normalizedAmount = baseAmount;
+    }
+
+    const basePoints = normalizedAmount * (exercise.pointsPerUnit || 0);
+    if (!Number.isFinite(basePoints) || basePoints <= 0) return null;
+
+    const bodyWeightKg = user?.preferences?.metrics?.bodyWeightKg ?? null;
+    const maxWeight = activity.sets.reduce(
+      (max, set) => Math.max(max, set.weight || 0),
+      activity.totalWeight || 0
+    );
+    let personalFactor = 1;
+    if (bodyWeightKg && maxWeight > 0) {
+      const raw = 1 + maxWeight / bodyWeightKg;
+      personalFactor = Math.max(0.8, Math.min(1.2, raw));
+    }
+
+    return Number((basePoints * personalFactor).toFixed(1));
   };
 
   const getMetricVisibility = (exercise?: Exercise | null, unit?: string | null) => {
@@ -1462,318 +1504,6 @@ export function WorkoutForm({
     }
   };
 
-  const defaultExerciseFilters = {
-    query: "",
-    category: "all",
-    movementPattern: "all",
-    measurementType: "all",
-    muscleGroup: "all",
-    equipment: "all",
-    requiresWeight: "all",
-  };
-
-  const getMeasurementLabel = (value?: string | null) =>
-    measurementTypeOptions.find((option) => option.value === value)?.label ??
-    value ??
-    "-";
-
-  const filterExercises = (
-    source: Exercise[],
-    filterState: typeof defaultExerciseFilters
-  ) => {
-    const query = filterState.query.trim().toLowerCase();
-    return source.filter((exercise) => {
-      if (filterState.category !== "all" && exercise.category !== filterState.category) {
-        return false;
-      }
-      if (
-        filterState.movementPattern !== "all" &&
-        exercise.movementPattern !== filterState.movementPattern
-      ) {
-        return false;
-      }
-      if (
-        filterState.measurementType !== "all" &&
-        exercise.measurementType !== filterState.measurementType
-      ) {
-        return false;
-      }
-      if (
-        filterState.muscleGroup !== "all" &&
-        !(exercise.muscleGroups || []).includes(filterState.muscleGroup)
-      ) {
-        return false;
-      }
-      if (
-        filterState.equipment !== "all" &&
-        !(exercise.equipment || []).includes(filterState.equipment)
-      ) {
-        return false;
-      }
-      if (filterState.requiresWeight !== "all") {
-        const requiresWeight = exercise.requiresWeight === true;
-        if (filterState.requiresWeight === "yes" && !requiresWeight) {
-          return false;
-        }
-        if (filterState.requiresWeight === "no" && requiresWeight) {
-          return false;
-        }
-      }
-      if (!query) return true;
-      return (
-        exercise.name?.toLowerCase().includes(query) ||
-        exercise.slug?.toLowerCase().includes(query)
-      );
-    });
-  };
-
-  const ExercisePicker = ({
-    value,
-    onSelect,
-    hasError,
-  }: {
-    value: string;
-    onSelect: (exerciseId: string) => void;
-    hasError?: boolean;
-  }) => {
-    const [open, setOpen] = useState(false);
-    const [filters, setFilters] = useState(defaultExerciseFilters);
-    const [showFilters, setShowFilters] = useState(false);
-    const selectedExercise = exercises.find((exercise) => exercise.id === value) || null;
-
-    const filtered = useMemo(
-      () => filterExercises(exercises, filters),
-      [exercises, filters]
-    );
-
-    const options = useMemo(() => {
-      if (!selectedExercise) return filtered;
-      if (filtered.some((exercise) => exercise.id === selectedExercise.id)) {
-        return filtered;
-      }
-      return [selectedExercise, ...filtered];
-    }, [filtered, selectedExercise]);
-
-    const resetFilters = () => {
-      setFilters(defaultExerciseFilters);
-      setShowFilters(false);
-    };
-
-    return (
-      <Popover
-        open={open}
-        onOpenChange={(next) => {
-          setOpen(next);
-          if (next) {
-            setFilters(defaultExerciseFilters);
-            setShowFilters(false);
-          }
-        }}
-      >
-        <PopoverTrigger asChild>
-          <Button
-            type="button"
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            className={cn(
-              "w-full justify-between mt-1",
-              hasError && "border-destructive focus-visible:ring-destructive"
-            )}
-          >
-            {selectedExercise ? selectedExercise.name : t("training.form.selectExercise")}
-            <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        {hasError && (
-          <div className="mt-1 flex items-center gap-1 text-xs text-destructive">
-            <AlertTriangle className="h-3 w-3" />
-            <span>{t("training.form.exerciseRequired", "Bitte wähle eine Übung aus.")}</span>
-          </div>
-        )}
-        <PopoverContent className="w-[320px] p-0" align="start">
-          <Command shouldFilter={false}>
-            <div className="flex items-center gap-2 px-3 py-2 border-b">
-              <Search className="h-4 w-4 text-muted-foreground" />
-              <CommandInput
-                placeholder={t("training.form.searchExercise", "Übung suchen")}
-                value={filters.query}
-                onValueChange={(value) =>
-                  setFilters((prev) => ({ ...prev, query: value }))
-                }
-              />
-            </div>
-
-            {showFilters && (
-              <div className="p-3 space-y-2 border-b bg-muted/30">
-                <div className="grid grid-cols-2 gap-2">
-                  <Select
-                    value={filters.category}
-                    onValueChange={(value) =>
-                      setFilters((prev) => ({ ...prev, category: value }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t("training.form.filterCategory", "Kategorie")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{t("filters.all", "Alle")}</SelectItem>
-                      {exerciseFacets.categories.map((item) => (
-                        <SelectItem key={item} value={item}>
-                          {getExerciseCategoryLabel(item, t)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select
-                    value={filters.movementPattern}
-                    onValueChange={(value) =>
-                      setFilters((prev) => ({ ...prev, movementPattern: value }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t("training.form.filterPattern", "Bewegung")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{t("filters.all", "Alle")}</SelectItem>
-                      {movementPatternOptions.map((item) => (
-                        <SelectItem key={item.value} value={item.value}>
-                          {item.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select
-                    value={filters.measurementType}
-                    onValueChange={(value) =>
-                      setFilters((prev) => ({ ...prev, measurementType: value }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t("training.form.filterType", "Einheitstyp")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{t("filters.all", "Alle")}</SelectItem>
-                      {measurementTypeOptions.map((item) => (
-                        <SelectItem key={item.value} value={item.value}>
-                          {item.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select
-                    value={filters.muscleGroup}
-                    onValueChange={(value) =>
-                      setFilters((prev) => ({ ...prev, muscleGroup: value }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t("training.form.filterMuscle", "Muskel")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{t("filters.all", "Alle")}</SelectItem>
-                      {exerciseFacets.muscleGroups.map((item) => (
-                        <SelectItem key={item} value={item}>
-                          {getExerciseMuscleGroupLabel(item, t)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select
-                    value={filters.equipment}
-                    onValueChange={(value) =>
-                      setFilters((prev) => ({ ...prev, equipment: value }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t("training.form.filterEquipment", "Equipment")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{t("filters.all", "Alle")}</SelectItem>
-                      {exerciseFacets.equipment.map((item) => (
-                        <SelectItem key={item} value={item}>
-                          {item}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select
-                    value={filters.requiresWeight}
-                    onValueChange={(value) =>
-                      setFilters((prev) => ({ ...prev, requiresWeight: value }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t("training.form.filterWeight", "Gewicht")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{t("filters.all", "Alle")}</SelectItem>
-                      <SelectItem value="yes">
-                        {t("training.form.filterWeightRequired", "Gewicht erforderlich")}
-                      </SelectItem>
-                      <SelectItem value="no">
-                        {t("training.form.filterWeightOptional", "Kein Gewicht")}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between px-3 py-2 text-xs text-muted-foreground">
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 hover:text-foreground"
-                onClick={() => setShowFilters((prev) => !prev)}
-              >
-                {showFilters
-                  ? t("training.form.hideFilters", "Filter ausblenden")
-                  : t("training.form.showFilters", "Filter anzeigen")}
-              </button>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 hover:text-foreground"
-                onClick={resetFilters}
-              >
-                {t("filters.reset", "Filter zurücksetzen")}
-              </button>
-            </div>
-
-            <CommandList className="max-h-[260px]">
-              <CommandEmpty>
-                {t("training.form.noExercises", "Keine Übungen gefunden")}
-              </CommandEmpty>
-              <CommandGroup heading={t("training.form.exerciseResults", "Übungen")}>
-                {options.map((exercise) => (
-                  <CommandItem
-                    key={exercise.id}
-                    value={exercise.name}
-                    onSelect={() => {
-                      onSelect(exercise.id);
-                      setOpen(false);
-                    }}
-                    className="flex items-start justify-between gap-3"
-                  >
-                    <div>
-                      <div className="font-medium">{exercise.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {getExerciseCategoryLabel(exercise.category, t) || "-"} ·{" "}
-                        {getMeasurementLabel(exercise.measurementType)}
-                      </div>
-                    </div>
-                    {value === exercise.id && (
-                      <Check className="h-4 w-4 text-primary" />
-                    )}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-              <CommandSeparator />
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
-    );
-  };
 
   return (
     <Card>
@@ -2204,6 +1934,9 @@ export function WorkoutForm({
                             updateActivity(index, "activityType", value)
                           }
                           hasError={Boolean(activityError.activityType)}
+                          exercises={exercises}
+                          facets={exerciseFacets}
+                          enableFilters
                         />
                       </div>
 
@@ -2520,37 +2253,41 @@ export function WorkoutForm({
                               return sum + weight * multiplier;
                             }, 0);
                             const weightUnitLabel = getUserWeightUnit();
+                            const estimatedPoints = getEstimatedPoints(activity, exercise);
+                            const pointsLabel = estimatedPoints
+                              ? ` · ${estimatedPoints} ${t("training.form.pointsShort", "Punkte")}`
+                              : "";
 
                             if (showDistance && showTime) {
                               return `${t("training.form.total")}: ${totalDistance} ${getUnitLabel(
                                 activity.unit,
                                 exercise
-                              )} · ${totalDuration} ${getUnitLabel(activity.timeUnit || "min", exercise)}`;
+                              )} · ${totalDuration} ${getUnitLabel(activity.timeUnit || "min", exercise)}${pointsLabel}`;
                             }
                             if (showReps && showTime) {
                               const base = `${t("training.form.total")}: ${totalReps} ${t(
                                 "training.form.units.repetitions"
                               )} · ${totalDuration} ${getUnitLabel(activity.unit, exercise)}`;
                               if (supportsWeight && totalWeightVolume > 0) {
-                                return `${base} · ${totalWeightVolume} ${weightUnitLabel}`;
+                                return `${base} · ${totalWeightVolume} ${weightUnitLabel}${pointsLabel}`;
                               }
-                              return base;
+                              return `${base}${pointsLabel}`;
                             }
                             if (showReps && supportsWeight && totalWeightVolume > 0) {
                               return `${t("training.form.total")}: ${totalReps} ${t(
                                 "training.form.units.repetitions"
-                              )} · ${totalWeightVolume} ${weightUnitLabel}`;
+                              )} · ${totalWeightVolume} ${weightUnitLabel}${pointsLabel}`;
                             }
                             if (!showReps && supportsWeight && totalWeight > 0) {
                               return `${t("training.form.total")}: ${activity.totalAmount} ${getUnitLabel(
                                 activity.unit,
                                 exercise
-                              )} · ${totalWeight} ${weightUnitLabel}`;
+                              )} · ${totalWeight} ${weightUnitLabel}${pointsLabel}`;
                             }
                             return `${t("training.form.total")}: ${activity.totalAmount} ${getUnitLabel(
                               activity.unit,
                               exercise
-                            )}`;
+                            )}${pointsLabel}`;
                           })()}
                         </div>
                       </div>

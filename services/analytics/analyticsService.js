@@ -4,6 +4,7 @@ import {
     buildWorkoutSummaryQuery,
     buildWorkoutTimelineQuery,
     buildLongestWorkoutQuery,
+    buildActivityBreakdownQuery,
     buildRecoverySummaryQuery,
     buildRecoveryTimelineQuery,
     buildMoodDistributionQuery
@@ -21,19 +22,24 @@ import {
     roundNumber
 } from './utils.js';
 
-const buildActivityBreakdown = (summary) => {
-    const totals = [
-        { activity: 'pullups', total: summary.pullups },
-        { activity: 'pushups', total: summary.pushups },
-        { activity: 'running', total: summary.running },
-        { activity: 'cycling', total: summary.cycling },
-        { activity: 'situps', total: summary.situps }
-    ];
+const buildActivityBreakdown = (rows) => {
+    const totals = rows.map((row) => ({
+        activityId: row.activity_id,
+        label: row.activity_label,
+        measurementType: row.measurement_type,
+        supportsTime: row.supports_time,
+        supportsDistance: row.supports_distance,
+        total: Number(row.total_points) || 0
+    }));
 
     const grandTotal = totals.reduce((sum, entry) => sum + (entry.total ?? 0), 0);
 
     return totals.map((entry) => ({
-        activity: entry.activity,
+        activityId: entry.activityId,
+        label: entry.label,
+        measurementType: entry.measurementType,
+        supportsTime: entry.supportsTime,
+        supportsDistance: entry.supportsDistance,
         total: entry.total,
         percentage: grandTotal ? roundNumber(((entry.total ?? 0) / grandTotal) * 100, 1) : 0
     }));
@@ -212,6 +218,7 @@ export const getAnalyticsForPeriod = async (pool, userId, requestedPeriod, { sta
         workoutSummaryResult,
         workoutPreviousSummaryResult,
         longestWorkoutResult,
+        activityBreakdownResult,
         recoverySummaryResult,
         recoveryPreviousSummaryResult,
         recoveryTimelineResult,
@@ -222,6 +229,7 @@ export const getAnalyticsForPeriod = async (pool, userId, requestedPeriod, { sta
         pool.query(buildWorkoutSummaryQuery(start, end), [userId]),
         pool.query(buildWorkoutSummaryQuery(previousStart, previousEnd), [userId]),
         pool.query(buildLongestWorkoutQuery(start, end), [userId]),
+        pool.query(buildActivityBreakdownQuery(start, end), [userId]),
         pool.query(buildRecoverySummaryQuery(start, end), [userId]),
         pool.query(buildRecoverySummaryQuery(previousStart, previousEnd), [userId]),
         pool.query(buildRecoveryTimelineQuery(start, end), [userId]),
@@ -247,7 +255,14 @@ export const getAnalyticsForPeriod = async (pool, userId, requestedPeriod, { sta
         ? roundNumber(workoutSummary.points / workoutSummary.workouts, 1)
         : null;
 
-    const activityBreakdown = buildActivityBreakdown(workoutSummary);
+    const activityBreakdown = buildActivityBreakdown(activityBreakdownResult.rows || []);
+    const activityMetrics = activityBreakdown.map((entry) => ({
+        key: entry.activityId,
+        label: entry.label,
+        measurementType: entry.measurementType,
+        supportsTime: entry.supportsTime,
+        supportsDistance: entry.supportsDistance
+    }));
 
     const workoutsTotals = {
         ...workoutSummary,
@@ -315,6 +330,7 @@ export const getAnalyticsForPeriod = async (pool, userId, requestedPeriod, { sta
             totals: workoutsTotals,
             timeline: workoutTimeline,
             activityBreakdown,
+            activityMetrics,
             highlights: workoutHighlights,
             comparison: buildWorkoutsComparison(workoutSummary, previousWorkoutSummary)
         },

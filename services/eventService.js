@@ -182,7 +182,12 @@ const buildActivityTotalsMap = (rows) => {
       map.set(row.user_id, {});
     }
     const totals = map.get(row.user_id);
-    totals[row.activity_type] = parseNumber(row.total_quantity, 0);
+    totals[row.activity_type] = {
+      quantity: parseNumber(row.total_quantity, 0),
+      reps: parseNumber(row.total_reps, 0),
+      duration: parseNumber(row.total_duration, 0),
+      distance: parseNumber(row.total_distance, 0),
+    };
   }
   return map;
 };
@@ -255,7 +260,10 @@ export const processWeeklyEvents = async (
             SELECT
                 wir.user_id,
                 wa.activity_type,
-                SUM(wa.quantity) AS total_quantity
+                SUM(wa.quantity) AS total_quantity,
+                COALESCE(SUM(wa.reps), 0) AS total_reps,
+                COALESCE(SUM(wa.duration), 0) AS total_duration,
+                COALESCE(SUM(wa.distance), 0) AS total_distance
             FROM workouts_in_range wir
             JOIN workout_activities wa ON wa.workout_id = wir.id
             GROUP BY wir.user_id, wa.activity_type
@@ -280,7 +288,7 @@ export const processWeeklyEvents = async (
       const totalPoints = parseNumber(row.total_points, 0);
       const totalWorkouts = parseNumber(row.total_workouts, 0);
       const totalExercises = Object.values(totalsByType).reduce(
-        (sum, value) => sum + parseNumber(value, 0),
+        (sum, value) => sum + parseNumber(value.quantity, 0),
         0
       );
 
@@ -635,7 +643,10 @@ export const processMonthlyEvents = async (
             SELECT
                 wir.user_id,
                 wa.activity_type,
-                SUM(wa.quantity) AS total_quantity
+                SUM(wa.quantity) AS total_quantity,
+                COALESCE(SUM(wa.reps), 0) AS total_reps,
+                COALESCE(SUM(wa.duration), 0) AS total_duration,
+                COALESCE(SUM(wa.distance), 0) AS total_distance
             FROM workouts_in_range wir
             JOIN workout_activities wa ON wa.workout_id = wir.id
             GROUP BY wir.user_id, wa.activity_type

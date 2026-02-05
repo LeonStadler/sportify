@@ -347,13 +347,6 @@ export function MyWorkouts() {
           onOffsetChange={handleOffsetChange}
           t={t}
           locale={i18n.language}
-          presets={[
-            { value: "all", label: t("filters.period.all") },
-            { value: "week", label: t("filters.period.week") },
-            { value: "month", label: t("filters.period.month") },
-            { value: "year", label: t("filters.period.year") },
-            { value: "custom", label: t("filters.period.custom") },
-          ]}
           formatDate={formatDate}
         />
       }

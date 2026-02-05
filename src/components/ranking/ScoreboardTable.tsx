@@ -11,17 +11,14 @@ import NiceAvatar from "react-nice-avatar";
 
 interface LeaderboardUser {
   id: string;
-  rank: number;
+  rank?: number | null;
   displayName: string;
   avatarUrl: string | null;
   totalPoints: number;
-  totalPullups?: number;
-  totalPushups?: number;
-  totalRunning?: number;
-  totalCycling?: number;
   totalAmount?: number;
   unit?: string;
   isCurrentUser: boolean;
+  isMuted?: boolean;
 }
 
 interface ScoreboardTableProps {
@@ -39,24 +36,15 @@ export function ScoreboardTable({
 }: ScoreboardTableProps) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [activityMeta, setActivityMeta] = useState<{
+    measurementType?: "reps" | "time" | "distance" | null;
+    supportsTime?: boolean | null;
+    supportsDistance?: boolean | null;
+  } | null>(null);
   const { user } = useAuth();
   const { t } = useTranslation();
   const needsCustomRange =
     period === "custom" && (!dateRange?.from || !dateRange?.to);
-
-  const getUnitForActivity = (activityType: string) => {
-    switch (activityType) {
-      case "pullups":
-      case "pushups":
-      case "situps":
-        return t("scoreboard.units.repetitions");
-      case "running":
-      case "cycling":
-        return t("scoreboard.units.kilometers");
-      default:
-        return t("scoreboard.units.points");
-    }
-  };
 
   const fetchLeaderboard = useCallback(async () => {
     if (period === "custom" && (!dateRange?.from || !dateRange?.to)) {
@@ -93,13 +81,45 @@ export function ScoreboardTable({
       }
 
       const data = await response.json();
-      setLeaderboard(data.leaderboard);
+      let nextLeaderboard = Array.isArray(data.leaderboard)
+        ? data.leaderboard
+        : [];
+      if (user) {
+        const alreadyListed = nextLeaderboard.some(
+          (entry) => entry.id === user.id
+        );
+        if (!alreadyListed) {
+          nextLeaderboard = [
+            ...nextLeaderboard,
+            {
+              id: user.id,
+              displayName:
+                user.displayName ||
+                user.nickname ||
+                user.firstName ||
+                "Du",
+              avatarUrl: user.avatarUrl || null,
+              totalPoints: 0,
+              totalAmount: 0,
+              rank: null,
+              isCurrentUser: true,
+              isMuted: scope === "global" && user.showInGlobalRankings === false,
+            },
+          ];
+        }
+      }
+      setLeaderboard(nextLeaderboard);
+      if (data.activityMeta) {
+        setActivityMeta(data.activityMeta);
+      } else {
+        setActivityMeta(null);
+      }
     } catch (error) {
       console.error("Scoreboard fetch error:", error);
     } finally {
       setIsLoading(false);
     }
-  }, [activity, dateRange?.from, dateRange?.to, period, scope, t]);
+  }, [activity, dateRange?.from, dateRange?.to, period, scope, t, user]);
 
   useEffect(() => {
     fetchLeaderboard();
@@ -114,12 +134,19 @@ export function ScoreboardTable({
     return name.substring(0, 2).toUpperCase();
   };
 
-  const getRankColor = (rank: number) => {
+  const getRankColor = (rank?: number | null) => {
+    if (!rank) return "text-muted-foreground";
     if (rank === 1) return "text-yellow-500";
     if (rank === 2) return "text-slate-400";
     if (rank === 3) return "text-orange-600";
     return "text-muted-foreground";
   };
+
+  const distanceUnit = user?.preferences?.units?.distance === "miles" ? "miles" : "km";
+  const distanceLabel =
+    distanceUnit === "miles"
+      ? t("training.form.units.milesShort", "mi")
+      : t("training.form.units.kilometersShort", "km");
 
   if (isLoading) {
     return (
@@ -165,6 +192,7 @@ export function ScoreboardTable({
                 ? "bg-primary/10 border-primary/30 dark:bg-primary/20 dark:border-primary/40"
                 : "bg-card border-border hover:bg-accent/50"
             }
+            ${player.isMuted ? "opacity-70" : ""}
           `}
         >
           <div className="flex items-center gap-4">
@@ -172,7 +200,7 @@ export function ScoreboardTable({
               <span
                 className={`text-lg font-bold w-8 text-center ${getRankColor(player.rank)}`}
               >
-                {player.rank}
+                {player.rank ?? "—"}
               </span>
               <Avatar>
                 {player.avatarUrl && parseAvatarConfig(player.avatarUrl) ? (
@@ -193,17 +221,30 @@ export function ScoreboardTable({
               <p className="font-semibold text-foreground">
                 {player.displayName}
               </p>
-              {activity === "all" && (
+              {player.isMuted && (
                 <div className="flex flex-wrap gap-2 mt-1">
                   <Badge variant="outline" className="text-xs">
-                    {t("scoreboard.stats.pullups", "Klimmzüge")}: {player.totalPullups || 0}
+                    {t("scoreboard.notRanked", "Nicht in Wertung")}
                   </Badge>
+                </div>
+              )}
+              {activity !== "all" && player.totalAmount !== undefined && (
+                <div className="flex flex-wrap gap-2 mt-1">
                   <Badge variant="outline" className="text-xs">
-                    {t("scoreboard.stats.pushups", "Liegestütze")}: {player.totalPushups || 0}
-                  </Badge>
-                  <Badge variant="outline" className="text-xs">
-                    {t("scoreboard.stats.running", "Laufen")}: {player.totalRunning || 0}{" "}
-                    {t("scoreboard.units.kilometers", "km")}
+                    {t("scoreboard.units.amount", "Menge")}:{" "}
+                    {activityMeta?.measurementType === "distance"
+                      ? distanceUnit === "miles"
+                        ? (player.totalAmount / 1.60934).toFixed(1)
+                        : player.totalAmount.toFixed(1)
+                      : activityMeta?.measurementType === "time"
+                        ? Math.round((player.totalAmount || 0) / 60)
+                        : Math.round(player.totalAmount)}
+                    {" "}
+                    {activityMeta?.measurementType === "distance"
+                      ? distanceLabel
+                      : activityMeta?.measurementType === "time"
+                        ? t("training.form.units.minutesShort", "Min")
+                        : t("training.form.units.repetitionsShort", "Wdh.")}
                   </Badge>
                 </div>
               )}

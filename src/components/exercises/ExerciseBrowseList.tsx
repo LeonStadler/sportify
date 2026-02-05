@@ -34,6 +34,7 @@ export interface ExerciseBrowseItem {
   supportsTime?: boolean | null;
   supportsDistance?: boolean | null;
   muscleGroups?: string[] | null;
+  isFavorite?: boolean;
 }
 
 export interface ExerciseBrowseLabels {
@@ -52,6 +53,7 @@ export interface ExerciseBrowseLabels {
 interface ExerciseBrowseGridProps {
   items: ExerciseBrowseItem[];
   onSelect: (item: ExerciseBrowseItem) => void;
+  onToggleFavorite?: (item: ExerciseBrowseItem, next: boolean) => void;
   renderMenuItems: (item: ExerciseBrowseItem) => ReactNode;
   labels: ExerciseBrowseLabels;
 }
@@ -59,6 +61,7 @@ interface ExerciseBrowseGridProps {
 export function ExerciseBrowseGrid({
   items,
   onSelect,
+  onToggleFavorite,
   renderMenuItems,
   labels,
 }: ExerciseBrowseGridProps) {
@@ -79,7 +82,19 @@ export function ExerciseBrowseGrid({
                 {getExerciseDisciplineLabel(exercise.discipline, t) || "-"}
               </div>
             </div>
-            <div onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
+              {onToggleFavorite && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => onToggleFavorite(exercise, !exercise.isFavorite)}
+                >
+                  <span className={exercise.isFavorite ? "text-yellow-500" : "text-muted-foreground"}>
+                    ★
+                  </span>
+                </Button>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -143,6 +158,7 @@ interface ExerciseBrowseTableProps {
   sortDirection: "asc" | "desc";
   onSortClick: (value: string) => void;
   onSelect: (item: ExerciseBrowseItem) => void;
+  onToggleFavorite?: (item: ExerciseBrowseItem, next: boolean) => void;
   renderMenuItems: (item: ExerciseBrowseItem) => ReactNode;
   labels: ExerciseBrowseLabels;
 }
@@ -153,6 +169,7 @@ export function ExerciseBrowseTable({
   sortDirection,
   onSortClick,
   onSelect,
+  onToggleFavorite,
   renderMenuItems,
   labels,
 }: ExerciseBrowseTableProps) {
@@ -233,7 +250,24 @@ export function ExerciseBrowseTable({
               onClick={() => onSelect(exercise)}
             >
               <TableCell className="font-medium sticky left-0 bg-background z-10">
-                {exercise.name}
+                <div className="flex items-center gap-2">
+                  {onToggleFavorite && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onToggleFavorite(exercise, !exercise.isFavorite);
+                      }}
+                    >
+                      <span className={exercise.isFavorite ? "text-yellow-500" : "text-muted-foreground"}>
+                        ★
+                      </span>
+                    </Button>
+                  )}
+                  <span>{exercise.name}</span>
+                </div>
               </TableCell>
               <TableCell>{getExerciseCategoryLabel(exercise.category, t) || "-"}</TableCell>
               <TableCell>{getExerciseDisciplineLabel(exercise.discipline, t) || "-"}</TableCell>

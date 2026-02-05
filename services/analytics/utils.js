@@ -109,11 +109,6 @@ export const mapWorkoutSummary = (row) => {
         workouts: toNumber(data.workoutCount),
         durationMinutes: toNumber(data.totalDuration),
         points: toNumber(data.totalPoints),
-        pullups: toNumber(data.pullups),
-        pushups: toNumber(data.pushups),
-        running: toNumber(data.running),
-        cycling: toNumber(data.cycling),
-        situps: toNumber(data.situps),
         activeDays: toNumber(data.activeDays)
     };
 };
@@ -121,16 +116,24 @@ export const mapWorkoutSummary = (row) => {
 export const mapWorkoutTimeline = (rows) =>
     rows.map((row) => {
         const item = toCamelCase(row);
+        let activities = {};
+        if (item.activityTotals) {
+            if (typeof item.activityTotals === 'string') {
+                try {
+                    activities = JSON.parse(item.activityTotals);
+                } catch (error) {
+                    activities = {};
+                }
+            } else if (typeof item.activityTotals === 'object') {
+                activities = item.activityTotals || {};
+            }
+        }
         return {
             date: item.day,
-            pullups: toNumber(item.pullups),
-            pushups: toNumber(item.pushups),
-            running: toNumber(item.running),
-            cycling: toNumber(item.cycling),
-            situps: toNumber(item.situps),
             points: toNumber(item.points),
             workouts: toNumber(item.workouts),
-            durationMinutes: toNumber(item.durationMinutes)
+            durationMinutes: toNumber(item.durationMinutes),
+            activities
         };
     });
 

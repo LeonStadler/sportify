@@ -37,25 +37,29 @@ test('getAnalyticsForPeriod aggregates workout and recovery analytics', async ()
       rows: [
         {
           day: '2024-01-01',
-          pullups: 10,
-          pushups: 20,
-          running: 5,
-          cycling: 0,
-          situps: 15,
           points: 100,
           workouts: 1,
           duration_minutes: 45,
+          activity_totals: {
+            pullups: 10,
+            pushups: 20,
+            running: 5,
+            cycling: 0,
+            situps: 15,
+          },
         },
         {
           day: '2024-01-02',
-          pullups: 20,
-          pushups: 25,
-          running: 10,
-          cycling: 5,
-          situps: 20,
           points: 120,
           workouts: 1,
           duration_minutes: 50,
+          activity_totals: {
+            pullups: 20,
+            pushups: 25,
+            running: 10,
+            cycling: 5,
+            situps: 20,
+          },
         },
       ],
     },
@@ -65,11 +69,6 @@ test('getAnalyticsForPeriod aggregates workout and recovery analytics', async ()
           workout_count: 2,
           total_duration: 95,
           total_points: 220,
-          pullups: 30,
-          pushups: 45,
-          running: 15,
-          cycling: 5,
-          situps: 35,
           active_days: 2,
         },
       ],
@@ -80,11 +79,6 @@ test('getAnalyticsForPeriod aggregates workout and recovery analytics', async ()
           workout_count: 1,
           total_duration: 40,
           total_points: 120,
-          pullups: 15,
-          pushups: 20,
-          running: 5,
-          cycling: 0,
-          situps: 10,
           active_days: 1,
         },
       ],
@@ -96,6 +90,50 @@ test('getAnalyticsForPeriod aggregates workout and recovery analytics', async ()
           title: 'Long Session',
           start_time: '2024-01-02T10:00:00.000Z',
           duration_minutes: 50,
+        },
+      ],
+    },
+    {
+      rows: [
+        {
+          activity_id: 'pullups',
+          activity_label: 'pullups',
+          measurement_type: 'reps',
+          supports_time: false,
+          supports_distance: false,
+          total_points: 30,
+        },
+        {
+          activity_id: 'pushups',
+          activity_label: 'pushups',
+          measurement_type: 'reps',
+          supports_time: false,
+          supports_distance: false,
+          total_points: 45,
+        },
+        {
+          activity_id: 'running',
+          activity_label: 'running',
+          measurement_type: 'distance',
+          supports_time: true,
+          supports_distance: true,
+          total_points: 15,
+        },
+        {
+          activity_id: 'cycling',
+          activity_label: 'cycling',
+          measurement_type: 'distance',
+          supports_time: true,
+          supports_distance: true,
+          total_points: 5,
+        },
+        {
+          activity_id: 'situps',
+          activity_label: 'situps',
+          measurement_type: 'reps',
+          supports_time: false,
+          supports_distance: false,
+          total_points: 35,
         },
       ],
     },
@@ -181,11 +219,6 @@ test('getAnalyticsForPeriod aggregates workout and recovery analytics', async ()
     workouts: 2,
     durationMinutes: 95,
     points: 220,
-    pullups: 30,
-    pushups: 45,
-    running: 15,
-    cycling: 5,
-    situps: 35,
     activeDays: 2,
     averageDurationPerWorkout: 47.5,
     averagePointsPerWorkout: 110,
@@ -194,11 +227,88 @@ test('getAnalyticsForPeriod aggregates workout and recovery analytics', async ()
 
   assert.equal(analytics.workouts.timeline.length, 2);
   assert.deepEqual(analytics.workouts.activityBreakdown, [
-    { activity: 'pullups', total: 30, percentage: 23.1 },
-    { activity: 'pushups', total: 45, percentage: 34.6 },
-    { activity: 'running', total: 15, percentage: 11.5 },
-    { activity: 'cycling', total: 5, percentage: 3.8 },
-    { activity: 'situps', total: 35, percentage: 26.9 },
+    {
+      activityId: 'pullups',
+      label: 'pullups',
+      measurementType: 'reps',
+      supportsTime: false,
+      supportsDistance: false,
+      total: 30,
+      percentage: 23.1,
+    },
+    {
+      activityId: 'pushups',
+      label: 'pushups',
+      measurementType: 'reps',
+      supportsTime: false,
+      supportsDistance: false,
+      total: 45,
+      percentage: 34.6,
+    },
+    {
+      activityId: 'running',
+      label: 'running',
+      measurementType: 'distance',
+      supportsTime: true,
+      supportsDistance: true,
+      total: 15,
+      percentage: 11.5,
+    },
+    {
+      activityId: 'cycling',
+      label: 'cycling',
+      measurementType: 'distance',
+      supportsTime: true,
+      supportsDistance: true,
+      total: 5,
+      percentage: 3.8,
+    },
+    {
+      activityId: 'situps',
+      label: 'situps',
+      measurementType: 'reps',
+      supportsTime: false,
+      supportsDistance: false,
+      total: 35,
+      percentage: 26.9,
+    },
+  ]);
+  assert.deepEqual(analytics.workouts.activityMetrics, [
+    {
+      key: 'pullups',
+      label: 'pullups',
+      measurementType: 'reps',
+      supportsTime: false,
+      supportsDistance: false,
+    },
+    {
+      key: 'pushups',
+      label: 'pushups',
+      measurementType: 'reps',
+      supportsTime: false,
+      supportsDistance: false,
+    },
+    {
+      key: 'running',
+      label: 'running',
+      measurementType: 'distance',
+      supportsTime: true,
+      supportsDistance: true,
+    },
+    {
+      key: 'cycling',
+      label: 'cycling',
+      measurementType: 'distance',
+      supportsTime: true,
+      supportsDistance: true,
+    },
+    {
+      key: 'situps',
+      label: 'situps',
+      measurementType: 'reps',
+      supportsTime: false,
+      supportsDistance: false,
+    },
   ]);
   assert.deepEqual(analytics.workouts.comparison, {
     points: { current: 220, previous: 120, change: { difference: 100, percent: 83.3 } },
@@ -215,14 +325,16 @@ test('getAnalyticsForPeriod aggregates workout and recovery analytics', async ()
     },
     peakDay: {
       date: '2024-01-02',
-      pullups: 20,
-      pushups: 25,
-      running: 10,
-      cycling: 5,
-      situps: 20,
       points: 120,
       workouts: 1,
       durationMinutes: 50,
+      activities: {
+        pullups: 20,
+        pushups: 25,
+        running: 10,
+        cycling: 5,
+        situps: 20,
+      },
     },
     activeDays: 2,
   });
@@ -289,7 +401,7 @@ test('getAnalyticsForPeriod aggregates workout and recovery analytics', async ()
 
 test('getAnalyticsForPeriod handles empty datasets gracefully', async () => {
   const pool = new StubPool(
-    new Array(9).fill({ rows: [] })
+    new Array(10).fill({ rows: [] })
   );
 
   const analytics = await getAnalyticsForPeriod(pool, 'user-456', 'month');
@@ -299,24 +411,14 @@ test('getAnalyticsForPeriod handles empty datasets gracefully', async () => {
     workouts: 0,
     durationMinutes: 0,
     points: 0,
-    pullups: 0,
-    pushups: 0,
-    running: 0,
-    cycling: 0,
-    situps: 0,
     activeDays: 0,
     averageDurationPerWorkout: null,
     averagePointsPerWorkout: null,
     consistency: null,
   });
 
-  assert.deepEqual(analytics.workouts.activityBreakdown, [
-    { activity: 'pullups', total: 0, percentage: 0 },
-    { activity: 'pushups', total: 0, percentage: 0 },
-    { activity: 'running', total: 0, percentage: 0 },
-    { activity: 'cycling', total: 0, percentage: 0 },
-    { activity: 'situps', total: 0, percentage: 0 },
-  ]);
+  assert.deepEqual(analytics.workouts.activityBreakdown, []);
+  assert.deepEqual(analytics.workouts.activityMetrics, []);
 
   assert.deepEqual(analytics.workouts.comparison, {
     points: { current: 0, previous: 0, change: { difference: 0, percent: null } },

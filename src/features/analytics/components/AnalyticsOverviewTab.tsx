@@ -60,10 +60,32 @@ export function AnalyticsOverviewTab({
     if (!workouts?.activityBreakdown?.length) return null;
     const row: Record<string, number | string> = { name: "share" };
     workouts.activityBreakdown.forEach((entry) => {
-      row[entry.activity] = entry.percentage;
+      row[entry.activityId] = entry.percentage;
     });
     return [row];
   }, [workouts?.activityBreakdown]);
+
+  const breakdownMetrics = useMemo(() => {
+    if (!workouts?.activityBreakdown?.length) return activityMetrics;
+    const existing = new Map(activityMetrics.map((metric) => [metric.key, metric]));
+    const palette = ["#3b82f6", "#ef4444", "#22c55e", "#a855f7", "#f97316", "#0ea5e9", "#facc15", "#ec4899"];
+    let colorIndex = 0;
+    const dynamicMetrics = workouts.activityBreakdown.map((entry) => {
+      const existingMetric = existing.get(entry.activityId);
+      if (existingMetric) return existingMetric;
+      const color = palette[colorIndex % palette.length];
+      colorIndex += 1;
+      return {
+        key: entry.activityId,
+        label: entry.label,
+        color,
+        measurementType: entry.measurementType,
+        supportsTime: entry.supportsTime,
+        supportsDistance: entry.supportsDistance,
+      };
+    });
+    return dynamicMetrics;
+  }, [workouts?.activityBreakdown, activityMetrics]);
 
   return (
     <>
@@ -193,11 +215,11 @@ export function AnalyticsOverviewTab({
                           backgroundColor: "hsl(var(--popover))",
                         }}
                         formatter={(value: number, key: string) => {
-                          const metric = activityMetrics.find((m) => m.key === key);
+                          const metric = breakdownMetrics.find((m) => m.key === key);
                           return [`${formatters.formatDecimal(value, 1)}%`, metric?.label ?? key];
                         }}
                       />
-                      {activityMetrics.map((metric) => (
+                      {breakdownMetrics.map((metric) => (
                         <Bar
                           key={metric.key}
                           dataKey={metric.key as string}
@@ -213,10 +235,10 @@ export function AnalyticsOverviewTab({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {workouts.activityBreakdown.map((activity) => (
-                  <div key={activity.activity} className="rounded-lg border p-4 flex flex-col gap-1">
+                  <div key={activity.activityId} className="rounded-lg border p-4 flex flex-col gap-1">
                     <span className="text-sm text-muted-foreground">
-                      {activityMetrics.find((metric) => metric.key === activity.activity)?.label ??
-                        activity.activity}
+                      {breakdownMetrics.find((metric) => metric.key === activity.activityId)?.label ??
+                        activity.label}
                     </span>
                     <span className="text-xl font-semibold">
                       {activity.total !== null ? formatters.formatDecimal(activity.total, 1) : "—"}

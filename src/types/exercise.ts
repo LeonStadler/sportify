@@ -24,7 +24,11 @@ export interface Exercise {
   difficultyTier?: number | null;
   muscleGroups?: string[] | null;
   equipment?: string[] | null;
+  aliases?: string[] | null;
   unitOptions?: ExerciseUnitOption[];
+  isFavorite?: boolean;
+  usageCount?: number;
+  usagePoints?: number;
   status?: string | null;
   createdBy?: string | null;
   approvedBy?: string | null;

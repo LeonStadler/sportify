@@ -90,6 +90,7 @@ export interface Workout {
     lastName?: string;
     nickname?: string;
     displayPreference?: string;
+    displayName?: string;
   };
   createdAt: string;
   updatedAt: string;

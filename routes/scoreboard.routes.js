@@ -271,11 +271,7 @@ export const createScoreboardRouter = (pool) => {
                     COALESCE(
                       SUM(
                         CASE
-                          WHEN COALESCE(ex.id::text, wa.activity_type) = $1
-                            OR ex.slug = $1
-                            OR regexp_replace(lower(ex.slug), '[^a-z0-9]+', '', 'g') =
-                               regexp_replace(lower($1), '[^a-z0-9]+', '', 'g')
-                            OR wa.activity_type = $1
+                          WHEN wa.exercise_id = $1
                           THEN wa.quantity
                           ELSE 0
                         END
@@ -285,11 +281,7 @@ export const createScoreboardRouter = (pool) => {
                     COALESCE(
                       SUM(
                         CASE
-                          WHEN COALESCE(ex.id::text, wa.activity_type) = $1
-                            OR ex.slug = $1
-                            OR regexp_replace(lower(ex.slug), '[^a-z0-9]+', '', 'g') =
-                               regexp_replace(lower($1), '[^a-z0-9]+', '', 'g')
-                            OR wa.activity_type = $1
+                          WHEN wa.exercise_id = $1
                           THEN wa.points_earned
                           ELSE 0
                         END
@@ -299,19 +291,9 @@ export const createScoreboardRouter = (pool) => {
                 FROM users u
                 LEFT JOIN workouts w ON u.id = w.user_id ${dateFilter}
                 LEFT JOIN workout_activities wa ON w.id = wa.workout_id
-                LEFT JOIN exercises ex
-                  ON ex.id::text = wa.activity_type::text
-                  OR ex.slug = wa.activity_type
-                  OR regexp_replace(lower(ex.slug), '[^a-z0-9]+', '', 'g') =
-                     regexp_replace(lower(wa.activity_type), '[^a-z0-9]+', '', 'g')
+                LEFT JOIN exercises ex ON ex.id = wa.exercise_id
                 WHERE 1=1 ${scopeFilter}
-                  AND (
-                    COALESCE(ex.id::text, wa.activity_type) = $1
-                    OR ex.slug = $1
-                    OR regexp_replace(lower(ex.slug), '[^a-z0-9]+', '', 'g') =
-                       regexp_replace(lower($1), '[^a-z0-9]+', '', 'g')
-                    OR wa.activity_type = $1
-                  )
+                  AND wa.exercise_id = $1
                 GROUP BY u.id, u.first_name, u.last_name, u.nickname, u.display_preference, u.avatar_url
                 HAVING COALESCE(SUM(wa.points_earned), 0) > 0
                 ORDER BY total_points DESC
@@ -355,11 +337,7 @@ export const createScoreboardRouter = (pool) => {
                     COALESCE(
                       SUM(
                         CASE
-                          WHEN COALESCE(ex.id::text, wa.activity_type) = $${userParams.length}
-                            OR ex.slug = $${userParams.length}
-                            OR regexp_replace(lower(ex.slug), '[^a-z0-9]+', '', 'g') =
-                               regexp_replace(lower($${userParams.length}), '[^a-z0-9]+', '', 'g')
-                            OR wa.activity_type = $${userParams.length}
+                          WHEN wa.exercise_id = $${userParams.length}
                           THEN wa.quantity
                           ELSE 0
                         END
@@ -369,11 +347,7 @@ export const createScoreboardRouter = (pool) => {
                     COALESCE(
                       SUM(
                         CASE
-                          WHEN COALESCE(ex.id::text, wa.activity_type) = $${userParams.length}
-                            OR ex.slug = $${userParams.length}
-                            OR regexp_replace(lower(ex.slug), '[^a-z0-9]+', '', 'g') =
-                               regexp_replace(lower($${userParams.length}), '[^a-z0-9]+', '', 'g')
-                            OR wa.activity_type = $${userParams.length}
+                          WHEN wa.exercise_id = $${userParams.length}
                           THEN wa.points_earned
                           ELSE 0
                         END
@@ -383,11 +357,7 @@ export const createScoreboardRouter = (pool) => {
                   FROM users u
                   LEFT JOIN workouts w ON u.id = w.user_id ${userDateResult.clause}
                   LEFT JOIN workout_activities wa ON w.id = wa.workout_id
-                  LEFT JOIN exercises ex
-                    ON ex.id::text = wa.activity_type::text
-                    OR ex.slug = wa.activity_type
-                    OR regexp_replace(lower(ex.slug), '[^a-z0-9]+', '', 'g') =
-                       regexp_replace(lower(wa.activity_type), '[^a-z0-9]+', '', 'g')
+                  LEFT JOIN exercises ex ON ex.id = wa.exercise_id
                   GROUP BY u.id, u.first_name, u.last_name, u.nickname, u.display_preference, u.avatar_url, u.show_in_global_rankings
                 ),
                 eligible AS (
@@ -415,11 +385,7 @@ export const createScoreboardRouter = (pool) => {
                     COALESCE(
                       SUM(
                         CASE
-                          WHEN COALESCE(ex.id::text, wa.activity_type) = $${userParams.length}
-                            OR ex.slug = $${userParams.length}
-                            OR regexp_replace(lower(ex.slug), '[^a-z0-9]+', '', 'g') =
-                               regexp_replace(lower($${userParams.length}), '[^a-z0-9]+', '', 'g')
-                            OR wa.activity_type = $${userParams.length}
+                          WHEN wa.exercise_id = $${userParams.length}
                           THEN wa.quantity
                           ELSE 0
                         END
@@ -429,11 +395,7 @@ export const createScoreboardRouter = (pool) => {
                     COALESCE(
                       SUM(
                         CASE
-                          WHEN COALESCE(ex.id::text, wa.activity_type) = $${userParams.length}
-                            OR ex.slug = $${userParams.length}
-                            OR regexp_replace(lower(ex.slug), '[^a-z0-9]+', '', 'g') =
-                               regexp_replace(lower($${userParams.length}), '[^a-z0-9]+', '', 'g')
-                            OR wa.activity_type = $${userParams.length}
+                          WHEN wa.exercise_id = $${userParams.length}
                           THEN wa.points_earned
                           ELSE 0
                         END
@@ -443,12 +405,8 @@ export const createScoreboardRouter = (pool) => {
                   FROM users u
                   LEFT JOIN workouts w ON u.id = w.user_id ${userDateResult.clause}
                   LEFT JOIN workout_activities wa ON w.id = wa.workout_id
-                  LEFT JOIN exercises ex
-                    ON ex.id::text = wa.activity_type::text
-                    OR ex.slug = wa.activity_type
-                    OR regexp_replace(lower(ex.slug), '[^a-z0-9]+', '', 'g') =
-                       regexp_replace(lower(wa.activity_type), '[^a-z0-9]+', '', 'g')
-                  WHERE COALESCE(ex.id::text, wa.activity_type) = $${userParams.length}
+                  LEFT JOIN exercises ex ON ex.id = wa.exercise_id
+                  WHERE wa.exercise_id = $${userParams.length}
                   GROUP BY u.id, u.first_name, u.last_name, u.nickname, u.display_preference, u.avatar_url, u.show_in_global_rankings
                 ),
                 ranked AS (
@@ -496,9 +454,6 @@ export const createScoreboardRouter = (pool) => {
           SELECT id, name, measurement_type, supports_time, supports_distance
           FROM exercises
           WHERE id = $1
-             OR slug = $1
-             OR regexp_replace(lower(slug), '[^a-z0-9]+', '', 'g') =
-                regexp_replace(lower($1), '[^a-z0-9]+', '', 'g')
         `,
         [activity]
       );
@@ -600,8 +555,8 @@ export const createScoreboardRouter = (pool) => {
 
       const query = `
         SELECT
-          COALESCE(ex.id::text, wa.activity_type) AS activity_id,
-          COALESCE(ex.name, wa.activity_type) AS activity_label,
+          wa.exercise_id AS activity_id,
+          COALESCE(ex.name, wa.exercise_id) AS activity_label,
           COALESCE(ex.measurement_type, 'reps') AS measurement_type,
           COALESCE(ex.supports_time, false) AS supports_time,
           COALESCE(ex.supports_distance, false) AS supports_distance,
@@ -614,13 +569,10 @@ export const createScoreboardRouter = (pool) => {
         FROM workout_activities wa
         JOIN workouts w ON w.id = wa.workout_id ${dateFilter}
         JOIN users u ON u.id = w.user_id
-        LEFT JOIN exercises ex
-          ON ex.id::text = wa.activity_type::text
-          OR ex.slug = wa.activity_type
-          OR regexp_replace(lower(ex.slug), '[^a-z0-9]+', '', 'g') =
-             regexp_replace(lower(wa.activity_type), '[^a-z0-9]+', '', 'g')
+        LEFT JOIN exercises ex ON ex.id = wa.exercise_id
         WHERE 1=1 ${scopeFilter}
-        GROUP BY COALESCE(ex.id::text, wa.activity_type), ex.name, ex.measurement_type, ex.supports_time, ex.supports_distance
+          AND wa.exercise_id IS NOT NULL
+        GROUP BY wa.exercise_id, ex.name, ex.measurement_type, ex.supports_time, ex.supports_distance
         HAVING COALESCE(SUM(wa.points_earned), 0) > 0
            OR COALESCE(SUM(wa.quantity), 0) > 0
         ORDER BY score DESC

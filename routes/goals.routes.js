@@ -41,7 +41,7 @@ export const createGoalsRouter = (pool) => {
                 SELECT 
                     COALESCE(SUM(wa.points_earned), 0) as current_points
                 FROM workouts w
-                LEFT JOIN workout_activities wa ON w.id = wa.workout_id
+                LEFT JOIN workout_activities wa ON w.id = wa.workout_id AND wa.exercise_id IS NOT NULL
                 WHERE w.user_id = $1 
                     AND w.start_time::date >= DATE_TRUNC('week', CURRENT_DATE)
                     AND w.start_time::date < DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '1 week'
@@ -52,7 +52,7 @@ export const createGoalsRouter = (pool) => {
                 pool.query(
                     `
                     SELECT
-                      wa.activity_type,
+                      wa.exercise_id,
                       COALESCE(SUM(wa.reps), 0) AS total_reps,
                       COALESCE(SUM(wa.duration), 0) AS total_duration,
                       COALESCE(SUM(wa.distance), 0) AS total_distance
@@ -61,7 +61,8 @@ export const createGoalsRouter = (pool) => {
                     WHERE w.user_id = $1 
                       AND w.start_time::date >= DATE_TRUNC('week', CURRENT_DATE)
                       AND w.start_time::date < DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '1 week'
-                    GROUP BY wa.activity_type
+                      AND wa.exercise_id IS NOT NULL
+                    GROUP BY wa.exercise_id
                     `,
                     [req.user.id]
                 )
@@ -70,7 +71,7 @@ export const createGoalsRouter = (pool) => {
             const progress = pointsResult.rows[0];
             const totalsMap = new Map(
                 activityTotals.rows.map((row) => [
-                    row.activity_type,
+                    row.exercise_id,
                     {
                         reps: Number(row.total_reps) || 0,
                         duration: Number(row.total_duration) || 0,
@@ -148,7 +149,7 @@ export const createGoalsRouter = (pool) => {
                 SELECT 
                     COALESCE(SUM(wa.points_earned), 0) as current_points
                 FROM workouts w
-                LEFT JOIN workout_activities wa ON w.id = wa.workout_id
+                LEFT JOIN workout_activities wa ON w.id = wa.workout_id AND wa.exercise_id IS NOT NULL
                 WHERE w.user_id = $1 
                     AND w.start_time::date >= DATE_TRUNC('week', CURRENT_DATE)
                     AND w.start_time::date < DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '1 week'
@@ -159,7 +160,7 @@ export const createGoalsRouter = (pool) => {
                 pool.query(
                     `
                     SELECT
-                      wa.activity_type,
+                      wa.exercise_id,
                       COALESCE(SUM(wa.reps), 0) AS total_reps,
                       COALESCE(SUM(wa.duration), 0) AS total_duration,
                       COALESCE(SUM(wa.distance), 0) AS total_distance
@@ -168,7 +169,8 @@ export const createGoalsRouter = (pool) => {
                     WHERE w.user_id = $1 
                       AND w.start_time::date >= DATE_TRUNC('week', CURRENT_DATE)
                       AND w.start_time::date < DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '1 week'
-                    GROUP BY wa.activity_type
+                      AND wa.exercise_id IS NOT NULL
+                    GROUP BY wa.exercise_id
                     `,
                     [req.user.id]
                 )
@@ -184,7 +186,7 @@ export const createGoalsRouter = (pool) => {
 
             const totalsMap = new Map(
                 activityTotals.rows.map((row) => [
-                    row.activity_type,
+                    row.exercise_id,
                     {
                         reps: Number(row.total_reps) || 0,
                         duration: Number(row.total_duration) || 0,

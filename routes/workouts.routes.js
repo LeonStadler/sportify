@@ -88,7 +88,7 @@ export const createWorkoutsRouter = (pool) => {
 
       if (type && type !== "all") {
         filters.push(
-          `EXISTS (SELECT 1 FROM workout_activities wa_filter WHERE wa_filter.workout_id = w.id AND wa_filter.activity_type = $${paramIndex})`
+          `EXISTS (SELECT 1 FROM workout_activities wa_filter WHERE wa_filter.workout_id = w.id AND wa_filter.exercise_id = $${paramIndex})`
         );
         params.push(type);
         paramIndex++;
@@ -545,7 +545,7 @@ export const createWorkoutsRouter = (pool) => {
         LEFT JOIN LATERAL (
           SELECT COALESCE(array_agg(DISTINCT mg), ARRAY[]::text[]) AS muscle_groups
           FROM workout_template_activities wta2
-          JOIN exercises e ON e.id::text = wta2.activity_type::text
+          JOIN exercises e ON e.id = wta2.exercise_id
           CROSS JOIN LATERAL unnest(e.muscle_groups) AS mg
           WHERE wta2.template_id = wt.id
         ) mg ON true
@@ -719,7 +719,7 @@ export const createWorkoutsRouter = (pool) => {
         LEFT JOIN LATERAL (
           SELECT COALESCE(array_agg(DISTINCT mg), ARRAY[]::text[]) AS muscle_groups
           FROM workout_template_activities wta2
-          JOIN exercises e ON e.id::text = wta2.activity_type::text
+          JOIN exercises e ON e.id = wta2.exercise_id
           CROSS JOIN LATERAL unnest(e.muscle_groups) AS mg
           WHERE wta2.template_id = wt.id
         ) mg ON true
@@ -878,35 +878,52 @@ export const createWorkoutsRouter = (pool) => {
 
       // Load valid activity types from database
       const { rows: validExercises } = await pool.query(`
-                SELECT id FROM exercises WHERE is_active = true
+                SELECT id, slug FROM exercises WHERE is_active = true
             `);
-      const validActivityTypes = validExercises.map((ex) => ex.id);
-      // Add legacy types as fallback
-      const legacyTypes = [
-        "pullups",
-        "pushups",
-        "running",
-        "cycling",
-        "situps",
-      ];
-      legacyTypes.forEach((type) => {
-        if (!validActivityTypes.includes(type)) {
-          validActivityTypes.push(type);
+      const { rows: aliasRows } = await pool.query(`
+                SELECT ea.alias_slug, ea.exercise_id
+                FROM exercise_aliases ea
+                JOIN exercises e ON e.id = ea.exercise_id
+                WHERE e.is_active = true
+            `);
+      const validActivityTypes = new Set(validExercises.map((ex) => ex.id));
+      const normalizeExerciseKey = (value) =>
+        String(value || "")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "");
+      const normalizedExerciseMap = new Map();
+      validExercises.forEach((ex) => {
+        if (ex.id) {
+          normalizedExerciseMap.set(normalizeExerciseKey(ex.id), ex.id);
+        }
+        if (ex.slug) {
+          normalizedExerciseMap.set(normalizeExerciseKey(ex.slug), ex.id);
         }
       });
+      aliasRows.forEach((row) => {
+        if (row.alias_slug) {
+          normalizedExerciseMap.set(row.alias_slug, row.exercise_id);
+        }
+      });
+      const resolveExerciseId = (activityType) => {
+        const raw = String(activityType || "").trim();
+        if (!raw) return null;
+        if (validActivityTypes.has(raw)) return raw;
+        const normalized = normalizeExerciseKey(raw);
+        return normalizedExerciseMap.get(normalized) || null;
+      };
 
       // Validate activities
       for (const activity of activities) {
-        if (
-          !activity.activityType ||
-          !validActivityTypes.includes(activity.activityType)
-        ) {
+        const resolvedExerciseId = resolveExerciseId(activity.activityType);
+        if (!resolvedExerciseId) {
           return res
             .status(400)
             .json({
               error: `Ungültiger Aktivitätstyp: ${activity.activityType}`,
             });
         }
+        activity.activityType = resolvedExerciseId;
 
         // Berechne Gesamtmenge: Wenn Sets vorhanden sind, summiere alle Reps
         let activityAmount = activity.quantity || activity.amount;
@@ -1461,9 +1478,7 @@ export const createWorkoutsRouter = (pool) => {
               activity.activityType,
               activityAmount,
               points,
-              UUID_REGEX.test(activity.activityType)
-                ? activity.activityType
-                : null,
+              activity.activityType,
               measurementType || null,
               totalReps || null,
               totalDurationSec || null,
@@ -1514,11 +1529,12 @@ export const createWorkoutsRouter = (pool) => {
 
         if (!isTemplateRequest) {
           const { rows: lifetimeTotals } = await client.query(
-            `SELECT wa.activity_type, COALESCE(SUM(wa.quantity), 0) AS total_quantity
+            `SELECT wa.exercise_id, COALESCE(SUM(wa.quantity), 0) AS total_quantity
              FROM workouts w
              JOIN workout_activities wa ON w.id = wa.workout_id
              WHERE w.user_id = $1
-             GROUP BY wa.activity_type`,
+               AND wa.exercise_id IS NOT NULL
+             GROUP BY wa.exercise_id`,
             [req.user.id]
           );
 
@@ -1526,7 +1542,7 @@ export const createWorkoutsRouter = (pool) => {
             await badgeService.handleLifetimeMilestones(
               client,
               req.user.id,
-              total.activity_type,
+              total.exercise_id,
               Number(total.total_quantity) || 0
             );
           }
@@ -1890,35 +1906,52 @@ export const createWorkoutsRouter = (pool) => {
 
       // Load valid activity types from database
       const { rows: validExercises } = await pool.query(`
-                SELECT id FROM exercises WHERE is_active = true
+                SELECT id, slug FROM exercises WHERE is_active = true
             `);
-      const validActivityTypes = validExercises.map((ex) => ex.id);
-      // Add legacy types as fallback
-      const legacyTypes = [
-        "pullups",
-        "pushups",
-        "running",
-        "cycling",
-        "situps",
-      ];
-      legacyTypes.forEach((type) => {
-        if (!validActivityTypes.includes(type)) {
-          validActivityTypes.push(type);
+      const { rows: aliasRows } = await pool.query(`
+                SELECT ea.alias_slug, ea.exercise_id
+                FROM exercise_aliases ea
+                JOIN exercises e ON e.id = ea.exercise_id
+                WHERE e.is_active = true
+            `);
+      const validActivityTypes = new Set(validExercises.map((ex) => ex.id));
+      const normalizeExerciseKey = (value) =>
+        String(value || "")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "");
+      const normalizedExerciseMap = new Map();
+      validExercises.forEach((ex) => {
+        if (ex.id) {
+          normalizedExerciseMap.set(normalizeExerciseKey(ex.id), ex.id);
+        }
+        if (ex.slug) {
+          normalizedExerciseMap.set(normalizeExerciseKey(ex.slug), ex.id);
         }
       });
+      aliasRows.forEach((row) => {
+        if (row.alias_slug) {
+          normalizedExerciseMap.set(row.alias_slug, row.exercise_id);
+        }
+      });
+      const resolveExerciseId = (activityType) => {
+        const raw = String(activityType || "").trim();
+        if (!raw) return null;
+        if (validActivityTypes.has(raw)) return raw;
+        const normalized = normalizeExerciseKey(raw);
+        return normalizedExerciseMap.get(normalized) || null;
+      };
 
       // Validate activities
       for (const activity of activities) {
-        if (
-          !activity.activityType ||
-          !validActivityTypes.includes(activity.activityType)
-        ) {
+        const resolvedExerciseId = resolveExerciseId(activity.activityType);
+        if (!resolvedExerciseId) {
           return res
             .status(400)
             .json({
               error: `Ungültiger Aktivitätstyp: ${activity.activityType}`,
             });
         }
+        activity.activityType = resolvedExerciseId;
 
         // Berechne Gesamtmenge: Wenn Sets vorhanden sind, summiere alle Reps
         let activityAmount = activity.quantity || activity.amount;
@@ -2362,14 +2395,12 @@ export const createWorkoutsRouter = (pool) => {
             }
           }
 
-        const { rows: activityRows } = await client.query(activityQuery, [
+          const { rows: activityRows } = await client.query(activityQuery, [
             workoutId,
             activity.activityType,
             activityAmount,
             points,
-            UUID_REGEX.test(activity.activityType)
-              ? activity.activityType
-              : null,
+            activity.activityType,
             measurementType || null,
             totalReps || null,
             totalDurationSec || null,
@@ -2409,11 +2440,12 @@ export const createWorkoutsRouter = (pool) => {
 
         if (!isTemplateRecord) {
           const { rows: lifetimeTotals } = await client.query(
-            `SELECT wa.activity_type, COALESCE(SUM(wa.quantity), 0) AS total_quantity
+            `SELECT wa.exercise_id, COALESCE(SUM(wa.quantity), 0) AS total_quantity
              FROM workouts w
              JOIN workout_activities wa ON w.id = wa.workout_id
              WHERE w.user_id = $1
-             GROUP BY wa.activity_type`,
+               AND wa.exercise_id IS NOT NULL
+             GROUP BY wa.exercise_id`,
             [req.user.id]
           );
 
@@ -2421,7 +2453,7 @@ export const createWorkoutsRouter = (pool) => {
             await badgeService.handleLifetimeMilestones(
               client,
               req.user.id,
-              total.activity_type,
+              total.exercise_id,
               Number(total.total_quantity) || 0
             );
           }

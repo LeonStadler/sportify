@@ -14,7 +14,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, Check, Copy, Download, Shield } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 interface TwoFactorSetupDialogProps {
@@ -41,6 +41,7 @@ export function TwoFactorSetupDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedCodes, setCopiedCodes] = useState(false);
+  const initializedRef = useRef(false);
 
   const resetState = () => {
     setStep("qr");
@@ -51,9 +52,12 @@ export function TwoFactorSetupDialog({
     setError(null);
     setCopiedCodes(false);
     setIsLoading(false);
+    initializedRef.current = false;
   };
 
   const initialize2FA = useCallback(async () => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
     setIsLoading(true);
     setError(null);
     try {
@@ -66,6 +70,7 @@ export function TwoFactorSetupDialog({
       setBackupCodes(result.backupCodes);
       setStep("qr");
     } catch (err) {
+      initializedRef.current = false;
       const errorMessage =
         err instanceof Error
           ? err.message
@@ -79,7 +84,7 @@ export function TwoFactorSetupDialog({
     } finally {
       setIsLoading(false);
     }
-  }, [enable2FA, toast]);
+  }, [enable2FA, toast, t]);
 
   // Load 2FA setup when dialog opens
   useEffect(() => {

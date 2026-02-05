@@ -1,15 +1,11 @@
 import { PageTemplate } from "@/components/common/PageTemplate";
-import { ExerciseBrowsePanel } from "@/components/exercises/ExerciseBrowsePanel";
-import { getExerciseBrowseLabels } from "@/components/exercises/exerciseBrowseLabels";
-import { ExerciseBrowseGrid, ExerciseBrowseTable } from "@/components/exercises/ExerciseBrowseList";
 import { PageSizeSelector } from "@/components/common/pagination/PageSizeSelector";
 import { PaginationControls, PaginationMeta } from "@/components/common/pagination/PaginationControls";
+import { getExerciseBrowseLabels } from "@/components/exercises/exerciseBrowseLabels";
+import { ExerciseBrowseGrid, ExerciseBrowseTable } from "@/components/exercises/ExerciseBrowseList";
+import { ExerciseBrowsePanel } from "@/components/exercises/ExerciseBrowsePanel";
 import { ExerciseFiltersPanel } from "@/components/exercises/ExerciseFiltersPanel";
 import { ExerciseForm, ExerciseFormValue } from "@/components/exercises/ExerciseForm";
-import {
-  extractNormalizedExerciseUnits,
-  normalizeExerciseUnit,
-} from "@/components/exercises/unitNormalization";
 import {
   getExerciseCategoryLabel,
   getExerciseDisciplineLabel,
@@ -23,25 +19,26 @@ import {
   movementPatternOptions,
   muscleGroupTree,
 } from "@/components/exercises/exerciseOptions";
+import {
+  extractNormalizedExerciseUnits,
+  normalizeExerciseUnit,
+} from "@/components/exercises/unitNormalization";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogDescription,
+  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+  DropdownMenuItem
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -65,7 +62,6 @@ import {
   ChevronDown,
   Eye,
   EyeOff,
-  MoreHorizontal,
   RefreshCw,
   Settings,
   Shield,
@@ -214,6 +210,57 @@ interface AdminOverviewStats {
   workoutActivities: number;
 }
 
+interface MonitoringJobStat {
+  job_name: string;
+  status: string;
+  count: number | string;
+  last_run: string | null;
+  failed_count?: number | string;
+  running_count?: number | string;
+  completed_count?: number | string;
+}
+
+interface MonitoringJobFailure {
+  job_name: string;
+  count: number | string;
+}
+
+interface MonitoringJobEntry {
+  id: string;
+  job_name: string;
+  scheduled_for?: string | null;
+  started_at?: string | null;
+}
+
+interface MonitoringEmailStat {
+  status: string;
+  count: number | string;
+  failed_after_retries?: number | string;
+}
+
+interface MonitoringEmailEntry {
+  id: string;
+  recipient: string;
+  subject: string;
+  status: string;
+  attempts: number;
+  error?: string | null;
+  createdAt?: string | null;
+  processedAt?: string | null;
+}
+
+interface MonitoringData {
+  jobs: {
+    stats: MonitoringJobStat[];
+    stuckJobs: MonitoringJobEntry[];
+    recentFailures: MonitoringJobFailure[];
+  };
+  emails: {
+    stats: MonitoringEmailStat[];
+    recent: MonitoringEmailEntry[];
+  };
+}
+
 export function Admin() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -227,7 +274,7 @@ export function Admin() {
   const [isLoading, setIsLoading] = useState(false);
   const [showEmails, setShowEmails] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
-  const [monitoringData, setMonitoringData] = useState<any>(null);
+  const [monitoringData, setMonitoringData] = useState<MonitoringData | null>(null);
   const [isLoadingMonitoring, setIsLoadingMonitoring] = useState(false);
   const [mergeSourceId, setMergeSourceId] = useState("");
   const [mergeTargetId, setMergeTargetId] = useState("");
@@ -1014,7 +1061,7 @@ export function Admin() {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
           errorData.error ||
-            t("admin.errors.mergeFailed", "Merge fehlgeschlagen.")
+          t("admin.errors.mergeFailed", "Merge fehlgeschlagen.")
         );
       }
       toast({
@@ -1104,7 +1151,7 @@ export function Admin() {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
           errorData.error ||
-            t("admin.errors.deleteFailed", "Löschen fehlgeschlagen.")
+          t("admin.errors.deleteFailed", "Löschen fehlgeschlagen.")
         );
       }
       toast({
@@ -1127,7 +1174,7 @@ export function Admin() {
     }
   };
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(`${API_URL}/admin/users`, {
@@ -1143,9 +1190,9 @@ export function Admin() {
     } catch (error) {
       console.error("Error loading users:", error);
     }
-  };
+  }, []);
 
-  const loadExercises = async () => {
+  const loadExercises = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(`${API_URL}/admin/exercises`, {
@@ -1161,9 +1208,9 @@ export function Admin() {
     } catch (error) {
       console.error("Error loading exercises:", error);
     }
-  };
+  }, []);
 
-  const loadExerciseReports = async () => {
+  const loadExerciseReports = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(`${API_URL}/admin/exercise-reports?status=pending`, {
@@ -1176,9 +1223,9 @@ export function Admin() {
     } catch (error) {
       console.error("Error loading exercise reports:", error);
     }
-  };
+  }, []);
 
-  const loadExerciseEditRequests = async () => {
+  const loadExerciseEditRequests = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(
@@ -1192,7 +1239,7 @@ export function Admin() {
     } catch (error) {
       console.error("Error loading exercise edit requests:", error);
     }
-  };
+  }, []);
 
   const resolveExerciseReport = async (reportId: string, status: string) => {
     try {
@@ -1240,7 +1287,7 @@ export function Admin() {
     }
   };
 
-  const loadOverviewStats = async () => {
+  const loadOverviewStats = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(`${API_URL}/admin/overview-stats`, {
@@ -1264,9 +1311,9 @@ export function Admin() {
         variant: "destructive",
       });
     }
-  };
+  }, [t, toast]);
 
-  const loadMonitoringData = async () => {
+  const loadMonitoringData = useCallback(async () => {
     setIsLoadingMonitoring(true);
     try {
       const token = localStorage.getItem("token");
@@ -1293,7 +1340,7 @@ export function Admin() {
     } finally {
       setIsLoadingMonitoring(false);
     }
-  };
+  }, [t, toast]);
 
   const handleCleanupJobs = async () => {
     try {
@@ -1343,7 +1390,7 @@ export function Admin() {
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, [toast, t, loadUsers, loadExercises, loadExerciseReports, loadExerciseEditRequests, loadOverviewStats]);
 
   // Lade Daten beim Komponenten-Mount
   useEffect(() => {
@@ -1356,7 +1403,7 @@ export function Admin() {
     if (user?.role === "admin" && activeTab === "monitoring") {
       loadMonitoringData();
     }
-  }, [user?.role, activeTab]);
+  }, [user?.role, activeTab, loadMonitoringData]);
 
   const monitoringJobs = monitoringData?.jobs ?? {
     stats: [],
@@ -1452,7 +1499,7 @@ export function Admin() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Settings className="w-5 h-5" />
-                {t("admin.stats.title", "App-Statistiken")}
+                  {t("admin.stats.title", "App-Statistiken")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -1462,7 +1509,7 @@ export function Admin() {
                       {overviewStats?.users ?? users.length}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                    {t("admin.stats.users", "Registrierte Benutzer")}
+                      {t("admin.stats.users", "Registrierte Benutzer")}
                     </p>
                   </div>
                   <div className="p-4 border rounded-lg">
@@ -1470,7 +1517,7 @@ export function Admin() {
                       {users.filter((u) => u.isEmailVerified).length}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                    {t("admin.stats.verifiedEmails", "Verifizierte E-Mails")}
+                      {t("admin.stats.verifiedEmails", "Verifizierte E-Mails")}
                     </p>
                   </div>
                   <div className="p-4 border rounded-lg">
@@ -1478,7 +1525,7 @@ export function Admin() {
                       {users.filter((u) => u.role === "admin").length}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                    {t("admin.stats.admins", "Administratoren")}
+                      {t("admin.stats.admins", "Administratoren")}
                     </p>
                   </div>
                   <div className="p-4 border rounded-lg">
@@ -1486,7 +1533,7 @@ export function Admin() {
                       {overviewStats?.workouts ?? 0}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                    {t("admin.stats.workouts", "Durchgeführte Trainings")}
+                      {t("admin.stats.workouts", "Durchgeführte Trainings")}
                     </p>
                   </div>
                   <div className="p-4 border rounded-lg">
@@ -1494,7 +1541,7 @@ export function Admin() {
                       {overviewStats?.templates ?? 0}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                    {t("admin.stats.templates", "Workout‑Vorlagen")}
+                      {t("admin.stats.templates", "Workout‑Vorlagen")}
                     </p>
                   </div>
                   <div className="p-4 border rounded-lg">
@@ -1502,7 +1549,7 @@ export function Admin() {
                       {overviewStats?.exercises ?? exercises.length}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                    {t("admin.stats.exercises", "Angelegte Übungen")}
+                      {t("admin.stats.exercises", "Angelegte Übungen")}
                     </p>
                   </div>
                   <div className="p-4 border rounded-lg">
@@ -1510,7 +1557,7 @@ export function Admin() {
                       {overviewStats?.recoveryEntries ?? 0}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                    {t("admin.stats.recoveryEntries", "Erholungstagebuch‑Einträge")}
+                      {t("admin.stats.recoveryEntries", "Erholungstagebuch‑Einträge")}
                     </p>
                   </div>
                   <div className="p-4 border rounded-lg">
@@ -1518,7 +1565,7 @@ export function Admin() {
                       {overviewStats?.badges ?? 0}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                    {t("admin.stats.badges", "Vergebene Badges")}
+                      {t("admin.stats.badges", "Vergebene Badges")}
                     </p>
                   </div>
                   <div className="p-4 border rounded-lg">
@@ -1526,7 +1573,7 @@ export function Admin() {
                       {overviewStats?.awards ?? 0}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                    {t("admin.stats.awards", "Vergebene Auszeichnungen")}
+                      {t("admin.stats.awards", "Vergebene Auszeichnungen")}
                     </p>
                   </div>
                   <div className="p-4 border rounded-lg">
@@ -1534,7 +1581,7 @@ export function Admin() {
                       {overviewStats?.workoutActivities ?? 0}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                    {t("admin.stats.activities", "Getrackte Aktivitäten")}
+                      {t("admin.stats.activities", "Getrackte Aktivitäten")}
                     </p>
                   </div>
                 </div>
@@ -1549,7 +1596,7 @@ export function Admin() {
                 <CardTitle className="flex items-center gap-2 justify-between">
                   <div className="flex items-center gap-2">
                     <Users className="w-5 h-5" />
-                  {t("admin.users.title", "Benutzer-Verwaltung")}
+                    {t("admin.users.title", "Benutzer-Verwaltung")}
                   </div>
                   <Button
                     variant="outline"
@@ -1561,9 +1608,9 @@ export function Admin() {
                     ) : (
                       <Eye className="w-4 h-4" />
                     )}
-                  {showEmails
-                    ? t("admin.users.hideEmails", "E-Mails verbergen")
-                    : t("admin.users.showEmails", "E-Mails anzeigen")}
+                    {showEmails
+                      ? t("admin.users.hideEmails", "E-Mails verbergen")
+                      : t("admin.users.showEmails", "E-Mails anzeigen")}
                   </Button>
                 </CardTitle>
               </CardHeader>
@@ -1574,12 +1621,12 @@ export function Admin() {
                       <TableHeader>
                         <TableRow>
                           <TableHead className="sticky left-0 z-10 bg-background">
-                          {t("admin.users.table.name", "Name")}
+                            {t("admin.users.table.name", "Name")}
                           </TableHead>
-                        <TableHead>{t("admin.users.table.email", "E-Mail")}</TableHead>
-                        <TableHead>{t("admin.users.table.status", "Status")}</TableHead>
-                        <TableHead>{t("admin.users.table.created", "Erstellt")}</TableHead>
-                        <TableHead>{t("admin.users.table.lastLogin", "Letzter Login")}</TableHead>
+                          <TableHead>{t("admin.users.table.email", "E-Mail")}</TableHead>
+                          <TableHead>{t("admin.users.table.status", "Status")}</TableHead>
+                          <TableHead>{t("admin.users.table.created", "Erstellt")}</TableHead>
+                          <TableHead>{t("admin.users.table.lastLogin", "Letzter Login")}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1607,7 +1654,7 @@ export function Admin() {
                                 {adminUser.role === "admin" && (
                                   <Badge variant="secondary">
                                     <Shield className="w-3 h-3 mr-1" />
-                                  {t("admin.users.badge.admin", "Admin")}
+                                    {t("admin.users.badge.admin", "Admin")}
                                   </Badge>
                                 )}
                                 {adminUser.isEmailVerified && (
@@ -1615,7 +1662,7 @@ export function Admin() {
                                     variant="outline"
                                     className="text-green-600"
                                   >
-                                  {t("admin.users.badge.verified", "✓ Verifiziert")}
+                                    {t("admin.users.badge.verified", "✓ Verifiziert")}
                                   </Badge>
                                 )}
                                 {adminUser.has2FA && (
@@ -1642,9 +1689,9 @@ export function Admin() {
 
                   {users.length === 0 && (
                     <div className="text-center py-8">
-                    <p className="text-muted-foreground">
-                      {t("admin.users.empty", "Keine Benutzer gefunden")}
-                    </p>
+                      <p className="text-muted-foreground">
+                        {t("admin.users.empty", "Keine Benutzer gefunden")}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1657,9 +1704,9 @@ export function Admin() {
               disabled={isLoading}
               className="w-full"
             >
-            {isLoading
-              ? t("admin.users.refreshLoading", "Wird geladen...")
-              : t("admin.users.refresh", "Daten aktualisieren")}
+              {isLoading
+                ? t("admin.users.refreshLoading", "Wird geladen...")
+                : t("admin.users.refresh", "Daten aktualisieren")}
             </Button>
           </TabsContent>
 
@@ -1743,13 +1790,13 @@ export function Admin() {
                       options={exercises.filter((exercise) => exercise.id !== mergeSourceId)}
                     />
                   </div>
-                    <Button
-                      variant="outline"
-                      disabled={!mergeSourceId || !mergeTargetId}
-                      onClick={() => handleMergeExercise(mergeSourceId, mergeTargetId)}
-                    >
+                  <Button
+                    variant="outline"
+                    disabled={!mergeSourceId || !mergeTargetId}
+                    onClick={() => handleMergeExercise(mergeSourceId, mergeTargetId)}
+                  >
                     {t("admin.exercises.merge.action", "Zusammenführen")}
-                    </Button>
+                  </Button>
                   <div className="md:col-span-3 text-xs text-muted-foreground">
                     {t(
                       "admin.exercises.merge.helper",
@@ -2149,7 +2196,7 @@ export function Admin() {
               <CardContent className="space-y-3">
                 {exerciseReports.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                  {t("admin.moderation.reports.empty", "Keine offenen Reports")}
+                    {t("admin.moderation.reports.empty", "Keine offenen Reports")}
                   </p>
                 ) : (
                   <div className="overflow-x-auto">
@@ -2157,14 +2204,14 @@ export function Admin() {
                       <TableHeader>
                         <TableRow>
                           <TableHead className="sticky left-0 z-10 bg-background">
-                          {t("admin.moderation.reports.table.exercise", "Übung")}
+                            {t("admin.moderation.reports.table.exercise", "Übung")}
                           </TableHead>
-                        <TableHead>{t("admin.moderation.reports.table.reason", "Grund")}</TableHead>
-                        <TableHead>{t("admin.moderation.reports.table.details", "Beschreibung")}</TableHead>
-                        <TableHead>{t("admin.moderation.reports.table.created", "Erstellt")}</TableHead>
-                        <TableHead className="sticky right-0 z-10 bg-background text-right">
-                          {t("admin.moderation.reports.table.actions", "Aktionen")}
-                        </TableHead>
+                          <TableHead>{t("admin.moderation.reports.table.reason", "Grund")}</TableHead>
+                          <TableHead>{t("admin.moderation.reports.table.details", "Beschreibung")}</TableHead>
+                          <TableHead>{t("admin.moderation.reports.table.created", "Erstellt")}</TableHead>
+                          <TableHead className="sticky right-0 z-10 bg-background text-right">
+                            {t("admin.moderation.reports.table.actions", "Aktionen")}
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -2190,7 +2237,7 @@ export function Admin() {
                                     resolveExerciseReport(report.id, "resolved")
                                   }
                                 >
-                                {t("admin.moderation.reports.actions.resolve", "Erledigt")}
+                                  {t("admin.moderation.reports.actions.resolve", "Erledigt")}
                                 </Button>
                                 <Button
                                   size="sm"
@@ -2199,7 +2246,7 @@ export function Admin() {
                                     resolveExerciseReport(report.id, "dismissed")
                                   }
                                 >
-                                {t("admin.moderation.reports.actions.dismiss", "Ablehnen")}
+                                  {t("admin.moderation.reports.actions.dismiss", "Ablehnen")}
                                 </Button>
                               </div>
                             </TableCell>
@@ -2222,7 +2269,7 @@ export function Admin() {
               <CardContent className="space-y-3">
                 {exerciseEditRequests.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                  {t("admin.moderation.edits.empty", "Keine offenen Änderungsanfragen")}
+                    {t("admin.moderation.edits.empty", "Keine offenen Änderungsanfragen")}
                   </p>
                 ) : (
                   <div className="overflow-x-auto">
@@ -2230,13 +2277,13 @@ export function Admin() {
                       <TableHeader>
                         <TableRow>
                           <TableHead className="sticky left-0 z-10 bg-background">
-                          {t("admin.moderation.edits.table.exercise", "Übung")}
+                            {t("admin.moderation.edits.table.exercise", "Übung")}
                           </TableHead>
-                        <TableHead>{t("admin.moderation.edits.table.changes", "Änderungen")}</TableHead>
-                        <TableHead>{t("admin.moderation.edits.table.created", "Erstellt")}</TableHead>
-                        <TableHead className="sticky right-0 z-10 bg-background text-right">
-                          {t("admin.moderation.edits.table.actions", "Aktionen")}
-                        </TableHead>
+                          <TableHead>{t("admin.moderation.edits.table.changes", "Änderungen")}</TableHead>
+                          <TableHead>{t("admin.moderation.edits.table.created", "Erstellt")}</TableHead>
+                          <TableHead className="sticky right-0 z-10 bg-background text-right">
+                            {t("admin.moderation.edits.table.actions", "Aktionen")}
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -2250,12 +2297,13 @@ export function Admin() {
                               <div className="space-y-1">
                                 {Object.entries(request.changeRequest || {}).map(
                                   ([key, value]) => {
-                                    const exercise = exerciseMap.get(
-                                      request.exerciseId
-                                    ) as any;
+                                    const exercise = exerciseMap.get(request.exerciseId);
+                                    const exerciseRecord = exercise
+                                      ? (exercise as unknown as Record<string, unknown>)
+                                      : undefined;
                                     const oldValue =
-                                      exercise && key in exercise
-                                        ? formatChangeValue(exercise[key])
+                                      exerciseRecord && key in exerciseRecord
+                                        ? formatChangeValue(exerciseRecord[key])
                                         : null;
                                     return (
                                       <div key={key}>
@@ -2290,7 +2338,7 @@ export function Admin() {
                                     resolveEditRequest(request.id, "approved")
                                   }
                                 >
-                              {t("admin.moderation.edits.actions.approve", "Freigeben")}
+                                  {t("admin.moderation.edits.actions.approve", "Freigeben")}
                                 </Button>
                                 <Button
                                   size="sm"
@@ -2299,7 +2347,7 @@ export function Admin() {
                                     resolveEditRequest(request.id, "rejected")
                                   }
                                 >
-                              {t("admin.moderation.edits.actions.reject", "Ablehnen")}
+                                  {t("admin.moderation.edits.actions.reject", "Ablehnen")}
                                 </Button>
                               </div>
                             </TableCell>
@@ -2324,7 +2372,7 @@ export function Admin() {
             {isLoadingMonitoring && (
               <Card>
                 <CardContent className="p-6 text-sm text-muted-foreground">
-                {t("admin.monitoring.loading", "Monitoring-Daten werden geladen...")}
+                  {t("admin.monitoring.loading", "Monitoring-Daten werden geladen...")}
                 </CardContent>
               </Card>
             )}
@@ -2332,7 +2380,7 @@ export function Admin() {
             {!isLoadingMonitoring && !monitoringData && (
               <Card>
                 <CardContent className="p-6 text-sm text-muted-foreground">
-                {t("admin.monitoring.empty", "Keine Monitoring-Daten verfügbar.")}
+                  {t("admin.monitoring.empty", "Keine Monitoring-Daten verfügbar.")}
                 </CardContent>
               </Card>
             )}
@@ -2342,31 +2390,31 @@ export function Admin() {
                 {/* Job Stats */}
                 <Card>
                   <CardHeader>
-                  <CardTitle>{t("admin.monitoring.jobs.title", "Job-Status")}</CardTitle>
+                    <CardTitle>{t("admin.monitoring.jobs.title", "Job-Status")}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {monitoringJobs.stuckJobs.length > 0 && (
                       <Alert variant="destructive">
                         <AlertTriangle className="h-4 w-4" />
                         <AlertDescription>
-                        {t("admin.monitoring.jobs.stuck", {
-                          count: monitoringJobs.stuckJobs.length,
-                          defaultValue: `${monitoringJobs.stuckJobs.length} stuck job(s) gefunden`,
-                        })}
-                        <Button
-                          onClick={handleCleanupJobs}
-                          variant="outline"
-                          size="sm"
-                          className="ml-4"
-                        >
-                          {t("admin.monitoring.jobs.cleanup", "Cleanup durchführen")}
-                        </Button>
+                          {t("admin.monitoring.jobs.stuck", {
+                            count: monitoringJobs.stuckJobs.length,
+                            defaultValue: `${monitoringJobs.stuckJobs.length} stuck job(s) gefunden`,
+                          })}
+                          <Button
+                            onClick={handleCleanupJobs}
+                            variant="outline"
+                            size="sm"
+                            className="ml-4"
+                          >
+                            {t("admin.monitoring.jobs.cleanup", "Cleanup durchführen")}
+                          </Button>
                         </AlertDescription>
                       </Alert>
                     )}
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {monitoringJobs.stats.map((stat: any) => (
+                      {monitoringJobs.stats.map((stat: MonitoringJobStat) => (
                         <div
                           key={`${stat.job_name}-${stat.status}`}
                           className="p-4 border rounded-lg"
@@ -2410,11 +2458,11 @@ export function Admin() {
                     {monitoringJobs.recentFailures.length > 0 && (
                       <div className="mt-4">
                         <h4 className="font-semibold mb-2">
-                        {t("admin.monitoring.jobs.recentFailures", "Fehler der letzten 7 Tage")}
+                          {t("admin.monitoring.jobs.recentFailures", "Fehler der letzten 7 Tage")}
                         </h4>
                         <div className="space-y-2">
                           {monitoringJobs.recentFailures.map(
-                            (failure: any) => (
+                            (failure: MonitoringJobFailure) => (
                               <div
                                 key={failure.job_name}
                                 className="flex items-center justify-between p-2 bg-destructive/10 rounded"
@@ -2437,39 +2485,46 @@ export function Admin() {
                 {/* Email Queue Stats */}
                 <Card>
                   <CardHeader>
-                  <CardTitle>{t("admin.monitoring.emails.title", "E-Mail-Warteschlange")}</CardTitle>
+                    <CardTitle>{t("admin.monitoring.emails.title", "E-Mail-Warteschlange")}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {monitoringEmails.stats.map((stat: any) => (
-                        <div key={stat.status} className="p-4 border rounded-lg">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium">{stat.status}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {stat.status === "failed" &&
-                                  stat.failed_after_retries > 0
-                                  ? t("admin.monitoring.emails.stats.failedAfterRetries", {
-                                    count: stat.failed_after_retries,
-                                    defaultValue: `${stat.failed_after_retries} nach Retries`,
-                                  })
-                                  : t("admin.monitoring.emails.stats.total", "Gesamt")}
-                              </p>
+                      {monitoringEmails.stats.map((stat: MonitoringEmailStat) => {
+                        const failedAfterRetries = Number(stat.failed_after_retries ?? 0);
+                        const showFailedAfterRetries =
+                          stat.status === "failed" && failedAfterRetries > 0;
+                        const failedAfterRetriesLabel = t(
+                          "admin.monitoring.emails.stats.failedAfterRetries",
+                          `${failedAfterRetries} nach Retries`,
+                          { count: failedAfterRetries }
+                        );
+
+                        return (
+                          <div key={stat.status} className="p-4 border rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-medium">{stat.status}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {showFailedAfterRetries
+                                    ? failedAfterRetriesLabel
+                                    : t("admin.monitoring.emails.stats.total", "Gesamt")}
+                                </p>
+                              </div>
+                              <Badge
+                                variant={
+                                  stat.status === "sent"
+                                    ? "default"
+                                    : stat.status === "failed"
+                                      ? "destructive"
+                                      : "secondary"
+                                }
+                              >
+                                {stat.count}
+                              </Badge>
                             </div>
-                            <Badge
-                              variant={
-                                stat.status === "sent"
-                                  ? "default"
-                                  : stat.status === "failed"
-                                    ? "destructive"
-                                    : "secondary"
-                              }
-                            >
-                              {stat.count}
-                            </Badge>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                       {monitoringEmails.stats.length === 0 && (
                         <div className="text-sm text-muted-foreground">
                           {t("admin.monitoring.emails.empty", "Keine E-Mail-Statistiken verfügbar.")}
@@ -2478,26 +2533,26 @@ export function Admin() {
                     </div>
 
                     <div>
-                    <h4 className="font-semibold mb-2">
-                      {t("admin.monitoring.emails.recentTitle", "Letzte E-Mails (24h)")}
-                    </h4>
+                      <h4 className="font-semibold mb-2">
+                        {t("admin.monitoring.emails.recentTitle", "Letzte E-Mails (24h)")}
+                      </h4>
                       <div className="overflow-x-auto">
                         <Table className="min-w-[720px]">
                           <TableHeader>
                             <TableRow>
                               <TableHead className="sticky left-0 z-10 bg-background">
-                              {t("admin.monitoring.emails.table.recipient", "Empfänger")}
+                                {t("admin.monitoring.emails.table.recipient", "Empfänger")}
                               </TableHead>
-                            <TableHead>{t("admin.monitoring.emails.table.subject", "Betreff")}</TableHead>
-                            <TableHead>{t("admin.monitoring.emails.table.status", "Status")}</TableHead>
-                            <TableHead>{t("admin.monitoring.emails.table.attempts", "Versuche")}</TableHead>
-                            <TableHead>{t("admin.monitoring.emails.table.created", "Erstellt")}</TableHead>
+                              <TableHead>{t("admin.monitoring.emails.table.subject", "Betreff")}</TableHead>
+                              <TableHead>{t("admin.monitoring.emails.table.status", "Status")}</TableHead>
+                              <TableHead>{t("admin.monitoring.emails.table.attempts", "Versuche")}</TableHead>
+                              <TableHead>{t("admin.monitoring.emails.table.created", "Erstellt")}</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {monitoringEmails.recent
                               .slice(0, 10)
-                              .map((email: any) => (
+                              .map((email: MonitoringEmailEntry) => (
                                 <TableRow key={email.id}>
                                   <TableCell className="sticky left-0 z-10 bg-background font-mono text-xs">
                                     {email.recipient}

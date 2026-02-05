@@ -37,20 +37,14 @@ export function WeeklyGoalsDialog({
   const { toast } = useToast();
   const resolveDefaultExercises = (items: Exercise[]) => {
     const defaults = [
-      { keys: ["pullup", "pullups", "pull-up", "pull-ups", "klimmzug", "klimmzüge"], target: 30, unit: "reps" as const },
-      { keys: ["pushup", "pushups", "push-up", "push-ups", "liegestütz", "liegestütze"], target: 100, unit: "reps" as const },
-      { keys: ["situp", "situps", "sit-up", "sit-ups", "sit up", "sit ups"], target: 100, unit: "reps" as const },
-      { keys: ["running", "run", "laufen", "joggen"], target: 5, unit: "distance" as const },
+      { id: "pullups", target: 30, unit: "reps" as const },
+      { id: "pushups", target: 100, unit: "reps" as const },
+      { id: "situps", target: 100, unit: "reps" as const },
     ];
 
-    const lower = (value?: string | null) => (value || "").toLowerCase();
     return defaults
       .map((def) => {
-        const match = items.find((exercise) => {
-          const slug = lower(exercise.slug);
-          const name = lower(exercise.name);
-          return def.keys.some((key) => slug === key || name.includes(key));
-        });
+        const match = items.find((exercise) => exercise.id === def.id);
         if (!match) return null;
         return {
           exerciseId: match.id,

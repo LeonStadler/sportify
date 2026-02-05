@@ -80,7 +80,7 @@ export function PaginationControls({
     const safeMax = Math.max(3, maxVisiblePages);
     const half = Math.floor(safeMax / 2);
     let start = Math.max(1, currentPage - half);
-    let end = Math.min(totalPages, start + safeMax - 1);
+    const end = Math.min(totalPages, start + safeMax - 1);
     if (end - start + 1 < safeMax) {
       start = Math.max(1, end - safeMax + 1);
     }

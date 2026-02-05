@@ -88,7 +88,7 @@ export function Invite() {
         if (userId || localStorage.getItem('pendingInvite')) {
             fetchInviterInfo();
         }
-    }, [userId, navigate, isAuthenticated, user]);
+    }, [userId, navigate, isAuthenticated, user, t]);
 
     const handleAcceptInvitation = async () => {
         const inviteUserId = userId || localStorage.getItem('pendingInvite');

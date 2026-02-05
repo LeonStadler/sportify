@@ -12,10 +12,11 @@ I actively support the following versions with security updates:
 
 If you discover a security vulnerability, please **do not** open a public issue. Instead, please report it privately:
 
-1. **Email**: contact@leon-stadler.com
+1. **Email**: sportify@leon-stadler.com
 2. **Subject**: Security Vulnerability Report - Sportify
 
 Please include:
+
 - Description of the vulnerability
 - Steps to reproduce
 - Potential impact

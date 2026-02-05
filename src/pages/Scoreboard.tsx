@@ -27,34 +27,44 @@ import { useTranslation } from "react-i18next";
 import { API_URL } from "@/lib/api";
 import type { Exercise, ExerciseListResponse } from "@/types/exercise";
 
+type MetricType = "reps" | "time" | "distance";
+
+const normalizeMetricType = (value?: string | null): MetricType | undefined => {
+  if (value === "reps" || value === "time" || value === "distance") return value;
+  return undefined;
+};
+
+type TopExerciseEntry = {
+  id: string;
+  name: string;
+  measurementType?: MetricType;
+  supportsTime?: boolean;
+  supportsDistance?: boolean;
+};
+
+type ScoreboardTabItem = {
+  id: string;
+  name: string;
+  icon?: string;
+  isCustomize?: boolean;
+  isPinned?: boolean;
+  activityId?: string;
+  metaLabel?: string;
+  metaKind?: "auto" | "manual";
+};
+
 const resolveDefaultExercises = (items: Exercise[]) => {
-  const defaults = [
-    { keys: ["pullup", "pullups", "pull-up", "pull-ups", "klimmzug", "klimmzüge"] },
-    { keys: ["pushup", "pushups", "push-up", "push-ups", "liegestütz", "liegestütze"] },
-    { keys: ["situp", "situps", "sit-up", "sit-ups", "sit up", "sit ups"] },
-    { keys: ["running", "run", "laufen", "joggen"] },
-  ];
-  const lower = (value?: string | null) => (value || "").toLowerCase();
-  const resolved: Array<{
-    id: string;
-    name: string;
-    measurementType?: "reps" | "time" | "distance" | null;
-    supportsTime?: boolean | null;
-    supportsDistance?: boolean | null;
-  }> = [];
-  defaults.forEach((def) => {
-    const match = items.find((exercise) => {
-      const slug = lower(exercise.slug);
-      const name = lower(exercise.name);
-      return def.keys.some((key) => slug === key || name.includes(key));
-    });
+  const defaults = ["pullups", "pushups", "situps"];
+  const resolved: TopExerciseEntry[] = [];
+  defaults.forEach((id) => {
+    const match = items.find((exercise) => exercise.id === id);
     if (match && !resolved.some((item) => item.id === match.id)) {
       resolved.push({
         id: match.id,
         name: match.name,
-        measurementType: match.measurementType ?? null,
-        supportsTime: match.supportsTime ?? null,
-        supportsDistance: match.supportsDistance ?? null,
+        measurementType: normalizeMetricType(match.measurementType),
+        supportsTime: match.supportsTime ?? undefined,
+        supportsDistance: match.supportsDistance ?? undefined,
       });
     }
   });
@@ -62,9 +72,9 @@ const resolveDefaultExercises = (items: Exercise[]) => {
     return items.slice(0, 3).map((exercise) => ({
       id: exercise.id,
       name: exercise.name,
-      measurementType: exercise.measurementType ?? null,
-      supportsTime: exercise.supportsTime ?? null,
-      supportsDistance: exercise.supportsDistance ?? null,
+      measurementType: normalizeMetricType(exercise.measurementType),
+      supportsTime: exercise.supportsTime ?? undefined,
+      supportsDistance: exercise.supportsDistance ?? undefined,
     }));
   }
   return resolved;
@@ -89,33 +99,9 @@ export function Scoreboard() {
     muscleGroups: [],
     equipment: [],
   });
-  const [topExercisesPersonal, setTopExercisesPersonal] = useState<
-    Array<{
-      id: string;
-      name: string;
-      measurementType?: "reps" | "time" | "distance" | null;
-      supportsTime?: boolean | null;
-      supportsDistance?: boolean | null;
-    }>
-  >([]);
-  const [topExercisesFriends, setTopExercisesFriends] = useState<
-    Array<{
-      id: string;
-      name: string;
-      measurementType?: "reps" | "time" | "distance" | null;
-      supportsTime?: boolean | null;
-      supportsDistance?: boolean | null;
-    }>
-  >([]);
-  const [topExercisesGlobal, setTopExercisesGlobal] = useState<
-    Array<{
-      id: string;
-      name: string;
-      measurementType?: "reps" | "time" | "distance" | null;
-      supportsTime?: boolean | null;
-      supportsDistance?: boolean | null;
-    }>
-  >([]);
+  const [topExercisesPersonal, setTopExercisesPersonal] = useState<TopExerciseEntry[]>([]);
+  const [topExercisesFriends, setTopExercisesFriends] = useState<TopExerciseEntry[]>([]);
+  const [topExercisesGlobal, setTopExercisesGlobal] = useState<TopExerciseEntry[]>([]);
   const [pinnedExerciseIds, setPinnedExerciseIds] = useState<string[]>([]);
   const [pendingExerciseId, setPendingExerciseId] = useState<string | undefined>();
 
@@ -198,12 +184,12 @@ export function Scoreboard() {
 
   const customTabId = "custom-exercises";
 
-  const activityTypes = useMemo(() => {
+  const activityTypes = useMemo<ScoreboardTabItem[]>(() => {
     const personalTop = topExercisesPersonal[0];
     const friendsTop = topExercisesFriends[0];
     const globalTop = topExercisesGlobal[0];
 
-    const pinnedExercises = pinnedExerciseIds
+    const pinnedExercises: ScoreboardTabItem[] = pinnedExerciseIds
       .map((id) => {
         const exercise =
           exerciseOptions.find((item) => item.id === id) ||
@@ -220,13 +206,7 @@ export function Scoreboard() {
         };
       });
 
-    const autoTabs: Array<{
-      id: string;
-      name: string;
-      activityId: string;
-      metaLabel: string;
-      metaKind: "auto";
-    }> = [];
+    const autoTabs: ScoreboardTabItem[] = [];
 
     if (personalTop) {
       autoTabs.push({
@@ -270,7 +250,7 @@ export function Scoreboard() {
     t,
   ]);
 
-  const tabItems = useMemo(
+  const tabItems = useMemo<ScoreboardTabItem[]>(
     () => [
       ...activityTypes,
       {
@@ -325,6 +305,29 @@ export function Scoreboard() {
       }
     : null;
 
+  const sanitizeTopExercises = (
+    list: Array<{
+      id?: string;
+      name?: string;
+      measurementType?: string | null;
+      supportsTime?: boolean | null;
+      supportsDistance?: boolean | null;
+    }>
+  ): TopExerciseEntry[] =>
+    list
+      .filter((item): item is Required<Pick<TopExerciseEntry, "id" | "name">> & {
+        measurementType?: string | null;
+        supportsTime?: boolean | null;
+        supportsDistance?: boolean | null;
+      } => Boolean(item?.id && item?.name))
+      .map((item) => ({
+        id: item.id,
+        name: item.name,
+        measurementType: normalizeMetricType(item.measurementType),
+        supportsTime: item.supportsTime ?? undefined,
+        supportsDistance: item.supportsDistance ?? undefined,
+      }));
+
   useEffect(() => {
     const loadTopExercises = async () => {
       const token = localStorage.getItem("token");
@@ -352,21 +355,9 @@ export function Scoreboard() {
       };
 
       const pickUnique = (
-        list: Array<{
-          id: string;
-          name: string;
-          measurementType?: "reps" | "time" | "distance" | null;
-          supportsTime?: boolean | null;
-          supportsDistance?: boolean | null;
-        }>,
+        list: TopExerciseEntry[],
         used: Set<string>,
-        fallback: Array<{
-          id: string;
-          name: string;
-          measurementType?: "reps" | "time" | "distance" | null;
-          supportsTime?: boolean | null;
-          supportsDistance?: boolean | null;
-        }>
+        fallback: TopExerciseEntry[]
       ) => {
         const next = list.find((item) => item && !used.has(item.id));
         if (next) {
@@ -396,13 +387,13 @@ export function Scoreboard() {
         ]);
 
         const personalList = personalRes.ok
-          ? (await personalRes.json()).exercises || []
+          ? sanitizeTopExercises((await personalRes.json()).exercises || [])
           : [];
         const friendsList = friendsRes.ok
-          ? (await friendsRes.json()).exercises || []
+          ? sanitizeTopExercises((await friendsRes.json()).exercises || [])
           : [];
         const globalList = globalRes.ok
-          ? (await globalRes.json()).exercises || []
+          ? sanitizeTopExercises((await globalRes.json()).exercises || [])
           : [];
 
         const usedIds = new Set<string>();

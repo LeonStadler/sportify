@@ -182,7 +182,7 @@ const buildActivityTotalsMap = (rows) => {
       map.set(row.user_id, {});
     }
     const totals = map.get(row.user_id);
-    totals[row.activity_type] = {
+    totals[row.exercise_id] = {
       quantity: parseNumber(row.total_quantity, 0),
       reps: parseNumber(row.total_reps, 0),
       duration: parseNumber(row.total_duration, 0),
@@ -244,7 +244,7 @@ export const processWeeklyEvents = async (
                 COUNT(DISTINCT wir.id) AS total_workouts
             FROM users u
             LEFT JOIN workouts_in_range wir ON wir.user_id = u.id
-            LEFT JOIN workout_activities wa ON wa.workout_id = wir.id
+            LEFT JOIN workout_activities wa ON wa.workout_id = wir.id AND wa.exercise_id IS NOT NULL
             GROUP BY u.id
         `;
 
@@ -259,14 +259,15 @@ export const processWeeklyEvents = async (
             )
             SELECT
                 wir.user_id,
-                wa.activity_type,
+                wa.exercise_id,
                 SUM(wa.quantity) AS total_quantity,
                 COALESCE(SUM(wa.reps), 0) AS total_reps,
                 COALESCE(SUM(wa.duration), 0) AS total_duration,
                 COALESCE(SUM(wa.distance), 0) AS total_distance
             FROM workouts_in_range wir
             JOIN workout_activities wa ON wa.workout_id = wir.id
-            GROUP BY wir.user_id, wa.activity_type
+            WHERE wa.exercise_id IS NOT NULL
+            GROUP BY wir.user_id, wa.exercise_id
         `;
 
     const [{ rows }, activityTotalsResult] = await Promise.all([
@@ -627,7 +628,7 @@ export const processMonthlyEvents = async (
                 COALESCE(SUM(wa.points_earned), 0) AS total_points
             FROM users u
             LEFT JOIN workouts_in_range wir ON wir.user_id = u.id
-            LEFT JOIN workout_activities wa ON wa.workout_id = wir.id
+            LEFT JOIN workout_activities wa ON wa.workout_id = wir.id AND wa.exercise_id IS NOT NULL
             GROUP BY u.id
         `;
 
@@ -642,14 +643,15 @@ export const processMonthlyEvents = async (
             )
             SELECT
                 wir.user_id,
-                wa.activity_type,
+                wa.exercise_id,
                 SUM(wa.quantity) AS total_quantity,
                 COALESCE(SUM(wa.reps), 0) AS total_reps,
                 COALESCE(SUM(wa.duration), 0) AS total_duration,
                 COALESCE(SUM(wa.distance), 0) AS total_distance
             FROM workouts_in_range wir
             JOIN workout_activities wa ON wa.workout_id = wir.id
-            GROUP BY wir.user_id, wa.activity_type
+            WHERE wa.exercise_id IS NOT NULL
+            GROUP BY wir.user_id, wa.exercise_id
         `;
 
     const [{ rows }, activityTotalsResult] = await Promise.all([
@@ -688,13 +690,7 @@ export const processMonthlyEvents = async (
       (s) => s.totalPoints
     );
 
-    const activities = [
-      "pullups",
-      "pushups",
-      "situps",
-      "running",
-      "cycling",
-    ];
+    const activities = ["pullups", "pushups", "situps"];
     const globalActivityRanks = {};
     for (const activity of activities) {
       // Filter for users who actually did the activity and opted in

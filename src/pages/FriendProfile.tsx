@@ -200,7 +200,7 @@ export function FriendProfile() {
     loadProfile();
 
     return () => controller.abort();
-  }, [friendId]);
+  }, [friendId, t]);
 
   const sortedBadges = useMemo(() => {
     if (!profile?.badges) return [];

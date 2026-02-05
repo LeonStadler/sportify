@@ -4,18 +4,25 @@ import {
   PaginationControls,
   PaginationMeta,
 } from "@/components/common/pagination/PaginationControls";
-import { ExerciseBrowsePanel } from "@/components/exercises/ExerciseBrowsePanel";
 import { getExerciseBrowseLabels } from "@/components/exercises/exerciseBrowseLabels";
 import { ExerciseBrowseGrid, ExerciseBrowseTable } from "@/components/exercises/ExerciseBrowseList";
+import { ExerciseBrowsePanel } from "@/components/exercises/ExerciseBrowsePanel";
+import { ExerciseFiltersPanel } from "@/components/exercises/ExerciseFiltersPanel";
+import type { ExerciseFormValue } from "@/components/exercises/ExerciseForm";
+import { ExerciseForm } from "@/components/exercises/ExerciseForm";
 import {
   getExerciseCategoryLabel,
   getExerciseDisciplineLabel,
   getExerciseMovementPatternLabel,
   getExerciseMuscleGroupLabel,
 } from "@/components/exercises/exerciseLabels";
-import { ExerciseFiltersPanel } from "@/components/exercises/ExerciseFiltersPanel";
-import { ExerciseForm } from "@/components/exercises/ExerciseForm";
-import type { ExerciseFormValue } from "@/components/exercises/ExerciseForm";
+import {
+  categoryOptions as defaultCategoryOptions,
+  disciplineOptions,
+  measurementOptions,
+  movementPatternOptions,
+  muscleGroupTree,
+} from "@/components/exercises/exerciseOptions";
 import {
   extractNormalizedExerciseUnits,
   normalizeExerciseUnit,
@@ -27,32 +34,13 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+  DialogTitle
 } from "@/components/ui/dialog";
+import {
+  DropdownMenuItem
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  categoryOptions as defaultCategoryOptions,
-  disciplineOptions,
-  measurementOptions,
-  movementPatternOptions,
-  muscleGroupTree,
-} from "@/components/exercises/exerciseOptions";
 import {
   Tooltip,
   TooltipContent,
@@ -63,7 +51,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
 import type { Exercise, ExerciseListResponse } from "@/types/exercise";
-import { ArrowDown, ArrowUp, Info, MoreHorizontal } from "lucide-react";
+import { ArrowDown, ArrowUp, Info } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -323,38 +311,55 @@ export function Exercises() {
     return value;
   };
 
-  const buildExercisesParams = (page = 1) => {
-    const params = new URLSearchParams({
-      limit: pageSize.toString(),
-      offset: ((page - 1) * pageSize).toString(),
-    });
-    if (query.trim()) params.set("query", query.trim());
-    if (categoryFilter !== "all") params.set("category", categoryFilter);
-    if (disciplineFilter !== "all") params.set("discipline", disciplineFilter);
-    if (movementPatternFilter !== "all") params.set("movementPattern", movementPatternFilter);
-    if (measurementFilters.length > 0) {
-      params.set("measurementTypes", measurementFilters.join(","));
-    }
-    if (muscleFilters.length > 0) {
-      params.set("muscleGroups", muscleFilters.join(","));
-    }
-    if (requiresWeightFilter !== "all") params.set("requiresWeight", requiresWeightFilter);
-    params.set("difficultyMin", difficultyRange[0].toString());
-    params.set("difficultyMax", difficultyRange[1].toString());
-    if (sortBy !== "none") {
-      params.set("sortBy", sortBy);
-      params.set("sortDirection", sortDirection);
-    }
-    return params;
-  };
+  const buildExercisesParams = useCallback(
+    (page = 1) => {
+      const params = new URLSearchParams({
+        limit: pageSize.toString(),
+        offset: ((page - 1) * pageSize).toString(),
+      });
+      if (query.trim()) params.set("query", query.trim());
+      if (categoryFilter !== "all") params.set("category", categoryFilter);
+      if (disciplineFilter !== "all") params.set("discipline", disciplineFilter);
+      if (movementPatternFilter !== "all")
+        params.set("movementPattern", movementPatternFilter);
+      if (measurementFilters.length > 0) {
+        params.set("measurementTypes", measurementFilters.join(","));
+      }
+      if (muscleFilters.length > 0) {
+        params.set("muscleGroups", muscleFilters.join(","));
+      }
+      if (requiresWeightFilter !== "all")
+        params.set("requiresWeight", requiresWeightFilter);
+      params.set("difficultyMin", difficultyRange[0].toString());
+      params.set("difficultyMax", difficultyRange[1].toString());
+      if (sortBy !== "none") {
+        params.set("sortBy", sortBy);
+        params.set("sortDirection", sortDirection);
+      }
+      return params;
+    },
+    [
+      pageSize,
+      query,
+      categoryFilter,
+      disciplineFilter,
+      movementPatternFilter,
+      measurementFilters,
+      muscleFilters,
+      requiresWeightFilter,
+      difficultyRange,
+      sortBy,
+      sortDirection,
+    ]
+  );
 
   const loadExercises = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
-    const params = buildExercisesParams(currentPage);
-    params.set("includeMeta", "true");
+      const params = buildExercisesParams(currentPage);
+      params.set("includeMeta", "true");
       const response = await fetch(`${API_URL}/exercises?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -389,17 +394,7 @@ export function Exercises() {
   }, [
     user,
     currentPage,
-    pageSize,
-    query,
-    categoryFilter,
-    disciplineFilter,
-    movementPatternFilter,
-    measurementFilters,
-    muscleFilters,
-    requiresWeightFilter,
-    difficultyRange,
-    sortBy,
-    sortDirection,
+    buildExercisesParams,
   ]);
 
   const handleToggleFavorite = async (exerciseId: string, nextValue: boolean) => {
@@ -649,19 +644,19 @@ export function Exercises() {
         throw new Error("Create failed");
       }
       await loadExercises();
-    setFormValue({
-      name: "",
-      description: "",
-      nameVariants: {
-        deSingular: "",
-        dePlural: "",
-        enSingular: "",
-        enPlural: "",
-        other: "",
-      },
-      category: "",
-      discipline: "",
-      movementPattern: "",
+      setFormValue({
+        name: "",
+        description: "",
+        nameVariants: {
+          deSingular: "",
+          dePlural: "",
+          enSingular: "",
+          enPlural: "",
+          other: "",
+        },
+        category: "",
+        discipline: "",
+        movementPattern: "",
         measurementTypes: ["reps"],
         distanceUnit: user?.preferences?.units?.distance || "km",
         timeUnit: "min",
@@ -752,15 +747,15 @@ export function Exercises() {
           : "time";
     const unitOptions = hasDistance
       ? [
-          { value: "km", label: t("training.form.units.kilometers") },
-          { value: "m", label: t("training.form.units.meters") },
-          { value: "miles", label: t("training.form.units.miles") },
-        ]
+        { value: "km", label: t("training.form.units.kilometers") },
+        { value: "m", label: t("training.form.units.meters") },
+        { value: "miles", label: t("training.form.units.miles") },
+      ]
       : hasTime
         ? [
-            { value: "min", label: t("training.form.units.minutes", "Minuten") },
-            { value: "sec", label: t("training.form.units.seconds", "Sekunden") },
-          ]
+          { value: "min", label: t("training.form.units.minutes", "Minuten") },
+          { value: "sec", label: t("training.form.units.seconds", "Sekunden") },
+        ]
         : [];
     const resolvedUnit = hasDistance
       ? editDraft.distanceUnit || (user?.preferences?.units?.distance || "km")
@@ -835,61 +830,7 @@ export function Exercises() {
     }
   };
 
-  const openExerciseDetails = (exercise: Exercise, mode: "view" | "edit" | "report" = "view") => {
-    setActiveExercise(exercise);
-    setDetailExerciseId(exercise.id);
-    setDetailMode(mode);
-    if (mode === "edit") {
-      setEditDefaults(exercise);
-    } else {
-      setEditDraft(null);
-    }
-    if (mode !== "report") {
-      setReportReason("");
-      setReportDetails("");
-    }
-  };
-
-  const closeExerciseDetails = () => {
-    setDetailExerciseId(null);
-    setDetailMode("view");
-    setEditDraft(null);
-    setActiveExercise(null);
-    setReportReason("");
-    setReportDetails("");
-  };
-
-  const navigateExercise = (direction: "prev" | "next") => {
-    if (!detailExerciseId) return;
-    const index = exercises.findIndex((item) => item.id === detailExerciseId);
-    if (index === -1) return;
-    const nextIndex =
-      direction === "prev"
-        ? (index - 1 + exercises.length) % exercises.length
-        : (index + 1) % exercises.length;
-    const nextExercise = exercises[nextIndex];
-    if (nextExercise) {
-      openExerciseDetails(nextExercise);
-    }
-  };
-
-  useEffect(() => {
-    if (!detailExerciseId) return;
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === "ArrowLeft") navigateExercise("prev");
-      if (event.key === "ArrowRight") navigateExercise("next");
-      if (event.key === "Escape") closeExerciseDetails();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [detailExerciseId, exercises]);
-
-  const detailExercise = useMemo(
-    () => exercises.find((item) => item.id === detailExerciseId) || null,
-    [detailExerciseId, exercises]
-  );
-
-  const setEditDefaults = (exercise: Exercise) => {
+  const setEditDefaults = useCallback((exercise: Exercise) => {
     const measurementSet = new Set<string>();
     if (exercise.measurementType) measurementSet.add(exercise.measurementType);
     if (exercise.supportsTime && exercise.measurementType !== "time") measurementSet.add("time");
@@ -929,11 +870,68 @@ export function Exercises() {
       difficulty: exercise.difficultyTier || 5,
       requiresWeight: exercise.requiresWeight || false,
       allowsWeight: exercise.allowsWeight || false,
-      supportsSets: exercise.supportsSets ?? true,
+      supportsSets: exercise.supportsSets || false,
       muscleGroups: exercise.muscleGroups || [],
       equipment: (exercise.equipment || []).join(", "),
     });
-  };
+  }, [user?.preferences?.units?.distance]);
+
+  const openExerciseDetails = useCallback(
+    (exercise: Exercise, mode: "view" | "edit" | "report" = "view") => {
+      setActiveExercise(exercise);
+      setDetailExerciseId(exercise.id);
+      setDetailMode(mode);
+      if (mode === "edit") {
+        setEditDefaults(exercise);
+      } else {
+        setEditDraft(null);
+      }
+      if (mode !== "report") {
+        setReportReason("");
+        setReportDetails("");
+      }
+    },
+    [setEditDefaults]
+  );
+
+  const closeExerciseDetails = useCallback(() => {
+    setDetailExerciseId(null);
+    setDetailMode("view");
+    setEditDraft(null);
+    setActiveExercise(null);
+    setReportReason("");
+    setReportDetails("");
+  }, []);
+
+  const navigateExercise = useCallback((direction: "prev" | "next") => {
+    if (!detailExerciseId) return;
+    const index = exercises.findIndex((item) => item.id === detailExerciseId);
+    if (index === -1) return;
+    const nextIndex =
+      direction === "prev"
+        ? (index - 1 + exercises.length) % exercises.length
+        : (index + 1) % exercises.length;
+    const nextExercise = exercises[nextIndex];
+    if (nextExercise) {
+      openExerciseDetails(nextExercise);
+    }
+  }, [detailExerciseId, exercises, openExerciseDetails]);
+
+  useEffect(() => {
+    if (!detailExerciseId) return;
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === "ArrowLeft") navigateExercise("prev");
+      if (event.key === "ArrowRight") navigateExercise("next");
+      if (event.key === "Escape") closeExerciseDetails();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [detailExerciseId, exercises, navigateExercise, closeExerciseDetails]);
+
+  const detailExercise = useMemo(
+    () => exercises.find((item) => item.id === detailExerciseId) || null,
+    [detailExerciseId, exercises]
+  );
 
   return (
     <PageTemplate title={t("exerciseLibrary.title")} subtitle={t("exerciseLibrary.subtitle")}>

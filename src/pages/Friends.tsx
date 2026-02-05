@@ -177,7 +177,7 @@ function FriendsList() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchFriends();
@@ -377,7 +377,7 @@ function FriendRequestsList({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchRequests();
@@ -701,7 +701,7 @@ function UserSearch() {
     };
 
     searchUsers();
-  }, [debouncedQuery]);
+  }, [debouncedQuery, t]);
 
   const handleSendRequest = async (
     targetUserId: string,

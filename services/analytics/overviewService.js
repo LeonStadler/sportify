@@ -12,7 +12,7 @@ export const getOverviewStats = async (pool, userId, requestedPeriod) => {
             COALESCE(SUM(wa.points_earned), 0) as total_points,
             COALESCE(AVG(w.duration), 0) as avg_workout_duration
         FROM workouts w
-        LEFT JOIN workout_activities wa ON w.id = wa.workout_id
+        LEFT JOIN workout_activities wa ON w.id = wa.workout_id AND wa.exercise_id IS NOT NULL
         WHERE w.user_id = $1
     `;
 
@@ -21,14 +21,14 @@ export const getOverviewStats = async (pool, userId, requestedPeriod) => {
             COALESCE(SUM(wa.points_earned), 0) as period_points,
             COUNT(DISTINCT w.id) as period_workouts
         FROM workouts w
-        LEFT JOIN workout_activities wa ON w.id = wa.workout_id
+        LEFT JOIN workout_activities wa ON w.id = wa.workout_id AND wa.exercise_id IS NOT NULL
         WHERE w.user_id = $1
           AND ${periodCondition}
     `;
 
     const activityQuery = `
         SELECT
-            COALESCE(ex.id::text, wa.activity_type) AS activity_id,
+            wa.exercise_id AS activity_id,
             COALESCE(SUM(wa.points_earned), 0) as total_points,
             COALESCE(SUM(wa.points_earned) FILTER (WHERE ${periodCondition}), 0) as period_points,
             COALESCE(SUM(wa.reps), 0) as total_reps,
@@ -43,9 +43,10 @@ export const getOverviewStats = async (pool, userId, requestedPeriod) => {
             ex.supports_distance
         FROM workouts w
         LEFT JOIN workout_activities wa ON w.id = wa.workout_id
-        LEFT JOIN exercises ex ON ex.id::text = wa.activity_type::text OR ex.slug = wa.activity_type
+        LEFT JOIN exercises ex ON ex.id = wa.exercise_id
         WHERE w.user_id = $1
-        GROUP BY COALESCE(ex.id::text, wa.activity_type), ex.name, ex.measurement_type, ex.supports_time, ex.supports_distance
+          AND wa.exercise_id IS NOT NULL
+        GROUP BY wa.exercise_id, ex.name, ex.measurement_type, ex.supports_time, ex.supports_distance
         ORDER BY period_points DESC NULLS LAST, total_points DESC NULLS LAST
         LIMIT 10
     `;

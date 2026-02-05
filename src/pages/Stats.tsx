@@ -23,6 +23,11 @@ import { API_URL } from "@/lib/api";
 import { getNormalizedRange, getRangeForPeriod } from "@/utils/dateRanges";
 import type { Exercise, ExerciseListResponse } from "@/types/exercise";
 
+const normalizeMetricType = (
+  value?: string | null
+): ActivityMetricOption["measurementType"] =>
+  value === "reps" || value === "time" || value === "distance" ? value : undefined;
+
 export function Stats() {
   const { t, i18n } = useTranslation();
   const { toast } = useToast();
@@ -98,6 +103,48 @@ export function Stats() {
     loadExercises();
   }, []);
 
+  const handlePinnedExerciseChange = useCallback(
+    async (nextPinned: string[], options: { silent?: boolean } = {}) => {
+      if (!user) return;
+      setPinnedExerciseIds(nextPinned);
+      try {
+        const nextPreferences = {
+          ...user.preferences,
+          exercises: {
+            ...user.preferences?.exercises,
+            stats: {
+              ...user.preferences?.exercises?.stats,
+              pinnedExerciseIds: nextPinned,
+            },
+          },
+        };
+        await updateProfile(
+          {
+            firstName: user.firstName || "",
+            lastName: user.lastName || "",
+            nickname: user.nickname || "",
+            displayPreference: user.displayPreference || "firstName",
+            languagePreference: user.languagePreference || "de",
+            preferences: nextPreferences,
+          },
+          true
+        );
+        if (!options.silent) {
+          toast({
+            title: t("settings.saved", "Gespeichert"),
+            description: t(
+              "stats.customExercisesSaved",
+              "Deine Übungen wurden gespeichert."
+            ),
+          });
+        }
+      } catch (error) {
+        console.error("Failed to update pinned exercises", error);
+      }
+    },
+    [t, toast, updateProfile, user]
+  );
+
   useEffect(() => {
     if (!user || appliedDefaultPinned.current) return;
     if (pinnedExerciseIds.length > 0) return;
@@ -106,7 +153,7 @@ export function Stats() {
     if (defaults.length === 0) return;
     appliedDefaultPinned.current = true;
     handlePinnedExerciseChange(defaults, { silent: true });
-  }, [exerciseOptions, pinnedExerciseIds.length, user]);
+  }, [exerciseOptions, pinnedExerciseIds.length, user, handlePinnedExerciseChange]);
 
   useEffect(() => {
     if (error && error !== "missing-token") {
@@ -141,7 +188,7 @@ export function Stats() {
       merged.push({
         key: metric.key,
         label: metric.label,
-        measurementType: metric.measurementType ?? undefined,
+        measurementType: normalizeMetricType(metric.measurementType),
         supportsTime: metric.supportsTime ?? undefined,
         supportsDistance: metric.supportsDistance ?? undefined,
         color: "",
@@ -154,7 +201,7 @@ export function Stats() {
       merged.push({
         key: id,
         label: exercise?.name ?? id,
-        measurementType: exercise?.measurementType ?? undefined,
+        measurementType: normalizeMetricType(exercise?.measurementType),
         supportsTime: exercise?.supportsTime ?? undefined,
         supportsDistance: exercise?.supportsDistance ?? undefined,
         color: "",
@@ -187,77 +234,15 @@ export function Stats() {
     user?.preferences?.units?.distance === "miles" ? "miles" : "km";
 
   const resolveDefaultExerciseIds = (items: Exercise[]) => {
-    const defaults = [
-      { keys: ["pullup", "pullups", "pull-up", "pull-ups", "klimmzug", "klimmzüge"] },
-      { keys: ["pushup", "pushups", "push-up", "push-ups", "liegestütz", "liegestütze"] },
-      { keys: ["situp", "situps", "sit-up", "sit-ups", "sit up", "sit ups"] },
-      { keys: ["running", "run", "laufen", "joggen"] },
-    ];
-    const lower = (value?: string | null) => (value || "").toLowerCase();
+    const defaults = ["pullups", "pushups", "situps"];
     const result: string[] = [];
-    defaults.forEach((def) => {
-      const match = items.find((exercise) => {
-        const slug = lower(exercise.slug);
-        const name = lower(exercise.name);
-        return def.keys.some((key) => slug === key || name.includes(key));
-      });
+    defaults.forEach((id) => {
+      const match = items.find((exercise) => exercise.id === id);
       if (match && !result.includes(match.id)) {
         result.push(match.id);
       }
     });
     return result;
-  };
-
-  const handlePinnedExerciseChange = async (
-    nextPinned: string[],
-    options: { silent?: boolean } = {}
-  ) => {
-    if (!user) return;
-    setPinnedExerciseIds(nextPinned);
-    try {
-      const nextPreferences = {
-        ...user.preferences,
-        exercises: {
-          ...user.preferences?.exercises,
-          stats: {
-            ...user.preferences?.exercises?.stats,
-            pinnedExerciseIds: nextPinned,
-          },
-        },
-      };
-      await updateProfile(
-        {
-          firstName: user.firstName || "",
-          lastName: user.lastName || "",
-          nickname: user.nickname || "",
-          displayPreference: user.displayPreference || "firstName",
-          languagePreference: user.languagePreference || "de",
-          preferences: nextPreferences,
-        },
-        true
-      );
-      if (!options.silent) {
-        toast({
-          title: t("settings.saved", "Gespeichert"),
-          description: t(
-            "stats.pinnedExercisesSaved",
-            "Deine Übungs-Auswahl wurde gespeichert."
-          ),
-        });
-      }
-    } catch (error) {
-      console.error("Failed to save pinned exercises", error);
-      if (!options.silent) {
-        toast({
-          variant: "destructive",
-          title: t("common.error", "Fehler"),
-          description:
-            error instanceof Error
-              ? error.message
-              : t("settings.saveError", "Fehler beim Speichern"),
-        });
-      }
-    }
   };
 
   const handleAddPinnedExercise = (exerciseId: string) => {

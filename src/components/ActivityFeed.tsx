@@ -201,11 +201,13 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
         await sleep(800);
         await fetchOnce();
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error loading activity feed:", error);
+      const message =
+        error instanceof Error ? error.message : t("activityFeed.couldNotLoad");
       setWorkouts([]);
       setHasFriends(false);
-      setError(error?.message ?? t("activityFeed.couldNotLoad"));
+      setError(message);
       toast({
         title: t("dashboard.error"),
         description: t("activityFeed.errorLoading"),
@@ -214,7 +216,7 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [t, toast, navigate]);
+  }, [t, toast]);
 
   useEffect(() => {
     if (user) {

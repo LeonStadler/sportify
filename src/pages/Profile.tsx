@@ -52,7 +52,7 @@ import {
   Trophy,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import NiceAvatar, { NiceAvatarProps } from "react-nice-avatar";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -243,10 +243,13 @@ export function Profile() {
     useState(false);
   const [recoveryCodesDialogOpen, setRecoveryCodesDialogOpen] = useState(false);
   const [newRecoveryCodes, setNewRecoveryCodes] = useState<string[]>([]);
-  const defaultGoals: WeeklyGoals = {
-    points: { target: DEFAULT_WEEKLY_POINTS_GOAL, current: 0 },
-    exercises: [],
-  };
+  const defaultGoals: WeeklyGoals = useMemo(
+    () => ({
+      points: { target: DEFAULT_WEEKLY_POINTS_GOAL, current: 0 },
+      exercises: [],
+    }),
+    []
+  );
   const [goals, setGoals] = useState<WeeklyGoals>(defaultGoals);
   const [goalsForm, setGoalsForm] = useState<WeeklyGoals>(defaultGoals);
   const [goalExercises, setGoalExercises] = useState<Exercise[]>([]);
@@ -292,17 +295,7 @@ export function Profile() {
     }
   }, []);
 
-  // Load data on mount
-  useEffect(() => {
-    if (user) {
-      loadInvitations();
-      loadGoals();
-      loadGoalExercises();
-      loadAchievements();
-    }
-  }, [user, loadInvitations, loadAchievements]);
-
-  const loadGoalExercises = async () => {
+  const loadGoalExercises = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
       if (!token) return;
@@ -315,9 +308,9 @@ export function Profile() {
     } catch (error) {
       console.error("Error loading exercises:", error);
     }
-  };
+  }, []);
 
-  const loadGoals = async () => {
+  const loadGoals = useCallback(async () => {
     try {
       setLoadingGoals(true);
       const token = localStorage.getItem("token");
@@ -344,7 +337,17 @@ export function Profile() {
     } finally {
       setLoadingGoals(false);
     }
-  };
+  }, [defaultGoals]);
+
+  // Load data on mount
+  useEffect(() => {
+    if (user) {
+      loadInvitations();
+      loadGoals();
+      loadGoalExercises();
+      loadAchievements();
+    }
+  }, [user, loadInvitations, loadGoals, loadGoalExercises, loadAchievements]);
 
   const handleSaveGoals = async (newGoals: WeeklyGoals) => {
     try {
@@ -2020,6 +2023,13 @@ export function Profile() {
                       setGoalsForm((prev) => {
                         const next = [...prev.exercises];
                         next[index] = { ...next[index], exerciseId };
+                        return { ...prev, exercises: next };
+                      });
+                    }}
+                    onChangeExerciseUnit={(index, unit) => {
+                      setGoalsForm((prev) => {
+                        const next = [...prev.exercises];
+                        next[index] = { ...next[index], unit };
                         return { ...prev, exercises: next };
                       });
                     }}

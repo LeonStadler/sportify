@@ -111,14 +111,18 @@ export function WorkoutForm({
   }, [t]);
 
   // Benutzereinstellungen für Distanzeinheiten
-  const getUserDistanceUnit = () => {
-    return user?.preferences?.units?.distance || "km";
-  };
-  const getUserWeightUnit = () => {
-    return user?.preferences?.units?.weight || "kg";
-  };
-  const getDistanceUnitOptionsForProfile = () => {
-    const pref = String(getUserDistanceUnit()).toLowerCase();
+  const userDistanceUnit = useMemo(
+    () => user?.preferences?.units?.distance || "km",
+    [user?.preferences?.units?.distance]
+  );
+  const userWeightUnit = useMemo(
+    () => user?.preferences?.units?.weight || "kg",
+    [user?.preferences?.units?.weight]
+  );
+  const getUserDistanceUnit = useCallback(() => userDistanceUnit, [userDistanceUnit]);
+  const getUserWeightUnit = useCallback(() => userWeightUnit, [userWeightUnit]);
+  const getDistanceUnitOptionsForProfile = useCallback(() => {
+    const pref = String(userDistanceUnit).toLowerCase();
     if (pref === "miles" || pref === "mi") {
       return [{ value: "miles", label: t("training.form.units.miles"), multiplier: 1 }];
     }
@@ -126,8 +130,8 @@ export function WorkoutForm({
       { value: "km", label: t("training.form.units.kilometers"), multiplier: 1 },
       { value: "m", label: t("training.form.units.meters"), multiplier: 0.001 },
     ];
-  };
-  const getTimeUnitOptions = (preferred?: string) => {
+  }, [t, userDistanceUnit]);
+  const getTimeUnitOptions = useCallback((preferred?: string) => {
     const options = [
       { value: "min", label: t("training.form.units.minutes", "Minuten"), multiplier: 1 },
       { value: "sec", label: t("training.form.units.seconds", "Sekunden"), multiplier: 1 / 60 },
@@ -136,7 +140,7 @@ export function WorkoutForm({
       return [options[1], options[0]];
     }
     return options;
-  };
+  }, [t]);
 
   const getDefaultUnitOptions = useCallback(
     (measurementType?: string | null) => {
@@ -256,7 +260,7 @@ export function WorkoutForm({
   const [pauseSettingsOpen, setPauseSettingsOpen] = useState(false);
   const isTemplateLocked = forceTemplate === true;
   const [descriptionOpen, setDescriptionOpen] = useState(false);
-  const getDefaultUnit = () => "reps";
+  const getDefaultUnit = useCallback(() => "reps", []);
   const getUnitKind = (unit?: string | null) => {
     if (!unit) return "reps";
     if (["min", "sec"].includes(unit)) return "time";
@@ -283,17 +287,17 @@ export function WorkoutForm({
     [getDefaultUnitOptions, t]
   );
 
-  const normalizeUnitValue = (unit?: string | null) => {
+  const normalizeUnitValue = useCallback((unit?: string | null) => {
     if (!unit) return getDefaultUnit();
     if (unit === "Wiederholungen") return "reps";
     return unit;
-  };
+  }, [getDefaultUnit]);
 
   const supportsSetModeForExercise = (exercise?: Exercise | null) => {
     return Boolean(exercise);
   };
 
-  const getExerciseUnitOptions = (exercise?: Exercise | null) => {
+  const getExerciseUnitOptions = useCallback((exercise?: Exercise | null) => {
     if (!exercise) return getDefaultUnitOptions("reps");
     const measurementType = exercise.measurementType || "reps";
     const supportsTime = Boolean(exercise.supportsTime || measurementType === "time");
@@ -312,7 +316,7 @@ export function WorkoutForm({
     }
     if (supportsTime) return getTimeUnitOptions(exercise.unit);
     return getDefaultUnitOptions("reps");
-  };
+  }, [getDefaultUnitOptions, getDistanceUnitOptionsForProfile, getTimeUnitOptions]);
 
   const getPreferredUnitForExercise = useCallback(
     (exercise: Exercise, fallback?: string) => {
@@ -322,7 +326,7 @@ export function WorkoutForm({
       }
       return unitOptions[0]?.value || fallback || getDefaultUnit();
     },
-    [getDefaultUnitOptions, getDistanceUnitOptionsForProfile, getTimeUnitOptions]
+    [getExerciseUnitOptions, getDefaultUnit]
   );
 
   const getSetTotalAmount = (sets: WorkoutSet[]) => {
@@ -504,7 +508,7 @@ export function WorkoutForm({
     if (isTemplateLocked && useEndTime) {
       setUseEndTime(false);
     }
-  }, [isTemplate, isTemplateLocked, visibility]);
+  }, [isTemplate, isTemplateLocked, visibility, useEndTime]);
 
   useEffect(() => {
     if (isTemplateLocked) {
@@ -671,7 +675,7 @@ export function WorkoutForm({
       setSourceTemplateId(null);
       setDescriptionOpen(false);
     }
-  }, [workout, prefillWorkout, getDefaultTitle, isTemplateLocked]);
+  }, [workout, prefillWorkout, getDefaultTitle, isTemplateLocked, getUserWeightUnit, normalizeUnitValue]);
 
   useEffect(() => {
     if (!workout && prefillWorkout) {
@@ -747,7 +751,7 @@ export function WorkoutForm({
       );
       onPrefillConsumed?.();
     }
-  }, [prefillWorkout, workout, getDefaultTitle, onPrefillConsumed, isTemplateLocked]);
+  }, [prefillWorkout, workout, getDefaultTitle, onPrefillConsumed, isTemplateLocked, getUserWeightUnit, normalizeUnitValue]);
 
   const addActivity = () => {
     setActivities([

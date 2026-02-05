@@ -104,10 +104,13 @@ export function Dashboard() {
     activities: [],
   });
 
-  const defaultGoals: WeeklyGoals = {
-    points: { target: DEFAULT_WEEKLY_POINTS_GOAL, current: 0 },
-    exercises: [],
-  };
+  const defaultGoals: WeeklyGoals = useMemo(
+    () => ({
+      points: { target: DEFAULT_WEEKLY_POINTS_GOAL, current: 0 },
+      exercises: [],
+    }),
+    []
+  );
 
   const [goals, setGoals] = useState<WeeklyGoals>(defaultGoals);
 
@@ -180,20 +183,7 @@ export function Dashboard() {
     setCardConfigs((prev) => {
       const next = prev.map((config) => {
         if (config.type !== "activity") return config;
-        const legacyActivity = (config as unknown as { activityType?: string })
-          .activityType;
-        let activityId = config.activityId;
-        if (!activityId && legacyActivity) {
-          const match = exerciseOptions.find(
-            (exercise) =>
-              exercise.id === legacyActivity ||
-              exercise.slug === legacyActivity ||
-              exercise.name?.toLowerCase() === legacyActivity.toLowerCase()
-          );
-          if (match) {
-            activityId = match.id;
-          }
-        }
+        const activityId = config.activityId;
         const activityMode =
           config.activityMode || (activityId ? "custom" : "auto");
         return {
@@ -212,7 +202,7 @@ export function Dashboard() {
     });
   }, [exerciseOptions]);
 
-  const loadGoals = async (token: string) => {
+  const loadGoals = useCallback(async (token: string) => {
     try {
       const response = await fetch(`${API_URL}/goals`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -231,7 +221,7 @@ export function Dashboard() {
     } catch (error) {
       console.error("Error loading goals:", error);
     }
-  };
+  }, [defaultGoals.points.target]);
 
   const loadExerciseNames = useCallback(async () => {
     try {
@@ -339,7 +329,7 @@ export function Dashboard() {
     } finally {
       setIsLoading(false);
     }
-  }, [loadStatsForCards, toast, t, loadRecentWorkouts, loadExerciseNames]);
+  }, [loadStatsForCards, loadGoals, toast, t, loadRecentWorkouts, loadExerciseNames]);
 
   useEffect(() => {
     if (user) {

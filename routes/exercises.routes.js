@@ -199,14 +199,14 @@ export const createExercisesRouter = (pool) => {
           pool.query(
             `
               SELECT
-                wa.activity_type AS exercise_id,
+                wa.exercise_id AS exercise_id,
                 COUNT(*)::int AS usage_count,
                 COALESCE(SUM(wa.points_earned), 0)::numeric AS usage_points
               FROM workout_activities wa
               JOIN workouts w ON w.id = wa.workout_id
               WHERE w.user_id = $1
-                AND wa.activity_type = ANY($2)
-              GROUP BY wa.activity_type
+                AND wa.exercise_id = ANY($2)
+              GROUP BY wa.exercise_id
             `,
             [req.user.id, exerciseIds]
           ),

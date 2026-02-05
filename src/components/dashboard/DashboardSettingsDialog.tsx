@@ -36,7 +36,14 @@ interface DashboardSettingsDialogProps {
   cards: StatCardConfig[];
   onSave: (cards: StatCardConfig[]) => void;
   onReset?: () => void;
-  exercises: Array<{ id: string; name: string; measurementType?: string | null; supportsTime?: boolean | null; supportsDistance?: boolean | null }>;
+  exercises: Array<{
+    id: string;
+    name: string;
+    measurementType?: string | null;
+    supportsSets?: boolean | null;
+    supportsTime?: boolean | null;
+    supportsDistance?: boolean | null;
+  }>;
   facets: { categories: string[]; muscleGroups: string[]; equipment: string[] };
 }
 

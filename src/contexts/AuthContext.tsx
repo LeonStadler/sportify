@@ -52,6 +52,9 @@ export interface User {
         pinnedExerciseIds?: string[];
       };
     };
+    workouts?: {
+      favoriteTemplateIds?: string[];
+    };
   };
 }
 

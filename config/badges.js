@@ -63,24 +63,6 @@ export const LIFETIME_ACTIVITY_BADGES = [
         description: 'Absolviere insgesamt {threshold} Sit-ups.',
         icon: 'badge-situps',
         thresholds: [50, 100, 250, 500, 1000]
-    },
-    {
-        slug: 'lifetime-running',
-        category: 'lifetime',
-        activityType: 'running',
-        label: 'Erste {threshold} Lauf-Kilometer',
-        description: 'Laufe insgesamt {threshold} Kilometer.',
-        icon: 'badge-running',
-        thresholds: [10, 50, 100, 250, 500, 1000]
-    },
-    {
-        slug: 'lifetime-cycling',
-        category: 'lifetime',
-        activityType: 'cycling',
-        label: 'Erste {threshold} Radfahr-Kilometer',
-        description: 'Fahre insgesamt {threshold} Kilometer mit dem Rad.',
-        icon: 'badge-cycling',
-        thresholds: [25, 100, 250, 500, 1000, 2000]
     }
 ];
 

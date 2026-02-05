@@ -41,7 +41,7 @@ export function InviteLinkHandler() {
 
       handleInvitation();
     }
-  }, [isAuthenticated, invitationToken, acceptInvitation, toast, searchParams, setSearchParams]);
+  }, [isAuthenticated, invitationToken, acceptInvitation, toast, searchParams, setSearchParams, t]);
 
   return null;
 }

@@ -19,16 +19,16 @@ permission from the copyright holder.
 If you receive written permission to make the Software publicly available,
 you must comply with all of the following:
 
-1) Attribution in the frontend UI: "Powered by Sportify by Leon Stadler"
+1. Attribution in the frontend UI: "Powered by Sportify by Leon Stadler"
    with a link to https://leon-stadler.com, and a link to the official
    repository at https://github.com/LeonStadler/sportify.
-2) Publish the complete corresponding source code of your deployed version
+2. Publish the complete corresponding source code of your deployed version
    in a public repository that includes this license and the required
    attribution.
-3) Ensure the public repository clearly credits Leon Stadler and links to
+3. Ensure the public repository clearly credits Leon Stadler and links to
    the official repository.
 
-To request permission for any public use, contact contact@leon-stadler.com.
+To request permission for any public use, contact sportify@leon-stadler.com.
 
 No trademark rights are granted. No contributions are accepted unless
 explicitly requested in writing.

@@ -41,7 +41,7 @@ export function ScoreboardTable({
     supportsTime?: boolean | null;
     supportsDistance?: boolean | null;
   } | null>(null);
-  const { user } = useAuth();
+  const { user, getDisplayName } = useAuth();
   const { t } = useTranslation();
   const needsCustomRange =
     period === "custom" && (!dateRange?.from || !dateRange?.to);
@@ -91,12 +91,8 @@ export function ScoreboardTable({
         if (!alreadyListed) {
           const fallbackEntry = {
             id: user.id,
-            displayName:
-              user.displayName ||
-              user.nickname ||
-              user.firstName ||
-              "Du",
-            avatarUrl: user.avatarUrl || null,
+            displayName: getDisplayName ? getDisplayName() : user.nickname || user.firstName || "Du",
+            avatarUrl: user.avatar || null,
             totalPoints: 0,
             totalAmount: 0,
             rank: null,
@@ -128,7 +124,7 @@ export function ScoreboardTable({
     } finally {
       setIsLoading(false);
     }
-  }, [activity, dateRange?.from, dateRange?.to, period, scope, t, user]);
+  }, [activity, dateRange?.from, dateRange?.to, period, scope, t, user, getDisplayName]);
 
   useEffect(() => {
     fetchLeaderboard();

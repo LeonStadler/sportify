@@ -682,33 +682,39 @@ export function Training() {
     [templateDetailId, templates]
   );
 
-  const openTemplateDetails = (
-    template: Workout,
-    mode: "view" | "edit" = "view"
-  ) => {
-    setTemplateDetailId(template.id);
-    setTemplateDetailMode(mode);
-  };
+  const openTemplateDetails = useCallback(
+    (template: Workout, mode: "view" | "edit" = "view") => {
+      setTemplateDetailId(template.id);
+      setTemplateDetailMode(mode);
+    },
+    []
+  );
 
-  const closeTemplateDetails = () => {
+  const closeTemplateDetails = useCallback(() => {
     setTemplateDetailId(null);
     setTemplateDetailMode("view");
-  };
+  }, []);
 
-  const navigateTemplateDetails = (direction: "prev" | "next") => {
-    if (!templateDetailId || templateFilteredSorted.length === 0) return;
-    const index = templateFilteredSorted.findIndex((item) => item.id === templateDetailId);
-    if (index < 0) return;
-    const nextIndex =
-      direction === "prev"
-        ? (index - 1 + templateFilteredSorted.length) % templateFilteredSorted.length
-        : (index + 1) % templateFilteredSorted.length;
-    const nextTemplate = templateFilteredSorted[nextIndex];
-    if (nextTemplate) {
-      setTemplateDetailId(nextTemplate.id);
-      setTemplateDetailMode("view");
-    }
-  };
+  const navigateTemplateDetails = useCallback(
+    (direction: "prev" | "next") => {
+      if (!templateDetailId || templateFilteredSorted.length === 0) return;
+      const index = templateFilteredSorted.findIndex(
+        (item) => item.id === templateDetailId
+      );
+      if (index < 0) return;
+      const nextIndex =
+        direction === "prev"
+          ? (index - 1 + templateFilteredSorted.length) %
+            templateFilteredSorted.length
+          : (index + 1) % templateFilteredSorted.length;
+      const nextTemplate = templateFilteredSorted[nextIndex];
+      if (nextTemplate) {
+        setTemplateDetailId(nextTemplate.id);
+        setTemplateDetailMode("view");
+      }
+    },
+    [templateDetailId, templateFilteredSorted]
+  );
 
   const handleTemplateSortClick = (next: string) => {
     if (templateSortBy !== next) {
@@ -786,7 +792,7 @@ export function Training() {
       setActiveTab("templates");
       openTemplateDetails(template, "view");
     },
-    [fetchTemplateById]
+    [fetchTemplateById, openTemplateDetails]
   );
 
   const handleTemplateDelete = async (template: Workout) => {
@@ -844,7 +850,7 @@ export function Training() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [templateDetailId, templateFilteredSorted]);
+  }, [templateDetailId, templateFilteredSorted, navigateTemplateDetails, closeTemplateDetails]);
 
   useEffect(() => {
     setTemplateDuplicatesOpen(false);

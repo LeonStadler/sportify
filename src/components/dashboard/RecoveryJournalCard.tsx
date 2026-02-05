@@ -159,16 +159,18 @@ export function RecoveryJournalCard({ className }: { className?: string }) {
                 ? data.workouts
                 : [];
               const mapped: RecentWorkoutOption[] = workoutsArray
-                .map((w: any) => {
-                  const id = typeof w.id === "string" ? w.id : null;
+                .map((w: unknown) => {
+                  if (!w || typeof w !== "object") return null;
+                  const entry = w as Record<string, unknown>;
+                  const id = typeof entry.id === "string" ? entry.id : null;
                   if (!id) return null;
                   const title =
-                    typeof w.title === "string" ? w.title : t("recoveryDiary.noWorkout");
+                    typeof entry.title === "string" ? entry.title : t("recoveryDiary.noWorkout");
                   const workoutDate =
-                    typeof w.workoutDate === "string"
-                      ? w.workoutDate
-                      : typeof w.createdAt === "string"
-                      ? w.createdAt
+                    typeof entry.workoutDate === "string"
+                      ? entry.workoutDate
+                      : typeof entry.createdAt === "string"
+                      ? entry.createdAt
                       : undefined;
                   return { id, title, workoutDate };
                 })
@@ -178,6 +180,9 @@ export function RecoveryJournalCard({ className }: { className?: string }) {
           }
         }
       } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") {
+          return;
+        }
         console.error("Recovery analytics load error", e);
       } finally {
         setIsLoading(false);

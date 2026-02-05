@@ -24,6 +24,7 @@ activity_totals AS (
         SUM(wa.points_earned) AS points
     FROM workout_activities wa
     WHERE wa.workout_id IN (SELECT id FROM period_workouts)
+      AND wa.exercise_id IS NOT NULL
     GROUP BY wa.workout_id
 )
 SELECT
@@ -59,14 +60,13 @@ activity_agg AS (
     FROM (
         SELECT
             w.start_time::date AS day,
-            COALESCE(ex.id::text, wa.activity_type) AS activity_type,
+            wa.exercise_id AS activity_type,
             COALESCE(SUM(wa.quantity), 0) AS total_quantity,
             COALESCE(SUM(wa.points_earned), 0) AS total_points
         FROM period_workouts w
         LEFT JOIN workout_activities wa ON wa.workout_id = w.id
-        LEFT JOIN exercises ex ON ex.id::text = wa.activity_type::text OR ex.slug = wa.activity_type
-        WHERE wa.activity_type IS NOT NULL
-        GROUP BY w.start_time::date, COALESCE(ex.id::text, wa.activity_type)
+        WHERE wa.exercise_id IS NOT NULL
+        GROUP BY w.start_time::date, wa.exercise_id
     ) activity_totals
     GROUP BY day
 ),
@@ -121,18 +121,19 @@ period_workouts AS (
       AND w.start_time < period.end_ts
 )
 SELECT
-    COALESCE(ex.id::text, wa.activity_type) AS activity_id,
-    COALESCE(ex.name, wa.activity_type) AS activity_label,
+    wa.exercise_id AS activity_id,
+    COALESCE(ex.name, wa.exercise_id) AS activity_label,
     COALESCE(ex.measurement_type, 'reps') AS measurement_type,
     COALESCE(ex.supports_time, false) AS supports_time,
     COALESCE(ex.supports_distance, false) AS supports_distance,
     COALESCE(SUM(wa.points_earned), 0)::numeric AS total_points
 FROM workout_activities wa
 JOIN period_workouts pw ON pw.id = wa.workout_id
-LEFT JOIN exercises ex ON ex.id::text = wa.activity_type::text OR ex.slug = wa.activity_type
+LEFT JOIN exercises ex ON ex.id = wa.exercise_id
+WHERE wa.exercise_id IS NOT NULL
 GROUP BY
-    COALESCE(ex.id::text, wa.activity_type),
-    COALESCE(ex.name, wa.activity_type),
+    wa.exercise_id,
+    COALESCE(ex.name, wa.exercise_id),
     ex.measurement_type,
     ex.supports_time,
     ex.supports_distance

@@ -626,8 +626,8 @@ Complete documentation is available in the [`docs/`](docs/) folder:
 
 ## Lizenz / License
 
-Dieses Projekt ist source-available (nicht Open Source). Private, nicht-kommerzielle Nutzung ist erlaubt. Jede Weitergabe oder oeffentliche Bereitstellung (Hosting/SaaS) ist nur mit schriftlicher Genehmigung erlaubt und erfordert Namensnennung im Frontend sowie im oeffentlichen Repo. Details: siehe `LICENSE`. Genehmigungen: contact@leon-stadler.com.  
-This project is source-available (not open source). Private, non-commercial use is allowed. Any distribution or public availability (hosting/SaaS) requires written permission and attribution in the frontend and the public repo. See `LICENSE` for details. Permission requests: contact@leon-stadler.com.  
+Dieses Projekt ist source-available (nicht Open Source). Private, nicht-kommerzielle Nutzung ist erlaubt. Jede Weitergabe oder oeffentliche Bereitstellung (Hosting/SaaS) ist nur mit schriftlicher Genehmigung erlaubt und erfordert Namensnennung im Frontend sowie im oeffentlichen Repo. Details: siehe `LICENSE`. Genehmigungen: sportify@leon-stadler.com.  
+This project is source-available (not open source). Private, non-commercial use is allowed. Any distribution or public availability (hosting/SaaS) requires written permission and attribution in the frontend and the public repo. See `LICENSE` for details. Permission requests: sportify@leon-stadler.com.  
 Beitraege werden derzeit nicht angenommen. Contributions are not accepted at this time.
 
 ---

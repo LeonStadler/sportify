@@ -1599,10 +1599,20 @@ const resources = {
         },
         errors: {
           deleteFailed: "Löschen fehlgeschlagen.",
+          title: "Fehler",
+          overviewLoad: "Übersichtsdaten konnten nicht geladen werden.",
+          monitoringLoad: "Fehler beim Laden der Monitoring-Daten",
+          cleanupJobs: "Fehler beim Cleanup der Jobs",
+          adminLoad: "Fehler beim Laden der Admin-Daten",
+          mergeFailed: "Merge fehlgeschlagen.",
         },
         success: {
           deleteTitle: "Übung gelöscht",
           deleteDescription: "Die Übung wurde deaktiviert.",
+          title: "Erfolg",
+          cleanupJobs: "Stuck Jobs wurden bereinigt",
+          mergeTitle: "Merge erfolgreich",
+          mergeDescription: "Die Übung wurde zusammengeführt.",
         },
         exerciseDetail: {
           exercise: "Übung",
@@ -1687,20 +1697,6 @@ const resources = {
         date: {
           never: "Nie",
           invalid: "Ungültiges Datum",
-        },
-        errors: {
-          title: "Fehler",
-          overviewLoad: "Übersichtsdaten konnten nicht geladen werden.",
-          monitoringLoad: "Fehler beim Laden der Monitoring-Daten",
-          cleanupJobs: "Fehler beim Cleanup der Jobs",
-          adminLoad: "Fehler beim Laden der Admin-Daten",
-          mergeFailed: "Merge fehlgeschlagen.",
-        },
-        success: {
-          title: "Erfolg",
-          cleanupJobs: "Stuck Jobs wurden bereinigt",
-          mergeTitle: "Merge erfolgreich",
-          mergeDescription: "Die Übung wurde zusammengeführt.",
         },
       },
       // Recovery Diary
@@ -4608,10 +4604,20 @@ const resources = {
         },
         errors: {
           deleteFailed: "Delete failed.",
+          title: "Error",
+          overviewLoad: "Overview stats could not be loaded.",
+          monitoringLoad: "Failed to load monitoring data.",
+          cleanupJobs: "Failed to clean up jobs.",
+          adminLoad: "Failed to load admin data.",
+          mergeFailed: "Merge failed.",
         },
         success: {
           deleteTitle: "Exercise deleted",
           deleteDescription: "The exercise has been deactivated.",
+          title: "Success",
+          cleanupJobs: "Stuck jobs were cleaned up.",
+          mergeTitle: "Merge successful",
+          mergeDescription: "The exercises were merged.",
         },
         exerciseDetail: {
           exercise: "Exercise",
@@ -4695,20 +4701,6 @@ const resources = {
         date: {
           never: "Never",
           invalid: "Invalid date",
-        },
-        errors: {
-          title: "Error",
-          overviewLoad: "Overview stats could not be loaded.",
-          monitoringLoad: "Failed to load monitoring data.",
-          cleanupJobs: "Failed to clean up jobs.",
-          adminLoad: "Failed to load admin data.",
-          mergeFailed: "Merge failed.",
-        },
-        success: {
-          title: "Success",
-          cleanupJobs: "Stuck jobs were cleaned up.",
-          mergeTitle: "Merge successful",
-          mergeDescription: "The exercises were merged.",
         },
       },
       // Recovery Diary

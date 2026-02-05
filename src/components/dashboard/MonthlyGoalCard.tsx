@@ -1,5 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
   Tooltip,
@@ -55,10 +55,10 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
         const response = await fetch(
           `${API_URL}/stats/monthly-goal?offset=${monthOffset}`,
           {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
         );
 
         if (response.ok) {
@@ -88,9 +88,9 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
   const labelDate =
     monthKey && !Number.isNaN(Date.parse(`${monthKey}-01`))
       ? new Date(`${monthKey}-01`).toLocaleDateString(
-          i18n.language === "en" ? "en-US" : "de-DE",
-          { month: "long", year: "numeric" }
-        )
+        i18n.language === "en" ? "en-US" : "de-DE",
+        { month: "long", year: "numeric" }
+      )
       : t("dashboard.thisMonth", "diesen Monat");
 
   if (isLoading) {
@@ -101,18 +101,24 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
         aria-labelledby={titleId}
         tabIndex={0}
       >
-        <CardHeader className="p-4 sm:p-5 md:p-6 pb-2">
-          <CardTitle
-            className="text-base sm:text-lg md:text-xl font-semibold truncate"
-            id={titleId}
-          >
-            {t("dashboard.monthlyGoal", "Monthly goal")}
-          </CardTitle>
+        <CardHeader className="p-4 sm:p-5 pb-2">
+          <div className="flex flex-nowrap items-center justify-between gap-5 min-w-0">
+            <Skeleton className="h-7 w-32 rounded-md" />
+            <div className="flex flex-wrap items-center justify-between gap-0 w-full">
+              <Skeleton className="h-9 w-9 rounded-md shrink-0" />
+              <Skeleton className="h-5 w-28 rounded-md" />
+              <Skeleton className="h-9 w-9 rounded-md shrink-0" />
+            </div>
+            <Skeleton className="h-10 w-10 rounded-md shrink-0" />
+          </div>
         </CardHeader>
-        <CardContent className="p-4 sm:p-5 md:p-6 pt-0 space-y-4">
+        <CardContent className="p-4 sm:p-5 pt-3 space-y-4 min-h-0">
           <div className="space-y-2">
-            <Skeleton className="h-10 w-full max-w-[200px] rounded-lg" />
-            <Skeleton className="h-3 w-full rounded-full" />
+            <div className="flex flex-wrap justify-between items-baseline gap-x-3 gap-y-1">
+              <Skeleton className="h-4 w-24 rounded" />
+              <Skeleton className="h-4 w-20 rounded" />
+            </div>
+            <Skeleton className="h-2.5 w-full rounded-full" />
           </div>
         </CardContent>
       </Card>
@@ -121,19 +127,54 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
 
   return (
     <Card
-      className={cn("overflow-hidden transition-shadow hover:shadow-md", className)}
+      className={cn(
+        "overflow-hidden transition-shadow hover:shadow-md/50",
+        className
+      )}
       role="region"
       aria-labelledby={titleId}
       tabIndex={0}
     >
-      <CardHeader className="p-4 sm:p-5 md:p-6 pb-2">
-        <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
+      <CardHeader className="p-4 sm:p-5 pb-2">
+        <div className="flex flex-nowrap items-center justify-between gap-5 min-w-0">
           <CardTitle
-            className="text-base sm:text-lg md:text-xl font-semibold leading-tight min-w-0 truncate"
+            className="flex flex-wrap w-fit min-w-[140px] h-fit text-[23px] font-semibold tracking-tight"
             id={titleId}
           >
             {t("dashboard.monthlyGoal", "Monthly goal")}
           </CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-0 w-full">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="w-fit h-fit shrink-0 p-2.5"
+              disabled={monthOffset >= maxOffset}
+              onClick={() =>
+                setMonthOffset((prev) => Math.min(maxOffset, prev + 1))
+              }
+              aria-label={t("common.previous", "Zurück")}
+            >
+              <ChevronLeft className="h-4 w-4" aria-hidden />
+            </Button>
+            <span
+              className="text-sm sm:text-base font-semibold tabular-nums text-foreground text-center min-w-0 break-words px-1"
+              aria-live="polite"
+            >
+              {labelDate}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="w-fit h-fit shrink-0 p-2.5"
+              disabled={monthOffset === 0}
+              onClick={() => setMonthOffset((prev) => Math.max(0, prev - 1))}
+              aria-label={t("common.next", "Weiter")}
+            >
+              <ChevronRight className="h-4 w-4" aria-hidden />
+            </Button>
+          </div>
           <TooltipProvider delayDuration={150}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -141,10 +182,10 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                  className="shrink-0 p-3 text-muted-foreground hover:text-foreground hover:bg-muted/80"
                   title={t("dashboard.monthlyGoalAutoAdjust")}
                 >
-                  <Info className="h-4 w-4" />
+                  <Info className="h-4 w-4" aria-hidden />
                   <span className="sr-only">
                     {t("dashboard.monthlyGoalAutoAdjust")}
                   </span>
@@ -161,55 +202,19 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
           </TooltipProvider>
         </div>
       </CardHeader>
-      <CardContent className="p-4 sm:p-5 md:p-6 pt-0 space-y-4">
-        {/* Month navigation: wraps on very narrow, stays one row otherwise */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="h-9 w-9 shrink-0 rounded-full border-muted"
-            disabled={monthOffset >= maxOffset}
-            onClick={() =>
-              setMonthOffset((prev) => Math.min(maxOffset, prev + 1))
-            }
-            aria-label={t("common.previous", "Zurück")}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span
-            className="flex-1 min-w-0 text-center text-sm sm:text-base font-semibold tabular-nums text-foreground px-2"
-            aria-live="polite"
-          >
-            {labelDate}
-          </span>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="h-9 w-9 shrink-0 rounded-full border-muted"
-            disabled={monthOffset === 0}
-            onClick={() => setMonthOffset((prev) => Math.max(0, prev - 1))}
-            aria-label={t("common.next", "Weiter")}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-
-        {/* Points and progress: labels and values wrap cleanly */}
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-            <span className="text-sm text-muted-foreground">
+      <CardContent className="p-4 sm:p-5 pt-0 space-y-4 min-h-0">
+        {/* Progress block */}
+        <div className="space-y-2">
+          <div className="flex flex-wrap justify-between items-baseline gap-x-3 gap-y-1 text-sm">
+            <span className="text-muted-foreground">
               {t("dashboard.points", "Punkte")}{" "}
               <span className="text-foreground/80">
                 ({t("dashboard.goal", "Ziel")}: {target.toLocaleString()})
               </span>
             </span>
-            <span className="text-sm font-semibold tabular-nums text-foreground shrink-0">
-              {(stats.periodPoints ?? 0).toLocaleString()}
-              <span className="text-muted-foreground font-normal">
-                /{target.toLocaleString()}
-              </span>
+            <span className="font-semibold tabular-nums text-foreground shrink-0">
+              {(stats.periodPoints ?? 0).toLocaleString()} /{" "}
+              {target.toLocaleString()}
             </span>
           </div>
           <Progress
@@ -222,8 +227,7 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
             aria-valuemax={target}
           />
           <p className="text-xs text-muted-foreground">
-            {(stats.periodPoints ?? 0).toLocaleString()}{" "}
-            {t("dashboard.points", "Punkte")}{" "}
+            +{(stats.periodPoints ?? 0).toLocaleString()}{" "}
             {t("dashboard.thisMonth", "diesen Monat")}
           </p>
         </div>

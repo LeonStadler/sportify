@@ -1,9 +1,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { API_URL } from "@/lib/api";
-import { Calendar } from "lucide-react";
+import { Info } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Skeleton } from "../ui/skeleton";
@@ -95,11 +101,7 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
         tabIndex={0}
       >
         <CardHeader className="pb-4">
-          <CardTitle
-            className="text-lg md:text-xl flex items-center gap-2"
-            id={titleId}
-          >
-            <Calendar className="h-5 w-5" />
+          <CardTitle className="text-lg md:text-xl" id={titleId}>
             {t("dashboard.monthlyGoal", "Monthly goal")}
           </CardTitle>
         </CardHeader>
@@ -120,27 +122,55 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
       aria-labelledby={titleId}
       tabIndex={0}
     >
-        <CardHeader className="pb-4">
-          <CardTitle
-            className="text-lg md:text-xl flex items-center gap-2"
-            id={titleId}
-          >
-            <Calendar className="h-5 w-5" />
+      <CardHeader className="pb-4">
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-lg md:text-xl" id={titleId}>
             {t("dashboard.monthlyGoal", "Monthly goal")}
           </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <TooltipProvider delayDuration={150}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+                  title={t("dashboard.monthlyGoalAutoAdjust")}
+                >
+                  <Info className="h-4 w-4" />
+                  <span className="sr-only">
+                    {t("dashboard.monthlyGoalAutoAdjust")}
+                  </span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent
+                side="left"
+                align="start"
+                className="max-w-xs text-sm"
+              >
+                {t("dashboard.monthlyGoalAutoAdjust")}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center justify-between">
             <Button
               type="button"
               variant="ghost"
               size="sm"
               disabled={monthOffset >= maxOffset}
-              onClick={() => setMonthOffset((prev) => Math.min(maxOffset, prev + 1))}
+              onClick={() =>
+                setMonthOffset((prev) => Math.min(maxOffset, prev + 1))
+              }
             >
               {t("common.previous", "Zurück")}
             </Button>
-            <span>{labelDate}</span>
+            <span className="text-sm font-semibold tabular-nums text-foreground">
+              {labelDate}
+            </span>
             <Button
               type="button"
               variant="ghost"
@@ -151,11 +181,12 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
               {t("common.next", "Weiter")}
             </Button>
           </div>
-          <div>
-            <div className="flex justify-between text-sm mb-2">
-              <span>
-              {t("dashboard.points", "Punkte")} ({t("dashboard.goal", "Ziel")}:{" "}
-              {target.toLocaleString()})
+        </div>
+        <div>
+          <div className="flex justify-between text-sm mb-2">
+            <span>
+              {t("dashboard.points", "Punkte")} (
+              {t("dashboard.goal", "Ziel")}: {target.toLocaleString()})
             </span>
             <span className="font-medium">
               {(stats.periodPoints ?? 0).toLocaleString()}/
@@ -174,12 +205,6 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
           <p className="text-xs text-muted-foreground mt-2">
             +{(stats.periodPoints ?? 0).toLocaleString()}{" "}
             {t("dashboard.thisMonth", "diesen Monat")}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {t(
-              "dashboard.monthlyGoalAutoAdjust",
-              "Das Monatsziel passt sich automatisch an deine letzten Monate an."
-            )}
           </p>
         </div>
       </CardContent>

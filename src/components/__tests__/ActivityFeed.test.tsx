@@ -3,6 +3,10 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const TEST_API_URL = "http://localhost:3001/api";
+const routerFutureConfig = {
+  v7_startTransition: true,
+  v7_relativeSplatPath: true,
+};
 const toastMock = vi.fn();
 const tMock = (key: string, fallback?: string) => {
   const map: Record<string, string> = {
@@ -120,7 +124,7 @@ describe("ActivityFeed", () => {
     global.fetch = mockFetch as unknown as typeof fetch;
 
     render(
-      <MemoryRouter>
+      <MemoryRouter future={routerFutureConfig}>
         <ActivityFeed />
       </MemoryRouter>
     );
@@ -146,11 +150,14 @@ describe("ActivityFeed", () => {
         json: () => Promise.resolve({ error: "Boom" }),
       })
     );
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
 
     global.fetch = mockFetch as unknown as typeof fetch;
 
     render(
-      <MemoryRouter>
+      <MemoryRouter future={routerFutureConfig}>
         <ActivityFeed />
       </MemoryRouter>
     );
@@ -169,5 +176,6 @@ describe("ActivityFeed", () => {
     );
 
     expect(toastMock).toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
   });
 });

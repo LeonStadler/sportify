@@ -71,7 +71,7 @@ import { API_URL } from "@/lib/api";
 import type { Workout } from "@/types/workout";
 import { getNormalizedRange, getRangeForPeriod, toDateParam } from "@/utils/dateRanges";
 import { convertDistance, convertWeightFromKg } from "@/utils/units";
-import { ArrowDown, ArrowUp, ChevronDown, Copy, Eye, Info, Pencil, Play, Search, Star, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, Copy, Eye, Info, Pencil, Play, Star, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { useTranslation } from "react-i18next";
@@ -1274,7 +1274,6 @@ export function Training() {
                 <PopoverContent className="w-[320px] p-0" align="end">
                   <Command>
                     <div className="flex items-center gap-2 px-3 py-2 border-b">
-                      <Search className="h-4 w-4 text-muted-foreground" />
                       <CommandInput
                         placeholder={t("training.searchTemplates", "Vorlagen durchsuchen")}
                         value={templatePickerQuery}

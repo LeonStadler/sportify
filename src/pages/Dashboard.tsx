@@ -760,7 +760,7 @@ export function Dashboard() {
         <Button
           variant="ghost"
           size="icon"
-          className="absolute top-0 right-0 z-10"
+          className="absolute top-0 right-0"
           onClick={() => setSettingsOpen(true)}
           aria-label={t(
             "dashboard.settings.title",

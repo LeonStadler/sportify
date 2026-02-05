@@ -120,18 +120,59 @@ export const createScoreboardRouter = (pool) => {
         return res.status(400).json({ error: userDateResult.error });
       }
 
-      const userTotalsQuery = `
-                SELECT
+      const userTotalsQuery =
+        scope === "global"
+          ? `
+                WITH totals AS (
+                  SELECT
                     u.id,
                     ${USER_DISPLAY_NAME_SQL} as display_name,
                     u.avatar_url,
                     u.show_in_global_rankings,
                     COALESCE(SUM(wa.points_earned), 0) as total_points
-                FROM users u
-                LEFT JOIN workouts w ON u.id = w.user_id ${userDateResult.clause}
-                LEFT JOIN workout_activities wa ON w.id = wa.workout_id
-                WHERE u.id = $1
-                GROUP BY u.id, u.first_name, u.last_name, u.nickname, u.display_preference, u.avatar_url, u.show_in_global_rankings
+                  FROM users u
+                  LEFT JOIN workouts w ON u.id = w.user_id ${userDateResult.clause}
+                  LEFT JOIN workout_activities wa ON w.id = wa.workout_id
+                  GROUP BY u.id, u.first_name, u.last_name, u.nickname, u.display_preference, u.avatar_url, u.show_in_global_rankings
+                ),
+                eligible AS (
+                  SELECT * FROM totals
+                  WHERE show_in_global_rankings = true OR id = $1
+                ),
+                ranked AS (
+                  SELECT
+                    *,
+                    CASE
+                      WHEN total_points > 0 THEN RANK() OVER (ORDER BY total_points DESC)
+                      ELSE NULL
+                    END AS computed_rank
+                  FROM eligible
+                )
+                SELECT * FROM ranked WHERE id = $1
+            `
+          : `
+                WITH totals AS (
+                  SELECT
+                    u.id,
+                    ${USER_DISPLAY_NAME_SQL} as display_name,
+                    u.avatar_url,
+                    u.show_in_global_rankings,
+                    COALESCE(SUM(wa.points_earned), 0) as total_points
+                  FROM users u
+                  LEFT JOIN workouts w ON u.id = w.user_id ${userDateResult.clause}
+                  LEFT JOIN workout_activities wa ON w.id = wa.workout_id
+                  GROUP BY u.id, u.first_name, u.last_name, u.nickname, u.display_preference, u.avatar_url, u.show_in_global_rankings
+                ),
+                ranked AS (
+                  SELECT
+                    *,
+                    CASE
+                      WHEN total_points > 0 THEN RANK() OVER (ORDER BY total_points DESC)
+                      ELSE NULL
+                    END AS computed_rank
+                  FROM totals
+                )
+                SELECT * FROM ranked WHERE id = $1
             `;
 
       const userParams = [req.user.id, ...userDateResult.params];
@@ -141,17 +182,25 @@ export const createScoreboardRouter = (pool) => {
 
       if (userRow && !alreadyListed) {
         const converted = toCamelCase(userRow);
-        leaderboard.push({
+        const isMuted =
+          scope === "global" && userRow.show_in_global_rankings === false;
+        const userEntry = {
           id: converted.id,
           displayName: converted.displayName || "Athlet",
           avatarUrl: converted.avatarUrl || null,
           totalPoints: Number(converted.totalPoints) || 0,
-          rank: null,
+          rank: isMuted ? null : converted.computedRank ?? null,
           isCurrentUser: true,
-          isMuted:
-            scope === "global" &&
-            userRow.show_in_global_rankings === false,
-        });
+          isMuted,
+        };
+        const insertIndex = leaderboard.findIndex(
+          (entry) => (entry.totalPoints ?? 0) < userEntry.totalPoints
+        );
+        if (insertIndex === -1) {
+          leaderboard.push(userEntry);
+        } else {
+          leaderboard.splice(insertIndex, 0, userEntry);
+        }
       }
 
       res.json({ leaderboard });
@@ -219,12 +268,50 @@ export const createScoreboardRouter = (pool) => {
                     u.id,
                     ${USER_DISPLAY_NAME_SQL} as display_name,
                     u.avatar_url,
-                    COALESCE(SUM(wa.quantity), 0) as total_amount,
-                    COALESCE(SUM(wa.points_earned), 0) as total_points
+                    COALESCE(
+                      SUM(
+                        CASE
+                          WHEN COALESCE(ex.id::text, wa.activity_type) = $1
+                            OR ex.slug = $1
+                            OR regexp_replace(lower(ex.slug), '[^a-z0-9]+', '', 'g') =
+                               regexp_replace(lower($1), '[^a-z0-9]+', '', 'g')
+                            OR wa.activity_type = $1
+                          THEN wa.quantity
+                          ELSE 0
+                        END
+                      ),
+                      0
+                    ) as total_amount,
+                    COALESCE(
+                      SUM(
+                        CASE
+                          WHEN COALESCE(ex.id::text, wa.activity_type) = $1
+                            OR ex.slug = $1
+                            OR regexp_replace(lower(ex.slug), '[^a-z0-9]+', '', 'g') =
+                               regexp_replace(lower($1), '[^a-z0-9]+', '', 'g')
+                            OR wa.activity_type = $1
+                          THEN wa.points_earned
+                          ELSE 0
+                        END
+                      ),
+                      0
+                    ) as total_points
                 FROM users u
                 LEFT JOIN workouts w ON u.id = w.user_id ${dateFilter}
-                LEFT JOIN workout_activities wa ON w.id = wa.workout_id AND wa.activity_type = $1
+                LEFT JOIN workout_activities wa ON w.id = wa.workout_id
+                LEFT JOIN exercises ex
+                  ON ex.id::text = wa.activity_type::text
+                  OR ex.slug = wa.activity_type
+                  OR regexp_replace(lower(ex.slug), '[^a-z0-9]+', '', 'g') =
+                     regexp_replace(lower(wa.activity_type), '[^a-z0-9]+', '', 'g')
                 WHERE 1=1 ${scopeFilter}
+                  AND (
+                    COALESCE(ex.id::text, wa.activity_type) = $1
+                    OR ex.slug = $1
+                    OR regexp_replace(lower(ex.slug), '[^a-z0-9]+', '', 'g') =
+                       regexp_replace(lower($1), '[^a-z0-9]+', '', 'g')
+                    OR wa.activity_type = $1
+                  )
                 GROUP BY u.id, u.first_name, u.last_name, u.nickname, u.display_preference, u.avatar_url
                 HAVING COALESCE(SUM(wa.points_earned), 0) > 0
                 ORDER BY total_points DESC
@@ -256,19 +343,124 @@ export const createScoreboardRouter = (pool) => {
         return res.status(400).json({ error: userDateResult.error });
       }
       const userParams = [req.user.id, ...userDateResult.params, activity];
-      const userTotalsQuery = `
-                SELECT
+      const userTotalsQuery =
+        scope === "global"
+          ? `
+                WITH totals AS (
+                  SELECT
                     u.id,
                     ${USER_DISPLAY_NAME_SQL} as display_name,
                     u.avatar_url,
                     u.show_in_global_rankings,
-                    COALESCE(SUM(wa.quantity), 0) as total_amount,
-                    COALESCE(SUM(wa.points_earned), 0) as total_points
-                FROM users u
-                LEFT JOIN workouts w ON u.id = w.user_id ${userDateResult.clause}
-                LEFT JOIN workout_activities wa ON w.id = wa.workout_id AND wa.activity_type = $${userParams.length}
-                WHERE u.id = $1
-                GROUP BY u.id, u.first_name, u.last_name, u.nickname, u.display_preference, u.avatar_url, u.show_in_global_rankings
+                    COALESCE(
+                      SUM(
+                        CASE
+                          WHEN COALESCE(ex.id::text, wa.activity_type) = $${userParams.length}
+                            OR ex.slug = $${userParams.length}
+                            OR regexp_replace(lower(ex.slug), '[^a-z0-9]+', '', 'g') =
+                               regexp_replace(lower($${userParams.length}), '[^a-z0-9]+', '', 'g')
+                            OR wa.activity_type = $${userParams.length}
+                          THEN wa.quantity
+                          ELSE 0
+                        END
+                      ),
+                      0
+                    ) as total_amount,
+                    COALESCE(
+                      SUM(
+                        CASE
+                          WHEN COALESCE(ex.id::text, wa.activity_type) = $${userParams.length}
+                            OR ex.slug = $${userParams.length}
+                            OR regexp_replace(lower(ex.slug), '[^a-z0-9]+', '', 'g') =
+                               regexp_replace(lower($${userParams.length}), '[^a-z0-9]+', '', 'g')
+                            OR wa.activity_type = $${userParams.length}
+                          THEN wa.points_earned
+                          ELSE 0
+                        END
+                      ),
+                      0
+                    ) as total_points
+                  FROM users u
+                  LEFT JOIN workouts w ON u.id = w.user_id ${userDateResult.clause}
+                  LEFT JOIN workout_activities wa ON w.id = wa.workout_id
+                  LEFT JOIN exercises ex
+                    ON ex.id::text = wa.activity_type::text
+                    OR ex.slug = wa.activity_type
+                    OR regexp_replace(lower(ex.slug), '[^a-z0-9]+', '', 'g') =
+                       regexp_replace(lower(wa.activity_type), '[^a-z0-9]+', '', 'g')
+                  GROUP BY u.id, u.first_name, u.last_name, u.nickname, u.display_preference, u.avatar_url, u.show_in_global_rankings
+                ),
+                eligible AS (
+                  SELECT * FROM totals
+                  WHERE show_in_global_rankings = true OR id = $1
+                ),
+                ranked AS (
+                  SELECT
+                    *,
+                    CASE
+                      WHEN total_points > 0 THEN RANK() OVER (ORDER BY total_points DESC)
+                      ELSE NULL
+                    END AS computed_rank
+                  FROM eligible
+                )
+                SELECT * FROM ranked WHERE id = $1
+            `
+          : `
+                WITH totals AS (
+                  SELECT
+                    u.id,
+                    ${USER_DISPLAY_NAME_SQL} as display_name,
+                    u.avatar_url,
+                    u.show_in_global_rankings,
+                    COALESCE(
+                      SUM(
+                        CASE
+                          WHEN COALESCE(ex.id::text, wa.activity_type) = $${userParams.length}
+                            OR ex.slug = $${userParams.length}
+                            OR regexp_replace(lower(ex.slug), '[^a-z0-9]+', '', 'g') =
+                               regexp_replace(lower($${userParams.length}), '[^a-z0-9]+', '', 'g')
+                            OR wa.activity_type = $${userParams.length}
+                          THEN wa.quantity
+                          ELSE 0
+                        END
+                      ),
+                      0
+                    ) as total_amount,
+                    COALESCE(
+                      SUM(
+                        CASE
+                          WHEN COALESCE(ex.id::text, wa.activity_type) = $${userParams.length}
+                            OR ex.slug = $${userParams.length}
+                            OR regexp_replace(lower(ex.slug), '[^a-z0-9]+', '', 'g') =
+                               regexp_replace(lower($${userParams.length}), '[^a-z0-9]+', '', 'g')
+                            OR wa.activity_type = $${userParams.length}
+                          THEN wa.points_earned
+                          ELSE 0
+                        END
+                      ),
+                      0
+                    ) as total_points
+                  FROM users u
+                  LEFT JOIN workouts w ON u.id = w.user_id ${userDateResult.clause}
+                  LEFT JOIN workout_activities wa ON w.id = wa.workout_id
+                  LEFT JOIN exercises ex
+                    ON ex.id::text = wa.activity_type::text
+                    OR ex.slug = wa.activity_type
+                    OR regexp_replace(lower(ex.slug), '[^a-z0-9]+', '', 'g') =
+                       regexp_replace(lower(wa.activity_type), '[^a-z0-9]+', '', 'g')
+                  WHERE COALESCE(ex.id::text, wa.activity_type) = $${userParams.length}
+                  GROUP BY u.id, u.first_name, u.last_name, u.nickname, u.display_preference, u.avatar_url, u.show_in_global_rankings
+                ),
+                ranked AS (
+                  SELECT
+                    *,
+                    CASE
+                      WHEN total_points > 0 THEN RANK() OVER (ORDER BY total_points DESC)
+                      ELSE NULL
+                    END AS computed_rank
+                  FROM totals
+                )
+                SELECT * FROM ranked WHERE id = $1
             `;
 
       const { rows: userRows } = await pool.query(userTotalsQuery, userParams);
@@ -277,18 +469,26 @@ export const createScoreboardRouter = (pool) => {
 
       if (userRow && !alreadyListed) {
         const converted = toCamelCase(userRow);
-        leaderboard.push({
+        const isMuted =
+          scope === "global" && userRow.show_in_global_rankings === false;
+        const userEntry = {
           id: converted.id,
           displayName: converted.displayName || "Athlet",
           avatarUrl: converted.avatarUrl || null,
           totalAmount: Number(converted.totalAmount) || 0,
           totalPoints: Number(converted.totalPoints) || 0,
-          rank: null,
+          rank: isMuted ? null : converted.computedRank ?? null,
           isCurrentUser: true,
-          isMuted:
-            scope === "global" &&
-            userRow.show_in_global_rankings === false,
-        });
+          isMuted,
+        };
+        const insertIndex = leaderboard.findIndex(
+          (entry) => (entry.totalPoints ?? 0) < userEntry.totalPoints
+        );
+        if (insertIndex === -1) {
+          leaderboard.push(userEntry);
+        } else {
+          leaderboard.splice(insertIndex, 0, userEntry);
+        }
       }
 
       const { rows: activityRows } = await pool.query(
@@ -296,6 +496,9 @@ export const createScoreboardRouter = (pool) => {
           SELECT id, name, measurement_type, supports_time, supports_distance
           FROM exercises
           WHERE id = $1
+             OR slug = $1
+             OR regexp_replace(lower(slug), '[^a-z0-9]+', '', 'g') =
+                regexp_replace(lower($1), '[^a-z0-9]+', '', 'g')
         `,
         [activity]
       );
@@ -368,7 +571,12 @@ export const createScoreboardRouter = (pool) => {
       }
 
       let scopeFilter = "";
-      if (scope === "friends") {
+      if (scope === "personal") {
+        params.push(req.user.id);
+        const userParamIndex = paramIndex;
+        paramIndex++;
+        scopeFilter = `AND u.id = $${userParamIndex}`;
+      } else if (scope === "friends") {
         params.push(req.user.id);
         const userParamIndex = paramIndex;
         paramIndex++;
@@ -392,20 +600,30 @@ export const createScoreboardRouter = (pool) => {
 
       const query = `
         SELECT
-          wa.activity_type AS activity_id,
+          COALESCE(ex.id::text, wa.activity_type) AS activity_id,
           COALESCE(ex.name, wa.activity_type) AS activity_label,
           COALESCE(ex.measurement_type, 'reps') AS measurement_type,
           COALESCE(ex.supports_time, false) AS supports_time,
           COALESCE(ex.supports_distance, false) AS supports_distance,
-          COALESCE(SUM(wa.points_earned), 0)::numeric AS total_points
+          COALESCE(SUM(wa.points_earned), 0)::numeric AS total_points,
+          COALESCE(
+            NULLIF(SUM(wa.points_earned), 0),
+            NULLIF(SUM(wa.quantity), 0),
+            0
+          )::numeric AS score
         FROM workout_activities wa
         JOIN workouts w ON w.id = wa.workout_id ${dateFilter}
         JOIN users u ON u.id = w.user_id
-        LEFT JOIN exercises ex ON ex.id = wa.activity_type
+        LEFT JOIN exercises ex
+          ON ex.id::text = wa.activity_type::text
+          OR ex.slug = wa.activity_type
+          OR regexp_replace(lower(ex.slug), '[^a-z0-9]+', '', 'g') =
+             regexp_replace(lower(wa.activity_type), '[^a-z0-9]+', '', 'g')
         WHERE 1=1 ${scopeFilter}
-        GROUP BY wa.activity_type, ex.name, ex.measurement_type, ex.supports_time, ex.supports_distance
+        GROUP BY COALESCE(ex.id::text, wa.activity_type), ex.name, ex.measurement_type, ex.supports_time, ex.supports_distance
         HAVING COALESCE(SUM(wa.points_earned), 0) > 0
-        ORDER BY total_points DESC
+           OR COALESCE(SUM(wa.quantity), 0) > 0
+        ORDER BY score DESC
         LIMIT $${paramIndex}
       `;
       params.push(parsedLimit);

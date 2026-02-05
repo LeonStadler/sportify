@@ -4,6 +4,7 @@ import { GlobalRankingWarningDialog } from "@/components/ranking/GlobalRankingWa
 import { ScoreboardTable } from "@/components/ranking/ScoreboardTable";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -225,7 +226,6 @@ export function Scoreboard() {
       activityId: string;
       metaLabel: string;
       metaKind: "auto";
-      scopeOverride: "personal" | "friends" | "global";
     }> = [];
 
     if (personalTop) {
@@ -233,9 +233,8 @@ export function Scoreboard() {
         id: "auto-personal",
         name: personalTop.name,
         activityId: personalTop.id,
-        metaLabel: t("scoreboard.autoPersonal", "Deine Top‑Übung (automatisch)"),
+        metaLabel: t("scoreboard.autoPersonal", "Top bei dir"),
         metaKind: "auto",
-        scopeOverride: "personal",
       });
     }
     if (friendsTop) {
@@ -243,9 +242,8 @@ export function Scoreboard() {
         id: "auto-friends",
         name: friendsTop.name,
         activityId: friendsTop.id,
-        metaLabel: t("scoreboard.autoFriends", "Top bei Freunden (automatisch)"),
+        metaLabel: t("scoreboard.autoFriends", "Top bei Freunden"),
         metaKind: "auto",
-        scopeOverride: "friends",
       });
     }
     if (globalTop) {
@@ -253,9 +251,8 @@ export function Scoreboard() {
         id: "auto-global",
         name: globalTop.name,
         activityId: globalTop.id,
-        metaLabel: t("scoreboard.autoGlobal", "Top global (automatisch)"),
+        metaLabel: t("scoreboard.autoGlobal", "Top global"),
         metaKind: "auto",
-        scopeOverride: "global",
       });
     }
 
@@ -621,6 +618,22 @@ export function Scoreboard() {
                 <>
                   {activity.icon && <span className="mr-1.5">{activity.icon}</span>}
                   <span>{activity.name}</span>
+                  {activity.metaKind === "auto" && (
+                    <Badge
+                      variant="secondary"
+                      className="ml-2 h-4 px-1.5 text-[10px] uppercase tracking-wide"
+                    >
+                      {t("scoreboard.autoBadge", "Auto")}
+                    </Badge>
+                  )}
+                  {activity.metaKind === "manual" && (
+                    <Badge
+                      variant="outline"
+                      className="ml-2 h-4 px-1.5 text-[10px] uppercase tracking-wide"
+                    >
+                      {t("scoreboard.manualBadge", "Manuell")}
+                    </Badge>
+                  )}
                 </>
               )}
             </TabsTrigger>
@@ -633,10 +646,6 @@ export function Scoreboard() {
             const activityId = activity.activityId ?? activity.id;
             const metaLabel = activity.metaLabel;
             const metaKind = activity.metaKind;
-            const activityScope =
-              "scopeOverride" in activity && activity.scopeOverride
-                ? activity.scopeOverride
-                : scope;
             return (
           <TabsContent key={activity.id} value={activity.id} className="mt-6">
             <Card>
@@ -649,7 +658,9 @@ export function Scoreboard() {
                 </CardTitle>
                 {metaLabel && (
                   <p className="text-xs text-muted-foreground mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span>{metaLabel}</span>
+                    <span>
+                      {t("scoreboard.exerciseSelection", "Übungsauswahl")} · {metaLabel}
+                    </span>
                     <span className="text-muted-foreground/60">·</span>
                     <span>
                       {metaKind === "auto"
@@ -670,7 +681,7 @@ export function Scoreboard() {
                   activity={activityId}
                   period={effectivePeriod}
                   dateRange={resolvedRange}
-                  scope={activityScope}
+                  scope={scope}
                 />
               </CardContent>
             </Card>

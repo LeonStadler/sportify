@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertTriangle, Check, ChevronDown, Search, Star } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, Star } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -240,20 +240,21 @@ export const ExercisePicker = ({
         </div>
       )}
       <PopoverContent
-        className="w-[var(--radix-popover-trigger-width)] max-w-[90vw] p-0"
+        className="p-0 max-h-[70vh] overflow-y-auto"
         align="start"
+        style={{
+          width: "min(var(--radix-popover-trigger-width), 360px)",
+          maxWidth: "90vw",
+        }}
       >
         <Command shouldFilter={false} className="max-h-[70vh] overflow-hidden">
-          <div className="flex items-center gap-2 px-3 py-2 border-b">
-            <Search className="h-4 w-4 text-muted-foreground" />
-            <CommandInput
-              placeholder={t("training.form.searchExercise", "Übung suchen")}
-              value={filters.query}
-              onValueChange={(value) =>
-                setFilters((prev) => ({ ...prev, query: value }))
-              }
-            />
-          </div>
+          <CommandInput
+            placeholder={t("training.form.searchExercise", "Übung suchen")}
+            value={filters.query}
+            onValueChange={(value) =>
+              setFilters((prev) => ({ ...prev, query: value }))
+            }
+          />
 
           {enableFilters && (
             <>
@@ -415,7 +416,7 @@ export const ExercisePicker = ({
             </>
           )}
 
-          <CommandList className="max-h-[320px] overflow-y-auto overscroll-contain">
+          <CommandList className="max-h-[320px] overflow-y-auto">
             <CommandEmpty>
               {t("training.form.noExercises", "Keine Übungen gefunden")}
             </CommandEmpty>

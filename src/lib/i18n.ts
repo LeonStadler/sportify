@@ -793,6 +793,7 @@ const resources = {
         thisYear: "dieses Jahr",
         points: "Punkte",
         workouts: "Anzahl Trainings",
+        monthlyGoal: "Monatsziel",
         monthlyGoalAutoAdjust:
           "Das Monatsziel passt sich automatisch an deine letzten Monate an.",
         settings: {
@@ -996,6 +997,9 @@ const resources = {
         autoExercisesHint:
           "Automatisch ausgewählt nach Leistung im gewählten Zeitraum.",
         manualExercisesHint: "Manuell ausgewählte Übung.",
+        exerciseSelection: "Übungsauswahl",
+        autoBadge: "Auto",
+        manualBadge: "Manuell",
         autoPersonal: "Top bei dir",
         autoFriends: "Top bei Freunden",
         autoGlobal: "Top global",
@@ -1565,6 +1569,13 @@ const resources = {
           },
         },
         exercises: {
+          importExport: {
+            title: "Import & Export",
+            exportCsv: "CSV-Vorlage exportieren",
+            exportJson: "JSON-Vorlage exportieren",
+            exportXlsx: "Excel-Vorlage exportieren",
+            note: "Pflichtfelder sind alle Spalten außer Beschreibung. Ungültige Einträge werden übersprungen. Die Excel-Vorlage enthält Auswahlfelder.",
+          },
           merge: {
             title: "Zusammenführen",
             source: "Quell-Übung",
@@ -3797,6 +3808,7 @@ const resources = {
         thisYear: "this year",
         points: "Points",
         workouts: "Number of workouts",
+        monthlyGoal: "Monthly goal",
         monthlyGoalAutoAdjust:
           "Your monthly goal adjusts automatically based on your recent months.",
         settings: {
@@ -3998,6 +4010,9 @@ const resources = {
         autoExercisesHint:
           "Automatically selected based on performance in the chosen period.",
         manualExercisesHint: "Manually selected exercise.",
+        exerciseSelection: "Exercise selection",
+        autoBadge: "Auto",
+        manualBadge: "Manual",
         autoPersonal: "Top for you",
         autoFriends: "Top with friends",
         autoGlobal: "Top global",
@@ -4563,6 +4578,13 @@ const resources = {
           },
         },
         exercises: {
+          importExport: {
+            title: "Import & export",
+            exportCsv: "Export CSV template",
+            exportJson: "Export JSON template",
+            exportXlsx: "Export Excel template",
+            note: "All columns except description are required. Invalid entries are skipped. The Excel template includes dropdown selections.",
+          },
           merge: {
             title: "Merge",
             source: "Source exercise",

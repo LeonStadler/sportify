@@ -1,58 +1,103 @@
-# Sportify – Modern Sports Analytics Platform
+# Sportify
 
-**Sportify** ist eine moderne Progressive Web App für Sport‑Analytics und Fitness‑Tracking. Die Anwendung erlaubt das Erfassen von Workouts, die Analyse von Statistiken, den Vergleich mit Freunden sowie die langfristige Dokumentation von Fortschritten.
+**Moderne Progressive Web App für Sport‑Analytics und Fitness‑Tracking.** Workouts erfassen, Statistiken auswerten, mit Freunden vergleichen und Fortschritte langfristig dokumentieren – mit PWA‑Offline, optionalen Push‑Benachrichtigungen und mehrsprachiger Oberfläche (DE/EN).
+
+---
 
 ## Überblick
 
-- **Workout‑Management** mit Aktivitäten, Sets und Templates
-- **Übungsdatenbank** mit Filtern und Favoriten
-- **Statistiken & Scoreboard**
-- **Social Features** (Freunde, Feed, Reaktionen)
-- **Ziele & Challenges**
-- **Training Journal**
-- **Benachrichtigungen & Push**
-- **PWA** mit Offline‑Support
-- **2FA + E‑Mail‑Verifizierung**
+Sportify verbindet persönliches Training mit sozialem Wettbewerb und klarer Dokumentation:
 
-## Technologien
+| Bereich                    | Beschreibung                                                                            |
+| -------------------------- | --------------------------------------------------------------------------------------- |
+| **Training & Workouts**    | Workouts mit Aktivitäten, Sets und Templates; Übungsdatenbank mit Filtern und Favoriten |
+| **Statistiken & Rankings** | Auswertungen, Scoreboard, Punkte und Trends                                             |
+| **Social**                 | Freunde, Activity‑Feed, Reaktionen auf Workouts                                         |
+| **Ziele & Challenges**     | Wochenziele, Challenges, Fortschritts‑Tracking                                          |
+| **Training Journal**       | Einträge, Tags, Stimmung, Verknüpfung mit Workouts                                      |
+| **Sicherheit & Konto**     | E‑Mail‑Verifizierung, 2FA (TOTP), Passwort‑Reset                                        |
+| **PWA**                    | Installierbar, Offline‑Support, optional Web Push                                       |
 
-- React 18, Vite, TypeScript
-- Express, PostgreSQL
-- TanStack Query, Tailwind, Radix UI
-- i18next, PWA
+Die vollständige **Feature‑ und Produktdokumentation** findest du in der Online‑Doku (siehe unten).
 
-## Installation
+---
+
+## Architektur (Kurz)
+
+- **Frontend:** React 18, Vite, TypeScript – Tailwind, Radix UI (shadcn/ui), TanStack Query, React Router, i18next
+- **Backend:** Express, REST/JSON, JWT‑Auth, parameterisierte SQL (pg)
+- **Datenbank:** PostgreSQL, Migrationen in `migrations/`
+- **Betrieb:** Optional SMTP, Web Push (VAPID), Event‑Jobs (Cron); Deployment z. B. Vercel
+
+Details: [Architektur](https://vertic-id.com/docs/architecture), [Backend](https://vertic-id.com/docs/backend), [Frontend](https://vertic-id.com/docs/frontend), [Datenbank](https://vertic-id.com/docs/database).
+
+---
+
+## Schnellstart
+
+**Voraussetzungen:** Node.js ≥ 18, PostgreSQL
 
 ```bash
+# Abhängigkeiten
 npm install
-```
 
-## Entwicklung
+# Umgebung: .env aus .env.example anlegen (mind. DATABASE_URL, JWT_SECRET, FRONTEND_URL)
+# Siehe docs/development.md bzw. Online‑Doku
 
-```bash
+# Entwicklung (Frontend + Backend)
 npm run dev
 ```
 
-## Tests
+- Frontend: typischerweise <http://localhost:8080>
+- Backend: typischerweise <http://localhost:3001>
 
-```bash
-npm run test
-```
+---
+
+## Wichtige Skripte
+
+| Befehl                                         | Beschreibung                  |
+| ---------------------------------------------- | ----------------------------- |
+| `npm run dev`                                  | Frontend + Backend gemeinsam  |
+| `npm run dev:frontend` / `npm run dev:backend` | Nur Frontend bzw. Backend     |
+| `npm run build`                                | Produktions‑Build (TS + Vite) |
+| `npm run test`                                 | Tests (Node + Vitest)         |
+| `npm run lint`                                 | ESLint                        |
+| `npm run type-check`                           | TypeScript ohne Emit          |
+
+Weitere Skripte und Umgebungsvariablen: [Entwicklung](https://vertic-id.com/docs/development).
+
+---
 
 ## Umgebungsvariablen (Auszug)
 
-- `DATABASE_URL`
-- `JWT_SECRET`
-- `FRONTEND_URL`
-- `SMTP_*` (optional)
-- `VAPID_*` (optional)
+- **Pflicht:** `DATABASE_URL`, `JWT_SECRET`, `FRONTEND_URL`
+- **Optional:** SMTP (E‑Mail), VAPID (Push), Events/Jobs, Frontend‑Variablen (`VITE_*`)
 
-Details: [docs/development.md](docs/development.md)
+Vollständige Liste und Beschreibung: [Entwicklung – Umgebungsvariablen](https://vertic-id.com/docs/development#umgebungsvariablen).
+
+---
 
 ## Dokumentation
 
-- [Dokumentations-Übersicht](docs/README.md)
-- [API-Dokumentation](docs/api/README.md)
+**Online (empfohlen):**  
+**[sportify.leon-stadler.com/docs](https://vertic-id.com/docs)**
+
+Dort findest du u. a.:
+
+- **Architektur, Backend, Frontend, Datenbank**
+- **Design** (Corporate Identity, Tokens, Layout, Komponenten, A11y)
+- **API** (Endpoints, Auth, Workouts, Exercises, Social, Admin, …)
+- **Features** (Landing, Dashboard, Training, Journal, Ziele, Social, …)
+- **Systeme** (Templates, Notifications, Exercise‑System)
+- **Betrieb** (Deployment, PWA, E‑Mail)
+
+**Im Repository:**
+
+- [docs/README.md](docs/README.md) – Übersicht der Docs
+- [docs/development.md](docs/development.md) – Setup und Skripte
+- [docs/api/README.md](docs/api/README.md) – API‑Übersicht
+
+---
 
 ## Lizenz
 

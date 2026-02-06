@@ -867,57 +867,57 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
-  const updateProfile = async (
-    data: Partial<User>,
-    silent = false
-  ): Promise<void> => {
-    // Im silent-Modus keinen globalen Loading-State setzen (für Auto-Save)
-    if (!silent) {
-      setState((prev) => ({ ...prev, isLoading: true, error: null }));
-    }
-
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${API_URL}/profile/update`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(data),
-      });
-
-      const responseData = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          responseData.error || "Fehler beim Aktualisieren des Profils"
-        );
+  const updateProfile = useCallback(
+    async (data: Partial<User>, silent = false): Promise<void> => {
+      // Im silent-Modus keinen globalen Loading-State setzen (für Auto-Save)
+      if (!silent) {
+        setState((prev) => ({ ...prev, isLoading: true, error: null }));
       }
 
-      const normalized = normalizeUserPreferences(responseData);
-      // User-State aktualisieren ohne Loading-State zu ändern
-      setState((prev) => ({
-        ...prev,
-        user: normalized,
-        isLoading: silent ? prev.isLoading : false,
-        error: null,
-      }));
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Ein unbekannter Fehler ist aufgetreten.";
-      if (!silent) {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await fetch(`${API_URL}/profile/update`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(data),
+        });
+
+        const responseData = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            responseData.error || "Fehler beim Aktualisieren des Profils"
+          );
+        }
+
+        const normalized = normalizeUserPreferences(responseData);
+        // User-State aktualisieren ohne Loading-State zu ändern
         setState((prev) => ({
           ...prev,
-          isLoading: false,
-          error: errorMessage,
+          user: normalized,
+          isLoading: silent ? prev.isLoading : false,
+          error: null,
         }));
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Ein unbekannter Fehler ist aufgetreten.";
+        if (!silent) {
+          setState((prev) => ({
+            ...prev,
+            isLoading: false,
+            error: errorMessage,
+          }));
+        }
+        throw error;
       }
-      throw error;
-    }
-  };
+    },
+    []
+  );
 
   const deleteAccount = async (password: string): Promise<void> => {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));

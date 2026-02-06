@@ -176,7 +176,7 @@ export function WorkoutForm({
           ];
       }
     },
-    [t]
+    [t, userDistanceUnit]
   );
 
   const loadExercises = useCallback(async () => {

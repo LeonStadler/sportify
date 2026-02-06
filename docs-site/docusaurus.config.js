@@ -1,14 +1,14 @@
-// @ts-check
-// `@type` JSDoc annotations allow editor autocompletion and type checking
-// (when paired with `@ts-check`).
-// There are various equivalent ways to declare your Docusaurus config.
-// See: https://docusaurus.io/docs/api/docusaurus-config
+// Type-checking aus: Module liegen in docs-site/node_modules, IDE löst oft vom Repo-Root auf.
+// @ts-nocheck
 
 import { themes as prismThemes } from "prism-react-renderer";
 
-// This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
+// Basis-URL aus Umgebung (wie FRONTEND_URL im Rest des Projekts), ohne trailing slash
+const siteBaseUrl = (process.env.FRONTEND_URL || "https://sportify.leon-stadler.com").replace(
+  /\/$/,
+  ""
+);
 
-/** @type {import('@docusaurus/types').Config} */
 const config = {
   title: "Sportify Dokumentation",
   tagline: "Produkt-, API- und Betriebsdokumentation",
@@ -19,8 +19,8 @@ const config = {
     v4: true, // Improve compatibility with the upcoming Docusaurus v4
   },
 
-  // Set the production url of your site here
-  url: "https://sportify.leon-stadler.com",
+  // Production URL aus FRONTEND_URL (bis zum Slug)
+  url: siteBaseUrl,
   // Serve docs under /docs
   baseUrl: "/docs/",
 
@@ -111,7 +111,7 @@ const config = {
             items: [
               {
                 label: "Website",
-                href: "https://sportify.leon-stadler.com",
+                href: siteBaseUrl,
               },
               {
                 label: "Dokumentation",
@@ -119,7 +119,7 @@ const config = {
               },
               {
                 label: "Changelog",
-                href: "https://sportify.leon-stadler.com/changelog",
+                href: `${siteBaseUrl}/changelog`,
               },
               {
                 label: "Repository",
@@ -132,19 +132,19 @@ const config = {
             items: [
               {
                 label: "Datenschutz",
-                href: "https://sportify.leon-stadler.com/privacy",
+                href: `${siteBaseUrl}/privacy`,
               },
               {
                 label: "AGB",
-                href: "https://sportify.leon-stadler.com/terms",
+                href: `${siteBaseUrl}/terms`,
               },
               {
                 label: "Impressum",
-                href: "https://sportify.leon-stadler.com/imprint",
+                href: `${siteBaseUrl}/imprint`,
               },
               {
                 label: "Kontakt",
-                href: "https://sportify.leon-stadler.com/contact",
+                href: `${siteBaseUrl}/contact`,
               },
             ],
           },

@@ -16,12 +16,12 @@
 
 ### Ausführung
 
-- Migrationen laufen **beim Server‑Start**.
-- Für Vercel kann zusätzlich `RUN_MIGRATIONS_ON_REQUEST=true` genutzt werden.
+- Migrationen laufen **beim Server‑Start** (lokal) bzw. **beim Build** (Vercel, siehe `docs/deployment.md`).
 
 ### Status
 
-- `GET /api/health` liefert `migrations` (ran/inFlight/error).
+- `GET /api/health` liefert `migrations` (ran/inFlight/error) – relevant für lokalen Server; auf Vercel laufen Migrationen nur beim Build, nicht zur Laufzeit.
+- `GET /api/health/migrations` bestätigt, dass Migrationen nur beim Build ausgeführt werden (kein Cold-Start-Lauf).
 
 ### Struktur
 

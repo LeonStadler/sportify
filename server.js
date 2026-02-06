@@ -16,8 +16,8 @@ import { createFriendsRouter } from "./routes/friends.routes.js";
 import { createGoalsRouter } from "./routes/goals.routes.js";
 import { createNotificationsRouter } from "./routes/notifications.routes.js";
 import { createProfileRouter } from "./routes/profile.routes.js";
-import { createRecentWorkoutsRouter } from "./routes/recent-workouts.routes.js";
 import { createReactionsRouter } from "./routes/reactions.routes.js";
+import { createRecentWorkoutsRouter } from "./routes/recent-workouts.routes.js";
 import { createScoreboardRouter } from "./routes/scoreboard.routes.js";
 import { createStatsRouter } from "./routes/stats.routes.js";
 import { createTrainingJournalRouter } from "./routes/training-journal.routes.js";
@@ -35,7 +35,7 @@ const port = process.env.PORT || 3001;
 const sslEnabled = parseBoolean(process.env.DATABASE_SSL_ENABLED, false);
 const rejectUnauthorized = parseBoolean(
   process.env.DATABASE_SSL_REJECT_UNAUTHORIZED,
-  true
+  true,
 );
 const poolConfig = {
   connectionString: process.env.DATABASE_URL,
@@ -88,7 +88,9 @@ const runMigrations = async () => {
 const getMigrationStatus = () => ({
   ran: migrationsRan,
   inFlight: migrationsInFlight,
-  error: migrationsLastError ? String(migrationsLastError?.message ?? migrationsLastError) : null,
+  error: migrationsLastError
+    ? String(migrationsLastError?.message ?? migrationsLastError)
+    : null,
 });
 
 const adminMiddleware = createAdminMiddleware(pool);
@@ -101,25 +103,27 @@ const normalizeOrigin = (value) => value.replace(/\/$/, "");
 const parseOriginList = (value) =>
   value
     ? value
-      .split(",")
-      .map((entry) => entry.trim())
-      .filter(Boolean)
-      .map(normalizeOrigin)
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+        .map(normalizeOrigin)
     : [];
 
 // CORS Configuration
-const corsAllowList = new Set([
-  "http://localhost:4000",
-  "http://localhost:4001",
-  "http://localhost:8080",
-  "http://127.0.0.1:4000",
-  "http://127.0.0.1:4001",
-  "http://127.0.0.1:8080",
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-  process.env.FRONTEND_URL ? normalizeOrigin(process.env.FRONTEND_URL) : "",
-  ...parseOriginList(process.env.CORS_ALLOW_ORIGINS),
-].filter(Boolean));
+const corsAllowList = new Set(
+  [
+    "http://localhost:4000",
+    "http://localhost:4001",
+    "http://localhost:8080",
+    "http://127.0.0.1:4000",
+    "http://127.0.0.1:4001",
+    "http://127.0.0.1:8080",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    process.env.FRONTEND_URL ? normalizeOrigin(process.env.FRONTEND_URL) : "",
+    ...parseOriginList(process.env.CORS_ALLOW_ORIGINS),
+  ].filter(Boolean),
+);
 
 const corsOptions = {
   origin: (origin, callback) => {
@@ -147,16 +151,6 @@ const corsOptions = {
 // Middlewares
 app.use(cors(corsOptions));
 app.use(express.json());
-if (process.env.VERCEL && parseBoolean(process.env.RUN_MIGRATIONS_ON_REQUEST, false)) {
-  app.use(async (req, res, next) => {
-    try {
-      await runMigrations();
-      next();
-    } catch (error) {
-      next(error);
-    }
-  });
-}
 
 const ensureFriendInfrastructure = async () => {
   try {
@@ -166,7 +160,7 @@ const ensureFriendInfrastructure = async () => {
 
     if (!rows[0]?.has_users) {
       console.warn(
-        "Users table does not exist, skipping friend infrastructure setup"
+        "Users table does not exist, skipping friend infrastructure setup",
       );
       return;
     }
@@ -266,7 +260,7 @@ if (process.env.NODE_ENV === "production" && !process.env.VERCEL) {
   // Development or Vercel: Just respond for root path
   app.get("/", (req, res) => {
     res.send(
-      "Sportify API is running! Use the Vite dev server for the frontend."
+      "Sportify API is running! Use the Vite dev server for the frontend.",
     );
   });
 }

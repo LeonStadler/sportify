@@ -1245,92 +1245,94 @@ export function Training() {
         </TabsList>
 
         <TabsContent value="trainings" className="space-y-4 md:space-y-6">
-          <div className="space-y-4 md:space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <h2 className="text-lg font-semibold">
-                  {t("training.newWorkout", "Neues Workout")}
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  {t("training.newWorkoutHint", "Füge dein Training hinzu oder nutze eine Vorlage.")}
-                </p>
-              </div>
-              <Popover open={templatePickerOpen} onOpenChange={setTemplatePickerOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline">
-                    {t("training.useTemplate", "Vorlage nutzen")}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[320px] p-0" align="end">
-                  <Command>
-                    <div className="flex items-center gap-2 px-3 py-2 border-b">
-                      <CommandInput
-                        placeholder={t("training.searchTemplates", "Vorlagen durchsuchen")}
-                        value={templatePickerQuery}
-                        onValueChange={setTemplatePickerQuery}
-                      />
-                    </div>
-                    <CommandList className="max-h-[260px] overflow-y-auto">
-                      <CommandEmpty>
-                        {t("training.noTemplates", "Keine Vorlagen gefunden.")}
-                      </CommandEmpty>
-                      <CommandGroup>
-                        {templatePickerOptions.map((template) => (
-                          <CommandItem
-                            key={template.id}
-                            value={template.id}
-                            onSelect={() => {
-                              handleUseTemplate(template);
-                              setTemplatePickerOpen(false);
-                            }}
-                          >
-                            <div className="flex flex-col">
-                              <span className="font-medium flex items-center gap-2">
-                                {favoriteTemplateIds.includes(template.id) && (
-                                  <Star className="h-3.5 w-3.5 text-yellow-500" />
-                                )}
-                                {template.title}
-                              </span>
-                              {template.owner?.displayName && (
-                                <span className="text-xs text-muted-foreground">
-                                  {template.owner.displayName}
+          <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-[1fr_minmax(0,40%)] lg:items-start">
+            <div className="space-y-4 md:space-y-6 min-w-0">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-lg font-semibold">
+                    {t("training.newWorkout", "Neues Workout")}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {t("training.newWorkoutHint", "Füge dein Training hinzu oder nutze eine Vorlage.")}
+                  </p>
+                </div>
+                <Popover open={templatePickerOpen} onOpenChange={setTemplatePickerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline">
+                      {t("training.useTemplate", "Vorlage nutzen")}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[320px] p-0" align="end">
+                    <Command>
+                      <div className="flex items-center gap-2 px-3 py-2 border-b">
+                        <CommandInput
+                          placeholder={t("training.searchTemplates", "Vorlagen durchsuchen")}
+                          value={templatePickerQuery}
+                          onValueChange={setTemplatePickerQuery}
+                        />
+                      </div>
+                      <CommandList className="max-h-[260px] overflow-y-auto">
+                        <CommandEmpty>
+                          {t("training.noTemplates", "Keine Vorlagen gefunden.")}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {templatePickerOptions.map((template) => (
+                            <CommandItem
+                              key={template.id}
+                              value={template.id}
+                              onSelect={() => {
+                                handleUseTemplate(template);
+                                setTemplatePickerOpen(false);
+                              }}
+                            >
+                              <div className="flex flex-col">
+                                <span className="font-medium flex items-center gap-2">
+                                  {favoriteTemplateIds.includes(template.id) && (
+                                    <Star className="h-3.5 w-3.5 text-yellow-500" />
+                                  )}
+                                  {template.title}
                                 </span>
-                              )}
-                            </div>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                    <div className="border-t px-3 py-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="w-full justify-center"
-                        onClick={() => {
-                          setTemplatePickerOpen(false);
-                          setActiveTab("templates");
-                        }}
-                      >
-                        {t("training.templatesBrowse", "Vorlagen durchsuchen")}
-                      </Button>
-                    </div>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+                                {template.owner?.displayName && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {template.owner.displayName}
+                                  </span>
+                                )}
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                      <div className="border-t px-3 py-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-center"
+                          onClick={() => {
+                            setTemplatePickerOpen(false);
+                            setActiveTab("templates");
+                          }}
+                        >
+                          {t("training.templatesBrowse", "Vorlagen durchsuchen")}
+                        </Button>
+                      </div>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div ref={workoutFormRef}>
+                <WorkoutForm
+                  workout={editingWorkout ?? undefined}
+                  prefillWorkout={prefillWorkout}
+                  onPrefillConsumed={() => setPrefillWorkout(null)}
+                  onWorkoutCreated={handleWorkoutCreated}
+                  onWorkoutUpdated={handleWorkoutUpdated}
+                  onCancelEdit={handleCancelEdit}
+                />
+              </div>
             </div>
 
-            <div ref={workoutFormRef}>
-              <WorkoutForm
-                workout={editingWorkout ?? undefined}
-                prefillWorkout={prefillWorkout}
-                onPrefillConsumed={() => setPrefillWorkout(null)}
-                onWorkoutCreated={handleWorkoutCreated}
-                onWorkoutUpdated={handleWorkoutUpdated}
-                onCancelEdit={handleCancelEdit}
-              />
-            </div>
-
-            <Card>
+            <Card className="lg:sticky lg:top-4 min-w-0">
               <CardHeader className="pb-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">

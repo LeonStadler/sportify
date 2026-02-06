@@ -462,6 +462,12 @@ export function Changelog() {
             >
               {t("landing.footer.legalLinks.contact")}
             </Link>
+            <a
+              href="/docs/overview"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              {t("landing.footer.legalLinks.documentation", "Dokumentation")}
+            </a>
           </div>
         </div>
       </footer>

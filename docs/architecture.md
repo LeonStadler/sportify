@@ -2,205 +2,131 @@
 
 Diese Dokumentation beschreibt die Systemarchitektur von Sportify.
 
-## Übersicht
+## Überblick
 
-Sportify ist eine moderne Full-Stack-Webanwendung mit folgender Architektur:
+```mermaid
+flowchart LR
+  subgraph Client
+    UI["React App (Vite)"]
+    PWA["Service Worker / PWA"]
+  end
 
+  subgraph Server
+    API["Express API"]
+    Jobs["Event Jobs / Cron"]
+  end
+
+  subgraph Daten
+    DB[("PostgreSQL")]
+  end
+
+  subgraph Drittanbieter
+    Mail["Nodemailer / SMTP"]
+    Push["Web Push"]
+  end
+
+  UI -->|"REST/JSON"| API
+  PWA -->|"Offline Cache"| UI
+  API --> DB
+  API --> Mail
+  API --> Push
+  Jobs --> API
+  Jobs --> DB
 ```
-┌─────────────────┐
-│   Frontend      │
-│   (React/Vite)  │
-└────────┬────────┘
-         │ HTTP/REST
-         │
-┌────────▼────────┐
-│   Backend       │
-│   (Express)     │
-└────────┬────────┘
-         │
-┌────────▼────────┐
-│   PostgreSQL    │
-│   (Neon)        │
-└─────────────────┘
-```
 
-## Frontend-Architektur
+## Frontend
 
-### Technologie-Stack
+- React 18 + Vite
+- Routing via React Router
+- Datenzugriff via TanStack Query
+- UI via Tailwind + shadcn/ui
+- i18n via i18next
+- PWA/Offline via Service Worker
 
-- **React 18**: UI-Framework mit Hooks und Context API
-- **TypeScript**: Type-Safety und bessere Entwicklererfahrung
-- **Vite**: Schneller Build-Tool und Dev-Server
-- **React Router**: Client-seitiges Routing
-- **TanStack Query**: Server-State-Management und Caching
-- **shadcn/ui**: UI-Komponenten-Bibliothek
-- **Tailwind CSS**: Utility-First CSS-Framework
-
-### Struktur
+**Struktur (Auszug):**
 
 ```
 src/
-├── components/     # Wiederverwendbare Komponenten
-├── pages/          # Seiten-Komponenten
-├── hooks/          # Custom Hooks
-├── contexts/       # React Contexts
-├── lib/            # Utility-Funktionen
-├── types/          # TypeScript-Typen
-└── utils/          # Frontend-Utilities
+├── pages/         # Screens
+├── components/    # UI/Feature-Komponenten
+├── features/      # Feature-Module
+├── services/      # API-Clients
+├── contexts/      # Auth/Theme
+├── hooks/         # Custom Hooks
+└── utils/         # Helpers
 ```
 
-### State Management
+## Backend
 
-- **React Context**: Für globale Auth-State
-- **TanStack Query**: Für Server-State (API-Daten)
-- **Local State**: useState/useReducer für Komponenten-State
+- Node.js + Express
+- PostgreSQL via `pg` Pool
+- JWT Auth + 2FA (TOTP)
+- E-Mail Queue + Push
 
-### Routing
-
-- **Public Routes**: Landing, Login, Register, etc.
-- **Protected Routes**: Dashboard, Profile, Training, etc.
-- **Admin Routes**: Admin-Panel (nur für Admins)
-
-## Backend-Architektur
-
-### Technologie-Stack
-
-- **Node.js**: JavaScript-Runtime
-- **Express.js**: Web-Framework
-- **PostgreSQL**: Relationale Datenbank
-- **JWT**: Authentifizierung
-- **bcryptjs**: Password Hashing
-- **Nodemailer**: E-Mail-Versand
-
-### Struktur
+**Struktur (Auszug):**
 
 ```
-backend/
-├── routes/         # Route Handler
-├── middleware/     # Express Middleware
-├── services/       # Business Logic
-├── db/             # Datenbank-Logik
-├── utils/          # Utility-Funktionen
-└── migrations/     # Datenbank-Migrationen
+server.js
+routes/
+middleware/
+services/
+utils/
+migrations/
 ```
 
-### API-Design
+## Datenbank
 
-- **RESTful**: Standard HTTP-Methoden (GET, POST, PUT, DELETE)
-- **JSON**: Datenformat für Request/Response
-- **JWT**: Token-basierte Authentifizierung
-- **camelCase**: Response-Daten werden automatisch konvertiert
+- SQL‑Migrationen in `migrations/`
+- Kernobjekte: `users`, `workouts`, `workout_activities`, `exercises`,
+  `training_journal_entries`, `friendships`, `friend_requests`,
+  `notifications`, `invitations`, `push_subscriptions`, `job_runs`.
 
-### Middleware-Pipeline
+## Authentifizierung & Sicherheit
 
-1. **CORS**: Cross-Origin Resource Sharing
-2. **JSON Parser**: Request Body Parsing
-3. **Auth Middleware**: JWT-Verifizierung
-4. **Admin Middleware**: Admin-Rechte-Prüfung (optional)
-5. **Route Handler**: Business Logic
+- JWT in `Authorization: Bearer <token>`
+- 2FA (TOTP) + Backup‑Codes
+- E‑Mail‑Verifizierung
+- Rollen: `user`, `admin`
 
-## Datenbank-Architektur
+## Datenflüsse (Beispiele)
 
-### Schema-Übersicht
+### Auth‑Flow
 
-Haupttabellen:
+```mermaid
+sequenceDiagram
+  participant Client
+  participant API
+  participant DB
+  participant Mail
 
-- `users`: Benutzer-Daten
-- `workouts`: Workout-Einträge
-- `workout_activities`: Aktivitäten innerhalb eines Workouts
-- `exercises`: Übungstypen
-- `training_journal_entries`: Trainingstagebuch-Einträge
-- `friendships`: Freundschaften
-- `friend_requests`: Freundschaftsanfragen
-- `invitations`: Einladungen
-- `notifications`: Benachrichtigungen
+  Client->>API: POST /auth/register
+  API->>DB: user anlegen
+  API->>Mail: Verifizierung senden
+  Client->>API: POST /auth/verify-email
+  API->>DB: Email verifiziert
+  Client->>API: POST /auth/login
+  API-->>Client: JWT + User
+```
 
-### Beziehungen
+### Workout‑Flow
 
-- **One-to-Many**: User → Workouts, User → Training Journal Entries
-- **Many-to-Many**: Users ↔ Friendships
-- **Cascade Delete**: Beim Löschen eines Users werden alle zugehörigen Daten gelöscht
+```mermaid
+sequenceDiagram
+  participant Client
+  participant API
+  participant DB
 
-Siehe [Datenbank-Dokumentation](database.md) für Details.
-
-## Sicherheit
-
-### Authentifizierung
-
-- **JWT Tokens**: Stateless Authentifizierung
-- **Password Hashing**: bcryptjs mit Salt
-- **2FA**: TOTP-basierte Zwei-Faktor-Authentifizierung
-- **Email Verification**: E-Mail-basierte Kontoverifizierung
-
-### Autorisierung
-
-- **Role-based**: User vs. Admin
-- **Resource-based**: Benutzer können nur eigene Ressourcen verwalten
-- **Middleware**: Auth- und Admin-Middleware für Route-Schutz
-
-### Datenvalidierung
-
-- **Backend**: Input-Validierung in Route Handlern
-- **Frontend**: Zod-Schemas für Form-Validierung
-- **SQL Injection**: Parameterized Queries
-- **XSS**: Content Security Policy Headers
-
-## Performance
-
-### Frontend
-
-- **Code Splitting**: Route-based Lazy Loading
-- **Tree Shaking**: Unused Code Elimination
-- **Asset Optimization**: Vite Build-Optimierungen
-- **Caching**: Service Worker für Offline-Support
-
-### Backend
-
-- **Connection Pooling**: PostgreSQL Connection Pool
-- **Query Optimization**: Indizierte Datenbankabfragen
-- **Caching**: React Query für API-Response-Caching
-
-## Skalierung
-
-### Horizontal Scaling
-
-- **Stateless Backend**: JWT-basierte Authentifizierung ermöglicht Load Balancing
-- **Database**: PostgreSQL kann mit Read Replicas skaliert werden
-- **CDN**: Statische Assets können über CDN ausgeliefert werden
-
-### Vertical Scaling
-
-- **Connection Pool**: Anpassbare Pool-Größe
-- **Caching**: Erweiterte Caching-Strategien möglich
+  Client->>API: POST /workouts
+  API->>DB: workout + activities
+  Client->>API: GET /workouts
+  API->>DB: list
+  API-->>Client: workouts
+```
 
 ## Deployment
 
-### Vercel
+- Frontend: Vite Build (statisch)
+- Backend: Express App (`server.js`)
+- Zielplattform: Vercel (oder eigener Node‑Host)
 
-- **Serverless Functions**: Backend als Serverless Functions
-- **Static Assets**: Frontend als statische Dateien
-- **Automatic Deployments**: Git-basierte Deployments
-
-Siehe [Deployment-Dokumentation](deployment.md) für Details.
-
-## Monitoring & Logging
-
-### Development
-
-- **Console Logs**: Entwicklungs-Logs im Terminal
-- **Error Boundaries**: React Error Boundaries für Frontend-Fehler
-
-### Production
-
-- **Vercel Logs**: Automatische Logs auf Vercel
-- **Error Tracking**: (Optional) Integration mit Sentry oder ähnlich
-
-## Zukünftige Verbesserungen
-
-- [ ] Real-time Updates mit WebSockets
-- [ ] Erweiterte Caching-Strategien
-- [ ] Performance-Monitoring
-- [ ] Error Tracking Integration
-- [ ] API Rate Limiting
-- [ ] GraphQL API (optional)
-
+Siehe [deployment.md](deployment.md).

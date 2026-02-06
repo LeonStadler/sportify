@@ -1,27 +1,35 @@
 # Authentication API
 
-API-Endpunkte für Authentifizierung, Registrierung und Benutzerverwaltung.
+API-Endpunkte für Registrierung, Login, E-Mail-Verifizierung, Passwort-Reset und 2FA.
 
-## Endpunkte
+## GET /api/auth/me
 
-### POST /api/auth/register
+Liefert den aktuellen Benutzer.
+
+**Auth:** erforderlich
+
+**Antwort (200):** Benutzerobjekt inkl. Präferenzen, Rollen und Zeitstempeln.
+
+## POST /api/auth/register
 
 Registriert einen neuen Benutzer.
 
-**Request Body:**
+**Body (JSON):**
+
 ```json
 {
   "email": "user@example.com",
-  "password": "securepassword",
-  "firstName": "John",
-  "lastName": "Doe",
-  "nickname": "johndoe",
-  "displayPreference": "firstName",
-  "invitationToken": "optional-token"
+  "password": "min. 8 Zeichen",
+  "firstName": "Max",
+  "lastName": "Mustermann",
+  "nickname": "optional",
+  "displayPreference": "firstName|fullName|nickname",
+  "invitationToken": "optional"
 }
 ```
 
-**Response (200):**
+**Antwort (200):**
+
 ```json
 {
   "message": "Registrierung erfolgreich. Bitte verifiziere deine E-Mail.",
@@ -29,34 +37,32 @@ Registriert einen neuen Benutzer.
 }
 ```
 
-**Fehler:**
-- `400`: Ungültige Eingabedaten
-- `409`: E-Mail bereits registriert
+## POST /api/auth/login
 
-### POST /api/auth/login
+Login mit E-Mail und Passwort. Falls 2FA aktiv ist, wird ein TOTP oder Backup‑Code benötigt.
 
-Meldet einen Benutzer an.
+**Body (JSON):**
 
-**Request Body:**
 ```json
 {
   "email": "user@example.com",
-  "password": "securepassword",
+  "password": "passwort",
   "twoFactorToken": "123456",
   "backupCode": "BACKUPCODE"
 }
 ```
 
-**Response (200):**
+**Antwort (200):**
+
 ```json
 {
-  "user": { ... },
-  "token": "jwt-token",
-  "requires2FA": false
+  "user": { "...": "..." },
+  "token": "jwt-token"
 }
 ```
 
-**2FA erforderlich (200):**
+**Antwort (200) – 2FA erforderlich:**
+
 ```json
 {
   "requires2FA": true,
@@ -64,291 +70,149 @@ Meldet einen Benutzer an.
 }
 ```
 
-**Fehler:**
-- `401`: Ungültige Anmeldedaten
-- `403`: E-Mail nicht verifiziert
+## POST /api/auth/forgot-password
 
-### GET /api/auth/me
+Startet den Passwort‑Reset (E-Mail mit Token).
 
-Ruft die Daten des aktuellen Benutzers ab.
+**Body (JSON):**
 
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Response (200):**
 ```json
-{
-  "id": "uuid",
-  "email": "user@example.com",
-  "firstName": "John",
-  "lastName": "Doe",
-  "nickname": "johndoe",
-  "displayPreference": "firstName",
-  "isEmailVerified": true,
-  "has2FA": false,
-  "avatar": "url",
-  "themePreference": "system",
-  "languagePreference": "de",
-  "preferences": { ... },
-  "role": "user",
-  "createdAt": "2024-01-01T00:00:00Z",
-  "lastLoginAt": "2024-01-01T00:00:00Z"
-}
+{ "email": "user@example.com" }
 ```
 
-**Fehler:**
-- `401`: Nicht authentifiziert
-- `404`: Benutzer nicht gefunden
+**Antwort (200):**
 
-### POST /api/auth/verify-email
-
-Verifiziert die E-Mail-Adresse eines Benutzers.
-
-**Request Body:**
 ```json
-{
-  "token": "verification-token"
-}
+{ "message": "Passwort-Reset-E-Mail wurde gesendet." }
 ```
 
-**Response (200):**
+## POST /api/auth/reset-password/confirm
+
+Setzt das Passwort mit Reset‑Token zurück.
+
+**Body (JSON):**
+
 ```json
-{
-  "message": "E-Mail erfolgreich verifiziert."
-}
+{ "token": "reset-token", "password": "neues-passwort" }
 ```
 
-**Fehler:**
-- `400`: Ungültiger oder abgelaufener Token
+**Antwort (200):**
 
-### POST /api/auth/resend-verification
-
-Sendet eine neue Verifizierungs-E-Mail.
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Response (200):**
 ```json
-{
-  "message": "Verifizierungs-E-Mail wurde gesendet."
-}
+{ "message": "Passwort wurde erfolgreich zurückgesetzt." }
 ```
 
-### POST /api/auth/forgot-password
+## POST /api/auth/confirm-reset-password
 
-Fordert einen Passwort-Reset an.
+Alias für `/reset-password/confirm` (Frontend‑Kompatibilität). Gleiche Eingaben/Antworten.
 
-**Request Body:**
+## POST /api/auth/verify-email
+
+Bestätigt die E‑Mail‑Adresse.
+
+**Body (JSON):**
+
 ```json
-{
-  "email": "user@example.com"
-}
+{ "token": "verification-token" }
 ```
 
-**Response (200):**
+**Antwort (200):**
+
 ```json
-{
-  "message": "Passwort-Reset-E-Mail wurde gesendet."
-}
+{ "message": "E-Mail erfolgreich verifiziert." }
 ```
 
-**Rate Limiting:** Max. 3 Requests pro Stunde pro E-Mail
+## POST /api/auth/resend-verification
 
-### POST /api/auth/confirm-reset-password
+Sendet eine neue Verifizierungs‑Mail.
 
-Setzt das Passwort zurück.
+**Body (JSON):**
 
-**Request Body:**
 ```json
-{
-  "token": "reset-token",
-  "newPassword": "newsecurepassword"
-}
+{ "email": "optional, falls nicht authentifiziert" }
 ```
 
-**Response (200):**
+**Auth:** optional (falls vorhanden, wird der eingeloggte User verwendet)
+
+**Antwort (200):**
+
 ```json
-{
-  "message": "Passwort erfolgreich zurückgesetzt."
-}
+{ "message": "..." }
 ```
 
-**Fehler:**
-- `400`: Ungültiger oder abgelaufener Token
-- `400`: Passwort zu schwach
-
-## 2FA Endpunkte
+## 2FA
 
 ### POST /api/auth/enable-2fa
 
-Aktiviert 2FA für den Benutzer.
+Generiert Secret und Backup‑Codes (2FA wird danach via `verify-2fa` aktiviert).
 
-**Headers:**
-```
-Authorization: Bearer <token>
-```
+**Auth:** erforderlich
 
-**Response (200):**
+**Antwort (200):**
+
 ```json
 {
   "secret": {
-    "base32": "JBSWY3DPEHPK3PXP",
+    "base32": "...",
     "otpauthUrl": "otpauth://totp/..."
   },
-  "backupCodes": ["CODE1", "CODE2", ...]
+  "backupCodes": ["CODE1", "CODE2"]
 }
 ```
-
-**Hinweis:** 2FA ist noch nicht vollständig aktiviert. Benutzer muss Token verifizieren.
 
 ### POST /api/auth/verify-2fa
 
-Verifiziert den 2FA-Token und aktiviert 2FA vollständig.
+Aktiviert 2FA nach Token‑Prüfung.
 
-**Headers:**
-```
-Authorization: Bearer <token>
-```
+**Auth:** erforderlich
 
-**Request Body:**
+**Body (JSON):**
+
 ```json
-{
-  "token": "123456"
-}
+{ "token": "123456" }
 ```
-
-**Response (200):**
-```json
-{
-  "message": "2FA erfolgreich aktiviert."
-}
-```
-
-**Fehler:**
-- `400`: Ungültiger Token
 
 ### POST /api/auth/backup-codes/consume
 
-Verwendet einen Backup-Code für 2FA.
+Verwendet einen Backup‑Code als 2FA‑Ersatz.
 
-**Headers:**
-```
-Authorization: Bearer <token>
-```
+**Auth:** erforderlich
 
-**Request Body:**
+**Body (JSON):**
+
 ```json
-{
-  "code": "BACKUPCODE"
-}
-```
-
-**Response (200):**
-```json
-{
-  "message": "Backup-Code erfolgreich verwendet."
-}
+{ "code": "BACKUPCODE" }
 ```
 
 ### POST /api/auth/backup-codes/rotate
 
-Generiert neue Backup-Codes.
+Erzeugt neue Backup‑Codes.
 
-**Headers:**
-```
-Authorization: Bearer <token>
-```
+**Auth:** erforderlich
 
-**Request Body:**
+**Body (JSON):**
+
 ```json
-{
-  "password": "current-password"
-}
-```
-
-**Response (200):**
-```json
-{
-  "backupCodes": ["NEWCODE1", "NEWCODE2", ...]
-}
+{ "password": "aktuelles-passwort" }
 ```
 
 ### POST /api/auth/disable-2fa
 
-Deaktiviert 2FA für den Benutzer.
+Deaktiviert 2FA.
 
-**Headers:**
-```
-Authorization: Bearer <token>
-```
+**Auth:** erforderlich
 
-**Request Body:**
+**Body (JSON):**
+
 ```json
-{
-  "password": "current-password"
-}
+{ "password": "aktuelles-passwort" }
 ```
 
-**Response (200):**
-```json
-{
-  "message": "2FA erfolgreich deaktiviert."
-}
-```
+## Typische Fehler
 
-## Einladungen
-
-### POST /api/auth/accept-invitation
-
-Akzeptiert eine Einladung.
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Request Body:**
-```json
-{
-  "invitationToken": "invitation-token"
-}
-```
-
-**Response (200):**
-```json
-{
-  "message": "Einladung erfolgreich akzeptiert."
-}
-```
-
-## Fehlerbehandlung
-
-Alle Endpunkte können folgende Fehler zurückgeben:
-
-- `400`: Bad Request - Ungültige Eingabedaten
-- `401`: Unauthorized - Nicht authentifiziert oder ungültiger Token
-- `403`: Forbidden - Keine Berechtigung
-- `404`: Not Found - Ressource nicht gefunden
-- `429`: Too Many Requests - Rate Limit überschritten
-- `500`: Internal Server Error - Serverfehler
-
-## Rate Limiting
-
-Bestimmte Endpunkte haben Rate Limiting:
-
-- **Passwort-Reset**: 3 Requests pro Stunde pro E-Mail
-- **E-Mail-Verifizierung**: 5 Requests pro Stunde pro Benutzer
-
-## Sicherheit
-
-- Passwörter werden mit bcrypt gehasht
-- JWT-Tokens haben eine Ablaufzeit (Standard: 7 Tage)
-- 2FA-Tokens sind zeitbasiert (30 Sekunden)
-- Backup-Codes sind Einmal-Codes
-- E-Mail-Tokens haben Ablaufzeit (1 Stunde)
-
+- `400`: Ungültige Eingaben/Token
+- `401`: Nicht authentifiziert/Token ungültig
+- `403`: Nicht erlaubt (z. B. E‑Mail nicht verifiziert)
+- `409`: Konflikt (z. B. Spitzname/E‑Mail vergeben)
+- `429`: Rate Limit
+- `500`: Serverfehler

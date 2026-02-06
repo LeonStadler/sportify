@@ -65,7 +65,7 @@ const translateUnit = (unit: string, t: (key: string) => string) => {
     return t("training.form.units.meters");
   }
   if (normalizedUnit === "yards" || normalizedUnit === "yard" || normalizedUnit === "yd") {
-    return t("training.form.units.yards", "Yards");
+    return t("training.form.units.yards");
   }
   if (normalizedUnit === "meilen" || normalizedUnit === "miles") {
     return t("training.form.units.miles");

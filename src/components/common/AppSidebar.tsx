@@ -141,8 +141,8 @@ export function AppSidebar() {
   }
 
   return (
-    <Sidebar 
-      id="app-sidebar" 
+    <Sidebar
+      id="app-sidebar"
       className="border-r border-border bg-background"
       role="navigation"
       aria-label={t("navigation.mainNavigation")}
@@ -238,9 +238,9 @@ export function AppSidebar() {
 
         <SidebarSeparator className="mx-6 my-2" />
         <SidebarGroup className="mt-auto">
-        <SidebarGroupLabel className="text-muted-foreground text-xs uppercase tracking-wider px-6 py-3">
+          <SidebarGroupLabel className="text-muted-foreground text-xs uppercase tracking-wider px-6 py-3">
             {t("navigation.settingsGroup")}
-        </SidebarGroupLabel>
+          </SidebarGroupLabel>
           <SidebarGroupContent className="px-3">
             <SidebarMenu>
               {/* Language Switch */}

@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import type { Exercise, ExerciseListResponse } from "@/types/exercise";
 import type { Workout } from "@/types/workout";
 import { convertWeightFromKg, convertWeightToKg } from "@/utils/units";
+import { calculateSetTotals, getMetricVisibility } from "./workoutTotals";
 import { format } from "date-fns";
 import { de, enUS } from "date-fns/locale";
 import { CalendarIcon, Clock, Plus, Trash2, AlertTriangle } from "lucide-react";
@@ -439,29 +440,8 @@ export function WorkoutForm({
     return Number((basePoints * personalFactor).toFixed(1));
   };
 
-  const getMetricVisibility = (exercise?: Exercise | null, unit?: string | null) => {
-    if (!exercise) {
-      return { showReps: true, showTime: false, showDistance: false };
-    }
-    const measurementType = exercise.measurementType || "reps";
-    const supportsReps = ["reps", "weight", "mixed"].includes(measurementType);
-    const supportsTime = Boolean(exercise.supportsTime || measurementType === "time");
-    const supportsDistance = Boolean(
-      exercise.supportsDistance || measurementType === "distance"
-    );
-    if (supportsTime && supportsDistance) {
-      return { showReps: false, showTime: true, showDistance: true };
-    }
-    if (supportsTime && supportsReps && !supportsDistance) {
-      return { showReps: true, showTime: true, showDistance: false };
-    }
-    if (supportsDistance && supportsReps && !supportsTime) {
-      return { showReps: true, showTime: false, showDistance: true };
-    }
-    if (supportsTime) return { showReps: false, showTime: true, showDistance: false };
-    if (supportsDistance) return { showReps: false, showTime: false, showDistance: true };
-    return { showReps: true, showTime: false, showDistance: false };
-  };
+  const getMetricVisibilityForActivity = (exercise?: Exercise | null, unit?: string | null) =>
+    getMetricVisibility(exercise, unit);
   
   const [activities, setActivities] = useState<WorkoutActivity[]>([
     {
@@ -2082,7 +2062,7 @@ export function WorkoutForm({
                             <div className="flex flex-1 flex-col gap-1">
                               <div className="flex gap-2">
                               {(() => {
-                                const { showReps, showTime, showDistance } = getMetricVisibility(
+                                const { showReps, showTime, showDistance } = getMetricVisibilityForActivity(
                                   exercise,
                                   activity.unit
                                 );
@@ -2232,30 +2212,23 @@ export function WorkoutForm({
                         </Button>
                         <div className="text-sm text-muted-foreground">
                           {(() => {
-                            const { showReps, showTime, showDistance } = getMetricVisibility(
+                            const { showReps, showTime, showDistance } = getMetricVisibilityForActivity(
                               exercise,
                               activity.unit
                             );
                             const supportsWeight = Boolean(
                               exercise.requiresWeight || exercise.allowsWeight
                             );
-                            const totalReps = activity.sets.reduce((sum, set) => sum + (set.reps || 0), 0);
-                            const totalDuration = activity.sets.reduce((sum, set) => {
-                              const duration = set.duration || 0;
-                              if (!showReps || !showTime) return sum + duration;
-                              const reps = set.reps && set.reps > 0 ? set.reps : 1;
-                              return sum + duration * reps;
-                            }, 0);
-                            const totalDistance = activity.sets.reduce((sum, set) => sum + (set.distance || 0), 0);
-                            const totalWeight = activity.sets.reduce((sum, set) => sum + (set.weight || 0), 0);
-                            const totalWeightVolume = activity.sets.reduce((sum, set) => {
-                              const weight = set.weight || 0;
-                              if (weight <= 0) return sum;
-                              const multiplier = showReps
-                                ? (set.reps && set.reps > 0 ? set.reps : 1)
-                                : 1;
-                              return sum + weight * multiplier;
-                            }, 0);
+                            const totals = calculateSetTotals(activity.sets, {
+                              showReps,
+                              showTime,
+                              showDistance,
+                            });
+                            const totalReps = totals.totalReps;
+                            const totalDuration = totals.totalDuration;
+                            const totalDistance = totals.totalDistance;
+                            const totalWeight = totals.totalWeight;
+                            const totalWeightVolume = totals.totalWeightVolume;
                             const weightUnitLabel = getUserWeightUnit();
                             const estimatedPoints = getEstimatedPoints(activity, exercise);
                             const pointsLabel = estimatedPoints
@@ -2301,7 +2274,7 @@ export function WorkoutForm({
                         const supportsWeight = Boolean(
                           exercise.requiresWeight || exercise.allowsWeight
                         );
-                        const { showReps, showTime, showDistance } = getMetricVisibility(
+                        const { showReps, showTime, showDistance } = getMetricVisibilityForActivity(
                           exercise,
                           activity.unit
                         );

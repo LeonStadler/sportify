@@ -1,7 +1,17 @@
+import {
+  getExerciseCategoryLabel,
+  getExerciseDisciplineLabel
+} from "@/components/exercises/exerciseLabels";
+import {
+  categoryOptions as exerciseCategoryOptions,
+  disciplineOptions as exerciseDisciplineOptions,
+  movementPatternOptions as exerciseMovementPatternOptions,
+} from "@/components/exercises/exerciseOptions";
+import { ExercisePicker } from "@/components/exercises/ExercisePicker";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -27,23 +37,12 @@ import { cn } from "@/lib/utils";
 import type { Exercise, ExerciseListResponse } from "@/types/exercise";
 import type { Workout } from "@/types/workout";
 import { convertWeightFromKg, convertWeightToKg, getPrimaryDistanceUnit } from "@/utils/units";
-import { calculateSetTotals, getMetricVisibility } from "./workoutTotals";
 import { format } from "date-fns";
 import { de, enUS } from "date-fns/locale";
-import { CalendarIcon, Clock, Plus, Trash2, AlertTriangle } from "lucide-react";
+import { AlertTriangle, CalendarIcon, Clock, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  getExerciseCategoryLabel,
-  getExerciseDisciplineLabel,
-  getExerciseMuscleGroupLabel,
-} from "@/components/exercises/exerciseLabels";
-import { ExercisePicker } from "@/components/exercises/ExercisePicker";
-import {
-  categoryOptions as exerciseCategoryOptions,
-  disciplineOptions as exerciseDisciplineOptions,
-  movementPatternOptions as exerciseMovementPatternOptions,
-} from "@/components/exercises/exerciseOptions";
+import { calculateSetTotals, getMetricVisibility } from "./workoutTotals";
 
 interface WorkoutSet {
   reps: number;
@@ -90,7 +89,7 @@ export function WorkoutForm({
   const { user } = useAuth();
   const { toast } = useToast();
   const { t, i18n } = useTranslation();
-  
+
   const locale = useMemo(
     () => (i18n.language === "en" ? enUS : de),
     [i18n.language]
@@ -444,17 +443,17 @@ export function WorkoutForm({
 
   const getMetricVisibilityForActivity = (exercise?: Exercise | null, unit?: string | null) =>
     getMetricVisibility(exercise, unit);
-  
+
   const [activities, setActivities] = useState<WorkoutActivity[]>([
     {
-    activityType: "",
-    totalAmount: 0,
-    totalDuration: undefined,
-    totalWeight: undefined,
-    unit: getDefaultUnit(),
-    timeUnit: "min",
-    useSetMode: false,
-    sets: [{ reps: 0 }],
+      activityType: "",
+      totalAmount: 0,
+      totalDuration: undefined,
+      totalWeight: undefined,
+      unit: getDefaultUnit(),
+      timeUnit: "min",
+      useSetMode: false,
+      sets: [{ reps: 0 }],
       notes: "",
     },
   ]);
@@ -557,7 +556,7 @@ export function WorkoutForm({
         toValidDate(workout.createdAt) ||
         new Date();
       setWorkoutDate(date);
-      
+
       // Startzeit setzen (aus workout.startTime oder workout.workoutDate extrahieren)
       if (
         workout.startTime &&
@@ -568,7 +567,7 @@ export function WorkoutForm({
       } else {
         setWorkoutTime(format(date, "HH:mm"));
       }
-      
+
       // useEndTime aus Workout lesen
       const workoutUseEndTime = workout.useEndTime === true;
       setUseEndTime(workoutUseEndTime);
@@ -606,7 +605,7 @@ export function WorkoutForm({
           ? String(workout.restBetweenActivitiesSeconds)
           : ""
       );
-      
+
       setActivities(
         workout.activities.map((a) => ({
           activityType: a.activityType,
@@ -629,12 +628,12 @@ export function WorkoutForm({
           sets:
             a.sets && a.sets.length > 0
               ? a.sets.map((s) => ({
-                  ...s,
-                  weight:
-                    s.weight !== undefined
-                      ? convertWeightFromKg(s.weight, getUserWeightUnit())
-                      : undefined,
-                }))
+                ...s,
+                weight:
+                  s.weight !== undefined
+                    ? convertWeightFromKg(s.weight, getUserWeightUnit())
+                    : undefined,
+              }))
               : [{ reps: a.amount }],
           notes: a.notes || "",
         }))
@@ -721,12 +720,12 @@ export function WorkoutForm({
           sets:
             a.sets && a.sets.length > 0
               ? a.sets.map((s) => ({
-                  ...s,
-                  weight:
-                    s.weight !== undefined
-                      ? convertWeightFromKg(s.weight, getUserWeightUnit())
-                      : undefined,
-                }))
+                ...s,
+                weight:
+                  s.weight !== undefined
+                    ? convertWeightFromKg(s.weight, getUserWeightUnit())
+                    : undefined,
+              }))
               : [{ reps: a.amount }],
           notes: a.notes || "",
         }))
@@ -739,14 +738,14 @@ export function WorkoutForm({
     setActivities([
       ...activities,
       {
-      activityType: "",
-      totalAmount: 0,
-      totalDuration: undefined,
-      totalWeight: undefined,
-      unit: getDefaultUnit(),
-      timeUnit: "min",
-      useSetMode: false,
-      sets: [{ reps: 0 }],
+        activityType: "",
+        totalAmount: 0,
+        totalDuration: undefined,
+        totalWeight: undefined,
+        unit: getDefaultUnit(),
+        timeUnit: "min",
+        useSetMode: false,
+        sets: [{ reps: 0 }],
         notes: "",
       },
     ]);
@@ -765,7 +764,7 @@ export function WorkoutForm({
   ) => {
     const newActivities = [...activities];
     newActivities[index] = { ...newActivities[index], [field]: value };
-    
+
     // Automatische Einheit setzen bei Aktivitätstyp-Änderung
     if (field === "activityType") {
       const exercise = exercises.find((ex) => ex.id === value);
@@ -829,7 +828,7 @@ export function WorkoutForm({
         }
       }
     }
-    
+
     // Gesamtmenge bei Set-Änderungen berechnen
     if (
       field === "sets" &&
@@ -843,7 +842,7 @@ export function WorkoutForm({
         newActivities[index].unit
       );
     }
-    
+
     setActivities(newActivities);
   };
 
@@ -891,8 +890,8 @@ export function WorkoutForm({
     const supportsWeight = Boolean(
       exercise?.requiresWeight || exercise?.allowsWeight
     );
-    newActivities[activityIndex].sets.push({ 
-      reps: 0, 
+    newActivities[activityIndex].sets.push({
+      reps: 0,
       weight: supportsWeight ? undefined : undefined,
     });
     setActivities(newActivities);
@@ -920,7 +919,7 @@ export function WorkoutForm({
   // Toggle-Handler für Dauer/Endzeit
   const handleToggleEndTime = (checked: boolean) => {
     setUseEndTime(checked);
-    
+
     if (checked) {
       // Umschalten zu Endzeit-Modus: Wenn Dauer vorhanden, berechne Endzeit
       if (duration && workoutTime) {
@@ -958,7 +957,7 @@ export function WorkoutForm({
       ...prevSet,
       [field]: value,
     };
-    
+
     // Gesamtmenge neu berechnen
     if (newActivities[activityIndex].useSetMode) {
       const exercise = exercises.find(
@@ -989,13 +988,13 @@ export function WorkoutForm({
         });
       }
     }
-    
+
     setActivities(newActivities);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!user) {
       toast({
         title: t("common.error"),
@@ -1082,7 +1081,7 @@ export function WorkoutForm({
         exercise,
         activity.unit
       );
-      
+
       // Wenn Sets-Modus aktiviert ist, prüfe ob es gültige Sets gibt
       if (activity.useSetMode && activity.sets && activity.sets.length > 0) {
         const validSets = activity.sets.filter(
@@ -1146,7 +1145,7 @@ export function WorkoutForm({
         }
         return validSets.length > 0;
       }
-      
+
       // Ansonsten prüfe die Gesamtmenge
       if (supportsDistance && supportsTime) {
         const ok = (activity.totalAmount || 0) > 0 && (activity.totalDuration || 0) > 0;
@@ -1202,8 +1201,8 @@ export function WorkoutForm({
         const ok = requiresWeight
           ? (activity.totalWeight || 0) > 0
           : (activity.totalAmount || 0) > 0 ||
-            (activity.totalDuration || 0) > 0 ||
-            (activity.totalWeight || 0) > 0;
+          (activity.totalDuration || 0) > 0 ||
+          (activity.totalWeight || 0) > 0;
         if (!ok) {
           nextErrors.activities = nextErrors.activities || {};
           nextErrors.activities[activityIndex] = {
@@ -1254,7 +1253,7 @@ export function WorkoutForm({
 
     try {
       const token = localStorage.getItem("token");
-      
+
       // Datum und Uhrzeit kombinieren
       const [hours, minutes] = workoutTime.split(":").map(Number);
       let workoutDateTime =
@@ -1671,7 +1670,7 @@ export function WorkoutForm({
 
 
 
-          
+
 
           {isTemplate && (
             <div className="space-y-3">
@@ -1885,7 +1884,7 @@ export function WorkoutForm({
                   (ex) => ex.id === activity.activityType
                 );
                 const activityError = formErrors.activities?.[index] || {};
-                
+
                 return (
                   <div
                     key={index}
@@ -1926,64 +1925,22 @@ export function WorkoutForm({
                         />
                       </div>
 
-                        {exercise && (() => {
-                          const measurementType = exercise.measurementType || "reps";
-                          const supportsTime = Boolean(
-                            exercise.supportsTime || measurementType === "time"
-                          );
-                          const supportsDistance = Boolean(
-                            exercise.supportsDistance || measurementType === "distance"
-                          );
-                          const distanceOptions = getDistanceUnitOptionsForProfile();
-                          const timeOptions = getTimeUnitOptions();
+                      {exercise && (() => {
+                        const measurementType = exercise.measurementType || "reps";
+                        const supportsTime = Boolean(
+                          exercise.supportsTime || measurementType === "time"
+                        );
+                        const supportsDistance = Boolean(
+                          exercise.supportsDistance || measurementType === "distance"
+                        );
+                        const distanceOptions = getDistanceUnitOptionsForProfile();
+                        const timeOptions = getTimeUnitOptions();
 
-                          if (supportsTime && supportsDistance) {
-                            return (
-                              <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                  <Label className="text-xs md:text-sm">{t("training.form.totalDistance", "Distanz")}</Label>
-                                  <Select
-                                    value={activity.unit}
-                                    onValueChange={(value) => updateActivity(index, "unit", value)}
-                                  >
-                                    <SelectTrigger className="mt-1">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {distanceOptions.map((unit) => (
-                                        <SelectItem key={unit.value} value={unit.value}>
-                                          {unit.label}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <div>
-                                  <Label className="text-xs md:text-sm">{t("training.form.totalDuration", "Zeit (Min)")}</Label>
-                                  <Select
-                                    value={activity.timeUnit || "min"}
-                                    onValueChange={(value) => updateActivity(index, "timeUnit", value)}
-                                  >
-                                    <SelectTrigger className="mt-1">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {timeOptions.map((unit) => (
-                                        <SelectItem key={unit.value} value={unit.value}>
-                                          {unit.label}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                              </div>
-                            );
-                          }
-
-                          if (supportsDistance) {
-                            return (
+                        if (supportsTime && supportsDistance) {
+                          return (
+                            <div className="grid grid-cols-2 gap-2">
                               <div>
-                                <Label className="text-xs md:text-sm">{t("training.form.unit")}</Label>
+                                <Label className="text-xs md:text-sm">{t("training.form.totalDistance", "Distanz")}</Label>
                                 <Select
                                   value={activity.unit}
                                   onValueChange={(value) => updateActivity(index, "unit", value)}
@@ -2000,13 +1957,8 @@ export function WorkoutForm({
                                   </SelectContent>
                                 </Select>
                               </div>
-                            );
-                          }
-
-                          if (supportsTime) {
-                            return (
                               <div>
-                                <Label className="text-xs md:text-sm">{t("training.form.unit")}</Label>
+                                <Label className="text-xs md:text-sm">{t("training.form.totalDuration", "Zeit (Min)")}</Label>
                                 <Select
                                   value={activity.timeUnit || "min"}
                                   onValueChange={(value) => updateActivity(index, "timeUnit", value)}
@@ -2023,11 +1975,58 @@ export function WorkoutForm({
                                   </SelectContent>
                                 </Select>
                               </div>
-                            );
-                          }
+                            </div>
+                          );
+                        }
 
-                          return null;
-                        })()}
+                        if (supportsDistance) {
+                          return (
+                            <div>
+                              <Label className="text-xs md:text-sm">{t("training.form.unit")}</Label>
+                              <Select
+                                value={activity.unit}
+                                onValueChange={(value) => updateActivity(index, "unit", value)}
+                              >
+                                <SelectTrigger className="mt-1">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {distanceOptions.map((unit) => (
+                                    <SelectItem key={unit.value} value={unit.value}>
+                                      {unit.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          );
+                        }
+
+                        if (supportsTime) {
+                          return (
+                            <div>
+                              <Label className="text-xs md:text-sm">{t("training.form.unit")}</Label>
+                              <Select
+                                value={activity.timeUnit || "min"}
+                                onValueChange={(value) => updateActivity(index, "timeUnit", value)}
+                              >
+                                <SelectTrigger className="mt-1">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {timeOptions.map((unit) => (
+                                    <SelectItem key={unit.value} value={unit.value}>
+                                      {unit.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          );
+                        }
+
+                        return null;
+                      })()}
                     </div>
 
                     {/* Sets/Reps oder Gesamtmenge Toggle */}
@@ -2063,131 +2062,131 @@ export function WorkoutForm({
                             </span>
                             <div className="flex flex-1 flex-col gap-1">
                               <div className="flex gap-2">
-                              {(() => {
-                                const { showReps, showTime, showDistance } = getMetricVisibilityForActivity(
-                                  exercise,
-                                  activity.unit
-                                );
-                                return (
-                                  <>
-                                    {showReps && (
-                                      <Input
-                                        type="number"
-                                        placeholder={t("training.form.reps")}
-                                        value={set.reps || ""}
-                                        onChange={(e) =>
-                                          updateSet(
-                                            index,
-                                            setIndex,
-                                            "reps",
-                                            parseFloat(e.target.value) || 0
-                                          )
-                                        }
-                                        className={cn(
-                                          "flex-1",
-                                          activityError.sets?.[setIndex]?.reps &&
+                                {(() => {
+                                  const { showReps, showTime, showDistance } = getMetricVisibilityForActivity(
+                                    exercise,
+                                    activity.unit
+                                  );
+                                  return (
+                                    <>
+                                      {showReps && (
+                                        <Input
+                                          type="number"
+                                          placeholder={t("training.form.reps")}
+                                          value={set.reps || ""}
+                                          onChange={(e) =>
+                                            updateSet(
+                                              index,
+                                              setIndex,
+                                              "reps",
+                                              parseFloat(e.target.value) || 0
+                                            )
+                                          }
+                                          className={cn(
+                                            "flex-1",
+                                            activityError.sets?.[setIndex]?.reps &&
                                             "border-destructive focus-visible:ring-destructive"
-                                        )}
-                                        min="0"
-                                        step="1"
-                                        inputMode="decimal"
-                                      />
-                                    )}
-                                    {showDistance && (
-                                      <Input
-                                        type="number"
-                                        placeholder={t("training.form.totalDistance", "Distanz")}
-                                        value={set.distance || ""}
-                                        onChange={(e) =>
-                                          updateSet(
-                                            index,
-                                            setIndex,
-                                            "distance",
-                                            parseFloat(e.target.value) || 0
-                                          )
-                                        }
-                                        className={cn(
-                                          "flex-1",
-                                          activityError.sets?.[setIndex]?.distance &&
+                                          )}
+                                          min="0"
+                                          step="1"
+                                          inputMode="decimal"
+                                        />
+                                      )}
+                                      {showDistance && (
+                                        <Input
+                                          type="number"
+                                          placeholder={t("training.form.totalDistance", "Distanz")}
+                                          value={set.distance || ""}
+                                          onChange={(e) =>
+                                            updateSet(
+                                              index,
+                                              setIndex,
+                                              "distance",
+                                              parseFloat(e.target.value) || 0
+                                            )
+                                          }
+                                          className={cn(
+                                            "flex-1",
+                                            activityError.sets?.[setIndex]?.distance &&
                                             "border-destructive focus-visible:ring-destructive"
-                                        )}
-                                        min="0"
-                                        step="0.1"
-                                        inputMode="decimal"
-                                      />
-                                    )}
-                                    {showTime && (
-                                      <Input
-                                        type="number"
-                                        placeholder={t("training.form.totalDuration", "Zeit (Min)")}
-                                        value={set.duration || ""}
-                                        onChange={(e) =>
-                                          updateSet(
-                                            index,
-                                            setIndex,
-                                            "duration",
-                                            parseFloat(e.target.value) || 0
-                                          )
-                                        }
-                                        className={cn(
-                                          "flex-1",
-                                          activityError.sets?.[setIndex]?.duration &&
+                                          )}
+                                          min="0"
+                                          step="0.1"
+                                          inputMode="decimal"
+                                        />
+                                      )}
+                                      {showTime && (
+                                        <Input
+                                          type="number"
+                                          placeholder={t("training.form.totalDuration", "Zeit (Min)")}
+                                          value={set.duration || ""}
+                                          onChange={(e) =>
+                                            updateSet(
+                                              index,
+                                              setIndex,
+                                              "duration",
+                                              parseFloat(e.target.value) || 0
+                                            )
+                                          }
+                                          className={cn(
+                                            "flex-1",
+                                            activityError.sets?.[setIndex]?.duration &&
                                             "border-destructive focus-visible:ring-destructive"
-                                        )}
-                                        min="0"
-                                        step="1"
-                                        inputMode="numeric"
-                                      />
-                                    )}
-                                  </>
-                                );
-                              })()}
-                              {(exercise.requiresWeight || exercise.allowsWeight) && (
-                                <div className="flex-1">
-                                  <Input
-                                    type="number"
-                                    placeholder={getUserWeightUnit()}
-                                    value={set.weight || ""}
-                                    onChange={(e) =>
-                                      updateSet(
-                                        index,
-                                        setIndex,
-                                        "weight",
-                                        parseFloat(e.target.value) || 0
-                                      )
-                                    }
-                                    className={cn(
-                                      "w-full",
-                                      activityError.sets?.[setIndex]?.weight &&
+                                          )}
+                                          min="0"
+                                          step="1"
+                                          inputMode="numeric"
+                                        />
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                                {(exercise.requiresWeight || exercise.allowsWeight) && (
+                                  <div className="flex-1">
+                                    <Input
+                                      type="number"
+                                      placeholder={getUserWeightUnit()}
+                                      value={set.weight || ""}
+                                      onChange={(e) =>
+                                        updateSet(
+                                          index,
+                                          setIndex,
+                                          "weight",
+                                          parseFloat(e.target.value) || 0
+                                        )
+                                      }
+                                      className={cn(
+                                        "w-full",
+                                        activityError.sets?.[setIndex]?.weight &&
                                         "border-destructive focus-visible:ring-destructive"
+                                      )}
+                                      min="0"
+                                      step="0.5"
+                                      inputMode="decimal"
+                                    />
+                                    {activityError.sets?.[setIndex]?.weight && (
+                                      <div className="mt-1 flex items-center gap-1 text-xs text-destructive">
+                                        <AlertTriangle className="h-3 w-3" />
+                                        <span>
+                                          {t(
+                                            "training.form.requiredField",
+                                            "Dieses Feld ist erforderlich."
+                                          )}
+                                        </span>
+                                      </div>
                                     )}
-                                    min="0"
-                                    step="0.5"
-                                    inputMode="decimal"
-                                  />
-                                  {activityError.sets?.[setIndex]?.weight && (
-                                    <div className="mt-1 flex items-center gap-1 text-xs text-destructive">
-                                      <AlertTriangle className="h-3 w-3" />
-                                      <span>
-                                        {t(
-                                          "training.form.requiredField",
-                                          "Dieses Feld ist erforderlich."
-                                        )}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
+                                  </div>
+                                )}
                               </div>
                               {activityError.sets?.[setIndex] &&
                                 (activityError.sets?.[setIndex]?.reps ||
                                   activityError.sets?.[setIndex]?.duration ||
                                   activityError.sets?.[setIndex]?.distance) && (
-                                <div className="flex items-center gap-1 text-xs text-destructive">
-                                  <AlertTriangle className="h-3 w-3" />
-                                  <span>{t("training.form.requiredField", "Dieses Feld ist erforderlich.")}</span>
-                                </div>
-                              )}
+                                  <div className="flex items-center gap-1 text-xs text-destructive">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    <span>{t("training.form.requiredField", "Dieses Feld ist erforderlich.")}</span>
+                                  </div>
+                                )}
                             </div>
                             {activity.sets.length > 1 && (
                               <Button
@@ -2303,7 +2302,7 @@ export function WorkoutForm({
                                   className={cn(
                                     "mt-1",
                                     activityError.totalAmount &&
-                                      "border-destructive focus-visible:ring-destructive"
+                                    "border-destructive focus-visible:ring-destructive"
                                   )}
                                   inputMode="numeric"
                                 />
@@ -2346,7 +2345,7 @@ export function WorkoutForm({
                                   className={cn(
                                     "mt-1",
                                     activityError.totalAmount &&
-                                      "border-destructive focus-visible:ring-destructive"
+                                    "border-destructive focus-visible:ring-destructive"
                                   )}
                                   inputMode="decimal"
                                 />
@@ -2385,7 +2384,7 @@ export function WorkoutForm({
                                   className={cn(
                                     "mt-1",
                                     activityError.totalDuration &&
-                                      "border-destructive focus-visible:ring-destructive"
+                                    "border-destructive focus-visible:ring-destructive"
                                   )}
                                   inputMode="numeric"
                                 />
@@ -2419,7 +2418,7 @@ export function WorkoutForm({
                                   className={cn(
                                     "mt-1",
                                     activityError.totalWeight &&
-                                      "border-destructive focus-visible:ring-destructive"
+                                    "border-destructive focus-visible:ring-destructive"
                                   )}
                                   inputMode="decimal"
                                 />

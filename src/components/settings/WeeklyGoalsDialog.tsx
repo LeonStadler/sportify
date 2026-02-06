@@ -1,20 +1,21 @@
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { DEFAULT_WEEKLY_POINTS_GOAL } from "@/config/events";
 import { useToast } from "@/hooks/use-toast";
+import { API_URL } from "@/lib/api";
+import type { Exercise, ExerciseListResponse } from "@/types/exercise";
 import { Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { WeeklyGoals, WeeklyGoalsForm } from "./WeeklyGoalsForm";
-import type { Exercise, ExerciseListResponse } from "@/types/exercise";
-import { API_URL } from "@/lib/api";
 
 interface WeeklyGoalsDialogProps {
   open: boolean;
@@ -212,53 +213,58 @@ export function WeeklyGoalsDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            {t("weeklyGoals.dialog.title")}
-          </DialogTitle>
-          <DialogDescription>
-            {t("weeklyGoals.dialog.description")}
-          </DialogDescription>
-        </DialogHeader>
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent>
+        <div className="mx-auto w-full max-w-lg max-h-[85vh] overflow-y-auto">
+          <DrawerHeader>
+            <DrawerTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              {t("weeklyGoals.dialog.title")}
+            </DrawerTitle>
+            <DrawerDescription>
+              {t("weeklyGoals.dialog.description")}
+            </DrawerDescription>
+          </DrawerHeader>
 
-        <WeeklyGoalsForm
-          goals={localGoals}
-          exercises={exercises}
-          facets={facets}
-          onChangePoints={updatePointsGoal}
-          onChangeExercise={updateExerciseGoal}
-          onChangeExerciseUnit={updateExerciseUnit}
-          onChangeExerciseTarget={updateExerciseTarget}
-          onAddExercise={addExerciseGoal}
-          onRemoveExercise={removeExerciseGoal}
-          showPoints={showPoints}
-        />
+          <div className="px-4 pb-2">
+            <WeeklyGoalsForm
+              goals={localGoals}
+              exercises={exercises}
+              facets={facets}
+              onChangePoints={updatePointsGoal}
+              onChangeExercise={updateExerciseGoal}
+              onChangeExerciseUnit={updateExerciseUnit}
+              onChangeExerciseTarget={updateExerciseTarget}
+              onAddExercise={addExerciseGoal}
+              onRemoveExercise={removeExerciseGoal}
+              showPoints={showPoints}
+            />
+          </div>
 
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isSaving}
-          >
-            {t("common.cancel")}
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={handleReset}
-            disabled={isSaving}
-          >
-            {t("common.reset")}
-          </Button>
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving
-              ? t("common.saving")
-              : t("common.save")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <DrawerFooter className="gap-2 flex-row flex-wrap">
+            <DrawerClose asChild>
+              <Button
+                variant="outline"
+                disabled={isSaving}
+              >
+                {t("common.cancel")}
+              </Button>
+            </DrawerClose>
+            <Button
+              variant="secondary"
+              onClick={handleReset}
+              disabled={isSaving}
+            >
+              {t("common.reset")}
+            </Button>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving
+                ? t("common.saving")
+                : t("common.save")}
+            </Button>
+          </DrawerFooter>
+        </div>
+      </DrawerContent>
+    </Drawer>
   );
 }

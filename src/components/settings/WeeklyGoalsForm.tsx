@@ -1,13 +1,7 @@
+import { ExercisePicker } from "@/components/exercises/ExercisePicker";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
-import { useTranslation } from "react-i18next";
-import { Plus, Trash2 } from "lucide-react";
-import type { Exercise } from "@/types/exercise";
-import { Button } from "@/components/ui/button";
-import { ExercisePicker } from "@/components/exercises/ExercisePicker";
-import { useAuth } from "@/hooks/use-auth";
-import { getPrimaryDistanceUnit } from "@/utils/units";
 import {
   Select,
   SelectContent,
@@ -15,7 +9,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { ExerciseListResponse } from "@/types/exercise";
+import { Slider } from "@/components/ui/slider";
+import { useAuth } from "@/hooks/use-auth";
+import type { Exercise, ExerciseListResponse } from "@/types/exercise";
+import { getPrimaryDistanceUnit } from "@/utils/units";
+import { Plus, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export interface WeeklyGoalData {
   target: number;
@@ -96,7 +95,7 @@ export function WeeklyGoalsForm({
     <div className="space-y-6 py-2">
       {showPoints && (
         <div className="space-y-3">
-          <Label>{t("weeklyGoals.dialog.pointsGoal", "Punkte‑Ziel")}</Label>
+          <Label>{t("weeklyGoals.dialog.pointsGoal")}</Label>
           <div className="flex items-center gap-3">
             <Input
               type="number"
@@ -110,7 +109,7 @@ export function WeeklyGoalsForm({
               className="h-9 w-28 text-right"
             />
             <span className="text-xs text-muted-foreground">
-              {t("weeklyGoals.dialog.points", "Punkte")}
+              {t("weeklyGoals.dialog.pointsUnit")}
             </span>
           </div>
           <Slider
@@ -121,14 +120,14 @@ export function WeeklyGoalsForm({
             className="py-1"
           />
           <p className="text-xs text-muted-foreground">
-            {t("weeklyGoals.dialog.current", "Aktuell")}: {goals.points?.current ?? 0}
+            {t("weeklyGoals.dialog.currentAchieved")}: {goals.points?.current ?? 0}
           </p>
         </div>
       )}
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <Label>{t("weeklyGoals.dialog.exerciseGoals", "Übungsziele")}</Label>
+          <Label>{t("weeklyGoals.dialog.exerciseGoals")}</Label>
           <Button
             type="button"
             variant="outline"
@@ -137,13 +136,13 @@ export function WeeklyGoalsForm({
             disabled={goals.exercises.length >= 10}
           >
             <Plus className="h-4 w-4 mr-1" />
-            {t("weeklyGoals.dialog.addExercise", "Übung hinzufügen")}
+            {t("weeklyGoals.dialog.addExercise")}
           </Button>
         </div>
 
         {goals.exercises.length === 0 && (
           <p className="text-sm text-muted-foreground">
-            {t("weeklyGoals.dialog.noExercises", "Wähle bis zu 10 Übungen für dein Wochenziel.")}
+            {t("weeklyGoals.dialog.noExercises")}
           </p>
         )}
 
@@ -167,7 +166,7 @@ export function WeeklyGoalsForm({
                       }
                     }
                     enableFilters
-                    placeholder={t("weeklyGoals.dialog.selectExercise", "Übung wählen")}
+                    placeholder={t("weeklyGoals.dialog.selectExercise")}
                   />
                 </div>
                 <Button
@@ -250,7 +249,7 @@ export function WeeklyGoalsForm({
               />
 
               <p className="text-xs text-muted-foreground">
-                {t("weeklyGoals.dialog.current", "Aktuell")}: {goal.current ?? 0}
+                {t("weeklyGoals.dialog.currentAchieved")}: {goal.current ?? 0}
               </p>
             </div>
           );

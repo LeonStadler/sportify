@@ -6,9 +6,9 @@ import {
   getPrimaryWeightUnit,
   normalizeDistanceUnit,
 } from "@/utils/units";
+import { useTheme } from "next-themes";
 import React, { ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useTheme } from "next-themes";
 
 export interface User {
   id: string;
@@ -84,9 +84,9 @@ const normalizeUserPreferences = (user: User): User => {
   const temperature = getPrimaryTemperatureUnit(units.temperature);
   const themeFromPref =
     user.themePreference &&
-    (user.themePreference === "light" ||
-      user.themePreference === "dark" ||
-      user.themePreference === "system")
+      (user.themePreference === "light" ||
+        user.themePreference === "dark" ||
+        user.themePreference === "system")
       ? user.themePreference
       : raw.theme === "light" || raw.theme === "dark" || raw.theme === "system"
         ? raw.theme
@@ -1194,7 +1194,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       if (!response.ok) {
         let errorMessage = "Fehler beim Senden der Freundschaftsanfrage";
         const contentType = response.headers.get("content-type");
-        
+
         if (contentType && contentType.includes("application/json")) {
           try {
             const data = await response.json();
@@ -1213,7 +1213,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
             console.error("Error reading error response:", textError);
           }
         }
-        
+
         throw new Error(errorMessage);
       }
 

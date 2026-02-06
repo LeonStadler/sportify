@@ -9,10 +9,30 @@ import { DeleteAccountPasswordDialog } from "@/components/settings/DeleteAccount
 import { InviteFriendForm } from "@/components/settings/InviteFriendForm";
 import { PushNotificationSettings } from "@/components/settings/PushNotificationSettings";
 import { WeeklyGoals, WeeklyGoalsForm } from "@/components/settings/WeeklyGoalsForm";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -25,16 +45,6 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { DEFAULT_WEEKLY_POINTS_GOAL } from "@/config/events";
 import { Invitation } from "@/contexts/AuthContext";
 import { useAuth } from "@/hooks/use-auth";
@@ -56,14 +66,17 @@ import {
   Lock,
   Mail,
   Medal,
+  Minus,
+  Plus,
   RefreshCw,
+  Scale,
   Share2,
   Shield,
   Trash2,
   Trophy,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import NiceAvatar, { NiceAvatarProps } from "react-nice-avatar";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -373,21 +386,28 @@ export function Profile() {
         throw new Error(t("errors.notAuthenticated"));
       }
 
+      const payload = {
+        points: {
+          target: Number(newGoals.points?.target ?? 0),
+          current: newGoals.points?.current ?? 0,
+        },
+        exercises: newGoals.exercises,
+      };
       const response = await fetch(`${API_URL}/goals`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(newGoals),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
         const errorData = await response
           .json()
-          .catch(() => ({ error: t("goals.saveError") }));
+          .catch(() => ({ error: t("weeklyGoals.saveError") }));
         throw new Error(
-          errorData.error || t("goals.saveError")
+          errorData.error || t("weeklyGoals.saveError")
         );
       }
 
@@ -405,10 +425,8 @@ export function Profile() {
       setGoals(mergedGoals);
       setGoalsForm(mergedGoals);
       toast({
-        title: t("goals.saved"),
-        description: t(
-          "goals.savedDescription"
-        ),
+        title: t("weeklyGoals.saved"),
+        description: t("weeklyGoals.savedDescription"),
       });
     } catch (error) {
       toast({
@@ -416,7 +434,7 @@ export function Profile() {
         description:
           error instanceof Error
             ? error.message
-            : t("goals.saveError"),
+            : t("weeklyGoals.saveError"),
         variant: "destructive",
       });
       throw error;
@@ -437,8 +455,9 @@ export function Profile() {
     user?.showInGlobalRankings ?? true
   );
   const [showWarningDialog, setShowWarningDialog] = useState(false);
-  const [bodyWeightInput, setBodyWeightInput] = useState("");
-  const bodyWeightFocusedRef = useRef(false);
+  const [bodyWeightDrawerOpen, setBodyWeightDrawerOpen] = useState(false);
+  const [bodyWeightDraft, setBodyWeightDraft] = useState<number | null>(null);
+  const [bodyWeightInputDraft, setBodyWeightInputDraft] = useState("");
 
   // Update form when user changes
   useEffect(() => {
@@ -500,20 +519,6 @@ export function Profile() {
     },
     [i18n.language]
   );
-
-  useEffect(() => {
-    if (bodyWeightFocusedRef.current) return;
-    setBodyWeightInput(
-      formatBodyWeightDisplay(
-        preferencesForm.metrics.bodyWeightKg ?? null,
-        preferencesForm.units.weight
-      )
-    );
-  }, [
-    preferencesForm.metrics.bodyWeightKg,
-    preferencesForm.units.weight,
-    formatBodyWeightDisplay,
-  ]);
 
   const handleGlobalRankingToggle = (checked: boolean) => {
     if (!checked) {
@@ -682,7 +687,7 @@ export function Profile() {
 
     const effectiveForm =
       currentProfileForm.displayPreference === "nickname" &&
-      (!currentProfileForm.nickname || currentProfileForm.nickname.trim() === "")
+        (!currentProfileForm.nickname || currentProfileForm.nickname.trim() === "")
         ? { ...currentProfileForm, displayPreference: "firstName" as const }
         : currentProfileForm;
     const displayWasReset =
@@ -714,9 +719,9 @@ export function Profile() {
         description: displayWasReset
           ? t("profile.nicknameRemovedDisplayReset")
           : t(
-              "settings.settingSaved",
-              { setting: fieldLabels[fieldName] || fieldName }
-            ),
+            "settings.settingSaved",
+            { setting: fieldLabels[fieldName] || fieldName }
+          ),
       });
     } catch (error) {
       toast({
@@ -830,15 +835,15 @@ export function Profile() {
     } =
       pendingUnitSystem === "imperial"
         ? {
-            distance: "miles",
-            weight: "lbs",
-            temperature: "fahrenheit",
-          }
+          distance: "miles",
+          weight: "lbs",
+          temperature: "fahrenheit",
+        }
         : {
-            distance: "km",
-            weight: "kg",
-            temperature: "celsius",
-          };
+          distance: "km",
+          weight: "kg",
+          temperature: "celsius",
+        };
     savePreference(
       { units: nextUnits },
       t("profile.unitSystem", "Einheitensystem")
@@ -1402,108 +1407,318 @@ export function Profile() {
 
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">
-                      {t("profile.bodyWeightOptional", "Körpergewicht (optional)")}
+                      {t("profile.bodyWeightOptional")}
                     </Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        autoComplete="off"
-                        value={bodyWeightInput}
-                        placeholder={
-                          i18n.language === "de"
-                            ? t("profile.bodyWeightPlaceholder", "z. B. 72")
-                            : t("profile.bodyWeightPlaceholder", "e.g. 72")
-                        }
-                        onFocus={() => {
-                          bodyWeightFocusedRef.current = true;
-                        }}
-                        onBlur={() => {
-                          bodyWeightFocusedRef.current = false;
-                          const normalized = bodyWeightInput.replace(
-                            ",",
-                            "."
-                          );
-                          const raw = parseFloat(normalized);
-                          const kgValue = Number.isFinite(raw)
-                            ? convertWeightToKg(
-                                raw,
+                    <Drawer
+                      open={bodyWeightDrawerOpen}
+                      onOpenChange={(open) => {
+                        setBodyWeightDrawerOpen(open);
+                        if (open) {
+                          const currentKg =
+                            preferencesForm.metrics.bodyWeightKg ?? null;
+                          if (currentKg != null) {
+                            const displayVal = convertWeightFromKg(
+                              currentKg,
+                              preferencesForm.units.weight
+                            );
+                            setBodyWeightDraft(displayVal);
+                            setBodyWeightInputDraft(
+                              formatBodyWeightDisplay(
+                                currentKg,
                                 preferencesForm.units.weight
                               )
-                            : null;
-                          const toSave =
-                            kgValue != null && kgValue > 0 ? kgValue : null;
-                          savePreference(
-                            {
-                              metrics: {
-                                ...preferencesForm.metrics,
-                                bodyWeightKg: toSave,
-                              },
-                            },
-                            t("profile.bodyWeightOptional", "Körpergewicht")
-                          );
-                          setBodyWeightInput(
-                            formatBodyWeightDisplay(
-                              toSave,
-                              preferencesForm.units.weight
-                            )
-                          );
-                        }}
-                        onChange={(e) =>
-                          setBodyWeightInput(e.target.value)
+                            );
+                          } else {
+                            setBodyWeightDraft(null);
+                            setBodyWeightInputDraft("");
+                          }
                         }
-                        onKeyDown={(e) => {
-                          if (e.key !== "ArrowUp" && e.key !== "ArrowDown")
-                            return;
-                          e.preventDefault();
-                          const normalized = bodyWeightInput.replace(
-                            ",",
-                            "."
-                          );
-                          const current =
-                            parseFloat(normalized) ||
-                            (preferencesForm.metrics.bodyWeightKg != null
-                              ? convertWeightFromKg(
+                      }}
+                    >
+                      <DrawerTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start gap-2 font-normal h-10 text-left"
+                          type="button"
+                        >
+                          <Scale className="h-4 w-4 shrink-0 opacity-70" />
+                          {preferencesForm.metrics.bodyWeightKg != null ? (
+                            <>
+                              <span className="tabular-nums">
+                                {formatBodyWeightDisplay(
                                   preferencesForm.metrics.bodyWeightKg,
                                   preferencesForm.units.weight
-                                )
-                              : 0);
-                          const step = 0.5;
-                          const next =
-                            e.key === "ArrowUp"
-                              ? current + step
-                              : Math.max(0, current - step);
-                          const kgValue = convertWeightToKg(
-                            next,
-                            preferencesForm.units.weight
-                          );
-                          savePreference(
-                            {
-                              metrics: {
-                                ...preferencesForm.metrics,
-                                bodyWeightKg:
-                                  kgValue > 0 ? kgValue : null,
-                              },
-                            },
-                            t("profile.bodyWeightOptional", "Körpergewicht")
-                          );
-                          setBodyWeightInput(
-                            formatBodyWeightDisplay(
-                              kgValue > 0 ? kgValue : null,
-                              preferencesForm.units.weight
-                            )
-                          );
-                        }}
-                      />
-                      <span className="text-xs text-muted-foreground">
-                        {preferencesForm.units.weight}
-                      </span>
-                    </div>
+                                )}
+                              </span>
+                              <span className="text-muted-foreground text-xs">
+                                {preferencesForm.units.weight}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground">
+                              {t(
+                                "profile.bodyWeightSet"
+                              )}
+                            </span>
+                          )}
+                        </Button>
+                      </DrawerTrigger>
+                      <DrawerContent>
+                        <div className="mx-auto w-full max-w-sm">
+                          <DrawerHeader>
+                            <DrawerTitle>
+                              {t("profile.bodyWeightDrawerTitle")}
+                            </DrawerTitle>
+                            <DrawerDescription>
+                              {t("profile.bodyWeightDrawerDescription")}
+                            </DrawerDescription>
+                          </DrawerHeader>
+                          <div className="p-4 pb-0">
+                            <div className="flex items-center justify-center gap-4">
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-10 w-10 shrink-0 rounded-full"
+                                type="button"
+                                onClick={() => {
+                                  const kg =
+                                    bodyWeightDraft != null
+                                      ? convertWeightToKg(
+                                        bodyWeightDraft,
+                                        preferencesForm.units.weight
+                                      )
+                                      : 70;
+                                  const minKg = 20;
+                                  if (kg <= minKg) return;
+                                  const nextDisplay =
+                                    convertWeightFromKg(
+                                      kg - 0.5,
+                                      preferencesForm.units.weight
+                                    );
+                                  const next =
+                                    Math.round(nextDisplay * 10) / 10;
+                                  setBodyWeightDraft(next);
+                                  setBodyWeightInputDraft(
+                                    i18n.language === "de"
+                                      ? String(
+                                        next % 1 === 0
+                                          ? next
+                                          : next.toFixed(1)
+                                      ).replace(".", ",")
+                                      : String(
+                                        next % 1 === 0
+                                          ? next
+                                          : next.toFixed(1)
+                                      )
+                                  );
+                                }}
+                                disabled={
+                                  (bodyWeightDraft == null
+                                    ? 70
+                                    : convertWeightToKg(
+                                      bodyWeightDraft,
+                                      preferencesForm.units.weight
+                                    )) <= 20
+                                }
+                                aria-label={t("common.decrease", "Verringern")}
+                              >
+                                <Minus className="h-4 w-4" />
+                              </Button>
+                              <div className="flex-1 text-center min-w-[120px] flex flex-col items-center">
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  enterKeyHint="done"
+                                  aria-label={t("profile.bodyWeightOptional")}
+                                  placeholder={t("profile.bodyWeightPlaceholder")}
+                                  className="w-full bg-transparent text-5xl font-bold tracking-tighter tabular-nums text-center outline-none border-b-2 border-transparent focus:border-primary rounded-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-muted-foreground"
+                                  value={bodyWeightInputDraft}
+                                  onChange={(e) => {
+                                    const raw = e.target.value.replace(
+                                      ",",
+                                      "."
+                                    );
+                                    if (
+                                      raw === "" ||
+                                      /^\d*\.?\d*$/.test(raw)
+                                    ) {
+                                      setBodyWeightInputDraft(e.target.value);
+                                      if (raw === "") {
+                                        setBodyWeightDraft(null);
+                                      } else {
+                                        const num = parseFloat(raw);
+                                        if (Number.isFinite(num))
+                                          setBodyWeightDraft(num);
+                                      }
+                                    }
+                                  }}
+                                  onBlur={() => {
+                                    const normalized =
+                                      bodyWeightInputDraft.replace(",", ".");
+                                    const raw = parseFloat(normalized);
+                                    if (
+                                      bodyWeightInputDraft.trim() === "" ||
+                                      !Number.isFinite(raw) ||
+                                      raw <= 0
+                                    ) {
+                                      setBodyWeightDraft(null);
+                                      setBodyWeightInputDraft("");
+                                      return;
+                                    }
+                                    const kg = convertWeightToKg(
+                                      raw,
+                                      preferencesForm.units.weight
+                                    );
+                                    const clampedKg = Math.max(
+                                      20,
+                                      Math.min(300, kg)
+                                    );
+                                    const displayVal =
+                                      convertWeightFromKg(
+                                        clampedKg,
+                                        preferencesForm.units.weight
+                                      );
+                                    const rounded =
+                                      Math.round(displayVal * 10) / 10;
+                                    setBodyWeightDraft(rounded);
+                                    setBodyWeightInputDraft(
+                                      i18n.language === "de"
+                                        ? String(
+                                          rounded % 1 === 0
+                                            ? rounded
+                                            : rounded.toFixed(1)
+                                        ).replace(".", ",")
+                                        : String(
+                                          rounded % 1 === 0
+                                            ? rounded
+                                            : rounded.toFixed(1)
+                                        )
+                                    );
+                                  }}
+                                />
+                                <div className="text-muted-foreground text-xs uppercase tracking-wider mt-1">
+                                  {preferencesForm.units.weight}
+                                </div>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-10 w-10 shrink-0 rounded-full"
+                                type="button"
+                                onClick={() => {
+                                  const kg =
+                                    bodyWeightDraft != null
+                                      ? convertWeightToKg(
+                                        bodyWeightDraft,
+                                        preferencesForm.units.weight
+                                      )
+                                      : 70;
+                                  const maxKg = 300;
+                                  if (kg >= maxKg) return;
+                                  const nextDisplay =
+                                    convertWeightFromKg(
+                                      kg + 0.5,
+                                      preferencesForm.units.weight
+                                    );
+                                  const next =
+                                    Math.round(nextDisplay * 10) / 10;
+                                  setBodyWeightDraft(next);
+                                  setBodyWeightInputDraft(
+                                    i18n.language === "de"
+                                      ? String(
+                                        next % 1 === 0
+                                          ? next
+                                          : next.toFixed(1)
+                                      ).replace(".", ",")
+                                      : String(
+                                        next % 1 === 0
+                                          ? next
+                                          : next.toFixed(1)
+                                      )
+                                  );
+                                }}
+                                disabled={
+                                  bodyWeightDraft != null &&
+                                  convertWeightToKg(
+                                    bodyWeightDraft,
+                                    preferencesForm.units.weight
+                                  ) >= 300
+                                }
+                                aria-label={t("common.increase", "Erhöhen")}
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                          <DrawerFooter className="flex flex-col gap-3">
+                            <Button
+                              className="w-full"
+                              onClick={() => {
+                                const raw =
+                                  bodyWeightInputDraft.trim() === ""
+                                    ? null
+                                    : parseFloat(
+                                      bodyWeightInputDraft.replace(
+                                        ",",
+                                        "."
+                                      )
+                                    );
+                                const kg =
+                                  raw != null &&
+                                    Number.isFinite(raw) &&
+                                    raw > 0
+                                    ? convertWeightToKg(
+                                      raw,
+                                      preferencesForm.units.weight
+                                    )
+                                    : null;
+                                const toSave =
+                                  kg != null && kg > 0 ? kg : null;
+                                savePreference(
+                                  {
+                                    metrics: {
+                                      ...preferencesForm.metrics,
+                                      bodyWeightKg: toSave,
+                                    },
+                                  },
+                                  t("profile.bodyWeightOptional")
+                                );
+                                setBodyWeightDrawerOpen(false);
+                              }}
+                            >
+                              {t("common.save")}
+                            </Button>
+                            <div className="grid grid-cols-2 gap-2 w-full">
+                              <DrawerClose asChild>
+                                <Button variant="outline" className="w-full">
+                                  {t("common.cancel")}
+                                </Button>
+                              </DrawerClose>
+                              <Button
+                                variant="ghost"
+                                className="text-muted-foreground w-full"
+                                onClick={() => {
+                                  savePreference(
+                                    {
+                                      metrics: {
+                                        ...preferencesForm.metrics,
+                                        bodyWeightKg: null,
+                                      },
+                                    },
+                                    t("profile.bodyWeightOptional")
+                                  );
+                                  setBodyWeightDrawerOpen(false);
+                                }}
+                              >
+                                {t("profile.bodyWeightReset")}
+                              </Button>
+                            </div>
+                          </DrawerFooter>
+                        </div>
+                      </DrawerContent>
+                    </Drawer>
                     <p className="text-xs text-muted-foreground">
-                      {t(
-                        "profile.bodyWeightHint",
-                        "Optional: verbessert die Genauigkeit der Punkteberechnung. Ohne Angabe bleibt alles fair."
-                      )}
+                      {t("profile.bodyWeightHint")}
                     </p>
                   </div>
                 </div>
@@ -1748,12 +1963,12 @@ export function Profile() {
                             user.twoFactorEnabledAt !== "" &&
                             !isNaN(new Date(user.twoFactorEnabledAt).getTime())
                             ? formatDateTime(user.twoFactorEnabledAt, {
-                                day: "2-digit",
-                                month: "2-digit",
-                                year: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
                             : t("profile.notAvailable")}
                         </p>
                       </div>
@@ -1812,12 +2027,12 @@ export function Profile() {
                         user.lastLoginAt !== "" &&
                         !isNaN(new Date(user.lastLoginAt).getTime())
                         ? formatDateTime(user.lastLoginAt, {
-                            day: "2-digit",
-                            month: "2-digit",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
                         : t("profile.never")}
                     </p>
                   </div>
@@ -1832,12 +2047,12 @@ export function Profile() {
                         user.passwordChangedAt !== "" &&
                         !isNaN(new Date(user.passwordChangedAt).getTime())
                         ? formatDateTime(user.passwordChangedAt, {
-                            day: "2-digit",
-                            month: "2-digit",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
                         : t("profile.neverChanged")}
                     </p>
                   </div>

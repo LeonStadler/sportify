@@ -101,8 +101,7 @@ const resources = {
             "Falls du noch kein Konto hast, kannst du dich registrieren.",
           success: {
             friendshipCreatedTitle: "Freundschaft erstellt",
-            friendshipCreatedDesc:
-              "Ihr seid jetzt mit {{name}} befreundet.",
+            friendshipCreatedDesc: "Ihr seid jetzt mit {{name}} befreundet.",
             requestSentTitle: "Freundschaftsanfrage gesendet",
             requestSentDesc:
               "Eine Freundschaftsanfrage wurde an {{name}} gesendet.",
@@ -296,8 +295,7 @@ const resources = {
             "Bitte gib den 6-stelligen Code aus deiner Authenticator-App ein, um die Anmeldung abzuschließen.",
           codeLabel: "2FA-Code",
           codePlaceholder: "000000",
-          codeHint:
-            "Gib den 6-stelligen Code aus deiner Authenticator-App ein",
+          codeHint: "Gib den 6-stelligen Code aus deiner Authenticator-App ein",
           lost2fa: "2FA verloren?",
           backupCodeLabel: "Backup-Code",
           backupCodePlaceholder: "XXXX-XXXX-XXXX",
@@ -336,7 +334,7 @@ const resources = {
           security: "Sicherheit",
           preferences: "Einstellungen",
           achievements: "Erfolge",
-          goals: "Wochenziele",
+          goals: "Ziele",
           danger: "Gefahrenzone",
         },
         achievements: {
@@ -407,9 +405,11 @@ const resources = {
         },
         invitationResend: "Erneut versenden",
         invitationResent: "Einladung erneut versendet",
-        invitationResentDesc: "Die Einladung wurde erfolgreich erneut versendet.",
+        invitationResentDesc:
+          "Die Einladung wurde erfolgreich erneut versendet.",
         invitationResendError: "Fehler beim erneuten Versenden",
-        invitationResendErrorDesc: "Fehler beim erneuten Versenden der Einladung",
+        invitationResendErrorDesc:
+          "Fehler beim erneuten Versenden der Einladung",
         invitationDeleted: "Einladung gelöscht",
         invitationDeletedDesc: "Die Einladung wurde erfolgreich gelöscht.",
         invitationDeleteError: "Fehler beim Löschen",
@@ -476,8 +476,7 @@ const resources = {
         deleteAccountDialogTitle: "Konto löschen",
         deleteAccountDialogDesc:
           "Möchtest du dein Konto wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden. Alle deine Daten werden unwiderruflich gelöscht.",
-        deleteAccountDialogPrompt:
-          "Gib {{text}} ein, um fortzufahren:",
+        deleteAccountDialogPrompt: "Gib {{text}} ein, um fortzufahren:",
         deleteAccountDialogHint:
           'Bitte gib genau "{{text}}" ein (Großbuchstaben erforderlich).',
         deleteAccountDialogContinue: "Weiter",
@@ -496,7 +495,8 @@ const resources = {
           achievements: "Deine Erfolge und Statistiken gehen verloren",
           friendships: "Alle Freundschaften werden beendet",
           profile: "Dein Profil ist nicht mehr erreichbar",
-          irreversible: "Diese Aktion ist dauerhaft und kann nicht rückgängig gemacht werden",
+          irreversible:
+            "Diese Aktion ist dauerhaft und kann nicht rückgängig gemacht werden",
         },
         userPreferences: "Benutzereinstellungen",
         userPreferencesDesc: "Passe die App an deine Vorlieben an",
@@ -678,6 +678,15 @@ const resources = {
         activityLevelHigh: "Sehr aktiv",
         activityLevelHint:
           "Das beeinflusst das automatische Monatsziel, besonders wenn dir noch keine Trainingshistorie vorliegt.",
+        bodyWeightDrawerTitle: "Körpergewicht",
+        bodyWeightDrawerDescription:
+          "Optional: verbessert die Genauigkeit der Punkteberechnung.",
+        bodyWeightReset: "Zurücksetzen",
+        bodyWeightOptional: "Körpergewicht (optional)",
+        bodyWeightSet: "Körpergewicht festlegen",
+        bodyWeightHint:
+          "Optional: verbessert die Genauigkeit der Punkteberechnung. Ohne Angabe bleibt alles fair.",
+        bodyWeightPlaceholder: "70",
       },
       badges: {
         categories: {
@@ -816,7 +825,8 @@ const resources = {
           "Das Monatsziel passt sich automatisch an deine letzten Monate an.",
         settings: {
           title: "Dashboard-Kacheln konfigurieren",
-          description: "Passe die angezeigten Kacheln und Zeiträume nach deinen Wünschen an.",
+          description:
+            "Passe die angezeigten Kacheln und Zeiträume nach deinen Wünschen an.",
           button: "Kacheln anpassen",
           short: "Kacheln",
           card: "Kachel",
@@ -877,14 +887,22 @@ const resources = {
           description:
             "Passe deine wöchentlichen Ziele nach deinen Wünschen an.",
           current: "Aktuell",
+          currentAchieved: "Erreicht diese Woche",
+          pointsGoal: "Punkte‑Ziel",
           pointsLabel: "Punkte-Ziel",
           pointsUnit: "Punkte",
+          exerciseGoals: "Übungsziele",
+          addExercise: "Übung hinzufügen",
+          noExercises: "Wähle bis zu 10 Übungen für dein Wochenziel.",
+          noExerciseGoalsSet: "Keine Übungsziele gesetzt.",
+          selectExercise: "Übung wählen",
+          exercise: "Übung",
         },
         pointsTitle: "Wöchentliches Punkte-Ziel",
         pointsDescription:
           "Lege dein persönliches Punkte-Ziel für diese Woche fest.",
         pointsLabel: "Punkte",
-        pointsHint: "Standard-Challenge ist meist 1500 Punkte.",
+        pointsHint: "Standard-Wochenchallenge liegt bei 500 Punkte.",
       },
       // Activity Feed
       activityFeed: {
@@ -1449,7 +1467,8 @@ const resources = {
         categoryRequired: "Bitte wähle eine Kategorie aus.",
         disciplineRequired: "Bitte wähle eine Disziplin aus.",
         movementPatternRequired: "Bitte wähle ein Bewegungsmuster aus.",
-        requiredFields: "Bitte fülle Kategorie, Disziplin und Bewegungsmuster aus.",
+        requiredFields:
+          "Bitte fülle Kategorie, Disziplin und Bewegungsmuster aus.",
         exerciseCreated: "Übung erstellt",
         exerciseCreatedInfo: "Die Übung ist sofort nutzbar.",
         exerciseCreateError: "Übung konnte nicht erstellt werden.",
@@ -1694,7 +1713,7 @@ const resources = {
           loading: "Monitoring-Daten werden geladen...",
           empty: "Keine Monitoring-Daten verfügbar.",
           refreshHint:
-            "Klicken Sie auf \"Aktualisieren\", um Monitoring-Daten zu laden",
+            'Klicken Sie auf "Aktualisieren", um Monitoring-Daten zu laden',
           jobs: {
             title: "Job-Status",
             stuck: "{{count}} stuck job(s) gefunden",
@@ -1873,9 +1892,11 @@ const resources = {
         saveError: "Fehler beim Speichern",
         reactions: {
           friendsCanSee: "Freunde können Reaktionen sehen",
-          friendsCanSeeDescription: "Erlaube deinen Freunden, Reaktionen auf deine Workouts zu sehen",
+          friendsCanSeeDescription:
+            "Erlaube deinen Freunden, Reaktionen auf deine Workouts zu sehen",
           showNames: "Namen bei Reaktionen anzeigen",
-          showNamesDescription: "Zeige die Namen der Nutzer, die auf deine Workouts reagiert haben",
+          showNamesDescription:
+            "Zeige die Namen der Nutzer, die auf deine Workouts reagiert haben",
         },
       },
       // Push Notifications
@@ -3024,6 +3045,8 @@ const resources = {
         info: "Information",
         yes: "Ja",
         no: "Nein",
+        increase: "Erhöhen",
+        decrease: "Verringern",
         search: "Suche",
         notificationsCenter: {
           title: "Benachrichtigungen",
@@ -3149,8 +3172,7 @@ const resources = {
           title: "Friend invitation",
           description: "{{name}} wants to add you as a friend",
           promptAuthenticated: "Do you want to add {{name}} as a friend?",
-          promptUnauthenticated:
-            "To add {{name}} as a friend, please log in.",
+          promptUnauthenticated: "To add {{name}} as a friend, please log in.",
           accept: "Accept",
           later: "Later",
           sending: "Sending...",
@@ -3318,8 +3340,7 @@ const resources = {
           enterSixDigits: "Please enter a 6-digit code.",
           invalidCode: "Invalid code. Please try again.",
           enabledTitle: "2FA enabled",
-          enabledDesc:
-            "Two-factor authentication was enabled successfully.",
+          enabledDesc: "Two-factor authentication was enabled successfully.",
           copySecretSuccessTitle: "Copied",
           copySecretSuccessDesc: "Secret key copied to clipboard.",
           copySecretErrorTitle: "Error",
@@ -3383,7 +3404,7 @@ const resources = {
           security: "Security",
           preferences: "Preferences",
           achievements: "Achievements",
-          goals: "Weekly Goals",
+          goals: "Goals",
           danger: "Danger Zone",
         },
         achievements: {
@@ -3720,6 +3741,15 @@ const resources = {
         activityLevelHigh: "Very active",
         activityLevelHint:
           "This influences the automatic monthly goal, especially if you don't have much history yet.",
+        bodyWeightDrawerTitle: "Body weight",
+        bodyWeightDrawerDescription:
+          "Optional: improves accuracy of points calculation.",
+        bodyWeightReset: "Reset",
+        bodyWeightOptional: "Body weight (optional)",
+        bodyWeightSet: "Set body weight",
+        bodyWeightHint:
+          "Optional: improves accuracy of points calculation. Without an entry, everything stays fair.",
+        bodyWeightPlaceholder: "70",
       },
       badges: {
         categories: {
@@ -3855,7 +3885,8 @@ const resources = {
           "Your monthly goal adjusts automatically based on your recent months.",
         settings: {
           title: "Configure dashboard cards",
-          description: "Adjust the displayed cards and time ranges to your preferences.",
+          description:
+            "Adjust the displayed cards and time ranges to your preferences.",
           button: "Edit cards",
           short: "Cards",
           card: "Card",
@@ -3916,13 +3947,21 @@ const resources = {
           description:
             "Adjust your weekly goals according to your preferences.",
           current: "Current",
+          currentAchieved: "Achieved this week",
+          pointsGoal: "Points goal",
           pointsLabel: "Points goal",
           pointsUnit: "Points",
+          exerciseGoals: "Exercise goals",
+          addExercise: "Add exercise",
+          noExercises: "Select up to 10 exercises for your weekly goal.",
+          noExerciseGoalsSet: "No exercise goals set.",
+          selectExercise: "Select exercise",
+          exercise: "Exercise",
         },
         pointsTitle: "Weekly points goal",
         pointsDescription: "Set your personal points goal for this week.",
         pointsLabel: "Points",
-        pointsHint: "Default challenge is usually 1500 points.",
+        pointsHint: "Default weekly challenge is 500 points.",
       },
       // Activity Feed
       activityFeed: {
@@ -4133,13 +4172,13 @@ const resources = {
           weeklyActivity: "Weekly Activity",
           monthlyActivity: "Monthly Activity",
           progress: "Progress",
-        strengthTrainingTrend: "Strength Training Trend",
-        strengthPoints: "Strength Points",
-        enduranceTrend: "Endurance Trend",
-        endurancePoints: "Endurance Points",
-        personalRecords: "Personal Records",
-        activityDistribution: "Activity Distribution",
-      },
+          strengthTrainingTrend: "Strength Training Trend",
+          strengthPoints: "Strength Points",
+          enduranceTrend: "Endurance Trend",
+          endurancePoints: "Endurance Points",
+          personalRecords: "Personal Records",
+          activityDistribution: "Activity Distribution",
+        },
       },
       // Stats (Analytics)
       stats: {
@@ -4482,7 +4521,8 @@ const resources = {
         categoryRequired: "Please select a category.",
         disciplineRequired: "Please select a discipline.",
         movementPatternRequired: "Please select a movement pattern.",
-        requiredFields: "Please fill in category, discipline, and movement pattern.",
+        requiredFields:
+          "Please fill in category, discipline, and movement pattern.",
         exerciseCreated: "Exercise created",
         exerciseCreatedInfo: "The exercise is available immediately.",
         exerciseCreateError: "Could not create exercise.",
@@ -4726,7 +4766,7 @@ const resources = {
           title: "Monitoring",
           loading: "Loading monitoring data...",
           empty: "No monitoring data available.",
-          refreshHint: "Click \"Refresh\" to load monitoring data",
+          refreshHint: 'Click "Refresh" to load monitoring data',
           jobs: {
             title: "Job status",
             stuck: "{{count}} stuck job(s) found",
@@ -4765,7 +4805,8 @@ const resources = {
         subtitle:
           "Document your recovery, regeneration, daily form and personal notes.",
         entries: "Entries",
-        editWindowInfo: "Recovery diary entries can only be edited within 7 days.",
+        editWindowInfo:
+          "Recovery diary entries can only be edited within 7 days.",
         avgEnergy: "Ø Energy",
         avgFocus: "Ø Focus",
         avgSleep: "Ø Sleep Quality",
@@ -4899,9 +4940,11 @@ const resources = {
         saveError: "Failed to save",
         reactions: {
           friendsCanSee: "Friends can see reactions",
-          friendsCanSeeDescription: "Allow your friends to see reactions on your workouts",
+          friendsCanSeeDescription:
+            "Allow your friends to see reactions on your workouts",
           showNames: "Show names in reactions",
-          showNamesDescription: "Show the names of users who reacted to your workouts",
+          showNamesDescription:
+            "Show the names of users who reacted to your workouts",
         },
       },
       // Push Notifications
@@ -5526,6 +5569,8 @@ const resources = {
         info: "Information",
         yes: "Yes",
         no: "No",
+        increase: "Increase",
+        decrease: "Decrease",
         search: "Search",
         notificationsCenter: {
           title: "Notifications",

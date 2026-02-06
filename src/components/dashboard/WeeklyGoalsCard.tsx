@@ -28,7 +28,7 @@ export function WeeklyGoalsCard({
     .filter((entry) => entry.exerciseId)
     .map((entry) => {
       const label =
-        exerciseNameMap?.[entry.exerciseId] || t("weeklyGoals.dialog.exercise", "Übung");
+        exerciseNameMap?.[entry.exerciseId] || t("weeklyGoals.dialog.exercise");
       const unitLabel =
         entry.unit === "distance"
           ? distanceUnit === "miles"
@@ -56,8 +56,8 @@ export function WeeklyGoalsCard({
           size="icon"
           className="absolute -top-2 right-0"
           onClick={onOpenSettings}
-          aria-label={t("weeklyGoals.dialog.title", "Wochenziele einstellen")}
-          title={t("weeklyGoals.dialog.title", "Wochenziele einstellen")}
+          aria-label={t("weeklyGoals.dialog.title")}
+          title={t("weeklyGoals.dialog.title")}
         >
           <Settings className="h-4 w-4" aria-hidden="true" />
         </Button>
@@ -65,7 +65,7 @@ export function WeeklyGoalsCard({
       <CardContent className="space-y-4">
         {entries.length === 0 && (
           <p className="text-sm text-muted-foreground">
-            {t("weeklyGoals.dialog.noExercises", "Keine Übungsziele gesetzt.")}
+            {t("weeklyGoals.dialog.noExerciseGoalsSet")}
           </p>
         )}
         {entries.map((entry) => (

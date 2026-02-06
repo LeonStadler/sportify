@@ -35,11 +35,13 @@ npm run build
 node scripts/copy-docs-build.js
 ```
 
-Alternativ alles in einem Schritt:
+Alternativ alles in einem Schritt (inkl. Migrationen, sofern `DATABASE_URL` gesetzt):
 
 ```
 npm run build:with-docs
 ```
+
+Dabei läuft zuerst `npm run migrate`: Sind Migrationen ausstehend, werden sie einmal gegen die konfigurierte DB ausgeführt. Ohne `DATABASE_URL` wird migrate übersprungen (z. B. lokaler Build).
 
 ## Docusaurus‑Sync
 
@@ -59,6 +61,14 @@ Generierte Kopie:
 - `buildCommand`: `npm run build:with-docs`
 - `outputDirectory`: `dist`
 - Dokumentation wird in `dist/docs` ausgeliefert
+
+### Datenbank-Migrationen auf Vercel
+
+Migrationen laufen **nur während des Builds** (vor Docs- und App-Build), nicht beim Cold Start der Serverless-Funktion. Dafür muss `DATABASE_URL` in den Vercel Environment Variables für den **Build** verfügbar sein (Settings → Environment Variables → bei Production/Preview „Build“ anhaken).
+
+Ablauf: `build:with-docs` startet mit `npm run migrate` → Verbindung zur DB → alle ausstehenden Migrationen (z. B. `workout_templates`, `exercise_favorites`, `exercises.points_source`) werden einmal ausgeführt → danach Docs- und App-Build. Das Deployment dauert dadurch etwas länger, die App geht aber mit aktueller DB live.
+
+Ohne `DATABASE_URL` beim Build schlägt migrate nicht fehl (wird übersprungen); die API würde dann weiterhin 500 liefern, wenn Tabellen/Spalten fehlen. **Empfehlung:** `DATABASE_URL` für Build und Runtime setzen.
 
 ## Domain
 

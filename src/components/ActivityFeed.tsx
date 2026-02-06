@@ -8,31 +8,15 @@ import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
 import { parseAvatarConfig } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
+import { convertDistance, getPrimaryDistanceUnit } from "@/utils/units";
 import { WorkoutReactions } from "@/components/workout/WorkoutReactions";
 import type { FeedWorkout } from "@/types/workout";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import NiceAvatar from "react-nice-avatar";
 import { Link, useNavigate } from "react-router-dom";
 import { WidgetFooterButton } from "@/components/dashboard/WidgetFooterButton";
-
-const getActivityIcon = (activityType: string) => {
-  switch (activityType) {
-    case "pullups":
-      return "💪";
-    case "pushups":
-      return "🔥";
-    case "situps":
-      return "🚀";
-    case "running":
-      return "🏃";
-    case "cycling":
-      return "🚴";
-    default:
-      return "💪";
-  }
-};
 
 const getActivityName = (activityType: string, t: (key: string) => string) => {
   const translationKey = `activityFeed.activityTypes.${activityType.toLowerCase()}`;
@@ -59,11 +43,16 @@ const getActivityColor = (activityType: string) => {
   }
 };
 
-const formatAmount = (activityType: string, amount: number) => {
+const formatAmount = (
+  activityType: string,
+  amount: number,
+  distanceUnit: string,
+  distanceLabel: string
+) => {
   switch (activityType) {
     case "running":
     case "cycling":
-      return `${amount} km`;
+      return `${convertDistance(amount, "km", distanceUnit)} ${distanceLabel}`;
     default:
       return `${amount}×`;
   }
@@ -137,6 +126,11 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
   const { toast } = useToast();
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const distanceUnit = getPrimaryDistanceUnit(user?.preferences?.units?.distance);
+  const distanceLabel =
+    distanceUnit === "miles"
+      ? t("training.form.units.milesShort", "mi")
+      : t("training.form.units.kilometersShort", "km");
   const [workouts, setWorkouts] = useState<FeedWorkout[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -371,10 +365,12 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
                             variant="secondary"
                             className={`text-xs py-0.5 px-2 ${getActivityColor(activity.activityType)}`}
                           >
-                            {getActivityIcon(activity.activityType)}{" "}
+                            {getActivityName(activity.activityType, t)}{" "}
                             {formatAmount(
                               activity.activityType,
-                              activity.amount
+                              activity.amount,
+                              distanceUnit,
+                              distanceLabel
                             )}
                           </Badge>
                         ))}
@@ -416,7 +412,7 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
               </>
             ) : (
               <div className="text-center py-8">
-                <div className="text-4xl mb-4">👥</div>
+                <Users className="h-10 w-10 text-muted-foreground/70 mx-auto mb-4" />
                 {hasFriends === false ? (
                   <>
                     <p className="text-muted-foreground mb-2 font-medium">

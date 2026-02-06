@@ -1,6 +1,14 @@
 import { AuthContext } from "@/contexts/AuthContextProvider";
 import { API_URL } from "@/lib/api";
-import React, { ReactNode, useEffect, useState } from "react";
+import {
+  getPrimaryDistanceUnit,
+  getPrimaryTemperatureUnit,
+  getPrimaryWeightUnit,
+  normalizeDistanceUnit,
+} from "@/utils/units";
+import React, { ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "next-themes";
 
 export interface User {
   id: string;
@@ -58,6 +66,67 @@ export interface User {
   };
 }
 
+const normalizeLanguagePreference = (language?: string) =>
+  language === "en" ? "en" : "de";
+
+type UnitsLike = Partial<{
+  distance: string;
+  weight: string;
+  temperature: string;
+}>;
+
+const normalizeUserPreferences = (user: User): User => {
+  const raw = (user.preferences || {}) as Partial<User["preferences"]>;
+  const units: UnitsLike = raw.units || {};
+  const normalizedDistance = normalizeDistanceUnit(units.distance);
+  const distance = getPrimaryDistanceUnit(normalizedDistance);
+  const weight = getPrimaryWeightUnit(units.weight);
+  const temperature = getPrimaryTemperatureUnit(units.temperature);
+  const themeFromPref =
+    user.themePreference &&
+    (user.themePreference === "light" ||
+      user.themePreference === "dark" ||
+      user.themePreference === "system")
+      ? user.themePreference
+      : raw.theme === "light" || raw.theme === "dark" || raw.theme === "system"
+        ? raw.theme
+        : "system";
+
+  const normalized: User["preferences"] = {
+    ...raw,
+    timeFormat: raw.timeFormat === "12h" ? "12h" : "24h",
+    units: {
+      distance,
+      weight,
+      temperature,
+    },
+    notifications: {
+      push: raw.notifications?.push ?? true,
+      email: raw.notifications?.email ?? true,
+    },
+    privacy: {
+      publicProfile: raw.privacy?.publicProfile ?? true,
+    },
+    reactions: {
+      friendsCanSee: raw.reactions?.friendsCanSee ?? true,
+      showNames: raw.reactions?.showNames ?? true,
+    },
+    theme: themeFromPref,
+    metrics: {
+      bodyWeightKg: raw.metrics?.bodyWeightKg ?? null,
+      activityLevel: raw.metrics?.activityLevel ?? "medium",
+    },
+    exercises: raw.exercises,
+    workouts: raw.workouts,
+  };
+
+  return {
+    ...user,
+    languagePreference: normalizeLanguagePreference(user.languagePreference),
+    preferences: normalized,
+  };
+};
+
 export interface RegisterData {
   email: string;
   password: string;
@@ -65,6 +134,8 @@ export interface RegisterData {
   lastName: string;
   nickname?: string;
   displayPreference?: "firstName" | "fullName" | "nickname";
+  /** Aktuelle UI-Sprache bei Registrierung speichern (de | en). */
+  languagePreference?: "de" | "en";
   invitationToken?: string;
 }
 
@@ -143,12 +214,17 @@ interface ApiError extends Error {
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
+  const { i18n } = useTranslation();
+  const { theme, setTheme } = useTheme();
   const [state, setState] = useState<AuthState>({
     user: null,
     isAuthenticated: false,
     isLoading: true,
     error: null,
   });
+  const lastPersistedRef = useRef<{ theme?: string; language?: string }>({});
+  /** Nur beim ersten Laden/Login User-Preferences auf Theme/Sprache anwenden, nicht bei jedem state.user-Update (verhindert Feedback-Loop). */
+  const appliedInitialPreferencesForUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -163,7 +239,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
           });
 
           if (response.ok) {
-            const user = await response.json();
+            const user = normalizeUserPreferences(await response.json());
             setState({
               user,
               isAuthenticated: true,
@@ -271,11 +347,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
       // Success - extract user and token
       const { user, token } = data;
+      const normalizedUser = normalizeUserPreferences(user);
 
       localStorage.setItem("token", token);
 
       setState({
-        user,
+        user: normalizedUser,
         isAuthenticated: true,
         isLoading: false,
         error: null,
@@ -818,10 +895,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         );
       }
 
+      const normalized = normalizeUserPreferences(responseData);
       // User-State aktualisieren ohne Loading-State zu ändern
       setState((prev) => ({
         ...prev,
-        user: responseData,
+        user: normalized,
         isLoading: silent ? prev.isLoading : false,
         error: null,
       }));
@@ -888,6 +966,96 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       throw error;
     }
   };
+
+  const buildProfileUpdatePayload = useCallback(
+    (user: User, overrides: Partial<User> = {}) => ({
+      firstName: user.firstName || "",
+      lastName: user.lastName || "",
+      nickname: user.nickname || "",
+      displayPreference: user.displayPreference || "firstName",
+      languagePreference:
+        overrides.languagePreference ?? user.languagePreference ?? "de",
+      themePreference:
+        overrides.themePreference ??
+        user.themePreference ??
+        user.preferences?.theme ??
+        "system",
+      preferences: overrides.preferences ?? user.preferences,
+      avatar: user.avatar ?? undefined,
+      showInGlobalRankings:
+        overrides.showInGlobalRankings ?? user.showInGlobalRankings,
+    }),
+    []
+  );
+
+  const persistPreferences = useCallback(
+    async (updates: {
+      preferences?: User["preferences"];
+      languagePreference?: "de" | "en";
+      themePreference?: "light" | "dark" | "system";
+    }) => {
+      if (!state.user) return;
+      const payload = buildProfileUpdatePayload(state.user, updates);
+      try {
+        await updateProfile(payload, true);
+        if (updates.themePreference) {
+          lastPersistedRef.current.theme = updates.themePreference;
+        }
+        if (updates.preferences?.theme) {
+          lastPersistedRef.current.theme = updates.preferences.theme;
+        }
+        if (updates.languagePreference) {
+          lastPersistedRef.current.language = updates.languagePreference;
+        }
+      } catch (error) {
+        console.error("Preference sync failed:", error);
+      }
+    },
+    [buildProfileUpdatePayload, state.user, updateProfile]
+  );
+
+  useEffect(() => {
+    if (!state.user) {
+      appliedInitialPreferencesForUserIdRef.current = null;
+      return;
+    }
+    const userId = state.user.id;
+    if (appliedInitialPreferencesForUserIdRef.current === userId) return;
+    appliedInitialPreferencesForUserIdRef.current = userId;
+    const preferredTheme =
+      state.user.themePreference ??
+      state.user.preferences?.theme ??
+      "system";
+    setTheme(preferredTheme);
+    const preferredLanguage = normalizeLanguagePreference(state.user.languagePreference);
+    if (i18n.language !== preferredLanguage) {
+      i18n.changeLanguage(preferredLanguage);
+    }
+  }, [state.user, setTheme, i18n]);
+
+  useEffect(() => {
+    if (!state.user) return;
+    if (!theme) return;
+    const currentTheme =
+      theme === "light" || theme === "dark" || theme === "system"
+        ? theme
+        : "system";
+    const userTheme =
+      state.user.themePreference ??
+      state.user.preferences?.theme ??
+      "system";
+    if (currentTheme === userTheme) return;
+    if (lastPersistedRef.current.theme === currentTheme) return;
+    persistPreferences({ themePreference: currentTheme });
+  }, [persistPreferences, state.user, theme]);
+
+  useEffect(() => {
+    if (!state.user) return;
+    const normalizedLanguage = normalizeLanguagePreference(i18n.language);
+    if (normalizedLanguage === state.user.languagePreference) return;
+    if (lastPersistedRef.current.language === normalizedLanguage) return;
+    persistPreferences({ languagePreference: normalizedLanguage });
+  }, [i18n.language, persistPreferences, state.user]);
 
   const inviteUser = async (
     email: string,

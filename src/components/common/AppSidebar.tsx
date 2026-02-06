@@ -250,8 +250,8 @@ export function AppSidebar() {
                     <Globe size={20} />
                     <span>{t("settings.language")}</span>
                   </div>
-                  <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
-                    <LanguageSwitcher />
+                  <div className="flex items-center gap-2 px-2 py-1 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
+                    <LanguageSwitcher variant="sidebar" />
                   </div>
                 </div>
               </SidebarMenuItem>
@@ -263,8 +263,8 @@ export function AppSidebar() {
                     <Palette size={20} />
                     <span>{t("settings.theme")}</span>
                   </div>
-                  <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
-                    <ThemeSwitcher variant="toggle" />
+                  <div className="flex items-center gap-2 px-2 py-1 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
+                    <ThemeSwitcher variant="toggle" size="sm" />
                   </div>
                 </div>
               </SidebarMenuItem>

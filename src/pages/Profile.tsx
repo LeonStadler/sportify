@@ -25,9 +25,20 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { DEFAULT_WEEKLY_POINTS_GOAL } from "@/config/events";
 import { Invitation } from "@/contexts/AuthContext";
 import { useAuth } from "@/hooks/use-auth";
+import { useDateTimeFormatter } from "@/hooks/use-date-time-formatter";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
 import { getUserInitials, parseAvatarConfig } from "@/lib/avatar";
@@ -52,7 +63,7 @@ import {
   Trophy,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import NiceAvatar, { NiceAvatarProps } from "react-nice-avatar";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -93,6 +104,7 @@ interface AchievementsData {
 
 export function Profile() {
   const { t, i18n } = useTranslation();
+  const { formatDate, formatDateTime } = useDateTimeFormatter();
   const { theme, setTheme } = useTheme();
   const {
     user,
@@ -110,7 +122,6 @@ export function Profile() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const dateLocale = i18n.language === "en" ? enUS : de;
-  const dateLocaleString = i18n.language === "en" ? "en-US" : "de-DE";
 
   // Get initial tab from URL query parameter
   const getInitialTab = () => {
@@ -206,14 +217,20 @@ export function Profile() {
       showNames: user?.preferences?.reactions?.showNames ?? true,
     },
     theme:
+      user?.preferences?.theme ||
       (theme && (theme === "light" || theme === "dark" || theme === "system")
         ? theme
-        : "system") || "system",
+        : "system") ||
+      "system",
     metrics: {
       bodyWeightKg: user?.preferences?.metrics?.bodyWeightKg ?? null,
       activityLevel: user?.preferences?.metrics?.activityLevel ?? "medium",
     },
   });
+  const [unitSystemPromptOpen, setUnitSystemPromptOpen] = useState(false);
+  const [pendingUnitSystem, setPendingUnitSystem] = useState<
+    "metric" | "imperial" | null
+  >(null);
 
   // Password change state
   const [passwordForm, setPasswordForm] = useState({
@@ -420,6 +437,8 @@ export function Profile() {
     user?.showInGlobalRankings ?? true
   );
   const [showWarningDialog, setShowWarningDialog] = useState(false);
+  const [bodyWeightInput, setBodyWeightInput] = useState("");
+  const bodyWeightFocusedRef = useRef(false);
 
   // Update form when user changes
   useEffect(() => {
@@ -433,6 +452,68 @@ export function Profile() {
       setShowInGlobalRankings(user.showInGlobalRankings ?? true);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const syncedTheme =
+      user.themePreference ??
+      (theme && (theme === "light" || theme === "dark" || theme === "system")
+        ? theme
+        : user.preferences?.theme) ??
+      "system";
+    const syncedLanguage = i18n.language === "en" ? "en" : "de";
+    setPreferencesForm((prev) => ({
+      ...prev,
+      languagePreference: syncedLanguage,
+      timeFormat: user.preferences?.timeFormat || "24h",
+      units: {
+        distance: user.preferences?.units?.distance || "km",
+        weight: user.preferences?.units?.weight || "kg",
+        temperature: user.preferences?.units?.temperature || "celsius",
+      },
+      notifications: {
+        push: user.preferences?.notifications?.push ?? true,
+        email: user.preferences?.notifications?.email ?? true,
+      },
+      privacy: {
+        publicProfile: user.preferences?.privacy?.publicProfile ?? true,
+      },
+      reactions: {
+        friendsCanSee: user.preferences?.reactions?.friendsCanSee ?? true,
+        showNames: user.preferences?.reactions?.showNames ?? true,
+      },
+      theme: syncedTheme as "light" | "dark" | "system",
+      metrics: {
+        bodyWeightKg: user.preferences?.metrics?.bodyWeightKg ?? null,
+        activityLevel: user.preferences?.metrics?.activityLevel ?? "medium",
+      },
+    }));
+  }, [i18n.language, theme, user]);
+
+  const formatBodyWeightDisplay = useCallback(
+    (kg: number | null, unit: string) => {
+      if (kg == null) return "";
+      const display = convertWeightFromKg(kg, unit);
+      const str =
+        display % 1 === 0 ? String(display) : display.toFixed(1);
+      return i18n.language === "de" ? str.replace(".", ",") : str;
+    },
+    [i18n.language]
+  );
+
+  useEffect(() => {
+    if (bodyWeightFocusedRef.current) return;
+    setBodyWeightInput(
+      formatBodyWeightDisplay(
+        preferencesForm.metrics.bodyWeightKg ?? null,
+        preferencesForm.units.weight
+      )
+    );
+  }, [
+    preferencesForm.metrics.bodyWeightKg,
+    preferencesForm.units.weight,
+    formatBodyWeightDisplay,
+  ]);
 
   const handleGlobalRankingToggle = (checked: boolean) => {
     if (!checked) {
@@ -599,29 +680,27 @@ export function Profile() {
       return;
     }
 
-    // Check if displayPreference is 'nickname' but no nickname is provided
-    if (
+    const effectiveForm =
       currentProfileForm.displayPreference === "nickname" &&
       (!currentProfileForm.nickname || currentProfileForm.nickname.trim() === "")
-    ) {
-      toast({
-        title: t("common.error"),
-        description: t("profile.nicknameRequired"),
-        variant: "destructive",
-      });
-      return;
-    }
+        ? { ...currentProfileForm, displayPreference: "firstName" as const }
+        : currentProfileForm;
+    const displayWasReset =
+      currentProfileForm.displayPreference === "nickname" && effectiveForm.displayPreference === "firstName";
 
     try {
       await updateProfile(
         {
-          ...currentProfileForm,
+          ...effectiveForm,
           avatar: user?.avatar || undefined,
           showInGlobalRankings,
         },
         true // silent mode - kein globaler Loading-State
       );
       setValidationErrors({});
+      if (displayWasReset) {
+        setProfileForm((prev) => ({ ...prev, displayPreference: "firstName" }));
+      }
 
       const fieldLabels: Record<string, string> = {
         firstName: t("profile.firstName"),
@@ -632,10 +711,12 @@ export function Profile() {
 
       toast({
         title: t("settings.saved"),
-        description: t(
-          "settings.settingSaved",
-          { setting: fieldLabels[fieldName] || fieldName }
-        ),
+        description: displayWasReset
+          ? t("profile.nicknameRemovedDisplayReset")
+          : t(
+              "settings.settingSaved",
+              { setting: fieldLabels[fieldName] || fieldName }
+            ),
       });
     } catch (error) {
       toast({
@@ -652,10 +733,13 @@ export function Profile() {
   // Auto-Save Funktion für einzelne Einstellungen
   const savePreference = async (
     updates: Partial<typeof preferencesForm>,
-    settingName: string
+    settingName: string,
+    overrides?: { showInGlobalRankings?: boolean }
   ) => {
     const newPreferences = { ...preferencesForm, ...updates };
     setPreferencesForm(newPreferences);
+    const nextShowInGlobalRankings =
+      overrides?.showInGlobalRankings ?? showInGlobalRankings;
 
     try {
       await updateProfile(
@@ -665,9 +749,12 @@ export function Profile() {
           nickname: user?.nickname || "",
           displayPreference: user?.displayPreference || "firstName",
           languagePreference: newPreferences.languagePreference as "de" | "en",
+          ...(updates.theme != null && {
+            themePreference: updates.theme as "light" | "dark" | "system",
+          }),
           preferences: newPreferences,
           avatar: user?.avatar || undefined,
-          showInGlobalRankings,
+          showInGlobalRankings: nextShowInGlobalRankings,
         },
         true // silent mode - kein globaler Loading-State
       );
@@ -689,6 +776,81 @@ export function Profile() {
       });
     }
   };
+
+  const handlePublicProfileToggle = (checked: boolean) => {
+    const nextPrivacy = {
+      ...preferencesForm.privacy,
+      publicProfile: checked,
+    };
+    if (!checked) {
+      setShowInGlobalRankings(false);
+      savePreference(
+        { privacy: nextPrivacy },
+        t("profile.publicProfileSetting"),
+        { showInGlobalRankings: false }
+      );
+      return;
+    }
+    savePreference(
+      { privacy: nextPrivacy },
+      t("profile.publicProfileSetting")
+    );
+  };
+
+  const getUnitSystemFromValue = (value: string) =>
+    value === "miles" || value === "lbs" || value === "fahrenheit"
+      ? "imperial"
+      : "metric";
+
+  const handleUnitChange = (
+    field: "distance" | "weight" | "temperature",
+    value: "km" | "miles" | "kg" | "lbs" | "celsius" | "fahrenheit"
+  ) => {
+    if (preferencesForm.units[field] === value) {
+      return;
+    }
+    const nextUnits = {
+      ...preferencesForm.units,
+      [field]: value,
+    };
+    savePreference(
+      { units: nextUnits },
+      t("profile.unitsPreferences", "Einheiten-Präferenzen")
+    );
+    setPendingUnitSystem(getUnitSystemFromValue(value));
+    setUnitSystemPromptOpen(true);
+  };
+
+  const applyUnitSystem = () => {
+    if (!pendingUnitSystem) return;
+    const nextUnits: {
+      distance: "km" | "m" | "miles" | "yards";
+      weight: "kg" | "lbs";
+      temperature: "celsius" | "fahrenheit";
+    } =
+      pendingUnitSystem === "imperial"
+        ? {
+            distance: "miles",
+            weight: "lbs",
+            temperature: "fahrenheit",
+          }
+        : {
+            distance: "km",
+            weight: "kg",
+            temperature: "celsius",
+          };
+    savePreference(
+      { units: nextUnits },
+      t("profile.unitSystem", "Einheitensystem")
+    );
+    setUnitSystemPromptOpen(false);
+    setPendingUnitSystem(null);
+  };
+
+  const pendingSystemLabel =
+    pendingUnitSystem === "imperial"
+      ? t("profile.unitSystemImperialShort", "Imperial")
+      : t("profile.unitSystemMetricShort", "Metrisch");
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1244,34 +1406,94 @@ export function Profile() {
                     </Label>
                     <div className="flex items-center gap-2">
                       <Input
-                        type="number"
-                        min="0"
-                        step="0.1"
-                        value={
-                          preferencesForm.metrics.bodyWeightKg
-                            ? convertWeightFromKg(
-                                preferencesForm.metrics.bodyWeightKg,
-                                preferencesForm.units.weight
-                              ).toFixed(1)
-                            : ""
+                        type="text"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        value={bodyWeightInput}
+                        placeholder={
+                          i18n.language === "de"
+                            ? t("profile.bodyWeightPlaceholder", "z. B. 72")
+                            : t("profile.bodyWeightPlaceholder", "e.g. 72")
                         }
-                        onChange={(e) => {
-                          const raw = parseFloat(e.target.value);
+                        onFocus={() => {
+                          bodyWeightFocusedRef.current = true;
+                        }}
+                        onBlur={() => {
+                          bodyWeightFocusedRef.current = false;
+                          const normalized = bodyWeightInput.replace(
+                            ",",
+                            "."
+                          );
+                          const raw = parseFloat(normalized);
                           const kgValue = Number.isFinite(raw)
-                            ? convertWeightToKg(raw, preferencesForm.units.weight)
+                            ? convertWeightToKg(
+                                raw,
+                                preferencesForm.units.weight
+                              )
                             : null;
+                          const toSave =
+                            kgValue != null && kgValue > 0 ? kgValue : null;
+                          savePreference(
+                            {
+                              metrics: {
+                                ...preferencesForm.metrics,
+                                bodyWeightKg: toSave,
+                              },
+                            },
+                            t("profile.bodyWeightOptional", "Körpergewicht")
+                          );
+                          setBodyWeightInput(
+                            formatBodyWeightDisplay(
+                              toSave,
+                              preferencesForm.units.weight
+                            )
+                          );
+                        }}
+                        onChange={(e) =>
+                          setBodyWeightInput(e.target.value)
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key !== "ArrowUp" && e.key !== "ArrowDown")
+                            return;
+                          e.preventDefault();
+                          const normalized = bodyWeightInput.replace(
+                            ",",
+                            "."
+                          );
+                          const current =
+                            parseFloat(normalized) ||
+                            (preferencesForm.metrics.bodyWeightKg != null
+                              ? convertWeightFromKg(
+                                  preferencesForm.metrics.bodyWeightKg,
+                                  preferencesForm.units.weight
+                                )
+                              : 0);
+                          const step = 0.5;
+                          const next =
+                            e.key === "ArrowUp"
+                              ? current + step
+                              : Math.max(0, current - step);
+                          const kgValue = convertWeightToKg(
+                            next,
+                            preferencesForm.units.weight
+                          );
                           savePreference(
                             {
                               metrics: {
                                 ...preferencesForm.metrics,
                                 bodyWeightKg:
-                                  kgValue && kgValue > 0 ? kgValue : null,
+                                  kgValue > 0 ? kgValue : null,
                               },
                             },
                             t("profile.bodyWeightOptional", "Körpergewicht")
                           );
+                          setBodyWeightInput(
+                            formatBodyWeightDisplay(
+                              kgValue > 0 ? kgValue : null,
+                              preferencesForm.units.weight
+                            )
+                          );
                         }}
-                        placeholder={t("profile.bodyWeightPlaceholder", "z. B. 72")}
                       />
                       <span className="text-xs text-muted-foreground">
                         {preferencesForm.units.weight}
@@ -1358,9 +1580,7 @@ export function Profile() {
                                     {invitation.email}
                                   </p>
                                   <p className="text-xs text-muted-foreground">
-                                    {new Date(
-                                      invitation.createdAt
-                                    ).toLocaleDateString(dateLocaleString)}
+                                    {formatDate(invitation.createdAt)}
                                   </p>
                                 </div>
                               </div>
@@ -1527,15 +1747,13 @@ export function Profile() {
                             user.twoFactorEnabledAt !== undefined &&
                             user.twoFactorEnabledAt !== "" &&
                             !isNaN(new Date(user.twoFactorEnabledAt).getTime())
-                            ? new Date(
-                              user.twoFactorEnabledAt
-                            ).toLocaleDateString(dateLocaleString, {
-                              day: "2-digit",
-                              month: "2-digit",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
+                            ? formatDateTime(user.twoFactorEnabledAt, {
+                                day: "2-digit",
+                                month: "2-digit",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
                             : t("profile.notAvailable")}
                         </p>
                       </div>
@@ -1593,16 +1811,13 @@ export function Profile() {
                         user.lastLoginAt !== undefined &&
                         user.lastLoginAt !== "" &&
                         !isNaN(new Date(user.lastLoginAt).getTime())
-                        ? new Date(user.lastLoginAt).toLocaleDateString(
-                          dateLocaleString,
-                          {
+                        ? formatDateTime(user.lastLoginAt, {
                             day: "2-digit",
                             month: "2-digit",
                             year: "numeric",
                             hour: "2-digit",
                             minute: "2-digit",
-                          }
-                        )
+                          })
                         : t("profile.never")}
                     </p>
                   </div>
@@ -1616,16 +1831,13 @@ export function Profile() {
                         user.passwordChangedAt !== undefined &&
                         user.passwordChangedAt !== "" &&
                         !isNaN(new Date(user.passwordChangedAt).getTime())
-                        ? new Date(user.passwordChangedAt).toLocaleDateString(
-                          dateLocaleString,
-                          {
+                        ? formatDateTime(user.passwordChangedAt, {
                             day: "2-digit",
                             month: "2-digit",
                             year: "numeric",
                             hour: "2-digit",
                             minute: "2-digit",
-                          }
-                        )
+                          })
                         : t("profile.neverChanged")}
                     </p>
                   </div>
@@ -1761,101 +1973,82 @@ export function Profile() {
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Distanz */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    {t("profile.distance")}
-                  </Label>
-                  <Select
-                    value={preferencesForm.units.distance}
-                    onValueChange={(value) =>
-                      savePreference(
-                        {
-                          units: {
-                            ...preferencesForm.units,
-                            distance: value as "km" | "m" | "miles" | "yards",
-                          },
-                        },
-                        t("profile.distance")
-                      )
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="km">{t("profile.distanceKm")}</SelectItem>
-                      <SelectItem value="m">{t("profile.distanceM")}</SelectItem>
-                      <SelectItem value="miles">
-                        {t("profile.distanceMiles")}
-                      </SelectItem>
-                      <SelectItem value="yards">
-                        {t("profile.distanceYards")}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Gewicht */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    {t("profile.weight")}
-                  </Label>
-                  <Select
-                    value={preferencesForm.units.weight}
-                    onValueChange={(value) =>
-                      savePreference(
-                        {
-                          units: {
-                            ...preferencesForm.units,
-                            weight: value as "kg" | "lbs",
-                          },
-                        },
-                        t("profile.weight")
-                      )
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="kg">{t("profile.weightKg")}</SelectItem>
-                      <SelectItem value="lbs">{t("profile.weightLbs")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Temperatur */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    {t("profile.temperature")}
-                  </Label>
-                  <Select
-                    value={preferencesForm.units.temperature}
-                    onValueChange={(value) =>
-                      savePreference(
-                        {
-                          units: {
-                            ...preferencesForm.units,
-                            temperature: value as "celsius" | "fahrenheit",
-                          },
-                        },
-                        t("profile.temperature")
-                      )
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="celsius">
-                        {t("profile.temperatureCelsius")}
-                      </SelectItem>
-                      <SelectItem value="fahrenheit">
-                        {t("profile.temperatureFahrenheit")}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">
+                      {t("profile.unitDistance", "Distanz")}
+                    </Label>
+                    <Select
+                      value={preferencesForm.units.distance}
+                      onValueChange={(value) =>
+                        handleUnitChange(
+                          "distance",
+                          value as "km" | "miles"
+                        )
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="km">
+                          {t("training.form.units.kilometers", "Kilometer")}
+                        </SelectItem>
+                        <SelectItem value="miles">
+                          {t("training.form.units.miles", "Meilen")}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">
+                      {t("profile.unitWeight", "Gewicht")}
+                    </Label>
+                    <Select
+                      value={preferencesForm.units.weight}
+                      onValueChange={(value) =>
+                        handleUnitChange("weight", value as "kg" | "lbs")
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="kg">
+                          {t("training.form.units.kilograms", "Kilogramm")}
+                        </SelectItem>
+                        <SelectItem value="lbs">
+                          {t("training.form.units.pounds", "Pfund")}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">
+                      {t("profile.unitTemperature", "Temperatur")}
+                    </Label>
+                    <Select
+                      value={preferencesForm.units.temperature}
+                      onValueChange={(value) =>
+                        handleUnitChange(
+                          "temperature",
+                          value as "celsius" | "fahrenheit"
+                        )
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="celsius">
+                          {t("training.form.units.celsius", "Celsius")}
+                        </SelectItem>
+                        <SelectItem value="fahrenheit">
+                          {t("training.form.units.fahrenheit", "Fahrenheit")}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1904,17 +2097,7 @@ export function Profile() {
                   </div>
                   <Switch
                     checked={preferencesForm.privacy.publicProfile}
-                    onCheckedChange={(checked) =>
-                      savePreference(
-                        {
-                          privacy: {
-                            ...preferencesForm.privacy,
-                            publicProfile: checked,
-                          },
-                        },
-                        t("profile.publicProfileSetting")
-                      )
-                    }
+                    onCheckedChange={handlePublicProfileToggle}
                   />
                 </div>
 
@@ -2414,6 +2597,45 @@ export function Profile() {
         onOpenChange={setShowWarningDialog}
         onConfirm={() => performGlobalRankingUpdate(false)}
       />
+
+      <AlertDialog
+        open={unitSystemPromptOpen}
+        onOpenChange={(open) => {
+          setUnitSystemPromptOpen(open);
+          if (!open) {
+            setPendingUnitSystem(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t(
+                "profile.applyUnitSystemTitle",
+                "Einheitensystem übernehmen?"
+              )}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("profile.applyUnitSystemDescription", {
+                system: pendingSystemLabel,
+                defaultValue:
+                  "Möchtest du alle Einheiten auf {{system}} umstellen?",
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              {t("profile.applyUnitSystemKeep", "Nur diese Einheit")}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={applyUnitSystem}>
+              {t("profile.applyUnitSystemConfirm", {
+                system: pendingSystemLabel,
+                defaultValue: "{{system}} für alle",
+              })}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Password Dialog for 2FA */}
       {passwordDialogConfig && (

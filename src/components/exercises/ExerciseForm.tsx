@@ -69,6 +69,7 @@ interface ExerciseFormProps {
   onConfirmSimilarChange?: (value: boolean) => void;
   defaultDistanceUnit?: string;
   defaultTimeUnit?: string;
+  distanceUnitOptions?: Array<{ value: string; label: string }>;
 }
 
 export function ExerciseForm({
@@ -88,8 +89,23 @@ export function ExerciseForm({
   onConfirmSimilarChange,
   defaultDistanceUnit = "km",
   defaultTimeUnit = "min",
+  distanceUnitOptions,
 }: ExerciseFormProps) {
   const { t } = useTranslation();
+  const resolvedDistanceUnitOptions =
+    distanceUnitOptions && distanceUnitOptions.length > 0
+      ? distanceUnitOptions
+      : [
+          ...(defaultDistanceUnit === "miles"
+            ? [
+                { value: "miles", label: t("training.form.units.miles") },
+                { value: "yards", label: t("training.form.units.yards", "Yards") },
+              ]
+            : [
+                { value: "km", label: t("training.form.units.kilometers") },
+                { value: "m", label: t("training.form.units.meters") },
+              ]),
+        ];
 
   const descriptionIsOpen = descriptionOpen ?? Boolean(value.description);
 
@@ -407,9 +423,11 @@ export function ExerciseForm({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="km">{t("training.form.units.kilometers")}</SelectItem>
-                  <SelectItem value="m">{t("training.form.units.meters")}</SelectItem>
-                  <SelectItem value="miles">{t("training.form.units.miles")}</SelectItem>
+                  {resolvedDistanceUnitOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

@@ -13,21 +13,14 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { Exercise } from "@/types/exercise";
-import {
-  getExerciseCategoryLabel,
-  getExerciseMovementPatternLabel,
-  getExerciseMuscleGroupLabel,
-} from "@/components/exercises/exerciseLabels";
+import { getExerciseCategoryLabel } from "@/components/exercises/exerciseLabels";
 import { measurementOptions, movementPatternOptions } from "@/components/exercises/exerciseOptions";
+import {
+  ExerciseFilterCompact,
+  ExerciseFilterCompactState,
+} from "@/components/exercises/ExerciseFilterCompact";
 
 type ExerciseFacets = {
   categories: string[];
@@ -63,7 +56,9 @@ export const ExercisePicker = ({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<
+    ExerciseFilterCompactState & { query: string }
+  >({
     query: "",
     category: "all",
     movementPattern: "all",
@@ -240,7 +235,7 @@ export const ExercisePicker = ({
         </div>
       )}
       <PopoverContent
-        className="p-0 max-h-[70vh] overflow-y-auto"
+        className="p-0 max-h-[70vh] overflow-hidden"
         align="start"
         style={{
           width: "min(var(--radix-popover-trigger-width), 360px)",
@@ -260,138 +255,23 @@ export const ExercisePicker = ({
             <>
               {showFilters && (
                 <div className="p-3 space-y-2 border-b bg-muted/30">
-                  <div className="grid grid-cols-2 gap-2">
-                    <Select
-                      value={filters.sortBy}
-                      onValueChange={(value) =>
-                        setFilters((prev) => ({ ...prev, sortBy: value }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={t("training.form.sortBy", "Sortieren")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="popular">
-                          {t("training.form.sortPopular", "Beliebt")}
-                        </SelectItem>
-                        <SelectItem value="name-asc">
-                          {t("training.form.sortNameAsc", "Name (A–Z)")}
-                        </SelectItem>
-                        <SelectItem value="name-desc">
-                          {t("training.form.sortNameDesc", "Name (Z–A)")}
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={filters.category}
-                      onValueChange={(value) =>
-                        setFilters((prev) => ({ ...prev, category: value }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={t("training.form.filterCategory", "Kategorie")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">{t("filters.all", "Alle")}</SelectItem>
-                        {facets.categories.map((item) => (
-                          <SelectItem key={item} value={item}>
-                            {getExerciseCategoryLabel(item, t)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={filters.movementPattern}
-                      onValueChange={(value) =>
-                        setFilters((prev) => ({ ...prev, movementPattern: value }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={t("training.form.filterPattern", "Bewegung")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">{t("filters.all", "Alle")}</SelectItem>
-                        {movementPatternOptions.map((item) => (
-                          <SelectItem key={item.value} value={item.value}>
-                            {getExerciseMovementPatternLabel(item.value, t)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={filters.measurementType}
-                      onValueChange={(value) =>
-                        setFilters((prev) => ({ ...prev, measurementType: value }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={t("training.form.filterType", "Einheitstyp")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">{t("filters.all", "Alle")}</SelectItem>
-                        {measurementTypeOptions.map((item) => (
-                          <SelectItem key={item.value} value={item.value}>
-                            {t(item.labelKey, item.fallback)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={filters.muscleGroup}
-                      onValueChange={(value) =>
-                        setFilters((prev) => ({ ...prev, muscleGroup: value }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={t("training.form.filterMuscle", "Muskel")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">{t("filters.all", "Alle")}</SelectItem>
-                        {facets.muscleGroups.map((item) => (
-                          <SelectItem key={item} value={item}>
-                            {getExerciseMuscleGroupLabel(item, t)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={filters.equipment}
-                      onValueChange={(value) =>
-                        setFilters((prev) => ({ ...prev, equipment: value }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={t("training.form.filterEquipment", "Equipment")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">{t("filters.all", "Alle")}</SelectItem>
-                        {facets.equipment.map((item) => (
-                          <SelectItem key={item} value={item}>
-                            {item}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={filters.requiresWeight}
-                      onValueChange={(value) =>
-                        setFilters((prev) => ({ ...prev, requiresWeight: value }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={t("training.form.filterWeight", "Gewicht")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">{t("filters.all", "Alle")}</SelectItem>
-                        <SelectItem value="yes">
-                          {t("training.form.filterWeightRequired", "Gewicht erforderlich")}
-                        </SelectItem>
-                        <SelectItem value="no">
-                          {t("training.form.filterWeightOptional", "Kein Gewicht")}
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <ExerciseFilterCompact
+                    filters={{
+                      sortBy: filters.sortBy,
+                      category: filters.category,
+                      movementPattern: filters.movementPattern,
+                      measurementType: filters.measurementType,
+                      muscleGroup: filters.muscleGroup,
+                      equipment: filters.equipment,
+                      requiresWeight: filters.requiresWeight,
+                    }}
+                    onFiltersChange={(next) =>
+                      setFilters((prev) => ({ ...prev, ...next }))
+                    }
+                    facets={facets}
+                    movementPatternOptions={movementPatternOptions}
+                    measurementOptions={measurementTypeOptions}
+                  />
                 </div>
               )}
 
@@ -416,7 +296,11 @@ export const ExercisePicker = ({
             </>
           )}
 
-          <CommandList className="max-h-[320px] overflow-y-auto">
+          <CommandList
+            className="max-h-[320px] overflow-y-auto overscroll-contain"
+            onWheel={(event) => event.stopPropagation()}
+            onTouchMove={(event) => event.stopPropagation()}
+          >
             <CommandEmpty>
               {t("training.form.noExercises", "Keine Übungen gefunden")}
             </CommandEmpty>

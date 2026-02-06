@@ -7,7 +7,7 @@ import {
 import { getExerciseBrowseLabels } from "@/components/exercises/exerciseBrowseLabels";
 import { ExerciseBrowseGrid, ExerciseBrowseTable } from "@/components/exercises/ExerciseBrowseList";
 import { ExerciseBrowsePanel } from "@/components/exercises/ExerciseBrowsePanel";
-import { ExerciseFiltersPanel } from "@/components/exercises/ExerciseFiltersPanel";
+import { ExerciseFilterPanel } from "@/components/exercises/ExerciseFilterPanel";
 import type { ExerciseFormValue } from "@/components/exercises/ExerciseForm";
 import { ExerciseForm } from "@/components/exercises/ExerciseForm";
 import {
@@ -51,6 +51,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
 import type { Exercise, ExerciseListResponse } from "@/types/exercise";
+import { getPrimaryDistanceUnit } from "@/utils/units";
 import { ArrowDown, ArrowUp, Info } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -140,6 +141,22 @@ export function Exercises() {
   });
   const [pageSize, setPageSize] = useState(12);
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+  const primaryDistanceUnit = useMemo(
+    () => getPrimaryDistanceUnit(user?.preferences?.units?.distance),
+    [user?.preferences?.units?.distance]
+  );
+  const distanceUnitOptions = useMemo(() => {
+    if (primaryDistanceUnit === "miles") {
+      return [
+        { value: "miles", label: t("training.form.units.miles") },
+        { value: "yards", label: t("training.form.units.yards", "Yards") },
+      ];
+    }
+    return [
+      { value: "km", label: t("training.form.units.kilometers") },
+      { value: "m", label: t("training.form.units.meters") },
+    ];
+  }, [primaryDistanceUnit, t]);
 
   const [formValue, setFormValue] = useState<ExerciseFormValue>({
     name: "",
@@ -155,7 +172,7 @@ export function Exercises() {
     discipline: "",
     movementPattern: "",
     measurementTypes: ["reps"],
-    distanceUnit: user?.preferences?.units?.distance || "km",
+    distanceUnit: getPrimaryDistanceUnit(user?.preferences?.units?.distance),
     timeUnit: "min",
     difficulty: 5,
     requiresWeight: false,
@@ -575,11 +592,19 @@ export function Exercises() {
             ? "reps"
             : "time";
 
-      const distanceUnitOptions = [
-        { value: "km", label: t("training.form.units.kilometers") },
-        { value: "m", label: t("training.form.units.meters") },
-        { value: "miles", label: t("training.form.units.miles") },
-      ];
+      const preferredDistanceUnit = getPrimaryDistanceUnit(
+        user?.preferences?.units?.distance
+      );
+      const distanceUnitOptions =
+        preferredDistanceUnit === "miles"
+          ? [
+              { value: "miles", label: t("training.form.units.miles") },
+              { value: "yards", label: t("training.form.units.yards", "Yards") },
+            ]
+          : [
+              { value: "km", label: t("training.form.units.kilometers") },
+              { value: "m", label: t("training.form.units.meters") },
+            ];
       const timeUnitOptions = [
         { value: "min", label: t("training.form.units.minutes", "Minuten") },
         { value: "sec", label: t("training.form.units.seconds", "Sekunden") },
@@ -590,7 +615,7 @@ export function Exercises() {
           ? timeUnitOptions
           : [];
       const resolvedUnit = hasDistance
-        ? formValue.distanceUnit || (user?.preferences?.units?.distance || "km")
+        ? formValue.distanceUnit || preferredDistanceUnit
         : hasTime
           ? formValue.timeUnit || "min"
           : "reps";
@@ -658,7 +683,7 @@ export function Exercises() {
         discipline: "",
         movementPattern: "",
         measurementTypes: ["reps"],
-        distanceUnit: user?.preferences?.units?.distance || "km",
+        distanceUnit: getPrimaryDistanceUnit(user?.preferences?.units?.distance),
         timeUnit: "min",
         difficulty: 5,
         requiresWeight: false,
@@ -745,12 +770,19 @@ export function Exercises() {
         : hasReps
           ? "reps"
           : "time";
+    const preferredDistanceUnit = getPrimaryDistanceUnit(
+      user?.preferences?.units?.distance
+    );
     const unitOptions = hasDistance
       ? [
-        { value: "km", label: t("training.form.units.kilometers") },
-        { value: "m", label: t("training.form.units.meters") },
-        { value: "miles", label: t("training.form.units.miles") },
-      ]
+          {
+            value: preferredDistanceUnit,
+            label:
+              preferredDistanceUnit === "miles"
+                ? t("training.form.units.miles")
+                : t("training.form.units.kilometers"),
+          },
+        ]
       : hasTime
         ? [
           { value: "min", label: t("training.form.units.minutes", "Minuten") },
@@ -758,7 +790,7 @@ export function Exercises() {
         ]
         : [];
     const resolvedUnit = hasDistance
-      ? editDraft.distanceUnit || (user?.preferences?.units?.distance || "km")
+      ? editDraft.distanceUnit || preferredDistanceUnit
       : hasTime
         ? editDraft.timeUnit || "min"
         : "reps";
@@ -839,10 +871,12 @@ export function Exercises() {
     const unitOptionsValues = extractNormalizedExerciseUnits(exercise.unitOptions);
     const normalizedUnit = normalizeExerciseUnit(exercise.unit);
 
-    const distanceUnit =
+    const distanceUnitCandidate =
       (["km", "m", "miles"].includes(normalizedUnit) ? normalizedUnit : "") ||
       unitOptionsValues.find((value) => ["km", "m", "miles"].includes(value)) ||
-      (user?.preferences?.units?.distance || "km");
+      user?.preferences?.units?.distance ||
+      "km";
+    const distanceUnit = getPrimaryDistanceUnit(distanceUnitCandidate);
 
     const timeUnit =
       (["min", "sec"].includes(normalizedUnit) ? normalizedUnit : "") ||
@@ -973,7 +1007,8 @@ export function Exercises() {
               nameExactMatch={nameExactMatch}
               confirmSimilar={confirmSimilar}
               onConfirmSimilarChange={setConfirmSimilar}
-              defaultDistanceUnit={user?.preferences?.units?.distance || "km"}
+              defaultDistanceUnit={primaryDistanceUnit}
+              distanceUnitOptions={distanceUnitOptions}
               defaultTimeUnit="min"
             />
           </CardContent>
@@ -995,7 +1030,7 @@ export function Exercises() {
           }
           sortOptions={sortOptions}
           filtersPanel={
-            <ExerciseFiltersPanel
+            <ExerciseFilterPanel
               categoryOptions={categoryFilterOptions}
               disciplineOptions={disciplineOptions}
               movementPatternOptions={movementPatternOptions}
@@ -1238,7 +1273,8 @@ export function Exercises() {
                     onSubmit={handleEditRequest}
                     submitLabel={t("exerciseLibrary.sendRequest", "Anfrage senden")}
                     showDescriptionToggle
-                    defaultDistanceUnit={user?.preferences?.units?.distance || "km"}
+                    defaultDistanceUnit={primaryDistanceUnit}
+                    distanceUnitOptions={distanceUnitOptions}
                     defaultTimeUnit="min"
                   />
                 )}

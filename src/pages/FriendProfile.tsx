@@ -3,9 +3,12 @@ import { Badge as UiBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/hooks/use-auth";
+import { useDateTimeFormatter } from "@/hooks/use-date-time-formatter";
 import { API_URL } from "@/lib/api";
 import { parseAvatarConfig } from "@/lib/avatar";
 import { getBadgeText } from "@/lib/badges";
+import { convertDistance, getPrimaryDistanceUnit } from "@/utils/units";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { ArrowLeft, Award, Dumbbell, Home, Medal, UserX } from "lucide-react";
@@ -91,21 +94,12 @@ const getInitials = (name: string) => {
     .toUpperCase();
 };
 
-const getActivityIcon = (activityType: string) => {
-  switch (activityType) {
-    case "pullups":
-      return "💪";
-    case "pushups":
-      return "🔥";
-    case "situps":
-      return "🚀";
-    case "running":
-      return "🏃";
-    case "cycling":
-      return "🚴";
-    default:
-      return "💪";
-  }
+const getActivityName = (activityType: string, t: (key: string) => string) => {
+  const translationKey = `activityFeed.activityTypes.${activityType.toLowerCase()}`;
+  const translation = t(translationKey);
+  return translation !== translationKey
+    ? translation
+    : t("activityFeed.activityTypes.unknown");
 };
 
 const getActivityColor = (activityType: string) => {
@@ -125,11 +119,16 @@ const getActivityColor = (activityType: string) => {
   }
 };
 
-const formatAmount = (activityType: string, amount: number) => {
+const formatAmount = (
+  activityType: string,
+  amount: number,
+  distanceUnit: string,
+  distanceLabel: string
+) => {
   switch (activityType) {
     case "running":
     case "cycling":
-      return `${amount} km`;
+      return `${convertDistance(amount, "km", distanceUnit)} ${distanceLabel}`;
     default:
       return `${amount}×`;
   }
@@ -137,7 +136,14 @@ const formatAmount = (activityType: string, amount: number) => {
 
 export function FriendProfile() {
   const { friendId } = useParams();
-  const { t, i18n } = useTranslation();
+  const { user } = useAuth();
+  const { t } = useTranslation();
+  const { formatDateTime } = useDateTimeFormatter();
+  const distanceUnit = getPrimaryDistanceUnit(user?.preferences?.units?.distance);
+  const distanceLabel =
+    distanceUnit === "miles"
+      ? t("training.form.units.milesShort", "mi")
+      : t("training.form.units.kilometersShort", "km");
   const [profile, setProfile] = useState<FriendProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -489,25 +495,27 @@ export function FriendProfile() {
                           variant="secondary"
                           className={`text-xs py-0.5 px-2 ${getActivityColor(activity.activityType)}`}
                         >
-                          {getActivityIcon(activity.activityType)}{" "}
-                          {formatAmount(activity.activityType, activity.amount)}
+                          {getActivityName(activity.activityType, t)}{" "}
+                          {formatAmount(
+                            activity.activityType,
+                            activity.amount,
+                            distanceUnit,
+                            distanceLabel
+                          )}
                         </UiBadge>
                       ))}
                     </div>
                   )}
                   <p className="text-xs text-muted-foreground">
                     {workout.startTimeTimestamp
-                      ? new Date(workout.startTimeTimestamp).toLocaleDateString(
-                          i18n.language === "en" ? "en-US" : "de-DE",
-                          {
-                            weekday: "short",
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          }
-                        )
+                      ? formatDateTime(workout.startTimeTimestamp, {
+                          weekday: "short",
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
                       : t("training.unknownDate", "Unbekanntes Datum")}
                   </p>
                 </div>

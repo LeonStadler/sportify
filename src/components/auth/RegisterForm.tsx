@@ -21,7 +21,7 @@ interface RegisterFormProps {
 }
 
 export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, redirectTo }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { register: registerUser, isLoading, error, clearError } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -94,6 +94,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, redirectT
         lastName: data.lastName,
         nickname: data.nickname || undefined,
         displayPreference: data.displayPreference,
+        languagePreference: i18n.language === "en" ? "en" : "de",
         invitationToken: invitationToken
       };
 

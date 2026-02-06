@@ -26,7 +26,7 @@ import { API_URL } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { Exercise, ExerciseListResponse } from "@/types/exercise";
 import type { Workout } from "@/types/workout";
-import { convertWeightFromKg, convertWeightToKg } from "@/utils/units";
+import { convertWeightFromKg, convertWeightToKg, getPrimaryDistanceUnit } from "@/utils/units";
 import { calculateSetTotals, getMetricVisibility } from "./workoutTotals";
 import { format } from "date-fns";
 import { de, enUS } from "date-fns/locale";
@@ -113,7 +113,7 @@ export function WorkoutForm({
 
   // Benutzereinstellungen für Distanzeinheiten
   const userDistanceUnit = useMemo(
-    () => user?.preferences?.units?.distance || "km",
+    () => getPrimaryDistanceUnit(user?.preferences?.units?.distance),
     [user?.preferences?.units?.distance]
   );
   const userWeightUnit = useMemo(
@@ -127,10 +127,7 @@ export function WorkoutForm({
     if (pref === "miles" || pref === "mi") {
       return [{ value: "miles", label: t("training.form.units.miles"), multiplier: 1 }];
     }
-    return [
-      { value: "km", label: t("training.form.units.kilometers"), multiplier: 1 },
-      { value: "m", label: t("training.form.units.meters"), multiplier: 0.001 },
-    ];
+    return [{ value: "km", label: t("training.form.units.kilometers"), multiplier: 1 }];
   }, [t, userDistanceUnit]);
   const getTimeUnitOptions = useCallback((preferred?: string) => {
     const options = [
@@ -149,19 +146,12 @@ export function WorkoutForm({
         case "distance":
           return [
             {
-              value: "km",
-              label: t("training.form.units.kilometers"),
+              value: userDistanceUnit,
+              label:
+                userDistanceUnit === "miles"
+                  ? t("training.form.units.miles")
+                  : t("training.form.units.kilometers"),
               multiplier: 1,
-            },
-            {
-              value: "m",
-              label: t("training.form.units.meters"),
-              multiplier: 0.001,
-            },
-            {
-              value: "miles",
-              label: t("training.form.units.miles"),
-              multiplier: 1.609,
             },
           ];
         case "time":
@@ -221,11 +211,15 @@ export function WorkoutForm({
 
   const movementPatternOptions = useMemo(
     () => [
-      { value: "push", label: t("training.form.patternPush", "Push") },
-      { value: "pull", label: t("training.form.patternPull", "Pull") },
-      { value: "legs", label: t("training.form.patternLegs", "Beine") },
-      { value: "core", label: t("training.form.patternCore", "Core") },
-      { value: "full", label: t("training.form.patternFull", "Ganzkörper") },
+      { value: "push", label: t("exerciseLibrary.movement.push", "Push") },
+      { value: "pull", label: t("exerciseLibrary.movement.pull", "Pull") },
+      { value: "hinge", label: t("exerciseLibrary.movement.hinge", "Hinge") },
+      { value: "lunge", label: t("exerciseLibrary.movement.lunge", "Lunge") },
+      { value: "load", label: t("exerciseLibrary.movement.load", "Load") },
+      { value: "carry", label: t("exerciseLibrary.movement.carry", "Carry") },
+      { value: "rotation", label: t("exerciseLibrary.movement.rotation", "Rotation") },
+      { value: "antiRotation", label: t("exerciseLibrary.movement.antiRotation", "Anti-Rotation") },
+      { value: "gait", label: t("exerciseLibrary.movement.gait", "Gait") },
     ],
     [t]
   );
@@ -265,7 +259,7 @@ export function WorkoutForm({
   const getUnitKind = (unit?: string | null) => {
     if (!unit) return "reps";
     if (["min", "sec"].includes(unit)) return "time";
-    if (["km", "m", "miles"].includes(unit)) return "distance";
+    if (["km", "m", "miles", "yards"].includes(unit)) return "distance";
     return "reps";
   };
   const getUnitLabel = useCallback(
@@ -283,6 +277,7 @@ export function WorkoutForm({
       if (unit === "km") return t("training.form.units.kilometers");
       if (unit === "m") return t("training.form.units.meters");
       if (unit === "miles") return t("training.form.units.miles");
+      if (unit === "yards") return t("training.form.units.yards", "Yards");
       return unit;
     },
     [getDefaultUnitOptions, t]
@@ -306,7 +301,14 @@ export function WorkoutForm({
       exercise.supportsDistance || measurementType === "distance"
     );
     if (supportsDistance) {
-      const options = getDistanceUnitOptionsForProfile();
+      const exerciseOptions =
+        exercise.unitOptions?.filter((option) =>
+          ["km", "m", "miles", "yards"].includes(option.value)
+        ) ?? [];
+      const options =
+        exerciseOptions.length > 0
+          ? exerciseOptions
+          : getDistanceUnitOptionsForProfile();
       if (exercise.unit && options.some((option) => option.value === exercise.unit)) {
         return [
           options.find((option) => option.value === exercise.unit)!,

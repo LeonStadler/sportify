@@ -14,7 +14,7 @@ import {
 } from "@/components/exercises/exerciseLabels";
 import { TimeRangeFilter } from "@/components/filters/TimeRangeFilter";
 import { TemplateBrowseGrid, TemplateBrowseTable, type TemplateBrowseItem } from "@/components/training/TemplateBrowseList";
-import { TemplateFiltersPanel } from "@/components/training/TemplateFiltersPanel";
+import { ExerciseFilterPanel } from "@/components/exercises/ExerciseFilterPanel";
 import { TrainingDiarySection } from "@/components/training/TrainingDiarySection";
 import { WorkoutForm } from "@/components/training/WorkoutForm";
 import {
@@ -66,12 +66,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
+import { useDateTimeFormatter } from "@/hooks/use-date-time-formatter";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
 import type { Workout } from "@/types/workout";
 import { getNormalizedRange, getRangeForPeriod, toDateParam } from "@/utils/dateRanges";
-import { convertDistance, convertWeightFromKg } from "@/utils/units";
-import { ArrowDown, ArrowUp, ChevronDown, Copy, Eye, Info, Pencil, Play, Star, Trash2 } from "lucide-react";
+import { convertDistance, convertWeightFromKg, getPrimaryDistanceUnit } from "@/utils/units";
+import { ArrowDown, ArrowUp, Calendar, ChevronDown, Clock, Copy, Eye, Info, Pencil, Play, Star, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { useTranslation } from "react-i18next";
@@ -163,6 +164,7 @@ export function Training() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const { user, updateProfile } = useAuth();
+  const { formatDateTime } = useDateTimeFormatter();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [recentWorkouts, setRecentWorkouts] = useState<Workout[]>([]);
@@ -227,7 +229,7 @@ export function Training() {
   const workoutFormRef = useRef<HTMLDivElement | null>(null);
   const { toast } = useToast();
   const weightUnit = user?.preferences?.units?.weight || "kg";
-  const distanceUnit = user?.preferences?.units?.distance || "km";
+  const distanceUnit = getPrimaryDistanceUnit(user?.preferences?.units?.distance);
 
   const [exerciseTypes, setExerciseTypes] = useState<Array<{ id: string; name: string }>>([
     { id: "all", name: t("training.allExercises") },
@@ -1047,23 +1049,6 @@ export function Training() {
     return diffInDays <= 7;
   };
 
-  const getExerciseIcon = (exerciseType: string) => {
-    switch (exerciseType) {
-      case "pullups":
-        return "💪";
-      case "pushups":
-        return "🔥";
-      case "situps":
-        return "🚀";
-      case "running":
-        return "🏃";
-      case "cycling":
-        return "🚴";
-      default:
-        return "💪";
-    }
-  };
-
   const getExerciseColor = (exerciseType: string) => {
     switch (exerciseType) {
       case "pullups":
@@ -1110,6 +1095,9 @@ export function Training() {
     if (normalizedUnit === "m" || normalizedUnit === "meter" || normalizedUnit === "meters") {
       return t("training.form.units.meters");
     }
+    if (normalizedUnit === "yards" || normalizedUnit === "yard" || normalizedUnit === "yd") {
+      return t("training.form.units.yards", "Yards");
+    }
     if (normalizedUnit === "meilen" || normalizedUnit === "miles" || normalizedUnit === "mi") {
       return t("training.form.units.miles");
     }
@@ -1138,16 +1126,12 @@ export function Training() {
         return t("training.unknownDate");
       }
 
-      const locale = user?.languagePreference === "en" ? "en-US" : "de-DE";
-      const timeFormat = user?.preferences?.timeFormat || "24h";
-
-      return dateToFormat.toLocaleString(locale, {
+      return formatDateTime(dateToFormat, {
         day: "2-digit",
         month: "2-digit",
         year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
-        hour12: timeFormat === "12h",
       });
     } catch (error) {
       console.error("Date formatting error:", error, "Input:", workout);
@@ -1417,7 +1401,10 @@ export function Training() {
                               </h3>
                               {workout.duration && (
                                 <Badge variant="outline" className="text-xs">
-                                  ⏱️ {formatDuration(workout.duration)}
+                                  <span className="inline-flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    {formatDuration(workout.duration)}
+                                  </span>
                                 </Badge>
                               )}
                             </div>
@@ -1463,8 +1450,7 @@ export function Training() {
                                         className={`text-xs ${getExerciseColor(activity.activityType)}`}
                                         variant="secondary"
                                       >
-                                        {getExerciseIcon(activity.activityType)}{" "}
-                                        {getActivityName(activity.activityType)}:{" "}
+                                        {getActivityName(activity.activityType)}{" "}
                                         {formatActivityAmount(activity.amount, activity.unit)}
                                       </Badge>
                                       {setsDisplay && (
@@ -1479,11 +1465,14 @@ export function Training() {
                             </div>
 
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <span>📅 {formatWorkoutDateTime(workout)}</span>
+                              <span className="inline-flex items-center gap-1">
+                                <Calendar className="h-3.5 w-3.5" />
+                                {formatWorkoutDateTime(workout)}
+                              </span>
                             </div>
                             {getSourceTemplateCredit(workout) && (
-                              <div className="mt-1 text-xs text-muted-foreground">
-                                ⭐{" "}
+                              <div className="mt-1 text-xs text-muted-foreground inline-flex items-center gap-1">
+                                <Star className="h-3.5 w-3.5 text-yellow-500" />
                                 <button
                                   type="button"
                                   className="underline underline-offset-2 hover:text-foreground"
@@ -1507,7 +1496,7 @@ export function Training() {
                                   <span className="hidden sm:inline">
                                     {t("training.edit")}
                                   </span>
-                                  <span className="sm:hidden" aria-hidden="true">✏️</span>
+                                  <Pencil className="h-4 w-4 sm:hidden" aria-hidden="true" />
                                 </Button>
                                 <Button
                                   variant="outline"
@@ -1634,11 +1623,14 @@ export function Training() {
                             <h3 className="font-medium text-foreground text-sm md:text-base truncate">
                               {workout.title}
                             </h3>
-                            {workout.duration && (
-                              <Badge variant="outline" className="text-xs">
-                                ⏱️ {formatDuration(workout.duration)}
-                              </Badge>
-                            )}
+                              {workout.duration && (
+                                <Badge variant="outline" className="text-xs">
+                                  <span className="inline-flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    {formatDuration(workout.duration)}
+                                  </span>
+                                </Badge>
+                              )}
                           </div>
 
                           {workout.description && (
@@ -1677,14 +1669,13 @@ export function Training() {
                                   className="flex flex-col gap-1"
                                 >
                                   <div className="flex items-center gap-1 flex-wrap">
-                                    <Badge
-                                      className={`text-xs ${getExerciseColor(activity.activityType)}`}
-                                      variant="secondary"
-                                    >
-                                      {getExerciseIcon(activity.activityType)}{" "}
-                                      {getActivityName(activity.activityType)}:{" "}
-                                      {formatActivityAmount(activity.amount, activity.unit)}
-                                    </Badge>
+                                  <Badge
+                                    className={`text-xs ${getExerciseColor(activity.activityType)}`}
+                                    variant="secondary"
+                                  >
+                                    {getActivityName(activity.activityType)}{" "}
+                                    {formatActivityAmount(activity.amount, activity.unit)}
+                                  </Badge>
                                     {setsDisplay && (
                                       <span className="text-xs text-muted-foreground">
                                         ({setsDisplay})
@@ -1696,37 +1687,40 @@ export function Training() {
                             })}
                           </div>
 
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>📅 {formatWorkoutDateTime(workout)}</span>
-                          </div>
-                          {getSourceTemplateCredit(workout) && (
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              ⭐{" "}
-                              <button
-                                type="button"
-                                className="underline underline-offset-2 hover:text-foreground"
-                                onClick={() => openSourceTemplate(workout.sourceTemplateId)}
-                              >
-                                {getSourceTemplateCredit(workout)}
-                              </button>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span className="inline-flex items-center gap-1">
+                                <Calendar className="h-3.5 w-3.5" />
+                                {formatWorkoutDateTime(workout)}
+                              </span>
                             </div>
-                          )}
+                            {getSourceTemplateCredit(workout) && (
+                              <div className="mt-1 text-xs text-muted-foreground inline-flex items-center gap-1">
+                                <Star className="h-3.5 w-3.5 text-yellow-500" />
+                                <button
+                                  type="button"
+                                  className="underline underline-offset-2 hover:text-foreground"
+                                  onClick={() => openSourceTemplate(workout.sourceTemplateId)}
+                                >
+                                  {getSourceTemplateCredit(workout)}
+                                </button>
+                              </div>
+                            )}
                         </div>
                         <div className="flex gap-2">
                           {isWorkoutEditable(workout) && (
                             <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleEditClick(workout)}
-                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 flex-shrink-0"
-                                aria-label={t("training.edit")}
-                              >
-                                <span className="hidden sm:inline">
-                                  {t("training.edit")}
-                                </span>
-                                <span className="sm:hidden" aria-hidden="true">✏️</span>
-                              </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditClick(workout)}
+                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 flex-shrink-0"
+                                  aria-label={t("training.edit")}
+                                >
+                                  <span className="hidden sm:inline">
+                                    {t("training.edit")}
+                                  </span>
+                                  <Pencil className="h-4 w-4 sm:hidden" aria-hidden="true" />
+                                </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -1798,16 +1792,25 @@ export function Training() {
             }
             sortOptions={templateSortOptions}
             filtersPanel={
-              <TemplateFiltersPanel
+              <ExerciseFilterPanel
                 sourceFilter={templateSourceFilter}
                 onSourceFilterChange={setTemplateSourceFilter}
+                sourceOptions={[
+                  { value: "all", label: t("filters.all", "Alle") },
+                  { value: "own", label: t("training.templatesOwn", "Deine Vorlagen") },
+                  { value: "friends", label: t("training.templatesFriends", "Vorlagen von Freunden") },
+                  { value: "public", label: t("training.templatesPublic", "Öffentliche Vorlagen") },
+                ]}
                 categoryOptions={templateCategoryOptions}
                 categoryFilter={templateCategoryFilter}
                 onCategoryFilterChange={setTemplateCategoryFilter}
                 disciplineOptions={templateDisciplineOptions}
                 disciplineFilter={templateDisciplineFilter}
                 onDisciplineFilterChange={setTemplateDisciplineFilter}
-                movementPatternOptions={templateMovementPatternOptions}
+                movementPatternOptions={templateMovementPatternOptions.map((option) => ({
+                  value: option.value,
+                  fallback: option.label,
+                }))}
                 movementPatternFilter={templateMovementPatternFilter}
                 onMovementPatternFilterChange={setTemplateMovementPatternFilter}
                 muscleFilters={templateMuscleFilters}

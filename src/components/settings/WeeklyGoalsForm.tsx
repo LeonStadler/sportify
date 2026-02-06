@@ -6,6 +6,8 @@ import { Plus, Trash2 } from "lucide-react";
 import type { Exercise } from "@/types/exercise";
 import { Button } from "@/components/ui/button";
 import { ExercisePicker } from "@/components/exercises/ExercisePicker";
+import { useAuth } from "@/hooks/use-auth";
+import { getPrimaryDistanceUnit } from "@/utils/units";
 import {
   Select,
   SelectContent,
@@ -58,6 +60,8 @@ export function WeeklyGoalsForm({
   showPoints = true,
 }: WeeklyGoalsFormProps) {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const distanceUnit = getPrimaryDistanceUnit(user?.preferences?.units?.distance);
 
   const getAvailableUnits = (exercise?: Exercise | null) => {
     if (!exercise) return ["reps"] as WeeklyExerciseGoal["unit"][];
@@ -211,7 +215,9 @@ export function WeeklyGoalsForm({
                       )}
                       {availableUnits.includes("distance") && (
                         <SelectItem value="distance">
-                          {t("training.form.units.kilometersShort", "km")}
+                          {distanceUnit === "miles"
+                            ? t("training.form.units.milesShort", "mi")
+                            : t("training.form.units.kilometersShort", "km")}
                         </SelectItem>
                       )}
                     </SelectContent>
@@ -219,7 +225,9 @@ export function WeeklyGoalsForm({
                 ) : (
                   <span className="text-xs text-muted-foreground">
                     {activeUnit === "distance"
-                      ? t("training.form.units.kilometersShort", "km")
+                      ? distanceUnit === "miles"
+                        ? t("training.form.units.milesShort", "mi")
+                        : t("training.form.units.kilometersShort", "km")
                       : activeUnit === "time"
                         ? t("training.form.units.minutesShort", "Min")
                         : t("training.form.units.repetitionsShort", "Wdh.")}

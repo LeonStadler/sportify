@@ -51,6 +51,8 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
+import { useDateTimeFormatter } from "@/hooks/use-date-time-formatter";
+import { getPrimaryDistanceUnit } from "@/utils/units";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
 import {
@@ -265,6 +267,18 @@ export function Admin() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { t, i18n } = useTranslation();
+  const { formatDateTime } = useDateTimeFormatter();
+  const primaryDistanceUnit = getPrimaryDistanceUnit(user?.preferences?.units?.distance);
+  const distanceUnitOptions =
+    primaryDistanceUnit === "miles"
+      ? [
+          { value: "miles", label: t("training.form.units.miles", "Meilen") },
+          { value: "yards", label: t("training.form.units.yards", "Yards") },
+        ]
+      : [
+          { value: "km", label: t("training.form.units.kilometers", "Kilometer") },
+          { value: "m", label: t("training.form.units.meters", "Meter") },
+        ];
 
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -1447,7 +1461,7 @@ export function Admin() {
       if (isNaN(date.getTime())) {
         return t("admin.date.invalid", "Ungültiges Datum");
       }
-      return date.toLocaleString(i18n.language || "de-DE", {
+      return formatDateTime(date, {
         year: "numeric",
         month: "2-digit",
         day: "2-digit",
@@ -2175,7 +2189,8 @@ export function Admin() {
                         descriptionOpen={exerciseEditDescriptionOpen}
                         onDescriptionToggle={setExerciseEditDescriptionOpen}
                         showDescriptionToggle
-                        defaultDistanceUnit={user?.preferences?.units?.distance || "km"}
+                        defaultDistanceUnit={primaryDistanceUnit}
+                        distanceUnitOptions={distanceUnitOptions}
                         defaultTimeUnit="min"
                       />
                     )}
@@ -2443,7 +2458,7 @@ export function Admin() {
                           {stat.last_run && (
                             <p className="text-xs text-muted-foreground mt-2">
                               {t("admin.monitoring.jobs.lastRun", "Letzter Lauf")}:{" "}
-                              {new Date(stat.last_run).toLocaleString(i18n.language || "de-DE")}
+                              {formatDateTime(stat.last_run)}
                             </p>
                           )}
                         </div>
@@ -2575,9 +2590,7 @@ export function Admin() {
                                   </TableCell>
                                   <TableCell>{email.attempts}</TableCell>
                                   <TableCell className="text-xs">
-                                    {new Date(email.createdAt).toLocaleString(
-                                      i18n.language || "de-DE"
-                                    )}
+                                    {formatDateTime(email.createdAt)}
                                   </TableCell>
                                 </TableRow>
                               ))}

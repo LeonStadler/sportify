@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { API_URL } from "@/lib/api";
 import { parseAvatarConfig } from "@/lib/avatar";
 import { toDateParam } from "@/utils/dateRanges";
+import { getPrimaryDistanceUnit } from "@/utils/units";
 import { useCallback, useEffect, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { useTranslation } from "react-i18next";
@@ -147,7 +148,7 @@ export function ScoreboardTable({
     return "text-muted-foreground";
   };
 
-  const distanceUnit = user?.preferences?.units?.distance === "miles" ? "miles" : "km";
+  const distanceUnit = getPrimaryDistanceUnit(user?.preferences?.units?.distance);
   const distanceLabel =
     distanceUnit === "miles"
       ? t("training.form.units.milesShort", "mi")

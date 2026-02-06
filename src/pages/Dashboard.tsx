@@ -20,6 +20,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
 import type { Exercise, ExerciseListResponse } from "@/types/exercise";
+import { getPrimaryDistanceUnit } from "@/utils/units";
 import { BarChart, Dumbbell, Settings, TrendingUp, Trophy } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -564,8 +565,9 @@ export function Dashboard() {
         Icon = Trophy;
         break;
       case "activity": {
-        const distanceUnit =
-          user?.preferences?.units?.distance === "miles" ? "miles" : "km";
+        const distanceUnit = getPrimaryDistanceUnit(
+          user?.preferences?.units?.distance
+        );
         const distanceLabel =
           distanceUnit === "miles"
             ? t("training.form.units.milesShort", "mi")

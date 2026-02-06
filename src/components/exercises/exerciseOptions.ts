@@ -38,12 +38,14 @@ export const muscleGroupTree = [
 export const muscleGroupOptions = muscleGroupTree.flatMap((group) => group.children);
 
 export const disciplineOptions = [
+  "Strength/Weights",
   "Calisthenics/Bodyweight",
-  "Yoga/Stretching",
-  "Weights/Gym",
+  "Functional/HIIT",
   "Running",
   "Cycling",
   "Swimming",
+  "Mobility/Yoga",
+  "Team Sports",
 ];
 
 export const categoryOptions = [
@@ -57,9 +59,11 @@ export const categoryOptions = [
 export const movementPatternOptions = [
   { value: "push", labelKey: "exerciseLibrary.movement.push", fallback: "Push" },
   { value: "pull", labelKey: "exerciseLibrary.movement.pull", fallback: "Pull" },
-  { value: "squat", labelKey: "exerciseLibrary.movement.squat", fallback: "Squat" },
   { value: "hinge", labelKey: "exerciseLibrary.movement.hinge", fallback: "Hinge" },
+  { value: "lunge", labelKey: "exerciseLibrary.movement.lunge", fallback: "Lunge" },
+  { value: "load", labelKey: "exerciseLibrary.movement.load", fallback: "Load" },
   { value: "carry", labelKey: "exerciseLibrary.movement.carry", fallback: "Carry" },
   { value: "rotation", labelKey: "exerciseLibrary.movement.rotation", fallback: "Rotation" },
-  { value: "isometric", labelKey: "exerciseLibrary.movement.isometric", fallback: "Isometrisch" },
+  { value: "antiRotation", labelKey: "exerciseLibrary.movement.antiRotation", fallback: "Anti-Rotation" },
+  { value: "gait", labelKey: "exerciseLibrary.movement.gait", fallback: "Gait" },
 ];

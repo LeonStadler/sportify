@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/hooks/use-auth";
+import { getPrimaryDistanceUnit } from "@/utils/units";
 import { Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -21,8 +22,7 @@ export function WeeklyGoalsCard({
 }: WeeklyGoalsCardProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const distanceUnit =
-    user?.preferences?.units?.distance === "miles" ? "miles" : "km";
+  const distanceUnit = getPrimaryDistanceUnit(user?.preferences?.units?.distance);
 
   const entries = (goals.exercises || [])
     .filter((entry) => entry.exerciseId)

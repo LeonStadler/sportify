@@ -24,6 +24,7 @@ export const createProfileRouter = (pool) => {
         nickname,
         displayPreference,
         languagePreference,
+        themePreference,
         preferences,
         avatar,
         showInGlobalRankings,
@@ -66,10 +67,7 @@ export const createProfileRouter = (pool) => {
         normalizedDisplayPreference === "nickname" &&
         !normalizedNickname
       ) {
-        return res.status(400).json({
-          error:
-            "Wenn 'Spitzname' als Anzeigename gewählt ist, muss ein Spitzname angegeben werden.",
-        });
+        normalizedDisplayPreference = "firstName";
       }
 
       if (normalizedNickname) {
@@ -89,35 +87,80 @@ export const createProfileRouter = (pool) => {
         }
       }
 
+      const rawLanguageProvided = Object.prototype.hasOwnProperty.call(
+        req.body,
+        "languagePreference"
+      );
+      const themeProvided = Object.prototype.hasOwnProperty.call(
+        req.body,
+        "themePreference"
+      );
+      const normalizedThemePreference =
+        themePreference === "light" || themePreference === "dark" || themePreference === "system"
+          ? themePreference
+          : null;
+      const preferencesProvided = Object.prototype.hasOwnProperty.call(
+        req.body,
+        "preferences"
+      );
+      const avatarProvided = Object.prototype.hasOwnProperty.call(
+        req.body,
+        "avatar"
+      );
+
+      const normalizedLanguagePreference =
+        languagePreference === "en" || languagePreference === "de"
+          ? languagePreference
+          : null;
+      const languageProvided =
+        rawLanguageProvided && normalizedLanguagePreference !== null;
+
+      const normalizedPreferences = preferencesProvided
+        ? JSON.stringify(preferences ?? {})
+        : null;
+
+      const normalizedAvatar = avatarProvided
+        ? avatar
+          ? typeof avatar === "string"
+            ? avatar.trim() || null
+            : JSON.stringify(avatar)
+          : null
+        : null;
+
       const updateQuery = `
                 UPDATE users
                 SET first_name = $1,
                     last_name = $2,
                     nickname = $3,
-                    display_preference = $4, 
-                    language_preference = $5,
-                    preferences = $6,
-                    avatar_url = $7,
-                    show_in_global_rankings = COALESCE($8, show_in_global_rankings),
+                    display_preference = $4,
+                    language_preference = CASE WHEN $5 THEN $6 ELSE language_preference END,
+                    theme_preference = CASE WHEN $7 THEN $8 ELSE theme_preference END,
+                    preferences = CASE WHEN $9 THEN $10 ELSE preferences END,
+                    avatar_url = CASE WHEN $11 THEN $12 ELSE avatar_url END,
+                    show_in_global_rankings = COALESCE($13, show_in_global_rankings),
                     updated_at = CURRENT_TIMESTAMP
-                WHERE id = $9
+                WHERE id = $14
                 RETURNING id, email, first_name, last_name, nickname, display_preference, avatar_url,
-                         is_email_verified, has_2fa, language_preference, preferences, 
+                         is_email_verified, has_2fa, language_preference, theme_preference, preferences,
                          show_in_global_rankings, created_at, last_login_at, role
             `;
 
+      const themeUpdateProvided = Boolean(
+        themeProvided && normalizedThemePreference
+      );
       const { rows } = await pool.query(updateQuery, [
         firstName.trim(),
         lastName.trim(),
         normalizedNickname,
         normalizedDisplayPreference,
-        languagePreference || "de",
-        preferences ? JSON.stringify(preferences) : "{}",
-        avatar
-          ? typeof avatar === "string"
-            ? avatar
-            : JSON.stringify(avatar)
-          : null,
+        languageProvided,
+        normalizedLanguagePreference,
+        themeUpdateProvided,
+        normalizedThemePreference,
+        preferencesProvided,
+        normalizedPreferences,
+        avatarProvided,
+        normalizedAvatar,
         showInGlobalRankings !== undefined ? showInGlobalRankings : null,
         req.user.id,
       ]);

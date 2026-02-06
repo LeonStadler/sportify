@@ -129,6 +129,7 @@ export const createAuthRouter = (pool) => {
       lastName,
       nickname,
       displayPreference,
+      languagePreference,
       invitationToken,
     } = req.body;
 
@@ -265,9 +266,14 @@ export const createAuthRouter = (pool) => {
       const salt = await bcrypt.genSalt(10);
       const password_hash = await bcrypt.hash(password, salt);
 
+      const regLanguage =
+        languagePreference === "en" || languagePreference === "de"
+          ? languagePreference
+          : "de";
+
       const newUserQuery = `
-                INSERT INTO users (email, password_hash, first_name, last_name, nickname, display_preference, weekly_goals, role, password_changed_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, 'user', CURRENT_TIMESTAMP)
+                INSERT INTO users (email, password_hash, first_name, last_name, nickname, display_preference, weekly_goals, role, password_changed_at, language_preference, theme_preference)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, 'user', CURRENT_TIMESTAMP, $8, 'system')
                 RETURNING id, email, first_name, last_name, nickname, display_preference, role;
             `;
       const values = [
@@ -278,6 +284,7 @@ export const createAuthRouter = (pool) => {
         normalizedNickname,
         displayPreference || "firstName",
         "{}",
+        regLanguage,
       ];
 
       const { rows } = await pool.query(newUserQuery, values);

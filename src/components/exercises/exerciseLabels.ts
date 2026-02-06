@@ -23,6 +23,14 @@ const categoryLabelConfig: Record<string, LabelConfig> = {
 };
 
 const disciplineLabelConfig: Record<string, LabelConfig> = {
+  "Strength/Weights": {
+    key: "exerciseLibrary.disciplineLabels.strength",
+    fallback: "Strength/Weights",
+  },
+  strength: {
+    key: "exerciseLibrary.disciplineLabels.strength",
+    fallback: "Strength/Weights",
+  },
   "Calisthenics/Bodyweight": {
     key: "exerciseLibrary.disciplineLabels.calisthenics",
     fallback: "Calisthenics/Bodyweight",
@@ -30,6 +38,18 @@ const disciplineLabelConfig: Record<string, LabelConfig> = {
   calisthenics: {
     key: "exerciseLibrary.disciplineLabels.calisthenics",
     fallback: "Calisthenics/Bodyweight",
+  },
+  "Functional/HIIT": {
+    key: "exerciseLibrary.disciplineLabels.functional",
+    fallback: "Functional/HIIT",
+  },
+  functional: {
+    key: "exerciseLibrary.disciplineLabels.functional",
+    fallback: "Functional/HIIT",
+  },
+  hiit: {
+    key: "exerciseLibrary.disciplineLabels.functional",
+    fallback: "Functional/HIIT",
   },
   "Yoga/Stretching": {
     key: "exerciseLibrary.disciplineLabels.yoga",
@@ -75,6 +95,22 @@ const disciplineLabelConfig: Record<string, LabelConfig> = {
     key: "exerciseLibrary.disciplineLabels.swimming",
     fallback: "Swimming",
   },
+  "Mobility/Yoga": {
+    key: "exerciseLibrary.disciplineLabels.mobility",
+    fallback: "Mobility/Yoga",
+  },
+  mobility: {
+    key: "exerciseLibrary.disciplineLabels.mobility",
+    fallback: "Mobility/Yoga",
+  },
+  "Team Sports": {
+    key: "exerciseLibrary.disciplineLabels.team",
+    fallback: "Team Sports",
+  },
+  team: {
+    key: "exerciseLibrary.disciplineLabels.team",
+    fallback: "Team Sports",
+  },
   cardio: {
     key: "exerciseLibrary.disciplineLabels.cardio",
     fallback: "Cardio",
@@ -84,11 +120,15 @@ const disciplineLabelConfig: Record<string, LabelConfig> = {
 const movementPatternLabelConfig: Record<string, LabelConfig> = {
   push: { key: "exerciseLibrary.movement.push", fallback: "Push" },
   pull: { key: "exerciseLibrary.movement.pull", fallback: "Pull" },
-  squat: { key: "exerciseLibrary.movement.squat", fallback: "Squat" },
   hinge: { key: "exerciseLibrary.movement.hinge", fallback: "Hinge" },
+  lunge: { key: "exerciseLibrary.movement.lunge", fallback: "Lunge" },
+  load: { key: "exerciseLibrary.movement.load", fallback: "Load" },
   carry: { key: "exerciseLibrary.movement.carry", fallback: "Carry" },
   rotation: { key: "exerciseLibrary.movement.rotation", fallback: "Rotation" },
-  isometric: { key: "exerciseLibrary.movement.isometric", fallback: "Isometrisch" },
+  antiRotation: { key: "exerciseLibrary.movement.antiRotation", fallback: "Anti-Rotation" },
+  gait: { key: "exerciseLibrary.movement.gait", fallback: "Gait" },
+  squat: { key: "exerciseLibrary.movement.squat", fallback: "Squat" },
+  isometric: { key: "exerciseLibrary.movement.isometric", fallback: "Isometric" },
 };
 
 const muscleGroupLabelConfig: Record<string, LabelConfig> = {

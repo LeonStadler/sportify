@@ -1,0 +1,5 @@
+ALTER TABLE workouts
+  ADD COLUMN IF NOT EXISTS category TEXT,
+  ADD COLUMN IF NOT EXISTS discipline TEXT,
+  ADD COLUMN IF NOT EXISTS movement_pattern TEXT,
+  ADD COLUMN IF NOT EXISTS movement_patterns TEXT[];

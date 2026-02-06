@@ -24,16 +24,16 @@ export const createChallengesRouter = (pool) => {
 
             const progressQuery = `
                 SELECT
-                    COALESCE(SUM(CASE WHEN wa.activity_type = 'pullups' THEN wa.quantity ELSE 0 END), 0) AS pullups,
-                    COALESCE(SUM(CASE WHEN wa.activity_type = 'pushups' THEN wa.quantity ELSE 0 END), 0) AS pushups,
-                    COALESCE(SUM(CASE WHEN wa.activity_type = 'running' THEN wa.quantity ELSE 0 END), 0) AS running,
-                    COALESCE(SUM(CASE WHEN wa.activity_type = 'cycling' THEN wa.quantity ELSE 0 END), 0) AS cycling,
+                    COALESCE(SUM(CASE WHEN wa.exercise_id = 'pullups' THEN wa.quantity ELSE 0 END), 0) AS pullups,
+                    COALESCE(SUM(CASE WHEN wa.exercise_id = 'pushups' THEN wa.quantity ELSE 0 END), 0) AS pushups,
+                    COALESCE(SUM(CASE WHEN wa.exercise_id = 'situps' THEN wa.quantity ELSE 0 END), 0) AS situps,
                     COALESCE(SUM(wa.points_earned), 0) AS total_points,
                     COUNT(DISTINCT w.id) AS workouts_completed
                 FROM workouts w
                 LEFT JOIN workout_activities wa ON w.id = wa.workout_id
                 WHERE w.user_id = $1
                   AND ${WEEK_WINDOW_CONDITION}
+                  AND wa.exercise_id IS NOT NULL
             `;
 
             const leaderboardQuery = `
@@ -42,12 +42,13 @@ export const createChallengesRouter = (pool) => {
                     ${USER_DISPLAY_NAME_SQL} AS display_name,
                     u.avatar_url,
                     COALESCE(SUM(wa.points_earned), 0) AS total_points,
-                    COALESCE(SUM(CASE WHEN wa.activity_type = 'running' THEN wa.quantity ELSE 0 END), 0) AS total_running,
-                    COALESCE(SUM(CASE WHEN wa.activity_type = 'pullups' THEN wa.quantity ELSE 0 END), 0) AS total_pullups
+                    COALESCE(SUM(CASE WHEN wa.exercise_id = 'pullups' THEN wa.quantity ELSE 0 END), 0) AS total_pullups,
+                    COALESCE(SUM(CASE WHEN wa.exercise_id = 'situps' THEN wa.quantity ELSE 0 END), 0) AS total_situps
                 FROM users u
                 LEFT JOIN workouts w ON u.id = w.user_id
                 LEFT JOIN workout_activities wa ON w.id = wa.workout_id
                 WHERE ${WEEK_WINDOW_CONDITION}
+                  AND wa.exercise_id IS NOT NULL
                 GROUP BY u.id, u.first_name, u.last_name, u.nickname, u.display_preference, u.avatar_url
                 HAVING COALESCE(SUM(wa.points_earned), 0) > 0
                 ORDER BY total_points DESC
@@ -61,13 +62,14 @@ export const createChallengesRouter = (pool) => {
                         ${USER_DISPLAY_NAME_SQL} AS display_name,
                         u.avatar_url,
                         COALESCE(SUM(wa.points_earned), 0) AS total_points,
-                        COALESCE(SUM(CASE WHEN wa.activity_type = 'running' THEN wa.quantity ELSE 0 END), 0) AS total_running,
-                        COALESCE(SUM(CASE WHEN wa.activity_type = 'pullups' THEN wa.quantity ELSE 0 END), 0) AS total_pullups,
+                        COALESCE(SUM(CASE WHEN wa.exercise_id = 'pullups' THEN wa.quantity ELSE 0 END), 0) AS total_pullups,
+                        COALESCE(SUM(CASE WHEN wa.exercise_id = 'situps' THEN wa.quantity ELSE 0 END), 0) AS total_situps,
                         ROW_NUMBER() OVER (ORDER BY COALESCE(SUM(wa.points_earned), 0) DESC) AS position
                     FROM users u
                     LEFT JOIN workouts w ON u.id = w.user_id
                     LEFT JOIN workout_activities wa ON w.id = wa.workout_id
                     WHERE ${WEEK_WINDOW_CONDITION}
+                      AND wa.exercise_id IS NOT NULL
                     GROUP BY u.id, u.first_name, u.last_name, u.nickname, u.display_preference, u.avatar_url
                 )
                 SELECT * FROM ranked WHERE id = $1 AND total_points > 0
@@ -84,8 +86,7 @@ export const createChallengesRouter = (pool) => {
             const userProgress = {
                 pullups: Number(progressRow.pullups) || 0,
                 pushups: Number(progressRow.pushups) || 0,
-                running: Number(progressRow.running) || 0,
-                cycling: Number(progressRow.cycling) || 0,
+                situps: Number(progressRow.situps) || 0,
                 workoutsCompleted: Number(progressRow.workouts_completed) || 0,
                 totalPoints
             };
@@ -95,8 +96,8 @@ export const createChallengesRouter = (pool) => {
                 displayName: row.display_name || 'Athlet',
                 avatarUrl: row.avatar_url,
                 totalPoints: Number(row.total_points) || 0,
-                totalRunning: Number(row.total_running) || 0,
                 totalPullups: Number(row.total_pullups) || 0,
+                totalSitups: Number(row.total_situps) || 0,
                 rank: index + 1,
                 isCurrentUser: row.id === req.user.id
             }));
@@ -110,8 +111,8 @@ export const createChallengesRouter = (pool) => {
                     displayName: userStandingRow.display_name || 'Athlet',
                     avatarUrl: userStandingRow.avatar_url,
                     totalPoints: Number(userStandingRow.total_points) || 0,
-                    totalRunning: Number(userStandingRow.total_running) || 0,
                     totalPullups: Number(userStandingRow.total_pullups) || 0,
+                    totalSitups: Number(userStandingRow.total_situps) || 0,
                     rank: Number(userStandingRow.position) || leaderboard.length + 1,
                     isCurrentUser: true
                 });
@@ -133,15 +134,10 @@ export const createChallengesRouter = (pool) => {
                     current: userProgress.pushups,
                     percentage: Math.min((userProgress.pushups / weeklyChallengeTargets.pushups) * 100, 100)
                 },
-                running: {
-                    target: weeklyChallengeTargets.running,
-                    current: userProgress.running,
-                    percentage: Math.min((userProgress.running / weeklyChallengeTargets.running) * 100, 100)
-                },
-                cycling: {
-                    target: weeklyChallengeTargets.cycling,
-                    current: userProgress.cycling,
-                    percentage: Math.min((userProgress.cycling / weeklyChallengeTargets.cycling) * 100, 100)
+                situps: {
+                    target: weeklyChallengeTargets.situps,
+                    current: userProgress.situps,
+                    percentage: Math.min((userProgress.situps / weeklyChallengeTargets.situps) * 100, 100)
                 }
             };
 
@@ -169,4 +165,3 @@ export const createChallengesRouter = (pool) => {
 
     return router;
 };
-

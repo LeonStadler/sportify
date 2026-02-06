@@ -47,6 +47,7 @@ export const createUsersRouter = (pool) => {
                     OR u.email ILIKE $1
                 )
                 AND u.id != $2
+                AND COALESCE((u.preferences->'privacy'->>'publicProfile')::boolean, true) = true
                 -- Exclude existing friends
                 AND NOT EXISTS (
                     SELECT 1 FROM friendships f

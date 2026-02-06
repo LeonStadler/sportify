@@ -10,9 +10,10 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { API_URL } from "@/lib/api";
+import { getBadgeText } from "@/lib/badges";
 import { clearAppBadge, setAppBadge } from "@/utils/badge";
 import { formatDistanceToNow } from "date-fns";
-import { de } from "date-fns/locale";
+import { de, enUS } from "date-fns/locale";
 import {
   Award,
   Bell,
@@ -24,6 +25,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -54,12 +56,14 @@ const notificationIcons: Record<string, JSX.Element> = {
 };
 
 export function Notifications() {
+  const { t, i18n } = useTranslation();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
   const { isSupported, permission, isRegistering, requestPermission } =
     usePushNotifications();
+  const locale = i18n.language === "en" ? enUS : de;
 
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
@@ -73,7 +77,7 @@ export function Notifications() {
           setNotifications([]);
           return;
         }
-        throw new Error("Benachrichtigungen konnten nicht geladen werden.");
+        throw new Error(t("common.notificationsCenter.loadError"));
       }
       const data = await response.json();
       if (!Array.isArray(data)) {
@@ -84,7 +88,7 @@ export function Notifications() {
       const mapped: Notification[] = data.map((item) => ({
         id: item.id,
         type: item.type ?? "info",
-        title: item.title ?? "Benachrichtigung",
+        title: item.title ?? t("common.notificationsCenter.notificationTitleDefault"),
         message: item.message ?? "",
         payload: item.payload ?? null,
         isRead: Boolean(item.isRead ?? item.is_read ?? item.readAt),
@@ -99,7 +103,7 @@ export function Notifications() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchNotifications();
@@ -127,14 +131,18 @@ export function Notifications() {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 
-      if (!response.ok) throw new Error("Fehler beim Markieren als gelesen.");
+      if (!response.ok) {
+        throw new Error(t("common.notificationsCenter.markReadError"));
+      }
 
       setNotifications((prev) =>
         prev.map((notification) => ({ ...notification, isRead: true }))
       );
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Unbekannter Fehler"
+        error instanceof Error
+          ? error.message
+          : t("common.notificationsCenter.unknownError")
       );
     }
   };
@@ -170,7 +178,7 @@ export function Notifications() {
           variant="ghost" 
           size="icon" 
           className="relative"
-          aria-label={`Benachrichtigungen${unreadCount > 0 ? `, ${unreadCount} ungelesen` : ""}`}
+          aria-label={`${t("common.notificationsCenter.ariaLabel")}${unreadCount > 0 ? `, ${t("common.notificationsCenter.ariaLabelUnread", { count: unreadCount })}` : ""}`}
           aria-expanded={isOpen}
         >
           <Bell className="h-5 w-5" aria-hidden="true" />
@@ -180,16 +188,18 @@ export function Notifications() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-80 md:w-96" align="end">
-        <DropdownMenuLabel>Benachrichtigungen</DropdownMenuLabel>
+        <DropdownMenuLabel>{t("common.notificationsCenter.title")}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {isSupported && permission !== "granted" && (
           <div className="px-3 pb-2">
             <div className="rounded-md border bg-muted/40 p-3 text-sm">
-              <p className="font-medium">Push-Benachrichtigungen aktivieren</p>
+              <p className="font-medium">
+                {t("common.notificationsCenter.push.title")}
+              </p>
               <p className="text-xs text-muted-foreground mt-1">
                 {permission === "denied"
-                  ? "Benachrichtigungen sind aktuell im Browser blockiert. Erlaube Mitteilungen in den Einstellungen deines Geräts, um Updates zu erhalten."
-                  : "Erhalte Auszeichnungen und Freundes-Updates direkt als Mitteilung auf deinem Gerät."}
+                  ? t("common.notificationsCenter.push.blocked")
+                  : t("common.notificationsCenter.push.prompt")}
               </p>
               <Button
                 variant="secondary"
@@ -200,16 +210,16 @@ export function Notifications() {
                   requestPermission().catch((error) => {
                     console.error("Push permission error:", error);
                     toast.error(
-                      "Push-Benachrichtigungen konnten nicht aktiviert werden."
+                      t("common.notificationsCenter.push.requestError")
                     );
                   });
                 }}
               >
                 {permission === "denied"
-                  ? "In Einstellungen aktivieren"
+                  ? t("common.notificationsCenter.push.openSettings")
                   : isRegistering
-                    ? "Aktiviere..."
-                    : "Jetzt aktivieren"}
+                    ? t("common.notificationsCenter.push.enabling")
+                    : t("common.notificationsCenter.push.enable")}
               </Button>
             </div>
           </div>
@@ -222,7 +232,7 @@ export function Notifications() {
           </div>
         ) : notifications.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center p-4">
-            Keine neuen Benachrichtigungen.
+            {t("common.notificationsCenter.empty")}
           </p>
         ) : (
           <div className="max-h-96 overflow-y-auto">
@@ -230,6 +240,41 @@ export function Notifications() {
               const icon = notificationIcons[notification.type] ?? (
                 <Bell className="w-5 h-5 text-muted-foreground" />
               );
+              const badgeLabel =
+                notification.type === "badge-earned" &&
+                notification.payload &&
+                typeof notification.payload.badgeSlug === "string"
+                  ? getBadgeText(
+                      {
+                        slug: notification.payload.badgeSlug as string,
+                        level:
+                          typeof notification.payload.badgeLevel === "number"
+                            ? notification.payload.badgeLevel
+                            : null,
+                        label:
+                          typeof notification.payload.badgeLabel === "string"
+                            ? notification.payload.badgeLabel
+                            : null,
+                        icon:
+                          typeof notification.payload.badgeIcon === "string"
+                            ? notification.payload.badgeIcon
+                            : null,
+                        category:
+                          typeof notification.payload.badgeCategory === "string"
+                            ? notification.payload.badgeCategory
+                            : null,
+                      },
+                      t
+                    ).label
+                  : null;
+              const title =
+                notification.type === "badge-earned"
+                  ? t("badges.notifications.earnedTitle")
+                  : notification.title;
+              const message =
+                notification.type === "badge-earned" && badgeLabel
+                  ? t("badges.notifications.earnedMessage", { badge: badgeLabel })
+                  : notification.message;
 
               return (
                 <DropdownMenuItem
@@ -245,11 +290,11 @@ export function Notifications() {
                   {icon}
                   <div className="flex-1">
                     <p className="text-sm font-medium leading-tight">
-                      {notification.title}
+                      {title}
                     </p>
-                    {notification.message && (
+                    {message && (
                       <p className="text-xs text-muted-foreground leading-snug">
-                        {notification.message}
+                        {message}
                       </p>
                     )}
                     <p className="text-xs text-muted-foreground mt-1">
@@ -257,14 +302,14 @@ export function Notifications() {
                         try {
                           const date = new Date(notification.createdAt);
                           if (isNaN(date.getTime())) {
-                            return "Vor einiger Zeit";
+                            return t("common.notificationsCenter.timeAgoFallback");
                           }
                           return formatDistanceToNow(date, {
                             addSuffix: true,
-                            locale: de,
+                            locale,
                           });
                         } catch {
-                          return "Vor einiger Zeit";
+                          return t("common.notificationsCenter.timeAgoFallback");
                         }
                       })()}
                     </p>

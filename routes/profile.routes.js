@@ -24,6 +24,7 @@ export const createProfileRouter = (pool) => {
         nickname,
         displayPreference,
         languagePreference,
+        themePreference,
         preferences,
         avatar,
         showInGlobalRankings,
@@ -35,35 +36,130 @@ export const createProfileRouter = (pool) => {
           .json({ error: "Vorname und Nachname sind erforderlich." });
       }
 
+      const normalizedNickname =
+        nickname && String(nickname).trim().length > 0
+          ? String(nickname).trim()
+          : null;
+      if (normalizedNickname && /\s/.test(normalizedNickname)) {
+        return res.status(400).json({
+          error: "Spitzname darf keine Leerzeichen enthalten.",
+        });
+      }
+      if (normalizedNickname && !/^[A-Za-z0-9_]+$/.test(normalizedNickname)) {
+        return res.status(400).json({
+          error:
+            "Spitzname darf nur Buchstaben, Zahlen und Unterstriche enthalten.",
+        });
+      }
+
+      const allowedDisplayPreferences = new Set([
+        "firstName",
+        "fullName",
+        "nickname",
+      ]);
+      const normalizedDisplayPreference = allowedDisplayPreferences.has(
+        displayPreference,
+      )
+        ? displayPreference
+        : "firstName";
+
+      if (normalizedDisplayPreference === "nickname" && !normalizedNickname) {
+        normalizedDisplayPreference = "firstName";
+      }
+
+      if (normalizedNickname) {
+        const { rows: duplicateNicknameRows } = await pool.query(
+          `SELECT id
+           FROM users
+           WHERE id <> $1
+             AND nickname IS NOT NULL
+             AND LOWER(nickname) = LOWER($2)
+           LIMIT 1`,
+          [req.user.id, normalizedNickname],
+        );
+        if (duplicateNicknameRows.length > 0) {
+          return res.status(409).json({
+            error: "Dieser Spitzname ist bereits vergeben.",
+          });
+        }
+      }
+
+      const rawLanguageProvided = Object.prototype.hasOwnProperty.call(
+        req.body,
+        "languagePreference",
+      );
+      const themeProvided = Object.prototype.hasOwnProperty.call(
+        req.body,
+        "themePreference",
+      );
+      const normalizedThemePreference =
+        themePreference === "light" ||
+        themePreference === "dark" ||
+        themePreference === "system"
+          ? themePreference
+          : null;
+      const preferencesProvided = Object.prototype.hasOwnProperty.call(
+        req.body,
+        "preferences",
+      );
+      const avatarProvided = Object.prototype.hasOwnProperty.call(
+        req.body,
+        "avatar",
+      );
+
+      const normalizedLanguagePreference =
+        languagePreference === "en" || languagePreference === "de"
+          ? languagePreference
+          : null;
+      const languageProvided =
+        rawLanguageProvided && normalizedLanguagePreference !== null;
+
+      const normalizedPreferences = preferencesProvided
+        ? JSON.stringify(preferences ?? {})
+        : null;
+
+      const normalizedAvatar = avatarProvided
+        ? avatar
+          ? typeof avatar === "string"
+            ? avatar.trim() || null
+            : JSON.stringify(avatar)
+          : null
+        : null;
+
       const updateQuery = `
                 UPDATE users
                 SET first_name = $1,
                     last_name = $2,
                     nickname = $3,
-                    display_preference = $4, 
-                    language_preference = $5,
-                    preferences = $6,
-                    avatar_url = $7,
-                    show_in_global_rankings = COALESCE($8, show_in_global_rankings),
+                    display_preference = $4,
+                    language_preference = CASE WHEN $5 THEN $6 ELSE language_preference END,
+                    theme_preference = CASE WHEN $7 THEN $8 ELSE theme_preference END,
+                    preferences = CASE WHEN $9 THEN $10 ELSE preferences END,
+                    avatar_url = CASE WHEN $11 THEN $12 ELSE avatar_url END,
+                    show_in_global_rankings = COALESCE($13, show_in_global_rankings),
                     updated_at = CURRENT_TIMESTAMP
-                WHERE id = $9
+                WHERE id = $14
                 RETURNING id, email, first_name, last_name, nickname, display_preference, avatar_url,
-                         is_email_verified, has_2fa, language_preference, preferences, 
+                         is_email_verified, has_2fa, language_preference, theme_preference, preferences,
                          show_in_global_rankings, created_at, last_login_at, role
             `;
 
+      const themeUpdateProvided = Boolean(
+        themeProvided && normalizedThemePreference,
+      );
       const { rows } = await pool.query(updateQuery, [
         firstName.trim(),
         lastName.trim(),
-        nickname ? nickname.trim() : null,
-        displayPreference || "firstName",
-        languagePreference || "de",
-        preferences ? JSON.stringify(preferences) : "{}",
-        avatar
-          ? typeof avatar === "string"
-            ? avatar
-            : JSON.stringify(avatar)
-          : null,
+        normalizedNickname,
+        normalizedDisplayPreference,
+        languageProvided,
+        normalizedLanguagePreference,
+        themeUpdateProvided,
+        normalizedThemePreference,
+        preferencesProvided,
+        normalizedPreferences,
+        avatarProvided,
+        normalizedAvatar,
         showInGlobalRankings !== undefined ? showInGlobalRankings : null,
         req.user.id,
       ]);
@@ -93,6 +189,23 @@ export const createProfileRouter = (pool) => {
       res.json(user);
     } catch (error) {
       console.error("Update profile error:", error);
+
+      if (error?.code === "23514" && error?.constraint === "nickname_format") {
+        return res.status(400).json({
+          error:
+            "Spitzname darf nur Buchstaben, Zahlen und Unterstriche enthalten.",
+        });
+      }
+      if (
+        error?.code === "23505" &&
+        typeof error?.constraint === "string" &&
+        error.constraint.includes("nickname")
+      ) {
+        return res.status(409).json({
+          error: "Dieser Spitzname ist bereits vergeben.",
+        });
+      }
+
       res
         .status(500)
         .json({ error: "Serverfehler beim Aktualisieren des Profils." });
@@ -126,7 +239,7 @@ export const createProfileRouter = (pool) => {
 
       const isMatch = await bcrypt.compare(
         currentPassword,
-        rows[0].password_hash
+        rows[0].password_hash,
       );
       if (!isMatch) {
         return res
@@ -137,7 +250,7 @@ export const createProfileRouter = (pool) => {
       // Check if new password is different from current password
       const isSamePassword = await bcrypt.compare(
         newPassword,
-        rows[0].password_hash
+        rows[0].password_hash,
       );
       if (isSamePassword) {
         return res.status(400).json({
@@ -153,7 +266,7 @@ export const createProfileRouter = (pool) => {
       // Update password
       await pool.query(
         "UPDATE users SET password_hash = $1, password_changed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
-        [password_hash, req.user.id]
+        [password_hash, req.user.id],
       );
 
       res.json({ message: "Passwort wurde erfolgreich geändert." });
@@ -180,7 +293,7 @@ export const createProfileRouter = (pool) => {
       }
 
       const { rows: friendColumns } = await pool.query(
-        `SELECT column_name FROM information_schema.columns WHERE table_name = 'friendships'`
+        `SELECT column_name FROM information_schema.columns WHERE table_name = 'friendships'`,
       );
       const columnNames = friendColumns.map((row) => row.column_name);
 
@@ -211,7 +324,7 @@ export const createProfileRouter = (pool) => {
       const { rows: friendRows } = await pool.query(
         `SELECT id, first_name, last_name, nickname, display_preference, avatar_url, created_at
                  FROM users WHERE id = $1`,
-        [friendId]
+        [friendId],
       );
 
       if (friendRows.length === 0) {
@@ -232,7 +345,7 @@ export const createProfileRouter = (pool) => {
                  JOIN badges b ON b.id = ub.badge_id
                  WHERE ub.user_id = $1
                  ORDER BY ub.earned_at DESC`,
-        [friendId]
+        [friendId],
       );
 
       const badges = badgeRows.map((row) => {
@@ -246,7 +359,7 @@ export const createProfileRouter = (pool) => {
                  FROM awards
                  WHERE user_id = $1
                  ORDER BY created_at DESC`,
-        [friendId]
+        [friendId],
       );
 
       const awards = awardRows.map((row) => {
@@ -291,7 +404,7 @@ export const createProfileRouter = (pool) => {
         GROUP BY w.id, w.title, w.start_time, w.notes
         ORDER BY w.start_time DESC
         LIMIT 10`,
-        [friendId]
+        [friendId],
       );
 
       const recentWorkouts = workoutRows.map((row) => ({
@@ -334,7 +447,7 @@ export const createProfileRouter = (pool) => {
                  JOIN badges b ON b.id = ub.badge_id
                  WHERE ub.user_id = $1
                  ORDER BY ub.earned_at DESC`,
-        [userId]
+        [userId],
       );
 
       const badges = badgeRows.map((row) => {
@@ -349,7 +462,7 @@ export const createProfileRouter = (pool) => {
                  FROM awards
                  WHERE user_id = $1
                  ORDER BY created_at DESC`,
-        [userId]
+        [userId],
       );
 
       const awards = awardRows.map((row) => {
@@ -375,7 +488,7 @@ export const createProfileRouter = (pool) => {
       // Load badge progress
       const { rows: progressRows } = await pool.query(
         `SELECT badge_slug, counter, updated_at FROM user_badge_progress WHERE user_id = $1`,
-        [userId]
+        [userId],
       );
 
       const progress = progressRows.reduce((acc, row) => {
@@ -445,7 +558,7 @@ export const createProfileRouter = (pool) => {
       // Prüfe ob Benutzer bereits existiert
       const { rows: existingUsers } = await pool.query(
         "SELECT id, first_name, last_name, nickname, display_preference FROM users WHERE email = $1",
-        [email]
+        [email],
       );
 
       if (existingUsers.length > 0) {
@@ -463,7 +576,7 @@ export const createProfileRouter = (pool) => {
         const [firstUser, secondUser] = [req.user.id, targetUserId].sort();
         const { rowCount: existingFriends } = await pool.query(
           "SELECT 1 FROM friendships WHERE user_one_id = $1 AND user_two_id = $2",
-          [firstUser, secondUser]
+          [firstUser, secondUser],
         );
 
         if (existingFriends > 0) {
@@ -477,7 +590,7 @@ export const createProfileRouter = (pool) => {
           `SELECT 1 FROM friend_requests
                      WHERE ((requester_id = $1 AND target_id = $2) OR (requester_id = $2 AND target_id = $1))
                      AND status = 'pending'`,
-          [req.user.id, targetUserId]
+          [req.user.id, targetUserId],
         );
 
         if (pendingRequests > 0) {
@@ -515,7 +628,7 @@ export const createProfileRouter = (pool) => {
       const frontendUrl = getFrontendUrl(req);
       const inviteLink = `${frontendUrl}/invite/${req.user.id}`;
       const expiresDate = new Date(invitation.expires_at).toLocaleDateString(
-        "de-DE"
+        "de-DE",
       );
 
       // Plain-Text-Version für Fallback
@@ -556,7 +669,7 @@ Die Einladung läuft am ${expiresDate} ab.`;
       } catch (emailError) {
         console.error(
           `❌ Fehler beim Versenden der Einladungs-E-Mail an ${email}:`,
-          emailError
+          emailError,
         );
         console.error("   Fehler-Details:", {
           message: emailError.message,
@@ -566,7 +679,7 @@ Die Einladung läuft am ${expiresDate} ab.`;
         // Einladung wurde erstellt, aber E-Mail konnte nicht versendet werden
         // Wir werfen den Fehler weiter, damit der User informiert wird
         throw new Error(
-          `Einladung wurde erstellt, aber E-Mail konnte nicht versendet werden: ${emailError.message}`
+          `Einladung wurde erstellt, aber E-Mail konnte nicht versendet werden: ${emailError.message}`,
         );
       }
 
@@ -613,7 +726,7 @@ Die Einladung läuft am ${expiresDate} ab.`;
 
       const now = new Date();
       const fourteenDaysAgo = new Date(
-        now.getTime() - 14 * 24 * 60 * 60 * 1000
+        now.getTime() - 14 * 24 * 60 * 60 * 1000,
       );
 
       // Auto-Bereinigung: Lösche Einladungen, die mehr als 14 Tage nach Ablauf sind
@@ -622,7 +735,7 @@ Die Einladung läuft am ${expiresDate} ab.`;
          WHERE invited_by = $1 
          AND expires_at < $2 
          AND status != 'accepted'`,
-        [req.user.id, fourteenDaysAgo]
+        [req.user.id, fourteenDaysAgo],
       );
 
       // Prüfe auf abgelaufene Einladungen und erstelle Notifications
@@ -633,13 +746,12 @@ Die Einladung läuft am ${expiresDate} ab.`;
          AND status = 'pending'
          AND expires_at < $2
          AND expires_at >= $3`,
-        [req.user.id, now, fourteenDaysAgo]
+        [req.user.id, now, fourteenDaysAgo],
       );
 
       // Erstelle Notifications für abgelaufene Einladungen (nur einmal pro Einladung)
-      const { createNotification } = await import(
-        "../services/notificationService.js"
-      );
+      const { createNotification } =
+        await import("../services/notificationService.js");
       for (const expiredInvitation of expiredRows) {
         // Prüfe ob bereits eine Notification für diese abgelaufene Einladung existiert
         const { rows: existingNotifications } = await pool.query(
@@ -647,7 +759,7 @@ Die Einladung läuft am ${expiresDate} ab.`;
            WHERE user_id = $1 
            AND type = 'invitation-expired' 
            AND payload->>'invitationId' = $2`,
-          [req.user.id, expiredInvitation.id]
+          [req.user.id, expiredInvitation.id],
         );
 
         if (existingNotifications.length === 0) {
@@ -671,7 +783,7 @@ Die Einladung läuft am ${expiresDate} ab.`;
           } catch (notifError) {
             console.error(
               "Error creating expiration notification:",
-              notifError
+              notifError,
             );
             // Nicht kritisch, weiter machen
           }
@@ -683,7 +795,7 @@ Die Einladung läuft am ${expiresDate} ab.`;
                  FROM invitations
                  WHERE invited_by = $1
                  ORDER BY created_at DESC`,
-        [req.user.id]
+        [req.user.id],
       );
 
       const invitations = rows.map((row) => {
@@ -732,7 +844,7 @@ Die Einladung läuft am ${expiresDate} ab.`;
         `SELECT id, email, first_name, last_name, expires_at, status, used
          FROM invitations
          WHERE id = $1 AND invited_by = $2`,
-        [id, req.user.id]
+        [id, req.user.id],
       );
 
       if (rows.length === 0) {
@@ -760,9 +872,8 @@ Die Einladung läuft am ${expiresDate} ab.`;
       await pool.query("DELETE FROM invitations WHERE id = $1", [id]);
 
       // Erstelle neue Einladung
-      const { createInvitation } = await import(
-        "../services/invitationService.js"
-      );
+      const { createInvitation } =
+        await import("../services/invitationService.js");
       const { invitation: newInvitation, token } = await createInvitation(
         pool,
         {
@@ -770,14 +881,14 @@ Die Einladung läuft am ${expiresDate} ab.`;
           firstName: invitation.first_name || "",
           lastName: invitation.last_name || "",
           invitedBy: req.user.id,
-        }
+        },
       );
 
       // Sende E-Mail
       const frontendUrl = getFrontendUrl(req);
       const inviteLink = `${frontendUrl}/invite/${req.user.id}`;
       const expiresDate = new Date(newInvitation.expires_at).toLocaleDateString(
-        "de-DE"
+        "de-DE",
       );
 
       const emailBody = `Hallo!
@@ -834,7 +945,7 @@ Die Einladung läuft am ${expiresDate} ab.`;
       // Prüfe ob Einladung existiert und dem User gehört
       const { rows } = await pool.query(
         `SELECT id FROM invitations WHERE id = $1 AND invited_by = $2`,
-        [id, req.user.id]
+        [id, req.user.id],
       );
 
       if (rows.length === 0) {

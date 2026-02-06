@@ -9,10 +9,30 @@ import { DeleteAccountPasswordDialog } from "@/components/settings/DeleteAccount
 import { InviteFriendForm } from "@/components/settings/InviteFriendForm";
 import { PushNotificationSettings } from "@/components/settings/PushNotificationSettings";
 import { WeeklyGoals, WeeklyGoalsForm } from "@/components/settings/WeeklyGoalsForm";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -28,11 +48,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DEFAULT_WEEKLY_POINTS_GOAL } from "@/config/events";
 import { Invitation } from "@/contexts/AuthContext";
 import { useAuth } from "@/hooks/use-auth";
+import { useDateTimeFormatter } from "@/hooks/use-date-time-formatter";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
 import { getUserInitials, parseAvatarConfig } from "@/lib/avatar";
+import { getBadgeText } from "@/lib/badges";
+import type { Exercise } from "@/types/exercise";
+import { convertWeightFromKg, convertWeightToKg } from "@/utils/units";
 import { format } from "date-fns";
-import { de } from "date-fns/locale";
+import { de, enUS } from "date-fns/locale";
 import {
   Award,
   Camera,
@@ -42,14 +66,17 @@ import {
   Lock,
   Mail,
   Medal,
+  Minus,
+  Plus,
   RefreshCw,
+  Scale,
   Share2,
   Shield,
   Trash2,
   Trophy,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import NiceAvatar, { NiceAvatarProps } from "react-nice-avatar";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -89,7 +116,8 @@ interface AchievementsData {
 }
 
 export function Profile() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { formatDate, formatDateTime } = useDateTimeFormatter();
   const { theme, setTheme } = useTheme();
   const {
     user,
@@ -106,6 +134,7 @@ export function Profile() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const dateLocale = i18n.language === "en" ? enUS : de;
 
   // Get initial tab from URL query parameter
   const getInitialTab = () => {
@@ -162,7 +191,7 @@ export function Profile() {
     timeFormat: "12h" | "24h";
     units: {
       distance: "km" | "m" | "miles" | "yards";
-      weight: "kg" | "lbs" | "stone";
+      weight: "kg" | "lbs";
       temperature: "celsius" | "fahrenheit";
     };
     notifications: {
@@ -177,6 +206,10 @@ export function Profile() {
       showNames: boolean;
     };
     theme: "light" | "dark" | "system";
+    metrics: {
+      bodyWeightKg: number | null;
+      activityLevel: "low" | "medium" | "high";
+    };
   }>({
     languagePreference: user?.languagePreference || "de",
     timeFormat: user?.preferences?.timeFormat || "24h",
@@ -197,10 +230,20 @@ export function Profile() {
       showNames: user?.preferences?.reactions?.showNames ?? true,
     },
     theme:
+      user?.preferences?.theme ||
       (theme && (theme === "light" || theme === "dark" || theme === "system")
         ? theme
-        : "system") || "system",
+        : "system") ||
+      "system",
+    metrics: {
+      bodyWeightKg: user?.preferences?.metrics?.bodyWeightKg ?? null,
+      activityLevel: user?.preferences?.metrics?.activityLevel ?? "medium",
+    },
   });
+  const [unitSystemPromptOpen, setUnitSystemPromptOpen] = useState(false);
+  const [pendingUnitSystem, setPendingUnitSystem] = useState<
+    "metric" | "imperial" | null
+  >(null);
 
   // Password change state
   const [passwordForm, setPasswordForm] = useState({
@@ -230,16 +273,16 @@ export function Profile() {
     useState(false);
   const [recoveryCodesDialogOpen, setRecoveryCodesDialogOpen] = useState(false);
   const [newRecoveryCodes, setNewRecoveryCodes] = useState<string[]>([]);
-  const defaultGoals: WeeklyGoals = {
-    pullups: { target: 100, current: 0 },
-    pushups: { target: 400, current: 0 },
-    situps: { target: 200, current: 0 },
-    running: { target: 25, current: 0 },
-    cycling: { target: 100, current: 0 },
-    points: { target: DEFAULT_WEEKLY_POINTS_GOAL, current: 0 },
-  };
+  const defaultGoals: WeeklyGoals = useMemo(
+    () => ({
+      points: { target: DEFAULT_WEEKLY_POINTS_GOAL, current: 0 },
+      exercises: [],
+    }),
+    []
+  );
   const [goals, setGoals] = useState<WeeklyGoals>(defaultGoals);
   const [goalsForm, setGoalsForm] = useState<WeeklyGoals>(defaultGoals);
+  const [goalExercises, setGoalExercises] = useState<Exercise[]>([]);
   const [loadingGoals, setLoadingGoals] = useState(false);
   const [savingGoals, setSavingGoals] = useState(false);
   const [achievements, setAchievements] = useState<AchievementsData>({
@@ -282,16 +325,22 @@ export function Profile() {
     }
   }, []);
 
-  // Load data on mount
-  useEffect(() => {
-    if (user) {
-      loadInvitations();
-      loadGoals();
-      loadAchievements();
+  const loadGoalExercises = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      const response = await fetch(`${API_URL}/exercises?limit=500`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      setGoalExercises(Array.isArray(data.exercises) ? data.exercises : []);
+    } catch (error) {
+      console.error("Error loading exercises:", error);
     }
-  }, [user, loadInvitations, loadAchievements]);
+  }, []);
 
-  const loadGoals = async () => {
+  const loadGoals = useCallback(async () => {
     try {
       setLoadingGoals(true);
       const token = localStorage.getItem("token");
@@ -304,30 +353,11 @@ export function Profile() {
       if (response.ok) {
         const data = await response.json();
         const mergedGoals: WeeklyGoals = {
-          pullups: {
-            target: data.pullups?.target ?? defaultGoals.pullups.target,
-            current: data.pullups?.current ?? defaultGoals.pullups.current,
-          },
-          pushups: {
-            target: data.pushups?.target ?? defaultGoals.pushups.target,
-            current: data.pushups?.current ?? defaultGoals.pushups.current,
-          },
-          running: {
-            target: data.running?.target ?? defaultGoals.running.target,
-            current: data.running?.current ?? defaultGoals.running.current,
-          },
-          cycling: {
-            target: data.cycling?.target ?? defaultGoals.cycling.target,
-            current: data.cycling?.current ?? defaultGoals.cycling.current,
-          },
-          situps: {
-            target: data.situps?.target ?? defaultGoals.situps.target,
-            current: data.situps?.current ?? defaultGoals.situps.current,
-          },
           points: {
             target: data.points?.target ?? defaultGoals.points.target,
             current: data.points?.current ?? defaultGoals.points.current,
           },
+          exercises: Array.isArray(data.exercises) ? data.exercises : [],
         };
         setGoals(mergedGoals);
         setGoalsForm(mergedGoals);
@@ -337,78 +367,74 @@ export function Profile() {
     } finally {
       setLoadingGoals(false);
     }
-  };
+  }, [defaultGoals]);
+
+  // Load data on mount
+  useEffect(() => {
+    if (user) {
+      loadInvitations();
+      loadGoals();
+      loadGoalExercises();
+      loadAchievements();
+    }
+  }, [user, loadInvitations, loadGoals, loadGoalExercises, loadAchievements]);
 
   const handleSaveGoals = async (newGoals: WeeklyGoals) => {
     try {
       const token = localStorage.getItem("token");
       if (!token) {
-        throw new Error(t("errors.notAuthenticated", "Nicht authentifiziert"));
+        throw new Error(t("errors.notAuthenticated"));
       }
 
+      const payload = {
+        points: {
+          target: Number(newGoals.points?.target ?? 0),
+          current: newGoals.points?.current ?? 0,
+        },
+        exercises: newGoals.exercises,
+      };
       const response = await fetch(`${API_URL}/goals`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(newGoals),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
         const errorData = await response
           .json()
-          .catch(() => ({ error: "Fehler beim Speichern" }));
+          .catch(() => ({ error: t("weeklyGoals.saveError") }));
         throw new Error(
-          errorData.error ||
-          t("goals.saveError", "Fehler beim Speichern der Ziele")
+          errorData.error || t("weeklyGoals.saveError")
         );
       }
 
       const updatedGoals = (await response.json()) || {};
       const mergedGoals: WeeklyGoals = {
-        pullups: {
-          target: updatedGoals.pullups?.target ?? newGoals.pullups?.target ?? defaultGoals.pullups.target,
-          current: updatedGoals.pullups?.current ?? newGoals.pullups?.current ?? goals.pullups?.current ?? 0,
-        },
-        pushups: {
-          target: updatedGoals.pushups?.target ?? newGoals.pushups?.target ?? defaultGoals.pushups.target,
-          current: updatedGoals.pushups?.current ?? newGoals.pushups?.current ?? goals.pushups?.current ?? 0,
-        },
-        situps: {
-          target: updatedGoals.situps?.target ?? newGoals.situps?.target ?? defaultGoals.situps.target,
-          current: updatedGoals.situps?.current ?? newGoals.situps?.current ?? goals.situps?.current ?? 0,
-        },
-        running: {
-          target: updatedGoals.running?.target ?? newGoals.running?.target ?? defaultGoals.running.target,
-          current: updatedGoals.running?.current ?? newGoals.running?.current ?? goals.running?.current ?? 0,
-        },
-        cycling: {
-          target: updatedGoals.cycling?.target ?? newGoals.cycling?.target ?? defaultGoals.cycling.target,
-          current: updatedGoals.cycling?.current ?? newGoals.cycling?.current ?? goals.cycling?.current ?? 0,
-        },
         points: {
           target: updatedGoals.points?.target ?? newGoals.points?.target ?? defaultGoals.points.target,
           current: updatedGoals.points?.current ?? newGoals.points?.current ?? goals.points?.current ?? 0,
         },
+        exercises: Array.isArray(updatedGoals.exercises)
+          ? updatedGoals.exercises
+          : newGoals.exercises,
       };
 
       setGoals(mergedGoals);
       setGoalsForm(mergedGoals);
       toast({
-        title: t("goals.saved", "Wochenziele gespeichert"),
-        description: t(
-          "goals.savedDescription",
-          "Deine Wochenziele wurden erfolgreich aktualisiert."
-        ),
+        title: t("weeklyGoals.saved"),
+        description: t("weeklyGoals.savedDescription"),
       });
     } catch (error) {
       toast({
-        title: t("common.error", "Fehler"),
+        title: t("common.error"),
         description:
           error instanceof Error
             ? error.message
-            : t("goals.saveError", "Fehler beim Speichern der Wochenziele"),
+            : t("weeklyGoals.saveError"),
         variant: "destructive",
       });
       throw error;
@@ -429,6 +455,9 @@ export function Profile() {
     user?.showInGlobalRankings ?? true
   );
   const [showWarningDialog, setShowWarningDialog] = useState(false);
+  const [bodyWeightDrawerOpen, setBodyWeightDrawerOpen] = useState(false);
+  const [bodyWeightDraft, setBodyWeightDraft] = useState<number | null>(null);
+  const [bodyWeightInputDraft, setBodyWeightInputDraft] = useState("");
 
   // Update form when user changes
   useEffect(() => {
@@ -442,6 +471,54 @@ export function Profile() {
       setShowInGlobalRankings(user.showInGlobalRankings ?? true);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const syncedTheme =
+      user.themePreference ??
+      (theme && (theme === "light" || theme === "dark" || theme === "system")
+        ? theme
+        : user.preferences?.theme) ??
+      "system";
+    const syncedLanguage = i18n.language === "en" ? "en" : "de";
+    setPreferencesForm((prev) => ({
+      ...prev,
+      languagePreference: syncedLanguage,
+      timeFormat: user.preferences?.timeFormat || "24h",
+      units: {
+        distance: user.preferences?.units?.distance || "km",
+        weight: user.preferences?.units?.weight || "kg",
+        temperature: user.preferences?.units?.temperature || "celsius",
+      },
+      notifications: {
+        push: user.preferences?.notifications?.push ?? true,
+        email: user.preferences?.notifications?.email ?? true,
+      },
+      privacy: {
+        publicProfile: user.preferences?.privacy?.publicProfile ?? true,
+      },
+      reactions: {
+        friendsCanSee: user.preferences?.reactions?.friendsCanSee ?? true,
+        showNames: user.preferences?.reactions?.showNames ?? true,
+      },
+      theme: syncedTheme as "light" | "dark" | "system",
+      metrics: {
+        bodyWeightKg: user.preferences?.metrics?.bodyWeightKg ?? null,
+        activityLevel: user.preferences?.metrics?.activityLevel ?? "medium",
+      },
+    }));
+  }, [i18n.language, theme, user]);
+
+  const formatBodyWeightDisplay = useCallback(
+    (kg: number | null, unit: string) => {
+      if (kg == null) return "";
+      const display = convertWeightFromKg(kg, unit);
+      const str =
+        display % 1 === 0 ? String(display) : display.toFixed(1);
+      return i18n.language === "de" ? str.replace(".", ",") : str;
+    },
+    [i18n.language]
+  );
 
   const handleGlobalRankingToggle = (checked: boolean) => {
     if (!checked) {
@@ -465,21 +542,20 @@ export function Profile() {
         true
       );
       toast({
-        title: t("settings.saved", "Gespeichert"),
+        title: t("settings.saved"),
         description: t(
           "settings.settingSaved",
-          "{{setting}} wurde aktualisiert.",
-          { setting: "Sichtbarkeit in globaler Rangliste" }
+          { setting: t("profile.globalRankingSetting") }
         ),
       });
     } catch (error) {
       setShowInGlobalRankings(!checked); // Revert on error
       toast({
-        title: t("common.error", "Fehler"),
+        title: t("common.error"),
         description:
           error instanceof Error
             ? error.message
-            : t("settings.saveError", "Fehler beim Speichern"),
+            : t("settings.saveError"),
         variant: "destructive",
       });
     }
@@ -498,16 +574,16 @@ export function Profile() {
         showInGlobalRankings,
       });
       toast({
-        title: "Avatar gespeichert",
-        description: "Dein Avatar wurde erfolgreich aktualisiert.",
+        title: t("profile.avatarSaved"),
+        description: t("profile.avatarSavedDesc"),
       });
     } catch (error) {
       toast({
-        title: "Fehler",
+        title: t("common.error"),
         description:
           error instanceof Error
             ? error.message
-            : "Fehler beim Speichern des Avatars",
+            : t("profile.avatarError"),
         variant: "destructive",
       });
     }
@@ -525,16 +601,16 @@ export function Profile() {
         showInGlobalRankings,
       });
       toast({
-        title: "Avatar entfernt",
-        description: "Dein Profilbild wurde erfolgreich entfernt.",
+        title: t("profile.avatarRemoved"),
+        description: t("profile.avatarRemovedDesc"),
       });
     } catch (error) {
       toast({
-        title: "Fehler",
+        title: t("common.error"),
         description:
           error instanceof Error
             ? error.message
-            : "Fehler beim Entfernen des Avatars",
+            : t("profile.avatarRemoveError"),
         variant: "destructive",
       });
     }
@@ -549,11 +625,11 @@ export function Profile() {
     const errors: { firstName?: string; lastName?: string } = {};
 
     if (!profileForm.firstName || profileForm.firstName.trim() === "") {
-      errors.firstName = "Vorname ist ein Pflichtfeld.";
+      errors.firstName = t("profile.firstNameRequired");
     }
 
     if (!profileForm.lastName || profileForm.lastName.trim() === "") {
-      errors.lastName = "Nachname ist ein Pflichtfeld.";
+      errors.lastName = t("profile.lastNameRequired");
     }
 
     setValidationErrors(errors);
@@ -561,70 +637,99 @@ export function Profile() {
   };
 
   // Auto-Save für einzelne Profilfelder
-  const saveProfileField = async (fieldName: string) => {
+  const saveProfileField = async (
+    fieldName: string,
+    profileOverride?: typeof profileForm
+  ) => {
+    const currentProfileForm = profileOverride ?? profileForm;
+
     // Validierung
-    if (fieldName === "firstName" && !profileForm.firstName?.trim()) {
+    if (fieldName === "firstName" && !currentProfileForm.firstName?.trim()) {
       setValidationErrors((prev) => ({
         ...prev,
-        firstName: "Vorname ist ein Pflichtfeld.",
+        firstName: t("profile.firstNameRequired"),
       }));
       return;
     }
-    if (fieldName === "lastName" && !profileForm.lastName?.trim()) {
+    if (fieldName === "lastName" && !currentProfileForm.lastName?.trim()) {
       setValidationErrors((prev) => ({
         ...prev,
-        lastName: "Nachname ist ein Pflichtfeld.",
+        lastName: t("profile.lastNameRequired"),
       }));
       return;
     }
 
-    // Check if displayPreference is 'nickname' but no nickname is provided
+    if (currentProfileForm.nickname?.trim() && /\s/.test(currentProfileForm.nickname.trim())) {
+      toast({
+        title: t("common.error"),
+        description: t(
+          "profile.nicknameNoSpaces",
+          "Ein Spitzname darf keine Leerzeichen enthalten."
+        ),
+        variant: "destructive",
+      });
+      return;
+    }
     if (
-      profileForm.displayPreference === "nickname" &&
-      (!profileForm.nickname || profileForm.nickname.trim() === "")
+      currentProfileForm.nickname?.trim() &&
+      !/^[A-Za-z0-9_]+$/.test(currentProfileForm.nickname.trim())
     ) {
       toast({
-        title: t("common.error", "Fehler"),
-        description:
-          "Wenn 'Spitzname' als Anzeigename gewählt ist, muss ein Spitzname angegeben werden.",
+        title: t("common.error"),
+        description: t(
+          "profile.nicknameInvalidFormat",
+          "Ein Spitzname darf nur Buchstaben, Zahlen und Unterstriche enthalten."
+        ),
         variant: "destructive",
       });
       return;
     }
 
+    const effectiveForm =
+      currentProfileForm.displayPreference === "nickname" &&
+        (!currentProfileForm.nickname || currentProfileForm.nickname.trim() === "")
+        ? { ...currentProfileForm, displayPreference: "firstName" as const }
+        : currentProfileForm;
+    const displayWasReset =
+      currentProfileForm.displayPreference === "nickname" && effectiveForm.displayPreference === "firstName";
+
     try {
       await updateProfile(
         {
-          ...profileForm,
+          ...effectiveForm,
           avatar: user?.avatar || undefined,
           showInGlobalRankings,
         },
         true // silent mode - kein globaler Loading-State
       );
       setValidationErrors({});
+      if (displayWasReset) {
+        setProfileForm((prev) => ({ ...prev, displayPreference: "firstName" }));
+      }
 
       const fieldLabels: Record<string, string> = {
-        firstName: "Vorname",
-        lastName: "Nachname",
-        nickname: "Spitzname",
-        displayPreference: "Anzeigename",
+        firstName: t("profile.firstName"),
+        lastName: t("profile.lastName"),
+        nickname: t("profile.nicknameLabel"),
+        displayPreference: t("profile.displayNameLabel"),
       };
 
       toast({
-        title: t("settings.saved", "Gespeichert"),
-        description: t(
-          "settings.settingSaved",
-          "{{setting}} wurde aktualisiert.",
-          { setting: fieldLabels[fieldName] || fieldName }
-        ),
+        title: t("settings.saved"),
+        description: displayWasReset
+          ? t("profile.nicknameRemovedDisplayReset")
+          : t(
+            "settings.settingSaved",
+            { setting: fieldLabels[fieldName] || fieldName }
+          ),
       });
     } catch (error) {
       toast({
-        title: t("common.error", "Fehler"),
+        title: t("common.error"),
         description:
           error instanceof Error
             ? error.message
-            : "Fehler beim Speichern des Profils",
+            : t("profile.profileSaveError"),
         variant: "destructive",
       });
     }
@@ -633,10 +738,13 @@ export function Profile() {
   // Auto-Save Funktion für einzelne Einstellungen
   const savePreference = async (
     updates: Partial<typeof preferencesForm>,
-    settingName: string
+    settingName: string,
+    overrides?: { showInGlobalRankings?: boolean }
   ) => {
     const newPreferences = { ...preferencesForm, ...updates };
     setPreferencesForm(newPreferences);
+    const nextShowInGlobalRankings =
+      overrides?.showInGlobalRankings ?? showInGlobalRankings;
 
     try {
       await updateProfile(
@@ -646,31 +754,108 @@ export function Profile() {
           nickname: user?.nickname || "",
           displayPreference: user?.displayPreference || "firstName",
           languagePreference: newPreferences.languagePreference as "de" | "en",
+          ...(updates.theme != null && {
+            themePreference: updates.theme as "light" | "dark" | "system",
+          }),
           preferences: newPreferences,
           avatar: user?.avatar || undefined,
-          showInGlobalRankings,
+          showInGlobalRankings: nextShowInGlobalRankings,
         },
         true // silent mode - kein globaler Loading-State
       );
       toast({
-        title: t("settings.saved", "Gespeichert"),
+        title: t("settings.saved"),
         description: t(
           "settings.settingSaved",
-          "{{setting}} wurde aktualisiert.",
           { setting: settingName }
         ),
       });
     } catch (error) {
       toast({
-        title: t("common.error", "Fehler"),
+        title: t("common.error"),
         description:
           error instanceof Error
             ? error.message
-            : t("settings.saveError", "Fehler beim Speichern"),
+            : t("settings.saveError"),
         variant: "destructive",
       });
     }
   };
+
+  const handlePublicProfileToggle = (checked: boolean) => {
+    const nextPrivacy = {
+      ...preferencesForm.privacy,
+      publicProfile: checked,
+    };
+    if (!checked) {
+      setShowInGlobalRankings(false);
+      savePreference(
+        { privacy: nextPrivacy },
+        t("profile.publicProfileSetting"),
+        { showInGlobalRankings: false }
+      );
+      return;
+    }
+    savePreference(
+      { privacy: nextPrivacy },
+      t("profile.publicProfileSetting")
+    );
+  };
+
+  const getUnitSystemFromValue = (value: string) =>
+    value === "miles" || value === "lbs" || value === "fahrenheit"
+      ? "imperial"
+      : "metric";
+
+  const handleUnitChange = (
+    field: "distance" | "weight" | "temperature",
+    value: "km" | "miles" | "kg" | "lbs" | "celsius" | "fahrenheit"
+  ) => {
+    if (preferencesForm.units[field] === value) {
+      return;
+    }
+    const nextUnits = {
+      ...preferencesForm.units,
+      [field]: value,
+    };
+    savePreference(
+      { units: nextUnits },
+      t("profile.unitsPreferences", "Einheiten-Präferenzen")
+    );
+    setPendingUnitSystem(getUnitSystemFromValue(value));
+    setUnitSystemPromptOpen(true);
+  };
+
+  const applyUnitSystem = () => {
+    if (!pendingUnitSystem) return;
+    const nextUnits: {
+      distance: "km" | "m" | "miles" | "yards";
+      weight: "kg" | "lbs";
+      temperature: "celsius" | "fahrenheit";
+    } =
+      pendingUnitSystem === "imperial"
+        ? {
+          distance: "miles",
+          weight: "lbs",
+          temperature: "fahrenheit",
+        }
+        : {
+          distance: "km",
+          weight: "kg",
+          temperature: "celsius",
+        };
+    savePreference(
+      { units: nextUnits },
+      t("profile.unitSystem", "Einheitensystem")
+    );
+    setUnitSystemPromptOpen(false);
+    setPendingUnitSystem(null);
+  };
+
+  const pendingSystemLabel =
+    pendingUnitSystem === "imperial"
+      ? t("profile.unitSystemImperialShort", "Imperial")
+      : t("profile.unitSystemMetricShort", "Metrisch");
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -683,8 +868,8 @@ export function Profile() {
 
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       toast({
-        title: "Fehler",
-        description: "Die Passwörter stimmen nicht überein.",
+        title: t("common.error"),
+        description: t("profile.passwordMismatch"),
         variant: "destructive",
       });
       return;
@@ -692,8 +877,8 @@ export function Profile() {
 
     if (passwordForm.newPassword.length < 8) {
       toast({
-        title: "Fehler",
-        description: "Das Passwort muss mindestens 8 Zeichen lang sein.",
+        title: t("common.error"),
+        description: t("profile.passwordTooShort"),
         variant: "destructive",
       });
       return;
@@ -701,8 +886,8 @@ export function Profile() {
 
     if (!passwordForm.currentPassword) {
       toast({
-        title: "Fehler",
-        description: "Bitte gib dein aktuelles Passwort ein.",
+        title: t("common.error"),
+        description: t("profile.currentPasswordRequired"),
         variant: "destructive",
       });
       return;
@@ -710,8 +895,8 @@ export function Profile() {
 
     if (!passwordForm.newPassword) {
       toast({
-        title: "Fehler",
-        description: "Bitte gib ein neues Passwort ein.",
+        title: t("common.error"),
+        description: t("profile.newPasswordRequired"),
         variant: "destructive",
       });
       return;
@@ -723,8 +908,8 @@ export function Profile() {
         passwordForm.newPassword
       );
       toast({
-        title: "Passwort geändert",
-        description: "Dein Passwort wurde erfolgreich geändert.",
+        title: t("profile.passwordChanged"),
+        description: t("profile.passwordChangedDesc"),
       });
       // Reset form
       setPasswordForm({
@@ -737,11 +922,11 @@ export function Profile() {
       // But we can add additional logging if needed
       console.error("Password change error:", error);
       toast({
-        title: "Fehler",
+        title: t("common.error"),
         description:
           error instanceof Error
             ? error.message
-            : "Fehler beim Ändern des Passworts",
+            : t("profile.passwordChangeError"),
         variant: "destructive",
       });
     }
@@ -754,25 +939,23 @@ export function Profile() {
     } else {
       // Show password dialog for disabling 2FA
       setPasswordDialogConfig({
-        title: "2FA deaktivieren",
-        description:
-          "Bitte gib dein Passwort ein, um die Zwei-Faktor-Authentifizierung zu deaktivieren.",
-        confirmLabel: "2FA deaktivieren",
+        title: t("profile.disable2FATitle"),
+        description: t("profile.disable2FAPrompt"),
+        confirmLabel: t("auth.disable2FA"),
         onConfirm: async (password: string) => {
           try {
             await disable2FA(password);
             toast({
-              title: "2FA deaktiviert",
-              description:
-                "Zwei-Faktor-Authentifizierung wurde erfolgreich deaktiviert.",
+              title: t("profile.disable2FA"),
+              description: t("profile.disable2FADesc"),
             });
           } catch (error) {
             toast({
-              title: "Fehler",
+              title: t("common.error"),
               description:
                 error instanceof Error
                   ? error.message
-                  : "Fehler beim Deaktivieren der 2FA",
+                  : t("profile.disable2FAError"),
               variant: "destructive",
             });
             throw error;
@@ -812,24 +995,26 @@ export function Profile() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({
-          error: "Fehler beim erneuten Versenden",
+          error: t("profile.invitationResendError"),
         }));
-        throw new Error(errorData.error || "Fehler beim erneuten Versenden");
+        throw new Error(
+          errorData.error || t("profile.invitationResendError")
+        );
       }
 
       toast({
-        title: "Einladung erneut versendet",
-        description: "Die Einladung wurde erfolgreich erneut versendet.",
+        title: t("profile.invitationResent"),
+        description: t("profile.invitationResentDesc"),
       });
 
       await loadInvitations();
     } catch (error) {
       toast({
-        title: "Fehler",
+        title: t("common.error"),
         description:
           error instanceof Error
             ? error.message
-            : "Fehler beim erneuten Versenden der Einladung",
+            : t("profile.invitationResendErrorDesc"),
         variant: "destructive",
       });
     }
@@ -852,24 +1037,24 @@ export function Profile() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({
-          error: "Fehler beim Löschen",
+          error: t("profile.invitationDeleteError"),
         }));
-        throw new Error(errorData.error || "Fehler beim Löschen");
+        throw new Error(errorData.error || t("profile.invitationDeleteError"));
       }
 
       toast({
-        title: "Einladung gelöscht",
-        description: "Die Einladung wurde erfolgreich gelöscht.",
+        title: t("profile.invitationDeleted"),
+        description: t("profile.invitationDeletedDesc"),
       });
 
       await loadInvitations();
     } catch (error) {
       toast({
-        title: "Fehler",
+        title: t("common.error"),
         description:
           error instanceof Error
             ? error.message
-            : "Fehler beim Löschen der Einladung",
+            : t("profile.invitationDeleteErrorDesc"),
         variant: "destructive",
       });
     }
@@ -883,13 +1068,13 @@ export function Profile() {
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2000);
       toast({
-        title: "Link kopiert",
-        description: "Einladungslink wurde in die Zwischenablage kopiert.",
+        title: t("profile.linkCopied"),
+        description: t("profile.linkCopiedDesc"),
       });
     } catch (error) {
       toast({
-        title: "Fehler",
-        description: "Link konnte nicht kopiert werden.",
+        title: t("common.error"),
+        description: t("profile.linkCopyError"),
         variant: "destructive",
       });
     }
@@ -908,8 +1093,8 @@ export function Profile() {
     try {
       await deleteAccount(password);
       toast({
-        title: "Konto gelöscht",
-        description: "Dein Konto wurde erfolgreich gelöscht.",
+        title: t("profile.accountDeleted"),
+        description: t("profile.accountDeletedDesc"),
       });
       setDeleteAccountPasswordDialogOpen(false);
       // Redirect to login after successful account deletion
@@ -918,11 +1103,11 @@ export function Profile() {
       }, 1500);
     } catch (error) {
       toast({
-        title: "Fehler",
+        title: t("common.error"),
         description:
           error instanceof Error
             ? error.message
-            : "Fehler beim Löschen des Kontos",
+            : t("profile.deleteAccountError"),
         variant: "destructive",
       });
       throw error;
@@ -933,27 +1118,24 @@ export function Profile() {
     if (invitation.status === "accepted" || invitation.used) {
       return (
         <Badge variant="default" className="bg-green-500">
-          Eingeladen
+          {t("profile.invitationStatus.accepted")}
         </Badge>
       );
     }
     if (new Date(invitation.expiresAt) < new Date()) {
-      return <Badge variant="secondary">Abgelaufen</Badge>;
+      return <Badge variant="secondary">{t("profile.invitationStatus.expired")}</Badge>;
     }
-    return <Badge variant="outline">Ausstehend</Badge>;
+    return <Badge variant="outline">{t("profile.invitationStatus.pending")}</Badge>;
   };
 
   if (!user) {
-    return <div>Lädt...</div>;
+    return <div>{t("profile.loading")}</div>;
   }
 
   return (
     <PageTemplate
-      title={t("profile.title", "Profil")}
-      subtitle={t(
-        "profile.subtitle",
-        "Verwalte deine persönlichen Einstellungen und Ziele"
-      )}
+      title={t("profile.title")}
+      subtitle={t("profile.subtitle")}
       className="space-y-6"
     >
       <Tabs
@@ -967,13 +1149,17 @@ export function Profile() {
         className="w-full"
       >
         <TabsList>
-          <TabsTrigger value="profile">Profil</TabsTrigger>
-          <TabsTrigger value="preferences">Einstellungen</TabsTrigger>
-          <TabsTrigger value="goals">Wochenziele</TabsTrigger>
-          <TabsTrigger value="achievements">Erfolge</TabsTrigger>
-          <TabsTrigger value="security">Sicherheit</TabsTrigger>
+          <TabsTrigger value="profile">{t("profile.tabs.profile")}</TabsTrigger>
+          <TabsTrigger value="preferences">
+            {t("profile.tabs.preferences")}
+          </TabsTrigger>
+          <TabsTrigger value="goals">{t("profile.tabs.goals")}</TabsTrigger>
+          <TabsTrigger value="achievements">
+            {t("profile.tabs.achievements")}
+          </TabsTrigger>
+          <TabsTrigger value="security">{t("profile.tabs.security")}</TabsTrigger>
           <TabsTrigger value="danger" className="text-destructive">
-            Gefahrenzone
+            {t("profile.tabs.danger")}
           </TabsTrigger>
         </TabsList>
 
@@ -982,7 +1168,7 @@ export function Profile() {
             {/* Profile Info */}
             <Card>
               <CardHeader>
-                <CardTitle>Profil Informationen</CardTitle>
+                <CardTitle>{t("profile.profileInfo")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-4 mb-4">
@@ -1015,7 +1201,7 @@ export function Profile() {
                         variant="destructive"
                         onClick={handleAvatarRemove}
                         disabled={isLoading}
-                        title="Avatar entfernen"
+                        title={t("profile.removeAvatar")}
                       >
                         <Trash2 size={14} />
                       </Button>
@@ -1029,7 +1215,7 @@ export function Profile() {
                     {user.role === "admin" && (
                       <Badge variant="secondary" className="mt-1">
                         <Shield size={12} className="mr-1" />
-                        Administrator
+                        {t("profile.administrator")}
                       </Badge>
                     )}
                   </div>
@@ -1038,17 +1224,21 @@ export function Profile() {
                 <Separator />
 
                 <div className="bg-accent p-3 rounded-lg">
-                  <p className="text-sm font-medium">E-Mail Verifizierung</p>
+                  <p className="text-sm font-medium">
+                    {t("profile.emailVerification")}
+                  </p>
                   <p className="text-sm text-muted-foreground">
                     {user.isEmailVerified
-                      ? "✓ Deine E-Mail ist verifiziert"
-                      : "⚠ Bitte verifiziere deine E-Mail-Adresse"}
+                      ? t("profile.emailVerified")
+                      : t("profile.emailNotVerified")}
                   </p>
                 </div>
 
                 <div className="space-y-3">
                   <div>
-                    <Label htmlFor="firstName">Vorname *</Label>
+                    <Label htmlFor="firstName">
+                      {t("profile.firstName")} {t("profile.required")}
+                    </Label>
                     <Input
                       id="firstName"
                       value={profileForm.firstName}
@@ -1077,7 +1267,9 @@ export function Profile() {
                   </div>
 
                   <div>
-                    <Label htmlFor="lastName">Nachname *</Label>
+                    <Label htmlFor="lastName">
+                      {t("profile.lastName")} {t("profile.required")}
+                    </Label>
                     <Input
                       id="lastName"
                       value={profileForm.lastName}
@@ -1106,7 +1298,7 @@ export function Profile() {
                   </div>
 
                   <div>
-                    <Label htmlFor="nickname">Spitzname (optional)</Label>
+                    <Label htmlFor="nickname">{t("profile.nickname")}</Label>
                     <Input
                       id="nickname"
                       value={profileForm.nickname}
@@ -1121,43 +1313,86 @@ export function Profile() {
                   </div>
 
                   <div>
-                    <Label htmlFor="displayPreference">Anzeigename</Label>
+                    <Label htmlFor="displayPreference">
+                      {t("profile.displayNameLabel")}
+                    </Label>
                     <Select
                       value={profileForm.displayPreference}
                       onValueChange={(value) => {
-                        setProfileForm((prev) => ({
-                          ...prev,
+                        if (
+                          value === "nickname" &&
+                          (!profileForm.nickname ||
+                            profileForm.nickname.trim() === "")
+                        ) {
+                          toast({
+                            title: t("common.error"),
+                            description: t("profile.nicknameRequired"),
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        if (
+                          value === "nickname" &&
+                          /\s/.test(profileForm.nickname.trim())
+                        ) {
+                          toast({
+                            title: t("common.error"),
+                            description: t(
+                              "profile.nicknameNoSpaces",
+                              "Ein Spitzname darf keine Leerzeichen enthalten."
+                            ),
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        if (
+                          value === "nickname" &&
+                          !/^[A-Za-z0-9_]+$/.test(profileForm.nickname.trim())
+                        ) {
+                          toast({
+                            title: t("common.error"),
+                            description: t(
+                              "profile.nicknameInvalidFormat",
+                              "Ein Spitzname darf nur Buchstaben, Zahlen und Unterstriche enthalten."
+                            ),
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        const nextProfileForm = {
+                          ...profileForm,
                           displayPreference: value as
                             | "nickname"
                             | "firstName"
                             | "fullName",
-                        }));
-                        // Speichere sofort bei Select-Änderung
-                        setTimeout(
-                          () => saveProfileField("displayPreference"),
-                          0
-                        );
+                        };
+                        setProfileForm(nextProfileForm);
+                        void saveProfileField("displayPreference", nextProfileForm);
                       }}
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="firstName">Vorname</SelectItem>
+                        <SelectItem value="firstName">
+                          {t("profile.firstNameOption")}
+                        </SelectItem>
                         <SelectItem value="fullName">
-                          Vollständiger Name
+                          {t("profile.fullNameOption")}
                         </SelectItem>
                         <SelectItem
                           value="nickname"
                           disabled={
                             !profileForm.nickname ||
-                            profileForm.nickname.trim() === ""
+                            profileForm.nickname.trim() === "" ||
+                            /\s/.test(profileForm.nickname.trim()) ||
+                            !/^[A-Za-z0-9_]+$/.test(profileForm.nickname.trim())
                           }
                         >
-                          Spitzname{" "}
+                          {t("profile.nicknameOption")}{" "}
                           {(!profileForm.nickname ||
                             profileForm.nickname.trim() === "") &&
-                            "(kein Spitzname vergeben)"}
+                            t("profile.nicknameNotSet")}
                         </SelectItem>
                       </SelectContent>
                     </Select>
@@ -1165,10 +1400,326 @@ export function Profile() {
                       (!profileForm.nickname ||
                         profileForm.nickname.trim() === "") && (
                         <p className="text-sm text-muted-foreground mt-1">
-                          Bitte gib einen Spitzname ein, um diese Option zu
-                          verwenden.
+                          {t("profile.nicknameRequiredForDisplay")}
                         </p>
                       )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">
+                      {t("profile.bodyWeightOptional")}
+                    </Label>
+                    <Drawer
+                      open={bodyWeightDrawerOpen}
+                      onOpenChange={(open) => {
+                        setBodyWeightDrawerOpen(open);
+                        if (open) {
+                          const currentKg =
+                            preferencesForm.metrics.bodyWeightKg ?? null;
+                          if (currentKg != null) {
+                            const displayVal = convertWeightFromKg(
+                              currentKg,
+                              preferencesForm.units.weight
+                            );
+                            setBodyWeightDraft(displayVal);
+                            setBodyWeightInputDraft(
+                              formatBodyWeightDisplay(
+                                currentKg,
+                                preferencesForm.units.weight
+                              )
+                            );
+                          } else {
+                            setBodyWeightDraft(null);
+                            setBodyWeightInputDraft("");
+                          }
+                        }
+                      }}
+                    >
+                      <DrawerTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start gap-2 font-normal h-10 text-left"
+                          type="button"
+                        >
+                          <Scale className="h-4 w-4 shrink-0 opacity-70" />
+                          {preferencesForm.metrics.bodyWeightKg != null ? (
+                            <>
+                              <span className="tabular-nums">
+                                {formatBodyWeightDisplay(
+                                  preferencesForm.metrics.bodyWeightKg,
+                                  preferencesForm.units.weight
+                                )}
+                              </span>
+                              <span className="text-muted-foreground text-xs">
+                                {preferencesForm.units.weight}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground">
+                              {t(
+                                "profile.bodyWeightSet"
+                              )}
+                            </span>
+                          )}
+                        </Button>
+                      </DrawerTrigger>
+                      <DrawerContent>
+                        <div className="mx-auto w-full max-w-sm">
+                          <DrawerHeader>
+                            <DrawerTitle>
+                              {t("profile.bodyWeightDrawerTitle")}
+                            </DrawerTitle>
+                            <DrawerDescription>
+                              {t("profile.bodyWeightDrawerDescription")}
+                            </DrawerDescription>
+                          </DrawerHeader>
+                          <div className="p-4 pb-0">
+                            <div className="flex items-center justify-center gap-4">
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-10 w-10 shrink-0 rounded-full"
+                                type="button"
+                                onClick={() => {
+                                  const kg =
+                                    bodyWeightDraft != null
+                                      ? convertWeightToKg(
+                                        bodyWeightDraft,
+                                        preferencesForm.units.weight
+                                      )
+                                      : 70;
+                                  const minKg = 20;
+                                  if (kg <= minKg) return;
+                                  const nextDisplay =
+                                    convertWeightFromKg(
+                                      kg - 0.5,
+                                      preferencesForm.units.weight
+                                    );
+                                  const next =
+                                    Math.round(nextDisplay * 10) / 10;
+                                  setBodyWeightDraft(next);
+                                  setBodyWeightInputDraft(
+                                    i18n.language === "de"
+                                      ? String(
+                                        next % 1 === 0
+                                          ? next
+                                          : next.toFixed(1)
+                                      ).replace(".", ",")
+                                      : String(
+                                        next % 1 === 0
+                                          ? next
+                                          : next.toFixed(1)
+                                      )
+                                  );
+                                }}
+                                disabled={
+                                  (bodyWeightDraft == null
+                                    ? 70
+                                    : convertWeightToKg(
+                                      bodyWeightDraft,
+                                      preferencesForm.units.weight
+                                    )) <= 20
+                                }
+                                aria-label={t("common.decrease", "Verringern")}
+                              >
+                                <Minus className="h-4 w-4" />
+                              </Button>
+                              <div className="flex-1 text-center min-w-[120px] flex flex-col items-center">
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  enterKeyHint="done"
+                                  aria-label={t("profile.bodyWeightOptional")}
+                                  placeholder={t("profile.bodyWeightPlaceholder")}
+                                  className="w-full bg-transparent text-5xl font-bold tracking-tighter tabular-nums text-center outline-none border-b-2 border-transparent focus:border-primary rounded-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-muted-foreground"
+                                  value={bodyWeightInputDraft}
+                                  onChange={(e) => {
+                                    const raw = e.target.value.replace(
+                                      ",",
+                                      "."
+                                    );
+                                    if (
+                                      raw === "" ||
+                                      /^\d*\.?\d*$/.test(raw)
+                                    ) {
+                                      setBodyWeightInputDraft(e.target.value);
+                                      if (raw === "") {
+                                        setBodyWeightDraft(null);
+                                      } else {
+                                        const num = parseFloat(raw);
+                                        if (Number.isFinite(num))
+                                          setBodyWeightDraft(num);
+                                      }
+                                    }
+                                  }}
+                                  onBlur={() => {
+                                    const normalized =
+                                      bodyWeightInputDraft.replace(",", ".");
+                                    const raw = parseFloat(normalized);
+                                    if (
+                                      bodyWeightInputDraft.trim() === "" ||
+                                      !Number.isFinite(raw) ||
+                                      raw <= 0
+                                    ) {
+                                      setBodyWeightDraft(null);
+                                      setBodyWeightInputDraft("");
+                                      return;
+                                    }
+                                    const kg = convertWeightToKg(
+                                      raw,
+                                      preferencesForm.units.weight
+                                    );
+                                    const clampedKg = Math.max(
+                                      20,
+                                      Math.min(300, kg)
+                                    );
+                                    const displayVal =
+                                      convertWeightFromKg(
+                                        clampedKg,
+                                        preferencesForm.units.weight
+                                      );
+                                    const rounded =
+                                      Math.round(displayVal * 10) / 10;
+                                    setBodyWeightDraft(rounded);
+                                    setBodyWeightInputDraft(
+                                      i18n.language === "de"
+                                        ? String(
+                                          rounded % 1 === 0
+                                            ? rounded
+                                            : rounded.toFixed(1)
+                                        ).replace(".", ",")
+                                        : String(
+                                          rounded % 1 === 0
+                                            ? rounded
+                                            : rounded.toFixed(1)
+                                        )
+                                    );
+                                  }}
+                                />
+                                <div className="text-muted-foreground text-xs uppercase tracking-wider mt-1">
+                                  {preferencesForm.units.weight}
+                                </div>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-10 w-10 shrink-0 rounded-full"
+                                type="button"
+                                onClick={() => {
+                                  const kg =
+                                    bodyWeightDraft != null
+                                      ? convertWeightToKg(
+                                        bodyWeightDraft,
+                                        preferencesForm.units.weight
+                                      )
+                                      : 70;
+                                  const maxKg = 300;
+                                  if (kg >= maxKg) return;
+                                  const nextDisplay =
+                                    convertWeightFromKg(
+                                      kg + 0.5,
+                                      preferencesForm.units.weight
+                                    );
+                                  const next =
+                                    Math.round(nextDisplay * 10) / 10;
+                                  setBodyWeightDraft(next);
+                                  setBodyWeightInputDraft(
+                                    i18n.language === "de"
+                                      ? String(
+                                        next % 1 === 0
+                                          ? next
+                                          : next.toFixed(1)
+                                      ).replace(".", ",")
+                                      : String(
+                                        next % 1 === 0
+                                          ? next
+                                          : next.toFixed(1)
+                                      )
+                                  );
+                                }}
+                                disabled={
+                                  bodyWeightDraft != null &&
+                                  convertWeightToKg(
+                                    bodyWeightDraft,
+                                    preferencesForm.units.weight
+                                  ) >= 300
+                                }
+                                aria-label={t("common.increase", "Erhöhen")}
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                          <DrawerFooter className="flex flex-col gap-3">
+                            <Button
+                              className="w-full"
+                              onClick={() => {
+                                const raw =
+                                  bodyWeightInputDraft.trim() === ""
+                                    ? null
+                                    : parseFloat(
+                                      bodyWeightInputDraft.replace(
+                                        ",",
+                                        "."
+                                      )
+                                    );
+                                const kg =
+                                  raw != null &&
+                                    Number.isFinite(raw) &&
+                                    raw > 0
+                                    ? convertWeightToKg(
+                                      raw,
+                                      preferencesForm.units.weight
+                                    )
+                                    : null;
+                                const toSave =
+                                  kg != null && kg > 0 ? kg : null;
+                                savePreference(
+                                  {
+                                    metrics: {
+                                      ...preferencesForm.metrics,
+                                      bodyWeightKg: toSave,
+                                    },
+                                  },
+                                  t("profile.bodyWeightOptional")
+                                );
+                                setBodyWeightDrawerOpen(false);
+                              }}
+                            >
+                              {t("common.save")}
+                            </Button>
+                            <div className="grid grid-cols-2 gap-2 w-full">
+                              <DrawerClose asChild>
+                                <Button variant="outline" className="w-full">
+                                  {t("common.cancel")}
+                                </Button>
+                              </DrawerClose>
+                              <Button
+                                variant="ghost"
+                                className="text-muted-foreground w-full"
+                                onClick={() => {
+                                  savePreference(
+                                    {
+                                      metrics: {
+                                        ...preferencesForm.metrics,
+                                        bodyWeightKg: null,
+                                      },
+                                    },
+                                    t("profile.bodyWeightOptional")
+                                  );
+                                  setBodyWeightDrawerOpen(false);
+                                }}
+                              >
+                                {t("profile.bodyWeightReset")}
+                              </Button>
+                            </div>
+                          </DrawerFooter>
+                        </div>
+                      </DrawerContent>
+                    </Drawer>
+                    <p className="text-xs text-muted-foreground">
+                      {t("profile.bodyWeightHint")}
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -1179,12 +1730,12 @@ export function Profile() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Share2 className="w-5 h-5" />
-                  Freunde einladen
+                  {t("profile.inviteFriends")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Lade deine Freunde ein und trainiert gemeinsam!
+                  {t("profile.inviteFriendsDesc")}
                 </p>
 
                 <InviteFriendForm onSuccess={handleInviteSuccess} />
@@ -1192,7 +1743,7 @@ export function Profile() {
                 <Separator />
 
                 <div>
-                  <Label htmlFor="invite-link">Dein Einladungslink</Label>
+                  <Label htmlFor="invite-link">{t("profile.yourInviteLink")}</Label>
                   <div className="flex gap-2 mt-1">
                     <Input
                       id="invite-link"
@@ -1210,13 +1761,15 @@ export function Profile() {
                 {/* Invitations List */}
                 <div>
                   <h4 className="text-sm font-semibold mb-2">
-                    Eingeladene Freunde
+                    {t("profile.invitedFriends")}
                   </h4>
                   {loadingInvitations ? (
-                    <p className="text-sm text-muted-foreground">Lädt...</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t("profile.loadingInvitations")}
+                    </p>
                   ) : invitations.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                      Noch keine Einladungen gesendet.
+                      {t("profile.noInvitations")}
                     </p>
                   ) : (
                     <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -1242,9 +1795,7 @@ export function Profile() {
                                     {invitation.email}
                                   </p>
                                   <p className="text-xs text-muted-foreground">
-                                    {new Date(
-                                      invitation.createdAt
-                                    ).toLocaleDateString("de-DE")}
+                                    {formatDate(invitation.createdAt)}
                                   </p>
                                 </div>
                               </div>
@@ -1260,7 +1811,7 @@ export function Profile() {
                                       handleResendInvitation(invitation.id)
                                     }
                                     className="h-8 w-8 p-0"
-                                    title="Erneut versenden"
+                                    title={t("profile.invitationResend")}
                                   >
                                     <RefreshCw className="h-4 w-4" />
                                   </Button>
@@ -1271,7 +1822,7 @@ export function Profile() {
                                       handleDeleteInvitation(invitation.id)
                                     }
                                     className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                                    title="Löschen"
+                                    title={t("common.delete")}
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
@@ -1296,13 +1847,15 @@ export function Profile() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Key className="w-5 h-5" />
-                  Passwort ändern
+                  {t("profile.changePassword")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <form onSubmit={handlePasswordChange} className="space-y-4">
                   <div>
-                    <Label htmlFor="current-password">Aktuelles Passwort</Label>
+                    <Label htmlFor="current-password">
+                      {t("profile.currentPassword")}
+                    </Label>
                     <Input
                       id="current-password"
                       type="password"
@@ -1317,7 +1870,9 @@ export function Profile() {
                   </div>
 
                   <div>
-                    <Label htmlFor="new-password">Neues Passwort</Label>
+                    <Label htmlFor="new-password">
+                      {t("profile.newPassword")}
+                    </Label>
                     <Input
                       id="new-password"
                       type="password"
@@ -1333,7 +1888,7 @@ export function Profile() {
 
                   <div>
                     <Label htmlFor="confirm-password">
-                      Passwort bestätigen
+                      {t("profile.confirmPassword")}
                     </Label>
                     <Input
                       id="confirm-password"
@@ -1355,7 +1910,9 @@ export function Profile() {
                     disabled={isLoading}
                     onClick={handlePasswordChange}
                   >
-                    {isLoading ? "Wird geändert..." : "Passwort ändern"}
+                    {isLoading
+                      ? t("profile.passwordChanging")
+                      : t("profile.changePassword")}
                   </Button>
                 </form>
               </CardContent>
@@ -1366,18 +1923,21 @@ export function Profile() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Lock className="w-5 h-5" />
-                  Zwei-Faktor-Authentifizierung
+                  {t("profile.twoFactorAuth")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium">2FA aktivieren</p>
+                    <p className="font-medium">{t("profile.enable2FA")}</p>
                     <p className="text-sm text-muted-foreground">
-                      Zusätzliche Sicherheit für dein Konto
+                      {t("profile.enable2FADesc")}
                     </p>
                     <p className="text-sm">
-                      Status: {user.has2FA ? "✓ Aktiviert" : "○ Deaktiviert"}
+                      {t("profile.status")}:{" "}
+                      {user.has2FA
+                        ? t("profile.activated")
+                        : t("profile.deactivated")}
                     </p>
                   </div>
                   <Switch
@@ -1392,24 +1952,24 @@ export function Profile() {
                     <Separator />
                     <div className="space-y-3 text-sm">
                       <div className="space-y-1">
-                        <p className="font-medium">2FA Details</p>
+                        <p className="font-medium">
+                          {t("profile.twoFactorDetails")}
+                        </p>
                         <p className="text-muted-foreground">
-                          Aktiviert am:{" "}
+                          {t("profile.enabledAt")}{" "}
                           {user.twoFactorEnabledAt &&
                             user.twoFactorEnabledAt !== null &&
                             user.twoFactorEnabledAt !== undefined &&
                             user.twoFactorEnabledAt !== "" &&
                             !isNaN(new Date(user.twoFactorEnabledAt).getTime())
-                            ? new Date(
-                              user.twoFactorEnabledAt
-                            ).toLocaleDateString("de-DE", {
+                            ? formatDateTime(user.twoFactorEnabledAt, {
                               day: "2-digit",
                               month: "2-digit",
                               year: "numeric",
                               hour: "2-digit",
                               minute: "2-digit",
                             })
-                            : "Nicht verfügbar"}
+                            : t("profile.notAvailable")}
                         </p>
                       </div>
                       <Button
@@ -1422,24 +1982,23 @@ export function Profile() {
                             setNewRecoveryCodes(codes);
                             setRecoveryCodesDialogOpen(true);
                             toast({
-                              title: "Recovery-Keys zurückgesetzt",
-                              description:
-                                "Neue Recovery-Keys wurden erfolgreich generiert.",
+                              title: t("profile.recoveryKeysReset"),
+                              description: t("profile.recoveryKeysResetDesc"),
                             });
                           } catch (error) {
                             toast({
-                              title: "Fehler",
+                              title: t("common.error"),
                               description:
                                 error instanceof Error
                                   ? error.message
-                                  : "Fehler beim Zurücksetzen der Recovery-Keys",
+                                  : t("profile.recoveryKeysResetError"),
                               variant: "destructive",
                             });
                           }
                         }}
                         className="w-full"
                       >
-                        Recovery-Keys zurücksetzen
+                        {t("profile.resetRecoveryKeys")}
                       </Button>
                     </div>
                   </>
@@ -1452,35 +2011,34 @@ export function Profile() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Shield className="w-5 h-5" />
-                  Kontosicherheit
+                  {t("profile.accountSecurity")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1">
-                    <p className="text-sm font-medium">Letzter Login</p>
+                    <p className="text-sm font-medium">
+                      {t("profile.lastLogin")}
+                    </p>
                     <p className="text-sm text-muted-foreground">
                       {user.lastLoginAt &&
                         user.lastLoginAt !== null &&
                         user.lastLoginAt !== undefined &&
                         user.lastLoginAt !== "" &&
                         !isNaN(new Date(user.lastLoginAt).getTime())
-                        ? new Date(user.lastLoginAt).toLocaleDateString(
-                          "de-DE",
-                          {
-                            day: "2-digit",
-                            month: "2-digit",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          }
-                        )
-                        : "Nie"}
+                        ? formatDateTime(user.lastLoginAt, {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                        : t("profile.never")}
                     </p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-sm font-medium">
-                      Letzte Passwortänderung
+                      {t("profile.lastPasswordChange")}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {user.passwordChangedAt &&
@@ -1488,29 +2046,28 @@ export function Profile() {
                         user.passwordChangedAt !== undefined &&
                         user.passwordChangedAt !== "" &&
                         !isNaN(new Date(user.passwordChangedAt).getTime())
-                        ? new Date(user.passwordChangedAt).toLocaleDateString(
-                          "de-DE",
-                          {
-                            day: "2-digit",
-                            month: "2-digit",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          }
-                        )
-                        : "Nie geändert"}
+                        ? formatDateTime(user.passwordChangedAt, {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                        : t("profile.neverChanged")}
                     </p>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-sm font-medium">E-Mail-Verifizierung</p>
+                    <p className="text-sm font-medium">
+                      {t("profile.emailVerification")}
+                    </p>
                     <p className="text-sm text-muted-foreground">
                       {user.isEmailVerified ? (
                         <span className="text-green-600 dark:text-green-400">
-                          ✓ Verifiziert
+                          {t("profile.verified")}
                         </span>
                       ) : (
                         <span className="text-yellow-600 dark:text-yellow-400">
-                          ⚠ Nicht verifiziert
+                          {t("profile.notVerified")}
                         </span>
                       )}
                     </p>
@@ -1526,21 +2083,25 @@ export function Profile() {
             {/* Benutzereinstellungen */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Benutzereinstellungen</CardTitle>
+                <CardTitle className="text-lg">
+                  {t("profile.userPreferences")}
+                </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Passe die App an deine Vorlieben an
+                  {t("profile.userPreferencesDesc")}
                 </p>
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Sprache */}
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Sprache</Label>
+                  <Label className="text-sm font-medium">
+                    {t("profile.language")}
+                  </Label>
                   <Select
                     value={preferencesForm.languagePreference}
                     onValueChange={(value) =>
                       savePreference(
                         { languagePreference: value as "de" | "en" },
-                        "Sprache"
+                        t("profile.language")
                       )
                     }
                   >
@@ -1548,21 +2109,23 @@ export function Profile() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="de">Deutsch</SelectItem>
-                      <SelectItem value="en">English</SelectItem>
+                      <SelectItem value="de">{t("profile.german")}</SelectItem>
+                      <SelectItem value="en">{t("profile.english")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 {/* Uhrzeitformat */}
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Uhrzeitformat</Label>
+                  <Label className="text-sm font-medium">
+                    {t("profile.timeFormat")}
+                  </Label>
                   <Select
                     value={preferencesForm.timeFormat}
                     onValueChange={(value) =>
                       savePreference(
                         { timeFormat: value as "12h" | "24h" },
-                        "Uhrzeitformat"
+                        t("profile.timeFormat")
                       )
                     }
                   >
@@ -1570,8 +2133,12 @@ export function Profile() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="24h">24-Stunden (14:30)</SelectItem>
-                      <SelectItem value="12h">12-Stunden (2:30 PM)</SelectItem>
+                      <SelectItem value="24h">
+                        {t("profile.timeFormat24h")}
+                      </SelectItem>
+                      <SelectItem value="12h">
+                        {t("profile.timeFormat12h")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1587,7 +2154,7 @@ export function Profile() {
                       setTheme(value as "light" | "dark" | "system");
                       savePreference(
                         { theme: value as "light" | "dark" | "system" },
-                        t("settings.theme", "Design")
+                        t("profile.theme")
                       );
                     }}
                   >
@@ -1613,96 +2180,90 @@ export function Profile() {
             {/* Einheiten-Präferenzen */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Einheiten-Präferenzen</CardTitle>
+                <CardTitle className="text-lg">
+                  {t("profile.unitsPreferences")}
+                </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Wähle deine bevorzugten Einheiten für Messungen
+                  {t("profile.unitsPreferencesDesc")}
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Distanz */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Distanz</Label>
-                  <Select
-                    value={preferencesForm.units.distance}
-                    onValueChange={(value) =>
-                      savePreference(
-                        {
-                          units: {
-                            ...preferencesForm.units,
-                            distance: value as "km" | "m" | "miles" | "yards",
-                          },
-                        },
-                        "Distanzeinheit"
-                      )
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="km">Kilometer (km)</SelectItem>
-                      <SelectItem value="m">Meter (m)</SelectItem>
-                      <SelectItem value="miles">Meilen</SelectItem>
-                      <SelectItem value="yards">Yards</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Gewicht */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Gewicht</Label>
-                  <Select
-                    value={preferencesForm.units.weight}
-                    onValueChange={(value) =>
-                      savePreference(
-                        {
-                          units: {
-                            ...preferencesForm.units,
-                            weight: value as "kg" | "lbs" | "stone",
-                          },
-                        },
-                        "Gewichtseinheit"
-                      )
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="kg">Kilogramm (kg)</SelectItem>
-                      <SelectItem value="lbs">Pfund (lbs)</SelectItem>
-                      <SelectItem value="stone">Stone</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Temperatur */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Temperatur</Label>
-                  <Select
-                    value={preferencesForm.units.temperature}
-                    onValueChange={(value) =>
-                      savePreference(
-                        {
-                          units: {
-                            ...preferencesForm.units,
-                            temperature: value as "celsius" | "fahrenheit",
-                          },
-                        },
-                        "Temperatureinheit"
-                      )
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="celsius">Celsius (°C)</SelectItem>
-                      <SelectItem value="fahrenheit">
-                        Fahrenheit (°F)
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">
+                      {t("profile.unitDistance", "Distanz")}
+                    </Label>
+                    <Select
+                      value={preferencesForm.units.distance}
+                      onValueChange={(value) =>
+                        handleUnitChange(
+                          "distance",
+                          value as "km" | "miles"
+                        )
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="km">
+                          {t("training.form.units.kilometers", "Kilometer")}
+                        </SelectItem>
+                        <SelectItem value="miles">
+                          {t("training.form.units.miles", "Meilen")}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">
+                      {t("profile.unitWeight", "Gewicht")}
+                    </Label>
+                    <Select
+                      value={preferencesForm.units.weight}
+                      onValueChange={(value) =>
+                        handleUnitChange("weight", value as "kg" | "lbs")
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="kg">
+                          {t("training.form.units.kilograms", "Kilogramm")}
+                        </SelectItem>
+                        <SelectItem value="lbs">
+                          {t("training.form.units.pounds", "Pfund")}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">
+                      {t("profile.unitTemperature", "Temperatur")}
+                    </Label>
+                    <Select
+                      value={preferencesForm.units.temperature}
+                      onValueChange={(value) =>
+                        handleUnitChange(
+                          "temperature",
+                          value as "celsius" | "fahrenheit"
+                        )
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="celsius">
+                          {t("training.form.units.celsius", "Celsius")}
+                        </SelectItem>
+                        <SelectItem value="fahrenheit">
+                          {t("training.form.units.fahrenheit", "Fahrenheit")}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1710,16 +2271,18 @@ export function Profile() {
             {/* App-Einstellungen */}
             <Card className="md:col-span-2">
               <CardHeader>
-                <CardTitle className="text-lg">App-Einstellungen</CardTitle>
+                <CardTitle className="text-lg">
+                  {t("profile.appSettings")}
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label className="text-sm font-medium">
-                      E-Mail-Benachrichtigungen
+                      {t("profile.emailNotifications")}
                     </Label>
                     <p className="text-xs text-muted-foreground">
-                      Wöchentliche Zusammenfassung deiner Fortschritte
+                      {t("profile.emailNotificationsDesc")}
                     </p>
                   </div>
                   <Switch
@@ -1732,7 +2295,7 @@ export function Profile() {
                             email: checked,
                           },
                         },
-                        "E-Mail-Benachrichtigungen"
+                        t("profile.emailNotifications")
                       )
                     }
                   />
@@ -1741,37 +2304,25 @@ export function Profile() {
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label className="text-sm font-medium">
-                      Öffentliches Profil
+                      {t("profile.publicProfileSetting")}
                     </Label>
                     <p className="text-xs text-muted-foreground">
-                      Andere Benutzer können dein Profil und deine Aktivitäten
-                      sehen
+                      {t("profile.publicProfileDesc")}
                     </p>
                   </div>
                   <Switch
                     checked={preferencesForm.privacy.publicProfile}
-                    onCheckedChange={(checked) =>
-                      savePreference(
-                        {
-                          privacy: {
-                            ...preferencesForm.privacy,
-                            publicProfile: checked,
-                          },
-                        },
-                        "Öffentliches Profil"
-                      )
-                    }
+                    onCheckedChange={handlePublicProfileToggle}
                   />
                 </div>
 
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label className="text-sm font-medium">
-                      In globaler Rangliste anzeigen
+                      {t("profile.globalRankingSetting")}
                     </Label>
                     <p className="text-xs text-muted-foreground">
-                      Dein Profil erscheint in den globalen Statistiken und
-                      Ranglisten für alle Nutzer
+                      {t("profile.globalRankingDesc")}
                     </p>
                   </div>
                   <Switch
@@ -1786,10 +2337,10 @@ export function Profile() {
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label className="text-sm font-medium">
-                        {t("settings.reactions.friendsCanSee", "Freunde können Reaktionen sehen")}
+                        {t("settings.reactions.friendsCanSee")}
                       </Label>
                       <p className="text-xs text-muted-foreground">
-                        {t("settings.reactions.friendsCanSeeDescription", "Erlaube deinen Freunden, Reaktionen auf deine Workouts zu sehen")}
+                        {t("settings.reactions.friendsCanSeeDescription")}
                       </p>
                     </div>
                     <Switch
@@ -1804,7 +2355,7 @@ export function Profile() {
                               showNames: checked ? preferencesForm.reactions.showNames : false,
                             },
                           },
-                          t("settings.reactions.friendsCanSee", "Freunde können Reaktionen sehen")
+                          t("settings.reactions.friendsCanSee")
                         )
                       }
                     />
@@ -1813,10 +2364,10 @@ export function Profile() {
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label className="text-sm font-medium">
-                        {t("settings.reactions.showNames", "Namen bei Reaktionen anzeigen")}
+                        {t("settings.reactions.showNames")}
                       </Label>
                       <p className="text-xs text-muted-foreground">
-                        {t("settings.reactions.showNamesDescription", "Zeige die Namen der Nutzer, die auf deine Workouts reagiert haben")}
+                        {t("settings.reactions.showNamesDescription")}
                       </p>
                     </div>
                     <Switch
@@ -1830,7 +2381,7 @@ export function Profile() {
                               showNames: checked,
                             },
                           },
-                          t("settings.reactions.showNames", "Namen bei Reaktionen anzeigen")
+                          t("settings.reactions.showNames")
                         )
                       }
                     />
@@ -1847,24 +2398,59 @@ export function Profile() {
         <TabsContent value="goals" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Wochenziele</CardTitle>
+              <CardTitle>{t("profile.weeklyGoalsTitle")}</CardTitle>
               <p className="text-sm text-muted-foreground mt-2">
-                Passe deine wöchentlichen Ziele nach deinen Wünschen an. Die
-                Fortschritte werden automatisch basierend auf deinen Trainings
-                aktualisiert.
+                {t("profile.weeklyGoalsDesc")}
               </p>
             </CardHeader>
             <CardContent>
               {loadingGoals ? (
-                <p className="text-muted-foreground">Lädt...</p>
+                <p className="text-muted-foreground">{t("profile.loading")}</p>
               ) : (
                 <form onSubmit={handleGoalsSubmit}>
                   <WeeklyGoalsForm
                     goals={goalsForm}
-                    onChange={(key, target) => {
+                    exercises={goalExercises}
+                    onChangePoints={(target) => {
                       setGoalsForm((prev) => ({
                         ...prev,
-                        [key]: { ...prev[key], target: Math.max(0, target) },
+                        points: { ...prev.points, target: Math.max(0, target) },
+                      }));
+                    }}
+                    onChangeExercise={(index, exerciseId) => {
+                      setGoalsForm((prev) => {
+                        const next = [...prev.exercises];
+                        next[index] = { ...next[index], exerciseId };
+                        return { ...prev, exercises: next };
+                      });
+                    }}
+                    onChangeExerciseUnit={(index, unit) => {
+                      setGoalsForm((prev) => {
+                        const next = [...prev.exercises];
+                        next[index] = { ...next[index], unit };
+                        return { ...prev, exercises: next };
+                      });
+                    }}
+                    onChangeExerciseTarget={(index, target) => {
+                      setGoalsForm((prev) => {
+                        const next = [...prev.exercises];
+                        next[index] = { ...next[index], target: Math.max(0, target) };
+                        return { ...prev, exercises: next };
+                      });
+                    }}
+                    onAddExercise={() => {
+                      setGoalsForm((prev) => ({
+                        ...prev,
+                        exercises:
+                          prev.exercises.length >= 5
+                            ? prev.exercises
+                            : [...prev.exercises, { exerciseId: "", target: 0 }],
+                      }));
+                    }}
+                    onRemoveExercise={(index) => {
+                      setGoalsForm((prev) => ({
+                        ...prev,
+                        exercises: prev.exercises.filter((_, idx) => idx !== index),
                       }));
                     }}
                   />
@@ -1875,7 +2461,7 @@ export function Profile() {
                       onClick={handleResetGoals}
                       disabled={savingGoals || isLoading}
                     >
-                      {t("common.reset", "Zurücksetzen")}
+                      {t("common.reset")}
                     </Button>
                     <Button
                       type="submit"
@@ -1883,12 +2469,66 @@ export function Profile() {
                       disabled={savingGoals || isLoading}
                     >
                       {savingGoals
-                        ? "Wird gespeichert..."
-                        : "Wochenziele speichern"}
+                        ? t("profile.weeklyGoalsSaving")
+                        : t("profile.weeklyGoalsSaveAction")}
                     </Button>
                   </div>
                 </form>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("profile.monthlyGoalTitle", "Monatsziel")}</CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                {t(
+                  "profile.monthlyGoalDesc",
+                  "Lege dein Aktivitätsniveau fest, damit dein Monatsziel realistisch bleibt."
+                )}
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">
+                  {t("profile.activityLevelLabel", "Aktivitätsniveau")}
+                </Label>
+                <Select
+                  value={preferencesForm.metrics.activityLevel}
+                  onValueChange={(value) =>
+                    savePreference(
+                      {
+                        metrics: {
+                          ...preferencesForm.metrics,
+                          activityLevel: value as "low" | "medium" | "high",
+                        },
+                      },
+                      t("profile.activityLevelLabel", "Aktivitätsniveau")
+                    )
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">
+                      {t("profile.activityLevelLow", "Einsteiger")}
+                    </SelectItem>
+                    <SelectItem value="medium">
+                      {t("profile.activityLevelMedium", "Fortgeschritten")}
+                    </SelectItem>
+                    <SelectItem value="high">
+                      {t("profile.activityLevelHigh", "Sehr aktiv")}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {t(
+                    "profile.activityLevelHint",
+                    "Das beeinflusst das automatische Monatsziel, besonders wenn dir noch keine Trainingshistorie vorliegt."
+                  )}
+                </p>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -1930,7 +2570,7 @@ export function Profile() {
                 <CardHeader className="flex flex-row items-center justify-between space-y-0">
                   <CardTitle className="text-lg font-semibold flex items-center gap-2">
                     <Trophy className="h-5 w-5 text-amber-500" />
-                    {t("profile.achievements.awards", "Auszeichnungen")}
+                    {t("profile.achievements.awards")}
                   </CardTitle>
                   <Badge variant="outline">{achievements.awards.length}</Badge>
                 </CardHeader>
@@ -1939,16 +2579,10 @@ export function Profile() {
                     <div className="text-center py-8">
                       <Trophy className="mx-auto h-12 w-12 text-muted-foreground/30 mb-3" />
                       <p className="text-sm text-muted-foreground">
-                        {t(
-                          "profile.achievements.noAwards",
-                          "Noch keine Auszeichnungen erhalten."
-                        )}
+                        {t("profile.achievements.noAwards")}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {t(
-                          "profile.achievements.noAwardsHint",
-                          "Trainiere regelmäßig, um Auszeichnungen zu erhalten!"
-                        )}
+                        {t("profile.achievements.noAwardsHint")}
                       </p>
                     </div>
                   ) : (
@@ -1966,12 +2600,12 @@ export function Profile() {
                         {(award.periodStart || award.periodEnd) && (
                           <p className="text-xs text-muted-foreground">
                             {award.periodStart && award.periodEnd
-                              ? `${format(new Date(award.periodStart), "dd.MM.yyyy", { locale: de })} – ${format(new Date(award.periodEnd), "dd.MM.yyyy", { locale: de })}`
+                              ? `${format(new Date(award.periodStart), "dd.MM.yyyy", { locale: dateLocale })} – ${format(new Date(award.periodEnd), "dd.MM.yyyy", { locale: dateLocale })}`
                               : award.periodStart
                                 ? format(
                                   new Date(award.periodStart),
                                   "dd.MM.yyyy",
-                                  { locale: de }
+                                  { locale: dateLocale }
                                 )
                                 : ""}
                           </p>
@@ -1995,7 +2629,7 @@ export function Profile() {
                 <CardHeader className="flex flex-row items-center justify-between space-y-0">
                   <CardTitle className="text-lg font-semibold flex items-center gap-2">
                     <Medal className="h-5 w-5 text-primary" />
-                    {t("profile.achievements.badges", "Badges")}
+                    {t("profile.achievements.badges")}
                   </CardTitle>
                   <Badge variant="outline">{achievements.badges.length}</Badge>
                 </CardHeader>
@@ -2004,68 +2638,67 @@ export function Profile() {
                     <div className="text-center py-8">
                       <Medal className="mx-auto h-12 w-12 text-muted-foreground/30 mb-3" />
                       <p className="text-sm text-muted-foreground">
-                        {t(
-                          "profile.achievements.noBadges",
-                          "Noch keine Badges erhalten."
-                        )}
+                        {t("profile.achievements.noBadges")}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {t(
-                          "profile.achievements.noBadgesHint",
-                          "Erreiche Meilensteine, um Badges freizuschalten!"
-                        )}
+                        {t("profile.achievements.noBadgesHint")}
                       </p>
                     </div>
                   ) : (
-                    achievements.badges.map((badge) => (
-                      <div
-                        key={badge.id}
-                        className="flex items-center justify-between rounded-lg border bg-card p-4 hover:bg-accent/50 transition-colors"
-                      >
-                        <div className="flex-1">
-                          <p className="font-semibold leading-none mb-1">
-                            {badge.label}
-                          </p>
-                          {badge.description && (
-                            <p className="text-xs text-muted-foreground mb-1">
-                              {badge.description}
+                    achievements.badges.map((badge) => {
+                      const badgeText = getBadgeText(badge, t);
+                      return (
+                        <div
+                          key={badge.id}
+                          className="flex items-center justify-between rounded-lg border bg-card p-4 hover:bg-accent/50 transition-colors"
+                        >
+                          <div className="flex-1">
+                            <p className="font-semibold leading-none mb-1">
+                              {badgeText.label}
                             </p>
-                          )}
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span className="capitalize">{badge.category}</span>
-                            {badge.level && (
-                              <>
-                                <span>·</span>
-                                <span>
-                                  {t("profile.achievements.level", "Stufe")}{" "}
-                                  {badge.level}
-                                </span>
-                              </>
+                            {badgeText.description && (
+                              <p className="text-xs text-muted-foreground mb-1">
+                                {badgeText.description}
+                              </p>
                             )}
-                            {badge.earnedAt && (
-                              <>
-                                <span>·</span>
-                                <span>
-                                  {format(
-                                    new Date(badge.earnedAt),
-                                    "dd.MM.yyyy",
-                                    { locale: de }
-                                  )}
-                                </span>
-                              </>
-                            )}
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span className="capitalize">
+                                {badgeText.category || badge.category}
+                              </span>
+                              {badge.level && (
+                                <>
+                                  <span>·</span>
+                                  <span>
+                                    {t("profile.achievements.level")}{" "}
+                                    {badge.level}
+                                  </span>
+                                </>
+                              )}
+                              {badge.earnedAt && (
+                                <>
+                                  <span>·</span>
+                                  <span>
+                                    {format(
+                                      new Date(badge.earnedAt),
+                                      "dd.MM.yyyy",
+                                      { locale: dateLocale }
+                                    )}
+                                  </span>
+                                </>
+                              )}
+                            </div>
                           </div>
+                          {badge.icon && (
+                            <Badge
+                              variant="secondary"
+                              className="text-xs uppercase ml-3"
+                            >
+                              {badgeText.icon || badge.icon.replace("badge-", "")}
+                            </Badge>
+                          )}
                         </div>
-                        {badge.icon && (
-                          <Badge
-                            variant="secondary"
-                            className="text-xs uppercase ml-3"
-                          >
-                            {badge.icon.replace("badge-", "")}
-                          </Badge>
-                        )}
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </CardContent>
               </Card>
@@ -2079,7 +2712,7 @@ export function Profile() {
                 <CardHeader>
                   <CardTitle className="text-lg font-semibold flex items-center gap-2">
                     <Award className="h-5 w-5 text-green-500" />
-                    {t("profile.achievements.progress", "Fortschritt")}
+                    {t("profile.achievements.progress")}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -2098,8 +2731,7 @@ export function Profile() {
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {t(
-                              "profile.achievements.timesAchieved",
-                              "mal erreicht"
+                              "profile.achievements.timesAchieved"
                             )}
                           </p>
                         </div>
@@ -2119,16 +2751,10 @@ export function Profile() {
                 <CardContent className="py-12 text-center">
                   <Award className="mx-auto h-16 w-16 text-muted-foreground/30 mb-4" />
                   <h3 className="text-lg font-semibold mb-2">
-                    {t(
-                      "profile.achievements.startYourJourney",
-                      "Starte deine Reise!"
-                    )}
+                    {t("profile.achievements.startYourJourney")}
                   </h3>
                   <p className="text-muted-foreground max-w-md mx-auto">
-                    {t(
-                      "profile.achievements.startYourJourneyDescription",
-                      "Absolviere Workouts und erreiche deine Ziele, um Badges und Auszeichnungen zu sammeln. Jeder Erfolg zählt!"
-                    )}
+                    {t("profile.achievements.startYourJourneyDescription")}
                   </p>
                 </CardContent>
               </Card>
@@ -2140,30 +2766,24 @@ export function Profile() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-destructive">
                 <Shield className="w-5 h-5" />
-                Gefahrenzone
+                {t("profile.dangerZone")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 space-y-3">
                 <div>
                   <h3 className="font-semibold text-destructive mb-2">
-                    Konto löschen
+                    {t("profile.deleteAccount")}
                   </h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Wenn du dein Konto löschst, werden alle deine Daten
-                    unwiderruflich gelöscht. Diese Aktion kann nicht rückgängig
-                    gemacht werden. Alle deine Trainingsdaten, Erfolge,
-                    Freundschaften und Einstellungen gehen verloren.
+                    {t("profile.deleteAccountWarning")}
                   </p>
                   <ul className="text-sm text-muted-foreground space-y-1 mb-4 list-disc list-inside">
-                    <li>Alle deine Trainingsdaten werden gelöscht</li>
-                    <li>Deine Erfolge und Statistiken gehen verloren</li>
-                    <li>Alle Freundschaften werden beendet</li>
-                    <li>Dein Profil ist nicht mehr erreichbar</li>
-                    <li>
-                      Diese Aktion ist dauerhaft und kann nicht rückgängig
-                      gemacht werden
-                    </li>
+                    <li>{t("profile.deleteAccountList.data")}</li>
+                    <li>{t("profile.deleteAccountList.achievements")}</li>
+                    <li>{t("profile.deleteAccountList.friendships")}</li>
+                    <li>{t("profile.deleteAccountList.profile")}</li>
+                    <li>{t("profile.deleteAccountList.irreversible")}</li>
                   </ul>
                 </div>
                 <Button
@@ -2172,7 +2792,7 @@ export function Profile() {
                   onClick={handleDeleteAccount}
                   disabled={isLoading}
                 >
-                  Konto löschen
+                  {t("profile.deleteAccount")}
                 </Button>
               </div>
             </CardContent>
@@ -2192,6 +2812,45 @@ export function Profile() {
         onOpenChange={setShowWarningDialog}
         onConfirm={() => performGlobalRankingUpdate(false)}
       />
+
+      <AlertDialog
+        open={unitSystemPromptOpen}
+        onOpenChange={(open) => {
+          setUnitSystemPromptOpen(open);
+          if (!open) {
+            setPendingUnitSystem(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t(
+                "profile.applyUnitSystemTitle",
+                "Einheitensystem übernehmen?"
+              )}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("profile.applyUnitSystemDescription", {
+                system: pendingSystemLabel,
+                defaultValue:
+                  "Möchtest du alle Einheiten auf {{system}} umstellen?",
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              {t("profile.applyUnitSystemKeep", "Nur diese Einheit")}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={applyUnitSystem}>
+              {t("profile.applyUnitSystemConfirm", {
+                system: pendingSystemLabel,
+                defaultValue: "{{system}} für alle",
+              })}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Password Dialog for 2FA */}
       {passwordDialogConfig && (

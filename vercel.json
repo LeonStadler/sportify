@@ -1,5 +1,11 @@
 {
+  "buildCommand": "npm run build:with-docs",
+  "outputDirectory": "dist",
   "rewrites": [
+    {
+      "source": "/docs/(.*)",
+      "destination": "/docs/$1"
+    },
     {
       "source": "/api/(.*)",
       "destination": "/api/index.js"

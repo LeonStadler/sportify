@@ -21,11 +21,13 @@ import {
 interface ThemeSwitcherProps {
   className?: string;
   variant?: "dropdown" | "button" | "toggle" | "sidebar";
+  size?: "default" | "sm";
 }
 
 export default function ThemeSwitcher({
   className,
   variant = "dropdown",
+  size = "default",
 }: ThemeSwitcherProps) {
   const { theme, setTheme } = useTheme();
   const { t } = useTranslation();
@@ -83,6 +85,7 @@ export default function ThemeSwitcher({
         onValueChange={(value) => {
           if (value) setTheme(value);
         }}
+        size={size}
         className={`gap-0 ${className || ""}`.trim()}
       >
         {themes.map((themeOption) => {

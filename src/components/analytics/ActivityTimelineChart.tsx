@@ -10,16 +10,15 @@ import {
   YAxis,
 } from "recharts";
 
-import type { AnalyticsWorkoutDay } from "@/types/analytics";
-
 export interface ActivityMetricConfig {
-  key: keyof AnalyticsWorkoutDay;
+  key: string;
   label: string;
   color: string;
+  measurementType?: "reps" | "time" | "distance" | null;
 }
 
 interface ActivityTimelineChartProps {
-  data: AnalyticsWorkoutDay[];
+  data: Array<Record<string, number | string>>;
   metrics: ActivityMetricConfig[];
   stacked?: boolean;
   formatDate?: (value: string) => string;

@@ -1,5 +1,5 @@
+import { WidgetFooterButton } from "@/components/dashboard/WidgetFooterButton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -12,19 +12,18 @@ import { useAuth } from "@/hooks/use-auth";
 import { API_URL } from "@/lib/api";
 import { parseAvatarConfig } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
-import { Link } from "react-router-dom";
-import { WidgetFooterButton } from "@/components/dashboard/WidgetFooterButton";
 import {
+  ArrowRight,
   Calendar,
   CalendarDays,
   Globe,
   Trophy,
   Users,
-  ArrowRight,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import NiceAvatar from "react-nice-avatar";
+import { Link } from "react-router-dom";
 
 interface LeaderboardEntry {
   id: string;
@@ -185,72 +184,72 @@ export function DashboardLeaderboardCard({
 
   return (
     <Card className={cn("flex flex-col h-full", className)}>
-      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-2 space-y-0 pb-2">
-        <CardTitle className="text-lg font-medium flex flex-wrap items-center gap-2">
+      <CardHeader className="flex flex-wrap w-full min-w-0 h-fit flex-col sm:flex-row sm:items-center sm:justify-start gap-[15px] space-y-0 pb-2">
+        <CardTitle className="text-lg font-medium flex flex-nowrap items-center gap-[15px] w-fit h-fit">
           <Trophy className="h-5 w-5 text-yellow-500" />
           {t("scoreboard.title", "Rangliste")}
         </CardTitle>
-          <div className="flex flex-wrap items-center gap-2 justify-start sm:justify-end w-full sm:w-auto">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="gap-2"
-                  aria-label={t("filters.periodLabel", "Zeitraum")}
-                >
-                  {period === "week" ? (
-                    <CalendarDays className="h-4 w-4" aria-hidden="true" />
-                  ) : (
-                    <Calendar className="h-4 w-4" aria-hidden="true" />
-                  )}
-                  {period === "week"
-                    ? t("common.week", "Woche")
-                    : t("common.month", "Monat")}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={() => setPeriod("week")}>
-                  <CalendarDays className="mr-2 h-4 w-4" />
-                  {t("common.week", "Woche")}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setPeriod("month")}>
-                  <Calendar className="mr-2 h-4 w-4" />
-                  {t("common.month", "Monat")}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+        <div className="flex flex-wrap items-end gap-[15px] justify-start w-fit h-fit">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                aria-label={t("filters.periodLabel", "Zeitraum")}
+              >
+                {period === "week" ? (
+                  <CalendarDays className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <Calendar className="h-4 w-4" aria-hidden="true" />
+                )}
+                {period === "week"
+                  ? t("common.week", "Woche")
+                  : t("common.month", "Monat")}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => setPeriod("week")}>
+                <CalendarDays className="mr-2 h-4 w-4" />
+                {t("common.week", "Woche")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setPeriod("month")}>
+                <Calendar className="mr-2 h-4 w-4" />
+                {t("common.month", "Monat")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="gap-2"
-                  aria-label={t("scoreboard.scope", "Bereich")}
-                >
-                  {scope === "friends" ? (
-                    <Users className="h-4 w-4" aria-hidden="true" />
-                  ) : (
-                    <Globe className="h-4 w-4" aria-hidden="true" />
-                  )}
-                  {scope === "friends"
-                    ? t("scoreboard.friends", "Freunde")
-                    : t("scoreboard.global", "Global")}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={() => setScope("friends")}>
-                  <Users className="mr-2 h-4 w-4" />
-                  {t("scoreboard.friends", "Freunde")}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setScope("global")}>
-                  <Globe className="mr-2 h-4 w-4" />
-                  {t("scoreboard.global", "Global")}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                aria-label={t("scoreboard.scope", "Bereich")}
+              >
+                {scope === "friends" ? (
+                  <Users className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <Globe className="h-4 w-4" aria-hidden="true" />
+                )}
+                {scope === "friends"
+                  ? t("scoreboard.friends", "Freunde")
+                  : t("scoreboard.global", "Global")}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => setScope("friends")}>
+                <Users className="mr-2 h-4 w-4" />
+                {t("scoreboard.friends", "Freunde")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setScope("global")}>
+                <Globe className="mr-2 h-4 w-4" />
+                {t("scoreboard.global", "Global")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </CardHeader>
       <CardContent className="flex-1 min-h-0 pt-4">
         <div className="space-y-3">
@@ -270,15 +269,15 @@ export function DashboardLeaderboardCard({
           )}
         </div>
         <div className="mt-4">
-        <WidgetFooterButton
-          ariaLabel={t("scoreboard.showMore", "Mehr anzeigen")}
-          asChild
-        >
-          <Link to="/scoreboard" className="inline-flex items-center gap-2">
-            {t("scoreboard.showMore", "Mehr anzeigen")}
-            <ArrowRight className="h-4 w-4" aria-hidden="true" />
-          </Link>
-        </WidgetFooterButton>
+          <WidgetFooterButton
+            ariaLabel={t("scoreboard.showMore", "Mehr anzeigen")}
+            asChild
+          >
+            <Link to="/scoreboard" className="inline-flex items-center gap-2">
+              {t("scoreboard.showMore", "Mehr anzeigen")}
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          </WidgetFooterButton>
         </div>
       </CardContent>
     </Card>

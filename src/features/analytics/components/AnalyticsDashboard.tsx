@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import type { TFunction } from "i18next";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,8 @@ interface AnalyticsDashboardProps {
   recoveryMetrics: RecoveryMetricOption[];
   defaultTab?: string;
   t: TFunction;
+  distanceUnit?: "km" | "miles";
+  trainingExtras?: ReactNode;
 }
 
 const DEFAULT_RECOVERY_KEYS: RecoveryMetricKey[] = [
@@ -48,6 +51,8 @@ export function AnalyticsDashboard({
   recoveryMetrics,
   defaultTab = "overview",
   t,
+  distanceUnit = "km",
+  trainingExtras,
 }: AnalyticsDashboardProps) {
   const safeAnalyticsData = data ?? null;
   const workouts = safeAnalyticsData?.workouts;
@@ -152,7 +157,7 @@ export function AnalyticsDashboard({
 
           {safeAnalyticsData ? (
             <Tabs defaultValue={defaultTab} className="w-full">
-              <TabsList className="flex-wrap">
+              <TabsList className="flex-wrap gap-2">
                 <TabsTrigger value="overview">{t("stats.overview", "Übersicht")}</TabsTrigger>
                 <TabsTrigger value="training">{t("stats.training", "Training")}</TabsTrigger>
                 <TabsTrigger value="recovery">{t("stats.recovery", "Erholung")}</TabsTrigger>
@@ -193,6 +198,8 @@ export function AnalyticsDashboard({
               }}
               formatters={formatters}
               t={t}
+              distanceUnit={distanceUnit}
+              extraContent={trainingExtras}
             />
           </TabsContent>
 

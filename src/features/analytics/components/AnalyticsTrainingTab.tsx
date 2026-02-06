@@ -23,6 +23,8 @@ interface AnalyticsTrainingTabProps {
   onToggleActivityMetric: (key: ActivityMetricOption["key"]) => void;
   formatters: AnalyticsFormatters;
   t: TFunction;
+  distanceUnit?: "km" | "miles";
+  extraContent?: React.ReactNode;
 }
 
 export function AnalyticsTrainingTab({
@@ -34,15 +36,36 @@ export function AnalyticsTrainingTab({
   onToggleActivityMetric,
   formatters,
   t,
+  distanceUnit = "km",
+  extraContent,
 }: AnalyticsTrainingTabProps) {
   const highlights = workouts?.highlights;
   const totals = workouts?.totals;
   const timeline = (workouts?.timeline ?? []) as AnalyticsWorkoutDay[];
   const hasTimeline = timeline.length > 0;
   const [chartMode, setChartMode] = useState<"stacked" | "grouped">("stacked");
+  const activityTimelineData = timeline.map((entry) => {
+    const activityTotals = entry.activities || {};
+    const row: Record<string, number | string> = {
+      date: entry.date,
+    };
+    const distanceFactor = distanceUnit === "miles" ? 0.621371 : 1;
+    selectedActivityConfigs.forEach((metric) => {
+      const rawValue = Number(activityTotals[metric.key] ?? 0);
+      const normalizedValue =
+        metric.measurementType === "time"
+          ? rawValue / 60
+          : metric.measurementType === "distance"
+            ? rawValue * distanceFactor
+            : rawValue;
+      row[metric.key] = normalizedValue;
+    });
+    return row;
+  });
 
   return (
     <>
+      {extraContent}
       <Card>
         <CardHeader>
           <CardTitle>{t("stats.pointsTrend")}</CardTitle>
@@ -117,19 +140,26 @@ export function AnalyticsTrainingTab({
         <CardContent>
           {hasTimeline ? (
             <ActivityTimelineChart
-              data={timeline}
+              data={activityTimelineData}
               metrics={selectedActivityConfigs.map((metric) => ({
                 key: metric.key,
                 label: metric.label,
                 color: metric.color,
+                measurementType: metric.measurementType,
               }))}
               stacked={chartMode === "stacked"}
               formatDate={(value) => formatters.formatRangeDate(value)}
-              formatValue={(key, value) =>
-                key === "running" || key === "cycling"
-                  ? formatters.formatDecimal(value, 1)
-                  : formatters.formatInteger(Math.round(value))
-              }
+              formatValue={(key, value) => {
+                const metric = selectedActivityConfigs.find((item) => item.key === key);
+                const measurementType = metric?.measurementType;
+                if (measurementType === "distance") {
+                  return formatters.formatDecimal(value, 1);
+                }
+                if (measurementType === "time") {
+                  return formatters.formatInteger(Math.round(value));
+                }
+                return formatters.formatInteger(Math.round(value));
+              }}
             />
           ) : (
             <p className="text-sm text-muted-foreground">{t("stats.noWorkoutData")}</p>

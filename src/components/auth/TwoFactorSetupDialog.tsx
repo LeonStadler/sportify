@@ -14,7 +14,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, Check, Copy, Download, Shield } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface TwoFactorSetupDialogProps {
   open: boolean;
@@ -30,6 +31,7 @@ export function TwoFactorSetupDialog({
   onSuccess,
 }: TwoFactorSetupDialogProps) {
   const { enable2FA, verify2FA } = useAuth();
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [step, setStep] = useState<SetupStep>("qr");
   const [qrCode, setQrCode] = useState<string>("");
@@ -39,6 +41,7 @@ export function TwoFactorSetupDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedCodes, setCopiedCodes] = useState(false);
+  const initializedRef = useRef(false);
 
   const resetState = () => {
     setStep("qr");
@@ -49,35 +52,39 @@ export function TwoFactorSetupDialog({
     setError(null);
     setCopiedCodes(false);
     setIsLoading(false);
+    initializedRef.current = false;
   };
 
   const initialize2FA = useCallback(async () => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
     setIsLoading(true);
     setError(null);
     try {
       const result = await enable2FA();
       if (!result || !result.secret) {
-        throw new Error("Ungültige Antwort vom Server");
+        throw new Error(t("auth.twoFactorSetup.invalidServerResponse"));
       }
       setQrCode(result.secret.otpauthUrl);
       setSecret(result.secret.base32);
       setBackupCodes(result.backupCodes);
       setStep("qr");
     } catch (err) {
+      initializedRef.current = false;
       const errorMessage =
         err instanceof Error
           ? err.message
-          : "Fehler beim Initialisieren der 2FA";
+          : t("auth.twoFactorSetup.initError");
       setError(errorMessage);
       toast({
-        title: "Fehler",
+        title: t("common.error"),
         description: errorMessage,
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
-  }, [enable2FA, toast]);
+  }, [enable2FA, toast, t]);
 
   // Load 2FA setup when dialog opens
   useEffect(() => {
@@ -91,7 +98,7 @@ export function TwoFactorSetupDialog({
 
   const handleVerify = async () => {
     if (!verificationCode || verificationCode.length !== 6) {
-      setError("Bitte gib einen 6-stelligen Code ein.");
+      setError(t("auth.twoFactorSetup.enterSixDigits"));
       return;
     }
 
@@ -101,19 +108,18 @@ export function TwoFactorSetupDialog({
     try {
       await verify2FA(verificationCode);
       toast({
-        title: "2FA aktiviert",
-        description:
-          "Zwei-Faktor-Authentifizierung wurde erfolgreich aktiviert.",
+        title: t("auth.twoFactorSetup.enabledTitle"),
+        description: t("auth.twoFactorSetup.enabledDesc"),
       });
       setStep("backup");
     } catch (err) {
       const errorMessage =
         err instanceof Error
           ? err.message
-          : "Ungültiger Code. Bitte versuche es erneut.";
+          : t("auth.twoFactorSetup.invalidCode");
       setError(errorMessage);
       toast({
-        title: "Fehler",
+        title: t("common.error"),
         description: errorMessage,
         variant: "destructive",
       });
@@ -132,14 +138,14 @@ export function TwoFactorSetupDialog({
     try {
       await navigator.clipboard.writeText(secret);
       toast({
-        title: "Kopiert",
-        description: "Geheimer Schlüssel wurde in die Zwischenablage kopiert.",
+        title: t("auth.twoFactorSetup.copySecretSuccessTitle"),
+        description: t("auth.twoFactorSetup.copySecretSuccessDesc"),
       });
     } catch (err) {
       console.error("Fehler beim Kopieren des geheimen Schlüssels:", err);
       toast({
-        title: "Fehler",
-        description: "Der geheime Schlüssel konnte nicht kopiert werden.",
+        title: t("auth.twoFactorSetup.copySecretErrorTitle"),
+        description: t("auth.twoFactorSetup.copySecretErrorDesc"),
         variant: "destructive",
       });
     }
@@ -151,15 +157,15 @@ export function TwoFactorSetupDialog({
       await navigator.clipboard.writeText(codesText);
       setCopiedCodes(true);
       toast({
-        title: "Kopiert",
-        description: "Recovery-Codes wurden in die Zwischenablage kopiert.",
+        title: t("auth.twoFactorSetup.copyCodesSuccessTitle"),
+        description: t("auth.twoFactorSetup.copyCodesSuccessDesc"),
       });
       setTimeout(() => setCopiedCodes(false), 2000);
     } catch (err) {
       console.error("Fehler beim Kopieren der Recovery-Codes:", err);
       toast({
-        title: "Fehler",
-        description: "Die Recovery-Codes konnten nicht kopiert werden.",
+        title: t("auth.twoFactorSetup.copyCodesErrorTitle"),
+        description: t("auth.twoFactorSetup.copyCodesErrorDesc"),
         variant: "destructive",
       });
     }
@@ -177,8 +183,8 @@ export function TwoFactorSetupDialog({
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     toast({
-      title: "Download gestartet",
-      description: "Recovery-Codes wurden heruntergeladen.",
+      title: t("auth.twoFactorSetup.downloadTitle"),
+      description: t("auth.twoFactorSetup.downloadDesc"),
     });
   };
 
@@ -193,17 +199,17 @@ export function TwoFactorSetupDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Shield className="w-5 h-5" />
-            2FA einrichten
+            {t("auth.twoFactorSetup.title")}
           </DialogTitle>
           <DialogDescription>
-            Richte die Zwei-Faktor-Authentifizierung für dein Konto ein.
+            {t("auth.twoFactorSetup.description")}
           </DialogDescription>
         </DialogHeader>
 
         {isLoading && step === "qr" && !qrCode && (
           <div className="flex items-center justify-center py-8">
             <div className="text-sm text-muted-foreground">
-              2FA wird initialisiert...
+              {t("auth.twoFactorSetup.initializing")}
             </div>
           </div>
         )}
@@ -217,7 +223,9 @@ export function TwoFactorSetupDialog({
 
         {!isLoading && step === "qr" && !qrCode && !error && (
           <div className="flex items-center justify-center py-8">
-            <div className="text-sm text-muted-foreground">Bereit...</div>
+            <div className="text-sm text-muted-foreground">
+              {t("auth.twoFactorSetup.ready")}
+            </div>
           </div>
         )}
 
@@ -225,8 +233,7 @@ export function TwoFactorSetupDialog({
           <div className="space-y-4">
             <div className="text-sm text-muted-foreground">
               <p className="mb-2">
-                Scanne diesen QR-Code mit deiner Authenticator-App (z.B. Google
-                Authenticator, Authy, Microsoft Authenticator):
+                {t("auth.twoFactorSetup.scanQr")}
               </p>
             </div>
 
@@ -238,13 +245,13 @@ export function TwoFactorSetupDialog({
                   level="M"
                   includeMargin={false}
                   className="w-[200px] h-[200px]"
-                  aria-label="QR Code für 2FA Setup"
+                  aria-label={t("auth.twoFactorSetup.qrAriaLabel")}
                 />
               </div>
 
               <div className="w-full space-y-2">
                 <Label className="text-sm font-medium">
-                  Oder gib diesen Code manuell ein:
+                  {t("auth.twoFactorSetup.manualEntryLabel")}
                 </Label>
                 <div className="flex items-center gap-2">
                   <div className="flex-1 p-3 bg-background border rounded-lg font-mono text-sm">
@@ -255,7 +262,7 @@ export function TwoFactorSetupDialog({
                     variant="outline"
                     size="icon"
                     onClick={copySecret}
-                    title="Kopieren"
+                    title={t("auth.twoFactorSetup.copy")}
                   >
                     <Copy className="w-4 h-4" />
                   </Button>
@@ -265,14 +272,13 @@ export function TwoFactorSetupDialog({
 
             <Alert>
               <AlertDescription className="text-sm">
-                Nach dem Scannen oder Eingeben des Codes, gib den 6-stelligen
-                Code aus deiner App ein, um die Einrichtung abzuschließen.
+                {t("auth.twoFactorSetup.verifyInstruction")}
               </AlertDescription>
             </Alert>
 
             <div className="flex items-center gap-2 pt-2">
               <Label htmlFor="verification-code" className="flex-1">
-                6-stelliger Code aus deiner App:
+                {t("auth.twoFactorSetup.codeLabel")}
               </Label>
             </div>
             <div className="flex gap-2">
@@ -306,17 +312,15 @@ export function TwoFactorSetupDialog({
             <Alert>
               <Shield className="h-4 w-4" />
               <AlertDescription>
-                <strong>Wichtig:</strong> Speichere diese Recovery-Codes an
-                einem sicheren Ort. Du kannst sie verwenden, um auf dein Konto
-                zuzugreifen, falls du keinen Zugriff auf deine Authenticator-App
-                hast.
+                <strong>{t("auth.twoFactorSetup.backupTitle")}</strong>{" "}
+                {t("auth.twoFactorSetup.backupDesc")}
               </AlertDescription>
             </Alert>
 
             <div className="p-4 bg-muted rounded-lg space-y-3">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-medium">
-                  Deine Recovery-Codes:
+                  {t("auth.twoFactorSetup.backupLabel")}
                 </Label>
                 <div className="flex gap-2">
                   <Button
@@ -328,12 +332,12 @@ export function TwoFactorSetupDialog({
                     {copiedCodes ? (
                       <>
                         <Check className="w-4 h-4 mr-2" />
-                        Kopiert
+                        {t("auth.twoFactorSetup.copied")}
                       </>
                     ) : (
                       <>
                         <Copy className="w-4 h-4 mr-2" />
-                        Kopieren
+                        {t("auth.twoFactorSetup.copy")}
                       </>
                     )}
                   </Button>
@@ -344,7 +348,7 @@ export function TwoFactorSetupDialog({
                     onClick={downloadBackupCodes}
                   >
                     <Download className="w-4 h-4 mr-2" />
-                    Download
+                    {t("auth.recoveryCodes.download")}
                   </Button>
                 </div>
               </div>
@@ -363,8 +367,7 @@ export function TwoFactorSetupDialog({
 
             <Alert variant="default">
               <AlertDescription className="text-sm">
-                Jeder Code kann nur einmal verwendet werden. Stelle sicher, dass
-                du diese Codes an einem sicheren Ort speicherst.
+                {t("auth.twoFactorSetup.backupSingleUse")}
               </AlertDescription>
             </Alert>
           </div>
@@ -378,20 +381,22 @@ export function TwoFactorSetupDialog({
                 variant="outline"
                 onClick={() => onOpenChange(false)}
               >
-                Abbrechen
+                {t("common.cancel")}
               </Button>
               <Button
                 type="button"
                 onClick={handleVerify}
                 disabled={isLoading || verificationCode.length !== 6}
               >
-                {isLoading ? "Wird verarbeitet..." : "Code verifizieren"}
+                {isLoading
+                  ? t("auth.twoFactorSetup.verifying")
+                  : t("auth.twoFactorSetup.verifyButton")}
               </Button>
             </>
           )}
           {step === "backup" && (
             <Button type="button" onClick={handleComplete} className="w-full">
-              Fertig
+              {t("auth.twoFactorSetup.complete")}
             </Button>
           )}
         </DialogFooter>

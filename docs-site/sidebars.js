@@ -1,0 +1,102 @@
+// @ts-check
+
+/** @type {import('@docusaurus/plugin-content-docs').SidebarsConfig} */
+const sidebars = {
+  docs: [
+    {
+      type: 'doc',
+      id: 'overview',
+      label: 'Überblick',
+    },
+    {
+      type: 'category',
+      label: 'Grundlagen',
+      items: [
+        'grundlagen',
+        'architecture',
+        'backend',
+        'frontend',
+        'development',
+        'deployment',
+        'database',
+        'operations',
+        'scoring',
+        'pwa',
+        'pwa-testing',
+        'email/README',
+        'audit-gap-list',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Design',
+      items: [
+        'design/README',
+        'design/corporate-identity',
+        'design/corporate-design',
+        'design/design-tokens',
+        'design/typography',
+        'design/layout-grid',
+        'design/components',
+        'design/interactions-motion',
+        'design/accessibility',
+        'design/iconography',
+        'design/content-tone',
+        'design/landing-page',
+        'design/governance',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'API',
+      items: [
+        'api/README',
+        'api/admin',
+        'api/events',
+        'api/feed',
+        'api/friends',
+        'api/challenges',
+        'api/training-journal',
+        'api/users',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Features',
+      items: [
+        'features/overview',
+        'features/landing',
+        'features/dashboard',
+        'features/training-workouts',
+        'features/exercises',
+        'features/training-journal',
+        'features/goals-challenges',
+        'features/statistics',
+        'features/rankings',
+        'features/social',
+        'features/notifications',
+        'features/profile',
+        'features/admin',
+        'features/operations',
+        'features/contact',
+        'features/invite',
+        'features/share',
+        'features/changelog',
+        'features/legal',
+        'features/notfound',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Systeme',
+      items: [
+        'systems/README',
+        'systems/workout-templates',
+        'systems/notifications',
+        'exercise-system',
+      ],
+    },
+  ],
+};
+
+module.exports = sidebars;

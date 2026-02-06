@@ -5,6 +5,7 @@ import {
   DEFAULT_WEEKLY_POINT_CHALLENGE,
   DEFAULT_WEEKLY_POINTS_GOAL,
 } from "../config/badges.js";
+import { createSummaryUnsubscribeUrl } from "./emailPreferencesService.js";
 import { sendJobFailureAlert } from "./alertService.js";
 import {
   grantCategoryRankAward,
@@ -39,6 +40,39 @@ const ACTIVITY_LABELS = {
 const parseNumber = (value, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const parsePreferences = (value) => {
+  if (!value) return {};
+  if (typeof value === "object" && !Array.isArray(value)) return value;
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? parsed
+        : {};
+    } catch (_error) {
+      return {};
+    }
+  }
+
+  return {};
+};
+
+const hasSummaryEmailsEnabled = (preferences) =>
+  preferences?.notifications?.email !== false;
+
+const getSummaryUnsubscribeUrl = (userId) => {
+  try {
+    return createSummaryUnsubscribeUrl({ userId });
+  } catch (error) {
+    console.error(
+      `Could not create summary unsubscribe URL for user ${userId}:`,
+      error
+    );
+    return null;
+  }
 };
 
 const getOffsetMinutes = () => {
@@ -148,7 +182,12 @@ const buildActivityTotalsMap = (rows) => {
       map.set(row.user_id, {});
     }
     const totals = map.get(row.user_id);
-    totals[row.activity_type] = parseNumber(row.total_quantity, 0);
+    totals[row.exercise_id] = {
+      quantity: parseNumber(row.total_quantity, 0),
+      reps: parseNumber(row.total_reps, 0),
+      duration: parseNumber(row.total_duration, 0),
+      distance: parseNumber(row.total_distance, 0),
+    };
   }
   return map;
 };
@@ -198,13 +237,14 @@ export const processWeeklyEvents = async (
                 u.last_name,
                 u.nickname,
                 u.display_preference,
+                u.preferences,
                 u.weekly_goals,
                 u.show_in_global_rankings,
                 COALESCE(SUM(wa.points_earned), 0) AS total_points,
                 COUNT(DISTINCT wir.id) AS total_workouts
             FROM users u
             LEFT JOIN workouts_in_range wir ON wir.user_id = u.id
-            LEFT JOIN workout_activities wa ON wa.workout_id = wir.id
+            LEFT JOIN workout_activities wa ON wa.workout_id = wir.id AND wa.exercise_id IS NOT NULL
             GROUP BY u.id
         `;
 
@@ -219,11 +259,15 @@ export const processWeeklyEvents = async (
             )
             SELECT
                 wir.user_id,
-                wa.activity_type,
-                SUM(wa.quantity) AS total_quantity
+                wa.exercise_id,
+                SUM(wa.quantity) AS total_quantity,
+                COALESCE(SUM(wa.reps), 0) AS total_reps,
+                COALESCE(SUM(wa.duration), 0) AS total_duration,
+                COALESCE(SUM(wa.distance), 0) AS total_distance
             FROM workouts_in_range wir
             JOIN workout_activities wa ON wa.workout_id = wir.id
-            GROUP BY wir.user_id, wa.activity_type
+            WHERE wa.exercise_id IS NOT NULL
+            GROUP BY wir.user_id, wa.exercise_id
         `;
 
     const [{ rows }, activityTotalsResult] = await Promise.all([
@@ -245,7 +289,7 @@ export const processWeeklyEvents = async (
       const totalPoints = parseNumber(row.total_points, 0);
       const totalWorkouts = parseNumber(row.total_workouts, 0);
       const totalExercises = Object.values(totalsByType).reduce(
-        (sum, value) => sum + parseNumber(value, 0),
+        (sum, value) => sum + parseNumber(value.quantity, 0),
         0
       );
 
@@ -256,6 +300,9 @@ export const processWeeklyEvents = async (
         lastName: row.last_name,
         nickname: row.nickname,
         displayPreference: row.display_preference,
+        summaryEmailsEnabled: hasSummaryEmailsEnabled(
+          parsePreferences(row.preferences)
+        ),
         showInGlobalRankings: row.show_in_global_rankings,
         weeklyGoals: parseWeeklyGoals(row.weekly_goals),
         totalsByType,
@@ -412,12 +459,28 @@ export const processWeeklyEvents = async (
     // Process emails with individual error handling to prevent partial failures
     const emailResults = [];
     for (const summary of summaries) {
-      if (!summary.email) continue;
+      if (!summary.email) {
+        emailResults.push({
+          userId: summary.userId,
+          status: "skipped",
+          reason: "missing-recipient-email",
+        });
+        continue;
+      }
+      if (!summary.summaryEmailsEnabled) {
+        emailResults.push({
+          userId: summary.userId,
+          status: "skipped",
+          reason: "email-notifications-disabled",
+        });
+        continue;
+      }
       try {
         const badges = weeklyBadgesMap.get(summary.userId) || [];
         const awards = weeklyAwardsMap.get(summary.userId) || [];
         const evaluation = goalEvaluationMap.get(summary.userId);
         const leaderboard = leaderboardEvaluations.get(summary.userId);
+        const unsubscribeUrl = getSummaryUnsubscribeUrl(summary.userId);
 
         const activityLines = Object.entries(summary.totalsByType)
           .map(([type, amount]) => {
@@ -456,6 +519,11 @@ export const processWeeklyEvents = async (
             ? `• Neue Auszeichnungen: ${awards.map((a) => a.label).join(", ")}`
             : null,
           "",
+          unsubscribeUrl
+            ? "Wenn du diese Zusammenfassung nicht mehr erhalten möchtest, kannst du sie hier abbestellen:"
+            : null,
+          unsubscribeUrl || null,
+          unsubscribeUrl ? "" : null,
           "Bleib dran und viel Erfolg für die nächste Woche!",
         ].filter((line) => line !== null && line !== undefined);
 
@@ -555,11 +623,12 @@ export const processMonthlyEvents = async (
                 u.first_name,
                 u.last_name,
                 u.nickname,
+                u.preferences,
                 u.show_in_global_rankings,
                 COALESCE(SUM(wa.points_earned), 0) AS total_points
             FROM users u
             LEFT JOIN workouts_in_range wir ON wir.user_id = u.id
-            LEFT JOIN workout_activities wa ON wa.workout_id = wir.id
+            LEFT JOIN workout_activities wa ON wa.workout_id = wir.id AND wa.exercise_id IS NOT NULL
             GROUP BY u.id
         `;
 
@@ -574,11 +643,15 @@ export const processMonthlyEvents = async (
             )
             SELECT
                 wir.user_id,
-                wa.activity_type,
-                SUM(wa.quantity) AS total_quantity
+                wa.exercise_id,
+                SUM(wa.quantity) AS total_quantity,
+                COALESCE(SUM(wa.reps), 0) AS total_reps,
+                COALESCE(SUM(wa.duration), 0) AS total_duration,
+                COALESCE(SUM(wa.distance), 0) AS total_distance
             FROM workouts_in_range wir
             JOIN workout_activities wa ON wa.workout_id = wir.id
-            GROUP BY wir.user_id, wa.activity_type
+            WHERE wa.exercise_id IS NOT NULL
+            GROUP BY wir.user_id, wa.exercise_id
         `;
 
     const [{ rows }, activityTotalsResult] = await Promise.all([
@@ -598,6 +671,9 @@ export const processMonthlyEvents = async (
       email: row.email,
       firstName: row.first_name,
       lastName: row.last_name,
+      summaryEmailsEnabled: hasSummaryEmailsEnabled(
+        parsePreferences(row.preferences)
+      ),
       totalPoints: parseNumber(row.total_points, 0),
       totalsByType: activityTotalsMap.get(row.user_id) ?? {},
       showInGlobalRankings: row.show_in_global_rankings !== false, // default true
@@ -614,13 +690,7 @@ export const processMonthlyEvents = async (
       (s) => s.totalPoints
     );
 
-    const activities = [
-      "pullups",
-      "pushups",
-      "situps",
-      "running",
-      "cycling",
-    ];
+    const activities = ["pullups", "pushups", "situps"];
     const globalActivityRanks = {};
     for (const activity of activities) {
       // Filter for users who actually did the activity and opted in
@@ -796,12 +866,28 @@ export const processMonthlyEvents = async (
     // Process emails with individual error handling to prevent partial failures
     const emailResults = [];
     for (const summary of summaries) {
-      if (!summary.email) continue;
+      if (!summary.email) {
+        emailResults.push({
+          userId: summary.userId,
+          status: "skipped",
+          reason: "missing-recipient-email",
+        });
+        continue;
+      }
+      if (!summary.summaryEmailsEnabled) {
+        emailResults.push({
+          userId: summary.userId,
+          status: "skipped",
+          reason: "email-notifications-disabled",
+        });
+        continue;
+      }
       try {
         const awards = monthlyAwardsMap.get(summary.userId) || [];
         const badges = monthlyBadgesMap.get(summary.userId) || [];
         const challengeMet =
           summary.totalPoints >= DEFAULT_MONTHLY_POINT_CHALLENGE;
+        const unsubscribeUrl = getSummaryUnsubscribeUrl(summary.userId);
 
         // Build Ranking Strings for Email
         const rankingLines = [];
@@ -860,6 +946,11 @@ export const processMonthlyEvents = async (
             ? `• Neue Auszeichnungen: ${awards.map((a) => a.label).join(", ")}`
             : null,
           "",
+          unsubscribeUrl
+            ? "Wenn du diese Zusammenfassung nicht mehr erhalten möchtest, kannst du sie hier abbestellen:"
+            : null,
+          unsubscribeUrl || null,
+          unsubscribeUrl ? "" : null,
           "Großartige Arbeit in diesem Monat – weiter so!",
         ].filter((line) => line !== null && line !== undefined);
 

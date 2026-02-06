@@ -107,14 +107,14 @@ jobs:
           echo "Generated matrix: $matrix_json"
           echo "Matrix empty: $matrix_empty"
 
-      - name: Check required secrets
+      - name: Check required secrets/variables
         id: check-secrets
         shell: bash
         run: |
-          if [ -z "${{ secrets.EVENTS_CRON_SECRET }}" ] || [ -z "${{ secrets.EVENTS_BASE_URL }}" ]; then
+          if [ -z "${{ secrets['EVENTS_CRON_SECRET'] }}" ] || [ -z "${{ secrets['FRONTEND_URL'] || vars.FRONTEND_URL || '' }}" ]; then
             echo "secrets_ok=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::trigger-events job will be skipped because required secrets are missing."
-            echo "Required: EVENTS_CRON_SECRET and EVENTS_BASE_URL."
+            echo "::warning::trigger-events job will be skipped because required config is missing."
+            echo "Required: EVENTS_CRON_SECRET (secret) and FRONTEND_URL (secret or variable)."
           else
             echo "secrets_ok=true" >> "$GITHUB_OUTPUT"
           fi
@@ -137,11 +137,11 @@ jobs:
       - name: Set environment variables
         shell: bash
         run: |
-          # Set EVENTS_BASE_URL from secrets
-          echo "EVENTS_BASE_URL=${{ secrets.EVENTS_BASE_URL }}" >> "$GITHUB_ENV"
+          # Set EVENTS_BASE_URL from FRONTEND_URL (secret or repository variable)
+          echo "EVENTS_BASE_URL=${{ secrets['FRONTEND_URL'] || vars.FRONTEND_URL || '' }}" >> "$GITHUB_ENV"
           
           # Set EVENTS_CRON_SECRET from secrets
-          echo "EVENTS_CRON_SECRET=${{ secrets.EVENTS_CRON_SECRET }}" >> "$GITHUB_ENV"
+          echo "EVENTS_CRON_SECRET=${{ secrets['EVENTS_CRON_SECRET'] }}" >> "$GITHUB_ENV"
       
       - name: Validate base URL
         shell: bash

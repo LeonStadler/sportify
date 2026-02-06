@@ -2,9 +2,70 @@ import express from "express";
 import authMiddleware from "../middleware/authMiddleware.js";
 import { badgeService } from "../services/badgeService.js";
 import { applyDisplayName, toCamelCase } from "../utils/helpers.js";
+import {
+  computePersonalFactor,
+  normalizeDistanceToKm,
+  normalizeDurationToSeconds,
+} from "../utils/scoring.js";
 
 export const createWorkoutsRouter = (pool) => {
   const router = express.Router();
+  const UUID_REGEX =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  let activityTypeColumnChecked = false;
+
+  const parsePreferences = (value) => {
+    if (!value) return {};
+    if (typeof value === "object" && !Array.isArray(value)) return value;
+    if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value);
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+          ? parsed
+          : {};
+      } catch (_error) {
+        return {};
+      }
+    }
+    return {};
+  };
+
+  const getBodyWeightKg = (preferences) => {
+    const raw = preferences?.metrics?.bodyWeightKg ?? preferences?.bodyWeightKg;
+    const value = Number(raw);
+    return Number.isFinite(value) && value > 0 ? value : null;
+  };
+
+  const ensureActivityTypeColumnCompatible = async (client) => {
+    if (activityTypeColumnChecked) return;
+
+    const { rows } = await client.query(`
+      SELECT data_type, udt_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'workout_activities'
+        AND column_name = 'activity_type'
+      LIMIT 1
+    `);
+
+    const column = rows[0];
+    if (
+      column &&
+      (column.data_type === "USER-DEFINED" ||
+        column.udt_name === "activity_type")
+    ) {
+      await client.query(`
+        ALTER TABLE workout_activities
+        ALTER COLUMN activity_type TYPE VARCHAR(100)
+        USING activity_type::text
+      `);
+      console.log(
+        "[Workout] workout_activities.activity_type wurde auf VARCHAR migriert."
+      );
+    }
+
+    activityTypeColumnChecked = true;
+  };
 
   // GET /api/workouts - Get user workouts with pagination and filtering
   router.get("/", authMiddleware, async (req, res) => {
@@ -27,7 +88,7 @@ export const createWorkoutsRouter = (pool) => {
 
       if (type && type !== "all") {
         filters.push(
-          `EXISTS (SELECT 1 FROM workout_activities wa_filter WHERE wa_filter.workout_id = w.id AND wa_filter.activity_type = $${paramIndex})`
+          `EXISTS (SELECT 1 FROM workout_activities wa_filter WHERE wa_filter.workout_id = w.id AND wa_filter.exercise_id = $${paramIndex})`
         );
         params.push(type);
         paramIndex++;
@@ -79,8 +140,52 @@ export const createWorkoutsRouter = (pool) => {
                     w.rest_between_sets_seconds,
                     w.rest_between_activities_seconds,
                     w.rest_between_rounds_seconds,
+                    w.category,
+                    w.discipline,
+                    w.movement_pattern,
+                    CASE
+                      WHEN w.movement_patterns IS NOT NULL THEN w.movement_patterns
+                      WHEN w.movement_pattern IS NOT NULL THEN ARRAY[w.movement_pattern]
+                      ELSE ARRAY[]::text[]
+                    END AS movement_patterns,
                     w.visibility,
-                    w.is_template,
+                    false AS is_template,
+                    w.source_template_id,
+                    w.source_template_root_id,
+                    MAX(source_template.title) AS source_template_title,
+                    MAX(
+                      CASE
+                        WHEN source_owner.id IS NULL THEN NULL
+                        WHEN source_owner.display_preference = 'nickname'
+                          AND NULLIF(TRIM(source_owner.nickname), '') IS NOT NULL
+                          THEN source_owner.nickname
+                        WHEN source_owner.display_preference = 'fullName'
+                          THEN NULLIF(TRIM(CONCAT(COALESCE(source_owner.first_name, ''), ' ', COALESCE(source_owner.last_name, ''))), '')
+                        ELSE COALESCE(
+                          NULLIF(TRIM(source_owner.first_name), ''),
+                          NULLIF(TRIM(source_owner.nickname), ''),
+                          NULLIF(TRIM(CONCAT(COALESCE(source_owner.first_name, ''), ' ', COALESCE(source_owner.last_name, ''))), '')
+                        )
+                      END
+                    ) AS source_template_owner_display_name,
+                    MAX(source_owner.id::text) AS source_template_owner_id,
+                    MAX(root_template.title) AS source_template_root_title,
+                    MAX(
+                      CASE
+                        WHEN root_owner.id IS NULL THEN NULL
+                        WHEN root_owner.display_preference = 'nickname'
+                          AND NULLIF(TRIM(root_owner.nickname), '') IS NOT NULL
+                          THEN root_owner.nickname
+                        WHEN root_owner.display_preference = 'fullName'
+                          THEN NULLIF(TRIM(CONCAT(COALESCE(root_owner.first_name, ''), ' ', COALESCE(root_owner.last_name, ''))), '')
+                        ELSE COALESCE(
+                          NULLIF(TRIM(root_owner.first_name), ''),
+                          NULLIF(TRIM(root_owner.nickname), ''),
+                          NULLIF(TRIM(CONCAT(COALESCE(root_owner.first_name, ''), ' ', COALESCE(root_owner.last_name, ''))), '')
+                        )
+                      END
+                    ) AS source_template_root_owner_display_name,
+                    MAX(root_owner.id::text) AS source_template_root_owner_id,
                     w.created_at,
                     w.updated_at,
                     COALESCE(
@@ -104,6 +209,10 @@ export const createWorkoutsRouter = (pool) => {
                     reactions.reactions as reactions
                 FROM workouts w
                 LEFT JOIN workout_activities wa ON w.id = wa.workout_id
+                LEFT JOIN workout_templates source_template ON source_template.id = w.source_template_id
+                LEFT JOIN users source_owner ON source_owner.id = source_template.user_id
+                LEFT JOIN workout_templates root_template ON root_template.id = COALESCE(w.source_template_root_id, w.source_template_id)
+                LEFT JOIN users root_owner ON root_owner.id = root_template.user_id
                 LEFT JOIN LATERAL (
                   SELECT COALESCE(
                     jsonb_agg(
@@ -136,7 +245,7 @@ export const createWorkoutsRouter = (pool) => {
                   ) reaction_data
                 ) reactions ON true
                 ${filterClause}
-                GROUP BY w.id, w.title, w.description, w.start_time, w.duration, w.use_end_time, w.difficulty, w.session_type, w.rounds, w.rest_between_sets_seconds, w.rest_between_activities_seconds, w.rest_between_rounds_seconds, w.visibility, w.is_template, w.created_at, w.updated_at, reactions.reactions
+                GROUP BY w.id, w.title, w.description, w.start_time, w.duration, w.use_end_time, w.difficulty, w.session_type, w.rounds, w.rest_between_sets_seconds, w.rest_between_activities_seconds, w.rest_between_rounds_seconds, w.category, w.discipline, w.movement_pattern, w.movement_patterns, w.visibility, w.source_template_id, w.source_template_root_id, w.created_at, w.updated_at, reactions.reactions
                 ORDER BY w.start_time DESC, w.created_at DESC
                 LIMIT $${params.length + 1} OFFSET $${params.length + 2};
             `;
@@ -311,12 +420,12 @@ export const createWorkoutsRouter = (pool) => {
     }
   });
 
-  const buildTemplateAccessClause = (userIdParamIndex) => `
-    (w.user_id = $${userIdParamIndex}
-      OR w.visibility = 'public'
+  const buildTemplateAccessClause = (userIdParamIndex, alias = "w") => `
+    (${alias}.user_id = $${userIdParamIndex}
+      OR ${alias}.visibility = 'public'
       OR (
-        w.visibility = 'friends'
-        AND w.user_id IN (
+        ${alias}.visibility = 'friends'
+        AND ${alias}.user_id IN (
           SELECT CASE
             WHEN requester_id = $${userIdParamIndex} THEN addressee_id
             ELSE requester_id
@@ -337,52 +446,112 @@ export const createWorkoutsRouter = (pool) => {
 
       const query = `
         SELECT 
-          w.id,
-          w.user_id,
-          w.title,
-          w.description,
-          w.start_time,
-          w.duration,
-          w.use_end_time,
-          w.difficulty,
-          w.session_type,
-          w.rounds,
-          w.rest_between_sets_seconds,
-          w.rest_between_activities_seconds,
-          w.rest_between_rounds_seconds,
-          w.visibility,
-          w.is_template,
-          w.created_at,
-          w.updated_at,
+          wt.id,
+          wt.user_id,
+          wt.title,
+          wt.description,
+          wt.start_time,
+          wt.duration,
+          wt.use_end_time,
+          wt.difficulty,
+          wt.session_type,
+          wt.rounds,
+          wt.rest_between_sets_seconds,
+          wt.rest_between_activities_seconds,
+          wt.rest_between_rounds_seconds,
+          wt.category,
+          wt.discipline,
+          wt.movement_pattern,
+          CASE
+            WHEN wt.movement_patterns IS NOT NULL THEN wt.movement_patterns
+            WHEN wt.movement_pattern IS NOT NULL THEN ARRAY[wt.movement_pattern]
+            ELSE ARRAY[]::text[]
+          END AS movement_patterns,
+          wt.visibility,
+          wt.source_template_id,
+          wt.source_template_root_id,
+          MAX(source_template.title) AS source_template_title,
+          wt.created_at,
+          wt.updated_at,
           u.first_name,
           u.last_name,
           u.nickname,
           u.display_preference,
+          MAX(
+            CASE
+              WHEN source_owner.id IS NULL THEN NULL
+              WHEN source_owner.display_preference = 'nickname'
+                AND NULLIF(TRIM(source_owner.nickname), '') IS NOT NULL
+                THEN source_owner.nickname
+              WHEN source_owner.display_preference = 'fullName'
+                THEN NULLIF(TRIM(CONCAT(COALESCE(source_owner.first_name, ''), ' ', COALESCE(source_owner.last_name, ''))), '')
+              ELSE COALESCE(
+                NULLIF(TRIM(source_owner.first_name), ''),
+                NULLIF(TRIM(source_owner.nickname), ''),
+                NULLIF(TRIM(CONCAT(COALESCE(source_owner.first_name, ''), ' ', COALESCE(source_owner.last_name, ''))), '')
+              )
+            END
+          ) AS source_template_owner_display_name,
+          MAX(source_owner.id::text) AS source_template_owner_id,
+          MAX(root_template.title) AS source_template_root_title,
+          MAX(
+            CASE
+              WHEN root_owner.id IS NULL THEN NULL
+              WHEN root_owner.display_preference = 'nickname'
+                AND NULLIF(TRIM(root_owner.nickname), '') IS NOT NULL
+                THEN root_owner.nickname
+              WHEN root_owner.display_preference = 'fullName'
+                THEN NULLIF(TRIM(CONCAT(COALESCE(root_owner.first_name, ''), ' ', COALESCE(root_owner.last_name, ''))), '')
+              ELSE COALESCE(
+                NULLIF(TRIM(root_owner.first_name), ''),
+                NULLIF(TRIM(root_owner.nickname), ''),
+                NULLIF(TRIM(CONCAT(COALESCE(root_owner.first_name, ''), ' ', COALESCE(root_owner.last_name, ''))), '')
+              )
+            END
+          ) AS source_template_root_owner_display_name,
+          MAX(root_owner.id::text) AS source_template_root_owner_id,
+          COALESCE(usage_stats.usage_count, 0)::int AS usage_count,
+          COALESCE(mg.muscle_groups, ARRAY[]::text[]) AS muscle_groups,
           COALESCE(
             JSON_AGG(
               JSON_BUILD_OBJECT(
-                'id', wa.id,
-                'activityType', wa.activity_type,
-                'quantity', wa.quantity,
-                'points', wa.points_earned,
-                'notes', wa.notes,
-                'unit', wa.unit,
-                'restBetweenSetsSeconds', wa.rest_between_sets_seconds,
-                'restAfterSeconds', wa.rest_after_seconds,
-                'effort', wa.effort,
-                'supersetGroup', wa.superset_group,
-                'setsData', wa.sets_data
-              ) ORDER BY wa.order_index, wa.id
-            ) FILTER (WHERE wa.id IS NOT NULL),
+                'id', wta.id,
+                'activityType', wta.activity_type,
+                'quantity', wta.quantity,
+                'points', wta.points_earned,
+                'notes', wta.notes,
+                'unit', wta.unit,
+                'restBetweenSetsSeconds', wta.rest_between_sets_seconds,
+                'restAfterSeconds', wta.rest_after_seconds,
+                'effort', wta.effort,
+                'supersetGroup', wta.superset_group,
+                'setsData', wta.sets_data
+              ) ORDER BY wta.order_index, wta.id
+            ) FILTER (WHERE wta.id IS NOT NULL),
             '[]'::json
           ) as activities
-        FROM workouts w
-        JOIN users u ON u.id = w.user_id
-        LEFT JOIN workout_activities wa ON w.id = wa.workout_id
-        WHERE w.is_template = true
-          AND ${buildTemplateAccessClause(1)}
-        GROUP BY w.id, u.id
-        ORDER BY w.updated_at DESC
+        FROM workout_templates wt
+        JOIN users u ON u.id = wt.user_id
+        LEFT JOIN workout_template_activities wta ON wt.id = wta.template_id
+        LEFT JOIN workout_templates source_template ON source_template.id = wt.source_template_id
+        LEFT JOIN users source_owner ON source_owner.id = source_template.user_id
+        LEFT JOIN workout_templates root_template ON root_template.id = COALESCE(wt.source_template_root_id, wt.source_template_id)
+        LEFT JOIN users root_owner ON root_owner.id = root_template.user_id
+        LEFT JOIN LATERAL (
+          SELECT COUNT(*)::int AS usage_count
+          FROM workouts used_workout
+          WHERE used_workout.source_template_id = wt.id
+        ) usage_stats ON true
+        LEFT JOIN LATERAL (
+          SELECT COALESCE(array_agg(DISTINCT mg), ARRAY[]::text[]) AS muscle_groups
+          FROM workout_template_activities wta2
+          JOIN exercises e ON e.id = wta2.exercise_id
+          CROSS JOIN LATERAL unnest(e.muscle_groups) AS mg
+          WHERE wta2.template_id = wt.id
+        ) mg ON true
+        WHERE ${buildTemplateAccessClause(1, "wt")}
+        GROUP BY wt.id, u.id, mg.muscle_groups, usage_stats.usage_count
+        ORDER BY wt.updated_at DESC
         LIMIT $2 OFFSET $3;
       `;
 
@@ -411,6 +580,7 @@ export const createWorkoutsRouter = (pool) => {
           : [];
 
         const workout = toCamelCase(row);
+        workout.isTemplate = true;
         workout.activities = activities;
         workout.owner = {
           id: row.user_id,
@@ -419,6 +589,21 @@ export const createWorkoutsRouter = (pool) => {
           nickname: row.nickname,
           displayPreference: row.display_preference,
         };
+        let startTimeDate = null;
+        if (workout.startTime) {
+          if (workout.startTime instanceof Date) {
+            startTimeDate = workout.startTime;
+          } else {
+            startTimeDate = new Date(workout.startTime);
+          }
+        }
+        if (startTimeDate && !Number.isNaN(startTimeDate.getTime())) {
+          workout.workoutDate = startTimeDate.toISOString().split("T")[0];
+          const hours = String(startTimeDate.getHours()).padStart(2, "0");
+          const minutes = String(startTimeDate.getMinutes()).padStart(2, "0");
+          workout.startTime = `${hours}:${minutes}`;
+          workout.startTimeTimestamp = startTimeDate.toISOString();
+        }
         return workout;
       });
 
@@ -435,45 +620,111 @@ export const createWorkoutsRouter = (pool) => {
       const templateId = req.params.id;
       const query = `
         SELECT 
-          w.id,
-          w.user_id,
-          w.title,
-          w.description,
-          w.start_time,
-          w.duration,
-          w.use_end_time,
-          w.difficulty,
-          w.session_type,
-          w.rounds,
-          w.rest_between_sets_seconds,
-          w.rest_between_activities_seconds,
-          w.rest_between_rounds_seconds,
-          w.visibility,
-          w.is_template,
-          w.created_at,
-          w.updated_at,
+          wt.id,
+          wt.user_id,
+          wt.title,
+          wt.description,
+          wt.start_time,
+          wt.duration,
+          wt.use_end_time,
+          wt.difficulty,
+          wt.session_type,
+          wt.rounds,
+          wt.rest_between_sets_seconds,
+          wt.rest_between_activities_seconds,
+          wt.rest_between_rounds_seconds,
+          wt.category,
+          wt.discipline,
+          wt.movement_pattern,
+          CASE
+            WHEN wt.movement_patterns IS NOT NULL THEN wt.movement_patterns
+            WHEN wt.movement_pattern IS NOT NULL THEN ARRAY[wt.movement_pattern]
+            ELSE ARRAY[]::text[]
+          END AS movement_patterns,
+          wt.visibility,
+          wt.source_template_id,
+          wt.source_template_root_id,
+          MAX(source_template.title) AS source_template_title,
+          wt.created_at,
+          wt.updated_at,
+          u.first_name,
+          u.last_name,
+          u.nickname,
+          u.display_preference,
+          MAX(
+            CASE
+              WHEN source_owner.id IS NULL THEN NULL
+              WHEN source_owner.display_preference = 'nickname'
+                AND NULLIF(TRIM(source_owner.nickname), '') IS NOT NULL
+                THEN source_owner.nickname
+              WHEN source_owner.display_preference = 'fullName'
+                THEN NULLIF(TRIM(CONCAT(COALESCE(source_owner.first_name, ''), ' ', COALESCE(source_owner.last_name, ''))), '')
+              ELSE COALESCE(
+                NULLIF(TRIM(source_owner.first_name), ''),
+                NULLIF(TRIM(source_owner.nickname), ''),
+                NULLIF(TRIM(CONCAT(COALESCE(source_owner.first_name, ''), ' ', COALESCE(source_owner.last_name, ''))), '')
+              )
+            END
+          ) AS source_template_owner_display_name,
+          MAX(source_owner.id::text) AS source_template_owner_id,
+          MAX(root_template.title) AS source_template_root_title,
+          MAX(
+            CASE
+              WHEN root_owner.id IS NULL THEN NULL
+              WHEN root_owner.display_preference = 'nickname'
+                AND NULLIF(TRIM(root_owner.nickname), '') IS NOT NULL
+                THEN root_owner.nickname
+              WHEN root_owner.display_preference = 'fullName'
+                THEN NULLIF(TRIM(CONCAT(COALESCE(root_owner.first_name, ''), ' ', COALESCE(root_owner.last_name, ''))), '')
+              ELSE COALESCE(
+                NULLIF(TRIM(root_owner.first_name), ''),
+                NULLIF(TRIM(root_owner.nickname), ''),
+                NULLIF(TRIM(CONCAT(COALESCE(root_owner.first_name, ''), ' ', COALESCE(root_owner.last_name, ''))), '')
+              )
+            END
+          ) AS source_template_root_owner_display_name,
+          MAX(root_owner.id::text) AS source_template_root_owner_id,
+          COALESCE(usage_stats.usage_count, 0)::int AS usage_count,
+          COALESCE(mg.muscle_groups, ARRAY[]::text[]) AS muscle_groups,
           COALESCE(
             JSON_AGG(
               JSON_BUILD_OBJECT(
-                'id', wa.id,
-                'activityType', wa.activity_type,
-                'quantity', wa.quantity,
-                'points', wa.points_earned,
-                'notes', wa.notes,
-                'unit', wa.unit,
-                'restBetweenSetsSeconds', wa.rest_between_sets_seconds,
-                'restAfterSeconds', wa.rest_after_seconds,
-                'effort', wa.effort,
-                'supersetGroup', wa.superset_group,
-                'setsData', wa.sets_data
-              ) ORDER BY wa.order_index, wa.id
-            ) FILTER (WHERE wa.id IS NOT NULL),
+                'id', wta.id,
+                'activityType', wta.activity_type,
+                'quantity', wta.quantity,
+                'points', wta.points_earned,
+                'notes', wta.notes,
+                'unit', wta.unit,
+                'restBetweenSetsSeconds', wta.rest_between_sets_seconds,
+                'restAfterSeconds', wta.rest_after_seconds,
+                'effort', wta.effort,
+                'supersetGroup', wta.superset_group,
+                'setsData', wta.sets_data
+              ) ORDER BY wta.order_index, wta.id
+            ) FILTER (WHERE wta.id IS NOT NULL),
             '[]'::json
           ) as activities
-        FROM workouts w
-        LEFT JOIN workout_activities wa ON w.id = wa.workout_id
-        WHERE w.id = $1 AND w.is_template = true AND ${buildTemplateAccessClause(2)}
-        GROUP BY w.id
+        FROM workout_templates wt
+        JOIN users u ON u.id = wt.user_id
+        LEFT JOIN workout_template_activities wta ON wt.id = wta.template_id
+        LEFT JOIN workout_templates source_template ON source_template.id = wt.source_template_id
+        LEFT JOIN users source_owner ON source_owner.id = source_template.user_id
+        LEFT JOIN workout_templates root_template ON root_template.id = COALESCE(wt.source_template_root_id, wt.source_template_id)
+        LEFT JOIN users root_owner ON root_owner.id = root_template.user_id
+        LEFT JOIN LATERAL (
+          SELECT COUNT(*)::int AS usage_count
+          FROM workouts used_workout
+          WHERE used_workout.source_template_id = wt.id
+        ) usage_stats ON true
+        LEFT JOIN LATERAL (
+          SELECT COALESCE(array_agg(DISTINCT mg), ARRAY[]::text[]) AS muscle_groups
+          FROM workout_template_activities wta2
+          JOIN exercises e ON e.id = wta2.exercise_id
+          CROSS JOIN LATERAL unnest(e.muscle_groups) AS mg
+          WHERE wta2.template_id = wt.id
+        ) mg ON true
+        WHERE wt.id = $1 AND ${buildTemplateAccessClause(2, "wt")}
+        GROUP BY wt.id, u.id, mg.muscle_groups, usage_stats.usage_count
       `;
       const { rows } = await pool.query(query, [templateId, req.user.id]);
       if (rows.length === 0) {
@@ -502,7 +753,30 @@ export const createWorkoutsRouter = (pool) => {
             .filter((a) => a.id !== null)
         : [];
       const workout = toCamelCase(row);
+      workout.isTemplate = true;
       workout.activities = activities;
+      workout.owner = {
+        id: row.user_id,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        nickname: row.nickname,
+        displayPreference: row.display_preference,
+      };
+      let startTimeDate = null;
+      if (workout.startTime) {
+        if (workout.startTime instanceof Date) {
+          startTimeDate = workout.startTime;
+        } else {
+          startTimeDate = new Date(workout.startTime);
+        }
+      }
+      if (startTimeDate && !Number.isNaN(startTimeDate.getTime())) {
+        workout.workoutDate = startTimeDate.toISOString().split("T")[0];
+        const hours = String(startTimeDate.getHours()).padStart(2, "0");
+        const minutes = String(startTimeDate.getMinutes()).padStart(2, "0");
+        workout.startTime = `${hours}:${minutes}`;
+        workout.startTimeTimestamp = startTimeDate.toISOString();
+      }
       res.json(workout);
     } catch (error) {
       console.error("Template workout get error:", error);
@@ -530,6 +804,11 @@ export const createWorkoutsRouter = (pool) => {
         restBetweenSetsSeconds,
         restBetweenActivitiesSeconds,
         restBetweenRoundsSeconds,
+        category,
+        discipline,
+        movementPattern,
+        movementPatterns,
+        sourceTemplateId,
       } = req.body;
 
       const parsePositiveInt = (value) => {
@@ -542,6 +821,7 @@ export const createWorkoutsRouter = (pool) => {
         return Number.isFinite(num) && num >= 0 ? Math.round(num) : null;
       };
 
+      const isTemplateRequest = Boolean(isTemplate);
       const normalizedVisibility = ["private", "friends", "public"].includes(
         visibility
       )
@@ -558,6 +838,12 @@ export const createWorkoutsRouter = (pool) => {
       const normalizedRestBetweenRoundsSeconds = parseNonNegativeInt(
         restBetweenRoundsSeconds
       );
+      const rawSourceTemplateId =
+        typeof sourceTemplateId === "string" && sourceTemplateId.trim().length > 0
+          ? sourceTemplateId.trim()
+          : null;
+      let normalizedSourceTemplateId = null;
+      let normalizedSourceTemplateRootId = null;
 
       console.log("Received workout data:", {
         title,
@@ -570,7 +856,8 @@ export const createWorkoutsRouter = (pool) => {
           setsCount: a.sets?.length,
         })),
         visibility,
-        isTemplate,
+        isTemplate: isTemplateRequest,
+        sourceTemplateId: rawSourceTemplateId,
       });
 
       if (!title || !title.trim()) {
@@ -591,35 +878,52 @@ export const createWorkoutsRouter = (pool) => {
 
       // Load valid activity types from database
       const { rows: validExercises } = await pool.query(`
-                SELECT id FROM exercises WHERE is_active = true
+                SELECT id, slug FROM exercises WHERE is_active = true
             `);
-      const validActivityTypes = validExercises.map((ex) => ex.id);
-      // Add legacy types as fallback
-      const legacyTypes = [
-        "pullups",
-        "pushups",
-        "running",
-        "cycling",
-        "situps",
-      ];
-      legacyTypes.forEach((type) => {
-        if (!validActivityTypes.includes(type)) {
-          validActivityTypes.push(type);
+      const { rows: aliasRows } = await pool.query(`
+                SELECT ea.alias_slug, ea.exercise_id
+                FROM exercise_aliases ea
+                JOIN exercises e ON e.id = ea.exercise_id
+                WHERE e.is_active = true
+            `);
+      const validActivityTypes = new Set(validExercises.map((ex) => ex.id));
+      const normalizeExerciseKey = (value) =>
+        String(value || "")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "");
+      const normalizedExerciseMap = new Map();
+      validExercises.forEach((ex) => {
+        if (ex.id) {
+          normalizedExerciseMap.set(normalizeExerciseKey(ex.id), ex.id);
+        }
+        if (ex.slug) {
+          normalizedExerciseMap.set(normalizeExerciseKey(ex.slug), ex.id);
         }
       });
+      aliasRows.forEach((row) => {
+        if (row.alias_slug) {
+          normalizedExerciseMap.set(row.alias_slug, row.exercise_id);
+        }
+      });
+      const resolveExerciseId = (activityType) => {
+        const raw = String(activityType || "").trim();
+        if (!raw) return null;
+        if (validActivityTypes.has(raw)) return raw;
+        const normalized = normalizeExerciseKey(raw);
+        return normalizedExerciseMap.get(normalized) || null;
+      };
 
       // Validate activities
       for (const activity of activities) {
-        if (
-          !activity.activityType ||
-          !validActivityTypes.includes(activity.activityType)
-        ) {
+        const resolvedExerciseId = resolveExerciseId(activity.activityType);
+        if (!resolvedExerciseId) {
           return res
             .status(400)
             .json({
               error: `Ungültiger Aktivitätstyp: ${activity.activityType}`,
             });
         }
+        activity.activityType = resolvedExerciseId;
 
         // Berechne Gesamtmenge: Wenn Sets vorhanden sind, summiere alle Reps
         let activityAmount = activity.quantity || activity.amount;
@@ -650,35 +954,39 @@ export const createWorkoutsRouter = (pool) => {
 
       try {
         await client.query("BEGIN");
+        if (!isTemplateRequest) {
+          await ensureActivityTypeColumnCompatible(client);
+        }
 
         // First check if workouts table has required columns, add if missing
-        const checkColumnsQuery = `
+        if (!isTemplateRequest) {
+          const checkColumnsQuery = `
                     SELECT column_name, data_type
                     FROM information_schema.columns 
                     WHERE table_name = 'workouts' 
-                    AND column_name IN ('duration', 'start_time', 'use_end_time');
+                    AND column_name IN ('duration', 'start_time', 'use_end_time', 'category', 'discipline', 'movement_pattern', 'movement_patterns', 'source_template_id', 'source_template_root_id');
                 `;
-        const { rows: columnRows } = await client.query(checkColumnsQuery);
-        const existingColumns = columnRows.map((row) => row.column_name);
-        const startTimeType = columnRows.find(
-          (row) => row.column_name === "start_time"
-        )?.data_type;
+          const { rows: columnRows } = await client.query(checkColumnsQuery);
+          const existingColumns = columnRows.map((row) => row.column_name);
+          const startTimeType = columnRows.find(
+            (row) => row.column_name === "start_time"
+          )?.data_type;
 
-        if (!existingColumns.includes("duration")) {
-          await client.query(
-            "ALTER TABLE workouts ADD COLUMN duration INTEGER;"
-          );
-        }
-        if (!existingColumns.includes("start_time")) {
-          await client.query(
-            "ALTER TABLE workouts ADD COLUMN start_time TIMESTAMPTZ;"
-          );
-        } else if (
-          startTimeType &&
-          startTimeType !== "timestamp with time zone"
-        ) {
-          // Wenn start_time existiert aber nicht TIMESTAMPTZ ist, migriere es
-          await client.query(`
+          if (!existingColumns.includes("duration")) {
+            await client.query(
+              "ALTER TABLE workouts ADD COLUMN duration INTEGER;"
+            );
+          }
+          if (!existingColumns.includes("start_time")) {
+            await client.query(
+              "ALTER TABLE workouts ADD COLUMN start_time TIMESTAMPTZ;"
+            );
+          } else if (
+            startTimeType &&
+            startTimeType !== "timestamp with time zone"
+          ) {
+            // Wenn start_time existiert aber nicht TIMESTAMPTZ ist, migriere es
+            await client.query(`
                         ALTER TABLE workouts 
                         ALTER COLUMN start_time TYPE TIMESTAMPTZ 
                         USING CASE 
@@ -689,12 +997,63 @@ export const createWorkoutsRouter = (pool) => {
                             ELSE start_time::timestamptz
                         END;
                     `);
-        }
-        if (!existingColumns.includes("use_end_time")) {
-          await client.query(
-            "ALTER TABLE workouts ADD COLUMN use_end_time BOOLEAN DEFAULT false;"
+          }
+          if (!existingColumns.includes("use_end_time")) {
+            await client.query(
+              "ALTER TABLE workouts ADD COLUMN use_end_time BOOLEAN DEFAULT false;"
+            );
+          }
+          if (!existingColumns.includes("category")) {
+            await client.query("ALTER TABLE workouts ADD COLUMN category VARCHAR(50);");
+          }
+          if (!existingColumns.includes("discipline")) {
+            await client.query("ALTER TABLE workouts ADD COLUMN discipline VARCHAR(50);");
+          }
+          if (!existingColumns.includes("movement_pattern")) {
+            await client.query("ALTER TABLE workouts ADD COLUMN movement_pattern VARCHAR(50);");
+          }
+          if (!existingColumns.includes("movement_patterns")) {
+            await client.query("ALTER TABLE workouts ADD COLUMN movement_patterns TEXT[];");
+          }
+          if (!existingColumns.includes("source_template_id")) {
+            await client.query(
+            "ALTER TABLE workouts ADD COLUMN source_template_id UUID;"
           );
+          }
+          if (!existingColumns.includes("source_template_root_id")) {
+            await client.query(
+              "ALTER TABLE workouts ADD COLUMN source_template_root_id UUID;"
+            );
+          }
         }
+
+        if (rawSourceTemplateId && UUID_REGEX.test(rawSourceTemplateId)) {
+          const sourceTemplateCheckQuery = `
+            SELECT wt.id
+            FROM workout_templates wt
+            WHERE wt.id = $1
+              AND ${buildTemplateAccessClause(2, "wt")}
+            LIMIT 1;
+          `;
+          const { rows: sourceTemplateRows } = await client.query(
+            sourceTemplateCheckQuery,
+            [rawSourceTemplateId, req.user.id]
+          );
+        if (sourceTemplateRows.length > 0) {
+          normalizedSourceTemplateId = sourceTemplateRows[0].id;
+        }
+      }
+
+      if (normalizedSourceTemplateId) {
+        const { rows: rootRows } = await client.query(
+          "SELECT id, source_template_root_id FROM workout_templates WHERE id = $1",
+          [normalizedSourceTemplateId]
+        );
+        if (rootRows.length > 0) {
+          normalizedSourceTemplateRootId =
+            rootRows[0].source_template_root_id || rootRows[0].id;
+        }
+      }
 
         // Kombiniere workoutDate und startTime zu start_time (TIMESTAMPTZ)
         let finalStartTime = null;
@@ -711,6 +1070,8 @@ export const createWorkoutsRouter = (pool) => {
             // Nur Datum, Zeit bleibt 00:00:00
             finalStartTime = datePart.toISOString();
           }
+        } else if (isTemplateRequest && existingStartTime) {
+          finalStartTime = existingStartTime;
         } else {
           // Fallback: aktuelles Datum/Zeit
           finalStartTime = new Date().toISOString();
@@ -740,8 +1101,71 @@ export const createWorkoutsRouter = (pool) => {
           finalDuration = duration;
         }
 
-        // Create workout with start_time (TIMESTAMPTZ), duration, and use_end_time
-        const workoutQuery = `
+        const resolvedCategory = isTemplateRequest ? category || null : null;
+        const resolvedDiscipline = isTemplateRequest ? discipline || null : null;
+        const resolvedMovementPattern = isTemplateRequest
+          ? movementPattern || null
+          : null;
+        const resolvedMovementPatterns = isTemplateRequest
+          ? Array.isArray(movementPatterns)
+            ? movementPatterns
+            : movementPattern
+              ? [movementPattern]
+              : null
+          : null;
+
+        let workoutRows = [];
+        if (isTemplateRequest) {
+          const templateQuery = `
+                    INSERT INTO workout_templates (
+                      user_id,
+                      title,
+                      description,
+                      start_time,
+                      duration,
+                      use_end_time,
+                      difficulty,
+                      session_type,
+                      rounds,
+                      rest_between_sets_seconds,
+                      rest_between_activities_seconds,
+                      rest_between_rounds_seconds,
+                      category,
+                      discipline,
+                      movement_pattern,
+                      movement_patterns,
+                      source_template_id,
+                      source_template_root_id,
+                      visibility
+                    )
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+                    RETURNING id, title, description, start_time, duration, use_end_time, difficulty, session_type, rounds, rest_between_sets_seconds, rest_between_activities_seconds, rest_between_rounds_seconds, category, discipline, movement_pattern, movement_patterns, source_template_id, source_template_root_id, visibility, created_at, updated_at;
+                `;
+          const { rows } = await client.query(templateQuery, [
+            req.user.id,
+            title.trim(),
+            description ? description.trim() : null,
+            finalStartTime,
+            finalDuration && finalDuration > 0 ? Math.round(finalDuration) : null,
+            finalUseEndTime,
+            normalizedDifficulty,
+            sessionType || null,
+            normalizedRounds,
+            normalizedRestBetweenSetsSeconds,
+            normalizedRestBetweenActivitiesSeconds,
+            normalizedRestBetweenRoundsSeconds,
+            resolvedCategory,
+            resolvedDiscipline,
+            resolvedMovementPattern,
+            resolvedMovementPatterns,
+            normalizedSourceTemplateId,
+            normalizedSourceTemplateRootId,
+            normalizedVisibility,
+          ]);
+          workoutRows = rows;
+        } else {
+          // Create workout with start_time (TIMESTAMPTZ), duration, and use_end_time
+          const workoutQuery = `
                     INSERT INTO workouts (
                       user_id,
                       title,
@@ -755,96 +1179,160 @@ export const createWorkoutsRouter = (pool) => {
                       rest_between_sets_seconds,
                       rest_between_activities_seconds,
                       rest_between_rounds_seconds,
-                      visibility,
-                      is_template
+                      category,
+                      discipline,
+                      movement_pattern,
+                      movement_patterns,
+                      source_template_id,
+                      source_template_root_id,
+                      visibility
                     )
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-                    RETURNING id, title, description, start_time, duration, use_end_time, difficulty, session_type, rounds, rest_between_sets_seconds, rest_between_activities_seconds, rest_between_rounds_seconds, visibility, is_template, created_at, updated_at;
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+                    RETURNING id, title, description, start_time, duration, use_end_time, difficulty, session_type, rounds, rest_between_sets_seconds, rest_between_activities_seconds, rest_between_rounds_seconds, category, discipline, movement_pattern, movement_patterns, source_template_id, source_template_root_id, visibility, created_at, updated_at;
                 `;
-        const { rows: workoutRows } = await client.query(workoutQuery, [
-          req.user.id,
-          title.trim(),
-          description ? description.trim() : null,
-          finalStartTime,
-          finalDuration && finalDuration > 0 ? Math.round(finalDuration) : null,
-          finalUseEndTime,
-          normalizedDifficulty,
-          sessionType || null,
-          normalizedRounds,
-          normalizedRestBetweenSetsSeconds,
-          normalizedRestBetweenActivitiesSeconds,
-          normalizedRestBetweenRoundsSeconds,
-          normalizedVisibility,
-          Boolean(isTemplate),
-        ]);
+          const { rows } = await client.query(workoutQuery, [
+            req.user.id,
+            title.trim(),
+            description ? description.trim() : null,
+            finalStartTime,
+            finalDuration && finalDuration > 0 ? Math.round(finalDuration) : null,
+            finalUseEndTime,
+            normalizedDifficulty,
+            sessionType || null,
+            normalizedRounds,
+            normalizedRestBetweenSetsSeconds,
+            normalizedRestBetweenActivitiesSeconds,
+            normalizedRestBetweenRoundsSeconds,
+            resolvedCategory,
+            resolvedDiscipline,
+            resolvedMovementPattern,
+            resolvedMovementPatterns,
+            normalizedSourceTemplateId,
+            normalizedSourceTemplateRootId,
+            normalizedVisibility,
+          ]);
+          workoutRows = rows;
+        }
 
         const workoutId = workoutRows[0].id;
 
+        const { rows: userRows } = await client.query(
+          `SELECT preferences FROM users WHERE id = $1`,
+          [req.user.id]
+        );
+        const userPreferences = parsePreferences(userRows[0]?.preferences);
+        const bodyWeightKg = getBodyWeightKg(userPreferences);
+
         // Load exercises with points from database
         const { rows: exerciseRows } = await client.query(`
-                    SELECT id, points_per_unit, is_active
+                    SELECT id,
+                           points_per_unit,
+                           measurement_type,
+                           supports_time,
+                           supports_distance,
+                           requires_weight,
+                           allows_weight,
+                           unit,
+                           is_active
                     FROM exercises
                     WHERE is_active = true
                 `);
 
-        const exercisePointsMap = {};
+        const exerciseMap = new Map();
         exerciseRows.forEach((ex) => {
-          exercisePointsMap[ex.id] = parseFloat(ex.points_per_unit) || 0;
+          exerciseMap.set(ex.id, {
+            pointsPerUnit: parseFloat(ex.points_per_unit) || 0,
+            measurementType: ex.measurement_type || "reps",
+            supportsTime: Boolean(ex.supports_time),
+            supportsDistance: Boolean(ex.supports_distance),
+            requiresWeight: Boolean(ex.requires_weight),
+            allowsWeight: Boolean(ex.allows_weight),
+            unit: ex.unit,
+          });
         });
 
-        // Calculate points based on activity type and amount from database
-        const calculateActivityPoints = (activityType, amount) => {
-          if (exercisePointsMap[activityType] !== undefined) {
-            return amount * exercisePointsMap[activityType];
+        const calculateActivityScore = ({
+          activityType,
+          activityAmount,
+          unit,
+          totalReps,
+          totalDurationSec,
+          totalDistanceKm,
+          maxWeightKg,
+          measurementType,
+        }) => {
+          const exercise = exerciseMap.get(activityType);
+          if (!exercise) {
+            return 0;
           }
-          // Fallback for legacy exercises not in database
-          switch (activityType) {
-            case "pullups":
-              return amount * 3;
-            case "pushups":
-              return amount * 1;
-            case "situps":
-              return amount * 1;
-            case "running":
-              return amount * 10;
-            case "cycling":
-              return amount * 5;
-            default:
-              return 0;
+
+          let normalizedAmount = 0;
+          if (measurementType === "time") {
+            normalizedAmount =
+              totalDurationSec ||
+              normalizeDurationToSeconds(activityAmount, unit);
+          } else if (measurementType === "distance") {
+            normalizedAmount =
+              totalDistanceKm || normalizeDistanceToKm(activityAmount, unit);
+          } else {
+            normalizedAmount = totalReps || Number(activityAmount) || 0;
           }
+
+          const basePoints = normalizedAmount * (exercise.pointsPerUnit || 0);
+          if (!Number.isFinite(basePoints) || basePoints <= 0) {
+            return 0;
+          }
+
+          const personalFactor =
+            !isTemplateRequest && bodyWeightKg
+              ? computePersonalFactor({
+                  bodyWeightKg,
+                  extraWeightKg: maxWeightKg,
+                  maxDeviation: 0.2,
+                })
+              : 1;
+
+          return Number((basePoints * personalFactor).toFixed(2));
         };
 
-        // Check if workout_activities table has sets column
-        const checkSetsColumnQuery = `
+        if (!isTemplateRequest) {
+          // Check if workout_activities table has sets column
+          const checkSetsColumnQuery = `
                     SELECT column_name 
                     FROM information_schema.columns 
                     WHERE table_name = 'workout_activities' AND column_name IN ('sets_data', 'unit');
                 `;
-        const { rows: setsColumnRows } =
-          await client.query(checkSetsColumnQuery);
+          const { rows: setsColumnRows } =
+            await client.query(checkSetsColumnQuery);
 
-        const hasSetsData = setsColumnRows.some(
-          (row) => row.column_name === "sets_data"
-        );
-        const hasUnit = setsColumnRows.some(
-          (row) => row.column_name === "unit"
-        );
-
-        if (!hasSetsData) {
-          // Add sets_data column if it doesn't exist
-          console.log("Adding sets_data column to workout_activities");
-          await client.query(
-            "ALTER TABLE workout_activities ADD COLUMN sets_data JSONB;"
+          const hasSetsData = setsColumnRows.some(
+            (row) => row.column_name === "sets_data"
           );
+          const hasUnit = setsColumnRows.some(
+            (row) => row.column_name === "unit"
+          );
+
+          if (!hasSetsData) {
+            // Add sets_data column if it doesn't exist
+            console.log("Adding sets_data column to workout_activities");
+            await client.query(
+              "ALTER TABLE workout_activities ADD COLUMN sets_data JSONB;"
+            );
+          }
+
+          if (!hasUnit) {
+            // Add unit column if it doesn't exist
+            console.log("Adding unit column to workout_activities");
+            await client.query(
+              "ALTER TABLE workout_activities ADD COLUMN unit VARCHAR(20);"
+            );
+          }
         }
 
-        if (!hasUnit) {
-          // Add unit column if it doesn't exist
-          console.log("Adding unit column to workout_activities");
-          await client.query(
-            "ALTER TABLE workout_activities ADD COLUMN unit VARCHAR(20);"
-          );
-        }
+        const activityTable = isTemplateRequest
+          ? "workout_template_activities"
+          : "workout_activities";
+        const activityParentColumn = isTemplateRequest ? "template_id" : "workout_id";
 
         // Create activities
         const activitiesData = [];
@@ -854,6 +1342,13 @@ export const createWorkoutsRouter = (pool) => {
           // Berechne Gesamtmenge: Wenn Sets vorhanden sind, summiere alle Reps
           let activityAmount = activity.quantity || activity.amount;
           let setsToStore = null;
+          let totalReps = 0;
+          let totalDurationSec = 0;
+          let totalDistanceKm = 0;
+          let maxWeightKg = 0;
+          const exercise = exerciseMap.get(activity.activityType);
+          const measurementType =
+            exercise?.measurementType || "reps";
 
           if (
             activity.sets &&
@@ -869,10 +1364,28 @@ export const createWorkoutsRouter = (pool) => {
                   (set.duration || 0) > 0 ||
                   (set.distance || 0) > 0)
             );
-            const totalFromSets = validSets.reduce(
-              (sum, set) => sum + (set.reps || 0),
-              0
-            );
+            validSets.forEach((set) => {
+              const reps = Number(set.reps) || 0;
+              const durationSec = normalizeDurationToSeconds(
+                set.duration,
+                activity.unit
+              );
+              const distanceKm = normalizeDistanceToKm(
+                set.distance,
+                activity.unit
+              );
+              const weight = Number(set.weight) || 0;
+              totalReps += reps;
+              totalDurationSec += durationSec;
+              totalDistanceKm += distanceKm;
+              if (weight > maxWeightKg) maxWeightKg = weight;
+            });
+            const totalFromSets =
+              measurementType === "time"
+                ? totalDurationSec
+                : measurementType === "distance"
+                  ? totalDistanceKm
+                  : totalReps;
 
             // Verwende die berechnete Summe aus Sets, falls sie größer ist
             if (totalFromSets > 0) {
@@ -882,17 +1395,45 @@ export const createWorkoutsRouter = (pool) => {
             }
           }
 
-          const points = calculateActivityPoints(
-            activity.activityType,
-            activityAmount
-          );
+          if (!setsToStore) {
+            if (measurementType === "time") {
+              totalDurationSec = normalizeDurationToSeconds(
+                activityAmount,
+                activity.unit
+              );
+            } else if (measurementType === "distance") {
+              totalDistanceKm = normalizeDistanceToKm(
+                activityAmount,
+                activity.unit
+              );
+            } else {
+              totalReps = Number(activityAmount) || 0;
+            }
+          }
+
+          const points = calculateActivityScore({
+            activityType: activity.activityType,
+            activityAmount,
+            unit: activity.unit,
+            totalReps,
+            totalDurationSec,
+            totalDistanceKm,
+            maxWeightKg,
+            measurementType,
+          });
 
           const activityQuery = `
-                        INSERT INTO workout_activities (
-                          workout_id,
+                        INSERT INTO ${activityTable} (
+                          ${activityParentColumn},
                           activity_type,
                           quantity,
                           points_earned,
+                          exercise_id,
+                          measurement_type,
+                          reps,
+                          duration,
+                          distance,
+                          weight,
                           notes,
                           order_index,
                           sets_data,
@@ -902,7 +1443,7 @@ export const createWorkoutsRouter = (pool) => {
                           effort,
                           superset_group
                         )
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
                         RETURNING id, activity_type, quantity, points_earned, notes, order_index, sets_data, unit, rest_between_sets_seconds, rest_after_seconds, effort, superset_group;
                     `;
 
@@ -937,6 +1478,12 @@ export const createWorkoutsRouter = (pool) => {
               activity.activityType,
               activityAmount,
               points,
+              activity.activityType,
+              measurementType || null,
+              totalReps || null,
+              totalDurationSec || null,
+              totalDistanceKm || null,
+              maxWeightKg || null,
               activity.notes ? activity.notes.trim() : null,
               i,
               setsDataValue,
@@ -980,27 +1527,32 @@ export const createWorkoutsRouter = (pool) => {
           }
         }
 
-        const { rows: lifetimeTotals } = await client.query(
-          `SELECT wa.activity_type, COALESCE(SUM(wa.quantity), 0) AS total_quantity
-           FROM workouts w
-           JOIN workout_activities wa ON w.id = wa.workout_id
-           WHERE w.user_id = $1
-           GROUP BY wa.activity_type`,
-          [req.user.id]
-        );
-
-        for (const total of lifetimeTotals) {
-          await badgeService.handleLifetimeMilestones(
-            client,
-            req.user.id,
-            total.activity_type,
-            Number(total.total_quantity) || 0
+        if (!isTemplateRequest) {
+          const { rows: lifetimeTotals } = await client.query(
+            `SELECT wa.exercise_id, COALESCE(SUM(wa.quantity), 0) AS total_quantity
+             FROM workouts w
+             JOIN workout_activities wa ON w.id = wa.workout_id
+             WHERE w.user_id = $1
+               AND wa.exercise_id IS NOT NULL
+             GROUP BY wa.exercise_id`,
+            [req.user.id]
           );
+
+          for (const total of lifetimeTotals) {
+            await badgeService.handleLifetimeMilestones(
+              client,
+              req.user.id,
+              total.exercise_id,
+              Number(total.total_quantity) || 0
+            );
+          }
         }
 
         await client.query("COMMIT");
 
         const workout = toCamelCase(workoutRows[0]);
+        workout.isTemplate = isTemplateRequest;
+        workout.isTemplate = isTemplateRequest;
 
         // Extrahiere workoutDate und startTime aus start_time (TIMESTAMPTZ)
         // start_time ist NOT NULL, daher sollte es immer vorhanden sein
@@ -1123,7 +1675,43 @@ export const createWorkoutsRouter = (pool) => {
                     w.rest_between_activities_seconds,
                     w.rest_between_rounds_seconds,
                     w.visibility,
-                    w.is_template,
+                    false AS is_template,
+                    w.source_template_id,
+                    w.source_template_root_id,
+                    MAX(source_template.title) AS source_template_title,
+                    MAX(
+                      CASE
+                        WHEN source_owner.id IS NULL THEN NULL
+                        WHEN source_owner.display_preference = 'nickname'
+                          AND NULLIF(TRIM(source_owner.nickname), '') IS NOT NULL
+                          THEN source_owner.nickname
+                        WHEN source_owner.display_preference = 'fullName'
+                          THEN NULLIF(TRIM(CONCAT(COALESCE(source_owner.first_name, ''), ' ', COALESCE(source_owner.last_name, ''))), '')
+                        ELSE COALESCE(
+                          NULLIF(TRIM(source_owner.first_name), ''),
+                          NULLIF(TRIM(source_owner.nickname), ''),
+                          NULLIF(TRIM(CONCAT(COALESCE(source_owner.first_name, ''), ' ', COALESCE(source_owner.last_name, ''))), '')
+                        )
+                      END
+                    ) AS source_template_owner_display_name,
+                    MAX(source_owner.id::text) AS source_template_owner_id,
+                    MAX(root_template.title) AS source_template_root_title,
+                    MAX(
+                      CASE
+                        WHEN root_owner.id IS NULL THEN NULL
+                        WHEN root_owner.display_preference = 'nickname'
+                          AND NULLIF(TRIM(root_owner.nickname), '') IS NOT NULL
+                          THEN root_owner.nickname
+                        WHEN root_owner.display_preference = 'fullName'
+                          THEN NULLIF(TRIM(CONCAT(COALESCE(root_owner.first_name, ''), ' ', COALESCE(root_owner.last_name, ''))), '')
+                        ELSE COALESCE(
+                          NULLIF(TRIM(root_owner.first_name), ''),
+                          NULLIF(TRIM(root_owner.nickname), ''),
+                          NULLIF(TRIM(CONCAT(COALESCE(root_owner.first_name, ''), ' ', COALESCE(root_owner.last_name, ''))), '')
+                        )
+                      END
+                    ) AS source_template_root_owner_display_name,
+                    MAX(root_owner.id::text) AS source_template_root_owner_id,
                     w.created_at, w.updated_at,
                     COALESCE(
                         JSON_AGG(
@@ -1145,8 +1733,12 @@ export const createWorkoutsRouter = (pool) => {
                     ) as activities
                 FROM workouts w
                 LEFT JOIN workout_activities wa ON w.id = wa.workout_id
+                LEFT JOIN workout_templates source_template ON source_template.id = w.source_template_id
+                LEFT JOIN users source_owner ON source_owner.id = source_template.user_id
+                LEFT JOIN workout_templates root_template ON root_template.id = COALESCE(w.source_template_root_id, w.source_template_id)
+                LEFT JOIN users root_owner ON root_owner.id = root_template.user_id
                 WHERE w.id = $1 AND w.user_id = $2
-                GROUP BY w.id, w.title, w.description, w.start_time, w.duration, w.use_end_time, w.visibility, w.is_template, w.created_at, w.updated_at;
+                GROUP BY w.id, w.title, w.description, w.start_time, w.duration, w.use_end_time, w.visibility, w.source_template_id, w.source_template_root_id, w.created_at, w.updated_at;
             `;
       const { rows } = await pool.query(query, [workoutId, req.user.id]);
       if (rows.length === 0) {
@@ -1263,6 +1855,10 @@ export const createWorkoutsRouter = (pool) => {
         restBetweenSetsSeconds,
         restBetweenActivitiesSeconds,
         restBetweenRoundsSeconds,
+        category,
+        discipline,
+        movementPattern,
+        movementPatterns,
       } = req.body;
 
       const parsePositiveInt = (value) => {
@@ -1275,6 +1871,7 @@ export const createWorkoutsRouter = (pool) => {
         return Number.isFinite(num) && num >= 0 ? Math.round(num) : null;
       };
 
+      const isTemplateRequest = Boolean(isTemplate);
       const normalizedVisibility = ["private", "friends", "public"].includes(
         visibility
       )
@@ -1309,35 +1906,52 @@ export const createWorkoutsRouter = (pool) => {
 
       // Load valid activity types from database
       const { rows: validExercises } = await pool.query(`
-                SELECT id FROM exercises WHERE is_active = true
+                SELECT id, slug FROM exercises WHERE is_active = true
             `);
-      const validActivityTypes = validExercises.map((ex) => ex.id);
-      // Add legacy types as fallback
-      const legacyTypes = [
-        "pullups",
-        "pushups",
-        "running",
-        "cycling",
-        "situps",
-      ];
-      legacyTypes.forEach((type) => {
-        if (!validActivityTypes.includes(type)) {
-          validActivityTypes.push(type);
+      const { rows: aliasRows } = await pool.query(`
+                SELECT ea.alias_slug, ea.exercise_id
+                FROM exercise_aliases ea
+                JOIN exercises e ON e.id = ea.exercise_id
+                WHERE e.is_active = true
+            `);
+      const validActivityTypes = new Set(validExercises.map((ex) => ex.id));
+      const normalizeExerciseKey = (value) =>
+        String(value || "")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "");
+      const normalizedExerciseMap = new Map();
+      validExercises.forEach((ex) => {
+        if (ex.id) {
+          normalizedExerciseMap.set(normalizeExerciseKey(ex.id), ex.id);
+        }
+        if (ex.slug) {
+          normalizedExerciseMap.set(normalizeExerciseKey(ex.slug), ex.id);
         }
       });
+      aliasRows.forEach((row) => {
+        if (row.alias_slug) {
+          normalizedExerciseMap.set(row.alias_slug, row.exercise_id);
+        }
+      });
+      const resolveExerciseId = (activityType) => {
+        const raw = String(activityType || "").trim();
+        if (!raw) return null;
+        if (validActivityTypes.has(raw)) return raw;
+        const normalized = normalizeExerciseKey(raw);
+        return normalizedExerciseMap.get(normalized) || null;
+      };
 
       // Validate activities
       for (const activity of activities) {
-        if (
-          !activity.activityType ||
-          !validActivityTypes.includes(activity.activityType)
-        ) {
+        const resolvedExerciseId = resolveExerciseId(activity.activityType);
+        if (!resolvedExerciseId) {
           return res
             .status(400)
             .json({
               error: `Ungültiger Aktivitätstyp: ${activity.activityType}`,
             });
         }
+        activity.activityType = resolvedExerciseId;
 
         // Berechne Gesamtmenge: Wenn Sets vorhanden sind, summiere alle Reps
         let activityAmount = activity.quantity || activity.amount;
@@ -1367,16 +1981,50 @@ export const createWorkoutsRouter = (pool) => {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
-
-        const checkQuery =
-          "SELECT id FROM workouts WHERE id = $1 AND user_id = $2";
-        const { rows: checkRows } = await client.query(checkQuery, [
+        const templateCheckQuery =
+          "SELECT id, start_time FROM workout_templates WHERE id = $1 AND user_id = $2";
+        const { rows: templateRows } = await client.query(templateCheckQuery, [
           workoutId,
           req.user.id,
         ]);
-        if (checkRows.length === 0) {
-          await client.query("ROLLBACK");
-          return res.status(404).json({ error: "Workout nicht gefunden." });
+        const isTemplateRecord = templateRows.length > 0;
+        let existingStartTime = templateRows[0]?.start_time ?? null;
+
+        if (!isTemplateRecord) {
+          await ensureActivityTypeColumnCompatible(client);
+
+          const checkQuery =
+            "SELECT id, start_time FROM workouts WHERE id = $1 AND user_id = $2";
+          const { rows: checkRows } = await client.query(checkQuery, [
+            workoutId,
+            req.user.id,
+          ]);
+          if (checkRows.length === 0) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ error: "Workout nicht gefunden." });
+          }
+          existingStartTime = checkRows[0]?.start_time ?? null;
+
+          const checkColumnsQuery = `
+                    SELECT column_name
+                    FROM information_schema.columns 
+                    WHERE table_name = 'workouts' 
+                    AND column_name IN ('category', 'discipline', 'movement_pattern', 'movement_patterns');
+                `;
+          const { rows: columnRows } = await client.query(checkColumnsQuery);
+          const existingColumns = columnRows.map((row) => row.column_name);
+          if (!existingColumns.includes("category")) {
+            await client.query("ALTER TABLE workouts ADD COLUMN category VARCHAR(50);");
+          }
+          if (!existingColumns.includes("discipline")) {
+            await client.query("ALTER TABLE workouts ADD COLUMN discipline VARCHAR(50);");
+          }
+          if (!existingColumns.includes("movement_pattern")) {
+            await client.query("ALTER TABLE workouts ADD COLUMN movement_pattern VARCHAR(50);");
+          }
+          if (!existingColumns.includes("movement_patterns")) {
+            await client.query("ALTER TABLE workouts ADD COLUMN movement_patterns TEXT[];");
+          }
         }
 
         // Kombiniere workoutDate und startTime zu start_time (TIMESTAMPTZ)
@@ -1423,7 +2071,66 @@ export const createWorkoutsRouter = (pool) => {
           finalDuration = duration;
         }
 
-        const updateQuery = `
+        const resolvedCategory = isTemplateRecord ? category || null : null;
+        const resolvedDiscipline = isTemplateRecord ? discipline || null : null;
+        const resolvedMovementPattern = isTemplateRecord
+          ? movementPattern || null
+          : null;
+        const resolvedMovementPatterns = isTemplateRecord
+          ? Array.isArray(movementPatterns)
+            ? movementPatterns
+            : movementPattern
+              ? [movementPattern]
+              : null
+          : null;
+
+        let workoutRows = [];
+        if (isTemplateRecord) {
+          const updateTemplateQuery = `
+                    UPDATE workout_templates
+                    SET title = $1,
+                        description = $2,
+                        start_time = $3,
+                        duration = $4,
+                        use_end_time = $5,
+                        difficulty = $6,
+                        session_type = $7,
+                        rounds = $8,
+                        rest_between_sets_seconds = $9,
+                        rest_between_activities_seconds = $10,
+                        rest_between_rounds_seconds = $11,
+                        category = $12,
+                        discipline = $13,
+                        movement_pattern = $14,
+                        movement_patterns = $15,
+                        visibility = $16,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = $17 AND user_id = $18
+                    RETURNING id, title, description, start_time, duration, use_end_time, difficulty, session_type, rounds, rest_between_sets_seconds, rest_between_activities_seconds, rest_between_rounds_seconds, category, discipline, movement_pattern, movement_patterns, source_template_id, source_template_root_id, visibility, created_at, updated_at;
+                `;
+          const { rows } = await client.query(updateTemplateQuery, [
+            title.trim(),
+            description ? description.trim() : null,
+            finalStartTime,
+            finalDuration && finalDuration > 0 ? Math.round(finalDuration) : null,
+            finalUseEndTime,
+            normalizedDifficulty,
+            sessionType || null,
+            normalizedRounds,
+            normalizedRestBetweenSetsSeconds,
+            normalizedRestBetweenActivitiesSeconds,
+            normalizedRestBetweenRoundsSeconds,
+            resolvedCategory,
+            resolvedDiscipline,
+            resolvedMovementPattern,
+            resolvedMovementPatterns,
+            normalizedVisibility,
+            workoutId,
+            req.user.id,
+          ]);
+          workoutRows = rows;
+        } else {
+          const updateQuery = `
                     UPDATE workouts
                     SET title = $1,
                         description = $2,
@@ -1436,67 +2143,125 @@ export const createWorkoutsRouter = (pool) => {
                         rest_between_sets_seconds = $9,
                         rest_between_activities_seconds = $10,
                         rest_between_rounds_seconds = $11,
-                        visibility = $12,
-                        is_template = $13,
+                        category = $12,
+                        discipline = $13,
+                        movement_pattern = $14,
+                        movement_patterns = $15,
+                        visibility = $16,
                         updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $14 AND user_id = $15
-                    RETURNING id, title, description, start_time, duration, use_end_time, difficulty, session_type, rounds, rest_between_sets_seconds, rest_between_activities_seconds, rest_between_rounds_seconds, visibility, is_template, created_at, updated_at;
+                    WHERE id = $17 AND user_id = $18
+                    RETURNING id, title, description, start_time, duration, use_end_time, difficulty, session_type, rounds, rest_between_sets_seconds, rest_between_activities_seconds, rest_between_rounds_seconds, category, discipline, movement_pattern, movement_patterns, source_template_id, source_template_root_id, visibility, created_at, updated_at;
                 `;
-        const { rows: workoutRows } = await client.query(updateQuery, [
-          title.trim(),
-          description ? description.trim() : null,
-          finalStartTime,
-          finalDuration && finalDuration > 0 ? Math.round(finalDuration) : null,
-          finalUseEndTime,
-          normalizedDifficulty,
-          sessionType || null,
-          normalizedRounds,
-          normalizedRestBetweenSetsSeconds,
-          normalizedRestBetweenActivitiesSeconds,
-          normalizedRestBetweenRoundsSeconds,
-          normalizedVisibility,
-          Boolean(isTemplate),
-          workoutId,
-          req.user.id,
-        ]);
+          const { rows } = await client.query(updateQuery, [
+            title.trim(),
+            description ? description.trim() : null,
+            finalStartTime,
+            finalDuration && finalDuration > 0 ? Math.round(finalDuration) : null,
+            finalUseEndTime,
+            normalizedDifficulty,
+            sessionType || null,
+            normalizedRounds,
+            normalizedRestBetweenSetsSeconds,
+            normalizedRestBetweenActivitiesSeconds,
+            normalizedRestBetweenRoundsSeconds,
+            resolvedCategory,
+            resolvedDiscipline,
+            resolvedMovementPattern,
+            resolvedMovementPatterns,
+            normalizedVisibility,
+            workoutId,
+            req.user.id,
+          ]);
+          workoutRows = rows;
+        }
+
+        const activityTable = isTemplateRecord
+          ? "workout_template_activities"
+          : "workout_activities";
+        const activityParentColumn = isTemplateRecord ? "template_id" : "workout_id";
 
         await client.query(
-          "DELETE FROM workout_activities WHERE workout_id = $1",
+          `DELETE FROM ${activityTable} WHERE ${activityParentColumn} = $1`,
           [workoutId]
         );
 
+        const { rows: userRows } = await client.query(
+          `SELECT preferences FROM users WHERE id = $1`,
+          [req.user.id]
+        );
+        const userPreferences = parsePreferences(userRows[0]?.preferences);
+        const bodyWeightKg = getBodyWeightKg(userPreferences);
+
         // Load exercises with points from database
         const { rows: exerciseRows } = await client.query(`
-                    SELECT id, points_per_unit, is_active
+                    SELECT id,
+                           points_per_unit,
+                           measurement_type,
+                           supports_time,
+                           supports_distance,
+                           requires_weight,
+                           allows_weight,
+                           unit,
+                           is_active
                     FROM exercises
                     WHERE is_active = true
                 `);
 
-        const exercisePointsMap = {};
+        const exerciseMap = new Map();
         exerciseRows.forEach((ex) => {
-          exercisePointsMap[ex.id] = parseFloat(ex.points_per_unit) || 0;
+          exerciseMap.set(ex.id, {
+            pointsPerUnit: parseFloat(ex.points_per_unit) || 0,
+            measurementType: ex.measurement_type || "reps",
+            supportsTime: Boolean(ex.supports_time),
+            supportsDistance: Boolean(ex.supports_distance),
+            requiresWeight: Boolean(ex.requires_weight),
+            allowsWeight: Boolean(ex.allows_weight),
+            unit: ex.unit,
+          });
         });
 
-        // Calculate points based on activity type and amount from database
-        const calculateActivityPoints = (activityType, amount) => {
-          if (exercisePointsMap[activityType] !== undefined) {
-            return amount * exercisePointsMap[activityType];
+        const calculateActivityScore = ({
+          activityType,
+          activityAmount,
+          unit,
+          totalReps,
+          totalDurationSec,
+          totalDistanceKm,
+          maxWeightKg,
+          measurementType,
+        }) => {
+          const exercise = exerciseMap.get(activityType);
+          if (!exercise) {
+            return 0;
           }
-          // Fallback for legacy exercises not in database
-          switch (activityType) {
-            case "pullups":
-              return amount * 3;
-            case "pushups":
-              return amount * 1;
-            case "situps":
-              return amount * 1;
-            case "running":
-              return amount * 10;
-            case "cycling":
-              return amount * 5;
-            default:
-              return 0;
+
+          let normalizedAmount = 0;
+          if (measurementType === "time") {
+            normalizedAmount =
+              totalDurationSec ||
+              normalizeDurationToSeconds(activityAmount, unit);
+          } else if (measurementType === "distance") {
+            normalizedAmount =
+              totalDistanceKm || normalizeDistanceToKm(activityAmount, unit);
+          } else {
+            normalizedAmount = totalReps || Number(activityAmount) || 0;
           }
+
+          const basePoints = normalizedAmount * (exercise.pointsPerUnit || 0);
+          if (!Number.isFinite(basePoints) || basePoints <= 0) {
+            return 0;
+          }
+
+          const personalFactor =
+            !isTemplateRecord && bodyWeightKg
+              ? computePersonalFactor({
+                  bodyWeightKg,
+                  extraWeightKg: maxWeightKg,
+                  maxDeviation: 0.2,
+                })
+              : 1;
+
+          return Number((basePoints * personalFactor).toFixed(2));
         };
 
         const activitiesData = [];
@@ -1506,6 +2271,13 @@ export const createWorkoutsRouter = (pool) => {
           // Berechne Gesamtmenge: Wenn Sets vorhanden sind, summiere alle Reps
           let activityAmount = activity.quantity || activity.amount;
           let setsToStore = null;
+          let totalReps = 0;
+          let totalDurationSec = 0;
+          let totalDistanceKm = 0;
+          let maxWeightKg = 0;
+          const exercise = exerciseMap.get(activity.activityType);
+          const measurementType =
+            exercise?.measurementType || "reps";
 
           if (
             activity.sets &&
@@ -1521,10 +2293,28 @@ export const createWorkoutsRouter = (pool) => {
                   (set.duration || 0) > 0 ||
                   (set.distance || 0) > 0)
             );
-            const totalFromSets = validSets.reduce(
-              (sum, set) => sum + (set.reps || 0),
-              0
-            );
+            validSets.forEach((set) => {
+              const reps = Number(set.reps) || 0;
+              const durationSec = normalizeDurationToSeconds(
+                set.duration,
+                activity.unit
+              );
+              const distanceKm = normalizeDistanceToKm(
+                set.distance,
+                activity.unit
+              );
+              const weight = Number(set.weight) || 0;
+              totalReps += reps;
+              totalDurationSec += durationSec;
+              totalDistanceKm += distanceKm;
+              if (weight > maxWeightKg) maxWeightKg = weight;
+            });
+            const totalFromSets =
+              measurementType === "time"
+                ? totalDurationSec
+                : measurementType === "distance"
+                  ? totalDistanceKm
+                  : totalReps;
 
             // Verwende die berechnete Summe aus Sets, falls sie größer ist
             if (totalFromSets > 0) {
@@ -1534,16 +2324,44 @@ export const createWorkoutsRouter = (pool) => {
             }
           }
 
-          const points = calculateActivityPoints(
-            activity.activityType,
-            activityAmount
-          );
+          if (!setsToStore) {
+            if (measurementType === "time") {
+              totalDurationSec = normalizeDurationToSeconds(
+                activityAmount,
+                activity.unit
+              );
+            } else if (measurementType === "distance") {
+              totalDistanceKm = normalizeDistanceToKm(
+                activityAmount,
+                activity.unit
+              );
+            } else {
+              totalReps = Number(activityAmount) || 0;
+            }
+          }
+
+          const points = calculateActivityScore({
+            activityType: activity.activityType,
+            activityAmount,
+            unit: activity.unit,
+            totalReps,
+            totalDurationSec,
+            totalDistanceKm,
+            maxWeightKg,
+            measurementType,
+          });
           const activityQuery = `
-                        INSERT INTO workout_activities (
-                          workout_id,
+                        INSERT INTO ${activityTable} (
+                          ${activityParentColumn},
                           activity_type,
                           quantity,
                           points_earned,
+                          exercise_id,
+                          measurement_type,
+                          reps,
+                          duration,
+                          distance,
+                          weight,
                           notes,
                           order_index,
                           sets_data,
@@ -1553,7 +2371,7 @@ export const createWorkoutsRouter = (pool) => {
                           effort,
                           superset_group
                         )
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
                         RETURNING id, activity_type, quantity, points_earned, notes, order_index, sets_data, unit, rest_between_sets_seconds, rest_after_seconds, effort, superset_group;
                     `;
 
@@ -1577,11 +2395,17 @@ export const createWorkoutsRouter = (pool) => {
             }
           }
 
-        const { rows: activityRows } = await client.query(activityQuery, [
+          const { rows: activityRows } = await client.query(activityQuery, [
             workoutId,
             activity.activityType,
             activityAmount,
             points,
+            activity.activityType,
+            measurementType || null,
+            totalReps || null,
+            totalDurationSec || null,
+            totalDistanceKm || null,
+            maxWeightKg || null,
             activity.notes ? activity.notes.trim() : null,
             i,
             setsDataValue,
@@ -1614,22 +2438,25 @@ export const createWorkoutsRouter = (pool) => {
           activitiesData.push(row);
         }
 
-        const { rows: lifetimeTotals } = await client.query(
-          `SELECT wa.activity_type, COALESCE(SUM(wa.quantity), 0) AS total_quantity
-           FROM workouts w
-           JOIN workout_activities wa ON w.id = wa.workout_id
-           WHERE w.user_id = $1
-           GROUP BY wa.activity_type`,
-          [req.user.id]
-        );
-
-        for (const total of lifetimeTotals) {
-          await badgeService.handleLifetimeMilestones(
-            client,
-            req.user.id,
-            total.activity_type,
-            Number(total.total_quantity) || 0
+        if (!isTemplateRecord) {
+          const { rows: lifetimeTotals } = await client.query(
+            `SELECT wa.exercise_id, COALESCE(SUM(wa.quantity), 0) AS total_quantity
+             FROM workouts w
+             JOIN workout_activities wa ON w.id = wa.workout_id
+             WHERE w.user_id = $1
+               AND wa.exercise_id IS NOT NULL
+             GROUP BY wa.exercise_id`,
+            [req.user.id]
           );
+
+          for (const total of lifetimeTotals) {
+            await badgeService.handleLifetimeMilestones(
+              client,
+              req.user.id,
+              total.exercise_id,
+              Number(total.total_quantity) || 0
+            );
+          }
         }
 
         await client.query("COMMIT");
@@ -1723,6 +2550,26 @@ export const createWorkoutsRouter = (pool) => {
 
       try {
         await client.query("BEGIN");
+
+        const templateCheckQuery =
+          "SELECT id FROM workout_templates WHERE id = $1 AND user_id = $2";
+        const { rows: templateRows } = await client.query(templateCheckQuery, [
+          workoutId,
+          req.user.id,
+        ]);
+
+        if (templateRows.length > 0) {
+          await client.query(
+            "DELETE FROM workout_template_activities WHERE template_id = $1",
+            [workoutId]
+          );
+          await client.query(
+            "DELETE FROM workout_templates WHERE id = $1 AND user_id = $2",
+            [workoutId, req.user.id]
+          );
+          await client.query("COMMIT");
+          return res.json({ message: "Workout erfolgreich gelöscht." });
+        }
 
         // Check if workout exists and belongs to user
         const checkQuery =

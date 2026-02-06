@@ -9,7 +9,7 @@ import { MonthlyGoalCard } from "@/components/dashboard/MonthlyGoalCard";
 import { RecoveryJournalCard } from "@/components/dashboard/RecoveryJournalCard";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { WeeklyChallengeCard } from "@/components/dashboard/WeeklyChallengeCard";
-import { WeeklyGoalsCard, WeeklyProgress } from "@/components/dashboard/WeeklyGoalsCard";
+import { WeeklyGoalsCard } from "@/components/dashboard/WeeklyGoalsCard";
 import { WeeklyGoalsDialog } from "@/components/settings/WeeklyGoalsDialog";
 import { WeeklyGoals } from "@/components/settings/WeeklyGoalsForm";
 import { WeeklyPointsGoalDialog } from "@/components/settings/WeeklyPointsGoalDialog";
@@ -19,8 +19,10 @@ import { DEFAULT_WEEKLY_POINTS_GOAL } from "@/config/events";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
+import type { Exercise, ExerciseListResponse } from "@/types/exercise";
+import { getPrimaryDistanceUnit } from "@/utils/units";
 import { BarChart, Dumbbell, Settings, TrendingUp, Trophy } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 interface DashboardStats {
@@ -31,13 +33,21 @@ interface DashboardStats {
   userRank: number;
   totalUsers: number;
   period: string;
-  activities: {
-    pullups: { total: number; period: number };
-    pushups: { total: number; period: number };
-    running: { total: number; period: number };
-    cycling: { total: number; period: number };
-    situps: { total: number; period: number };
-  };
+  activities: Array<{
+    id: string;
+    name: string;
+    measurementType?: string | null;
+    supportsTime?: boolean | null;
+    supportsDistance?: boolean | null;
+    totalPoints: number;
+    periodPoints: number;
+    totalReps: number;
+    periodReps: number;
+    totalDuration: number;
+    periodDuration: number;
+    totalDistance: number;
+    periodDistance: number;
+  }>;
 }
 
 interface RecentWorkout {
@@ -55,9 +65,9 @@ interface RecentWorkout {
 
 const DEFAULT_CARDS: StatCardConfig[] = [
   { id: "1", type: "points", period: "week", color: "orange" },
-  { id: "2", type: "activity", period: "week", activityType: "pullups", color: "blue" },
-  { id: "3", type: "activity", period: "week", activityType: "running", color: "green" },
-  { id: "4", type: "rank", period: "week", color: "purple" },
+  { id: "2", type: "rank", period: "week", color: "purple" },
+  { id: "3", type: "activity", period: "week", activityMode: "auto", color: "blue", activityMetric: "reps" },
+  { id: "4", type: "workouts", period: "week", color: "green" },
 ];
 
 export function Dashboard() {
@@ -92,23 +102,16 @@ export function Dashboard() {
     userRank: 1,
     totalUsers: 1,
     period: "week",
-    activities: {
-      pullups: { total: 0, period: 0 },
-      pushups: { total: 0, period: 0 },
-      running: { total: 0, period: 0 },
-      cycling: { total: 0, period: 0 },
-      situps: { total: 0, period: 0 },
-    },
+    activities: [],
   });
 
-  const defaultGoals: WeeklyGoals = {
-    pullups: { target: 100, current: 0 },
-    pushups: { target: 400, current: 0 },
-    situps: { target: 200, current: 0 },
-    running: { target: 25, current: 0 },
-    cycling: { target: 100, current: 0 },
-    points: { target: DEFAULT_WEEKLY_POINTS_GOAL, current: 0 },
-  };
+  const defaultGoals: WeeklyGoals = useMemo(
+    () => ({
+      points: { target: DEFAULT_WEEKLY_POINTS_GOAL, current: 0 },
+      exercises: [],
+    }),
+    []
+  );
 
   const [goals, setGoals] = useState<WeeklyGoals>(defaultGoals);
 
@@ -117,12 +120,14 @@ export function Dashboard() {
     null
   );
   const [isLoading, setIsLoading] = useState(true);
-  const [weeklyProgress, setWeeklyProgress] = useState<WeeklyProgress>({
-    pullups: 0,
-    pushups: 0,
-    situps: 0,
-    running: 0,
-    cycling: 0,
+  const [exerciseNameMap, setExerciseNameMap] = useState<Record<string, string>>(
+    {}
+  );
+  const [exerciseOptions, setExerciseOptions] = useState<Exercise[]>([]);
+  const [exerciseFacets, setExerciseFacets] = useState({
+    categories: [],
+    muscleGroups: [],
+    equipment: [],
   });
 
   const loadStats = async (
@@ -168,31 +173,37 @@ export function Dashboard() {
       // Set default stats (week)
       if (statsMap["week"]) {
         setStats(statsMap["week"]);
-        const w = statsMap["week"].activities;
-        setWeeklyProgress({
-          pullups: w.pullups?.period ?? 0,
-          pushups: w.pushups?.period ?? 0,
-          situps: w.situps?.period ?? 0,
-          running: w.running?.period ?? 0,
-          cycling: w.cycling?.period ?? 0,
-        });
-      } else {
-        // fallback auf aktuelle stats falls week nicht geladen
-        const w = stats.activities;
-        setWeeklyProgress({
-          pullups: w.pullups?.period ?? 0,
-          pushups: w.pushups?.period ?? 0,
-          situps: w.situps?.period ?? 0,
-          running: w.running?.period ?? 0,
-          cycling: w.cycling?.period ?? 0,
-        });
       }
     } catch (error) {
       console.error("Error loading stats for cards:", error);
     }
   }, [cardConfigs]);
 
-  const loadGoals = async (token: string) => {
+  useEffect(() => {
+    if (exerciseOptions.length === 0) return;
+    setCardConfigs((prev) => {
+      const next = prev.map((config) => {
+        if (config.type !== "activity") return config;
+        const activityId = config.activityId;
+        const activityMode =
+          config.activityMode || (activityId ? "custom" : "auto");
+        return {
+          ...config,
+          activityId,
+          activityMode,
+          activityMetric: config.activityMetric || "reps",
+        };
+      });
+
+      const changed = JSON.stringify(prev) !== JSON.stringify(next);
+      if (changed) {
+        localStorage.setItem("dashboard-card-configs", JSON.stringify(next));
+      }
+      return changed ? next : prev;
+    });
+  }, [exerciseOptions]);
+
+  const loadGoals = useCallback(async (token: string) => {
     try {
       const response = await fetch(`${API_URL}/goals`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -200,37 +211,43 @@ export function Dashboard() {
 
       if (response.ok) {
         const data = (await response.json()) || {};
-        setGoals((prev) => ({
-          pullups: {
-            target: data.pullups?.target ?? prev.pullups?.target ?? defaultGoals.pullups.target,
-            current: data.pullups?.current ?? prev.pullups?.current ?? 0,
-          },
-          pushups: {
-            target: data.pushups?.target ?? prev.pushups?.target ?? defaultGoals.pushups.target,
-            current: data.pushups?.current ?? prev.pushups?.current ?? 0,
-          },
-          situps: {
-            target: data.situps?.target ?? prev.situps?.target ?? defaultGoals.situps.target,
-            current: data.situps?.current ?? prev.situps?.current ?? 0,
-          },
-          running: {
-            target: data.running?.target ?? prev.running?.target ?? defaultGoals.running.target,
-            current: data.running?.current ?? prev.running?.current ?? 0,
-          },
-          cycling: {
-            target: data.cycling?.target ?? prev.cycling?.target ?? defaultGoals.cycling.target,
-            current: data.cycling?.current ?? prev.cycling?.current ?? 0,
-          },
+        setGoals({
           points: {
-            target: data.points?.target ?? prev.points?.target ?? defaultGoals.points.target,
-            current: data.points?.current ?? prev.points?.current ?? 0,
+            target: data.points?.target ?? defaultGoals.points.target,
+            current: data.points?.current ?? 0,
           },
-        }));
+          exercises: Array.isArray(data.exercises) ? data.exercises : [],
+        });
       }
     } catch (error) {
       console.error("Error loading goals:", error);
     }
-  };
+  }, [defaultGoals.points.target]);
+
+  const loadExerciseNames = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      const response = await fetch(`${API_URL}/exercises?limit=500&includeMeta=true`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) return;
+      const data: ExerciseListResponse = await response.json();
+      const map: Record<string, string> = {};
+      (data.exercises || []).forEach((ex: { id: string; name: string }) => {
+        map[ex.id] = ex.name;
+      });
+      setExerciseNameMap(map);
+      setExerciseOptions(Array.isArray(data.exercises) ? data.exercises : []);
+      setExerciseFacets({
+        categories: data.facets?.categories || [],
+        muscleGroups: data.facets?.muscleGroups || [],
+        equipment: data.facets?.equipment || [],
+      });
+    } catch (error) {
+      console.error("Error loading exercise names:", error);
+    }
+  }, []);
 
   const loadRecentWorkouts = useCallback(
     async (token: string) => {
@@ -301,6 +318,7 @@ export function Dashboard() {
         loadStatsForCards(),
         loadGoals(token),
         loadRecentWorkouts(token),
+        loadExerciseNames(),
       ]);
     } catch (error) {
       console.error("Error loading dashboard data:", error);
@@ -312,7 +330,7 @@ export function Dashboard() {
     } finally {
       setIsLoading(false);
     }
-  }, [loadStatsForCards, toast, t, loadRecentWorkouts]);
+  }, [loadStatsForCards, loadGoals, toast, t, loadRecentWorkouts, loadExerciseNames]);
 
   useEffect(() => {
     if (user) {
@@ -325,27 +343,6 @@ export function Dashboard() {
       loadStatsForCards();
     }
   }, [user, cardConfigs, loadStatsForCards]);
-
-  const formatActivityName = (activityType: string) => {
-    const activityKey = activityType.toLowerCase();
-    const translationKey = `dashboard.activityTypes.${activityKey}`;
-    const translation = t(translationKey);
-    // Fallback to original if translation key doesn't exist
-    return translation !== translationKey ? translation : activityType;
-  };
-
-  const formatActivityAmount = (activityType: string, amount: number) => {
-    switch (activityType) {
-      case "pullup":
-      case "pushup":
-        return `${amount}x`;
-      case "running":
-      case "cycling":
-        return `${amount} km`;
-      default:
-        return `${amount}`;
-    }
-  };
 
   const formatTimeAgo = (workout: RecentWorkout) => {
     // Kombiniere workoutDate und startTime, wenn verfügbar
@@ -388,36 +385,6 @@ export function Dashboard() {
     }
   };
 
-  const getActivityColor = (activityType: string) => {
-    switch (activityType) {
-      case "pullup":
-        return "bg-orange-50 border-orange-200";
-      case "pushup":
-        return "bg-blue-50 border-blue-200";
-      case "running":
-        return "bg-green-50 border-green-200";
-      case "cycling":
-        return "bg-purple-50 border-purple-200";
-      default:
-        return "bg-gray-50 border-gray-200";
-    }
-  };
-
-  const getActivityDotColor = (activityType: string) => {
-    switch (activityType) {
-      case "pullup":
-        return "bg-orange-500";
-      case "pushup":
-        return "bg-blue-500";
-      case "running":
-        return "bg-green-500";
-      case "cycling":
-        return "bg-purple-500";
-      default:
-        return "bg-gray-500";
-    }
-  };
-
   const handleSaveCardConfigs = (configs: StatCardConfig[]) => {
     setCardConfigs(configs);
     localStorage.setItem("dashboard-card-configs", JSON.stringify(configs));
@@ -455,32 +422,18 @@ export function Dashboard() {
       }
 
       const updatedGoals = (await response.json()) || {};
-      setGoals((prev) => ({
-        pullups: {
-          target: updatedGoals.pullups?.target ?? newGoals.pullups?.target ?? defaultGoals.pullups.target,
-          current: updatedGoals.pullups?.current ?? newGoals.pullups?.current ?? prev.pullups?.current ?? 0,
-        },
-        pushups: {
-          target: updatedGoals.pushups?.target ?? newGoals.pushups?.target ?? defaultGoals.pushups.target,
-          current: updatedGoals.pushups?.current ?? newGoals.pushups?.current ?? prev.pushups?.current ?? 0,
-        },
-        situps: {
-          target: updatedGoals.situps?.target ?? newGoals.situps?.target ?? defaultGoals.situps.target,
-          current: updatedGoals.situps?.current ?? newGoals.situps?.current ?? prev.situps?.current ?? 0,
-        },
-        running: {
-          target: updatedGoals.running?.target ?? newGoals.running?.target ?? defaultGoals.running.target,
-          current: updatedGoals.running?.current ?? newGoals.running?.current ?? prev.running?.current ?? 0,
-        },
-        cycling: {
-          target: updatedGoals.cycling?.target ?? newGoals.cycling?.target ?? defaultGoals.cycling.target,
-          current: updatedGoals.cycling?.current ?? newGoals.cycling?.current ?? prev.cycling?.current ?? 0,
-        },
+      setGoals({
         points: {
-          target: updatedGoals.points?.target ?? newGoals.points?.target ?? defaultGoals.points.target,
-          current: updatedGoals.points?.current ?? newGoals.points?.current ?? prev.points?.current ?? 0,
+          target:
+            updatedGoals.points?.target ??
+            newGoals.points?.target ??
+            defaultGoals.points.target,
+          current: updatedGoals.points?.current ?? newGoals.points?.current ?? 0,
         },
-      }));
+        exercises: Array.isArray(updatedGoals.exercises)
+          ? updatedGoals.exercises
+          : newGoals.exercises,
+      });
       toast({
         title: t("weeklyGoals.saved", "Wochenziele gespeichert"),
         description: t(
@@ -526,11 +479,81 @@ export function Dashboard() {
     }
   };
 
+  const resolveMetric = (
+    activity: DashboardStats["activities"][number] | undefined,
+    metric: StatCardConfig["activityMetric"] | undefined
+  ) => {
+    const supportsDistance =
+      activity?.supportsDistance || activity?.measurementType === "distance";
+    const supportsTime =
+      activity?.supportsTime || activity?.measurementType === "time";
+    const supportsReps =
+      activity?.measurementType === "reps" ||
+      (!supportsDistance && !supportsTime) ||
+      (activity?.totalReps ?? 0) > 0 ||
+      (activity?.periodReps ?? 0) > 0;
+    if (metric === "distance" && supportsDistance) return "distance";
+    if (metric === "time" && supportsTime) return "time";
+    if (metric === "reps" && supportsReps) return "reps";
+    if (supportsDistance) return "distance";
+    if (supportsReps) return "reps";
+    if (supportsTime) return "time";
+    return "reps";
+  };
+
+  const autoAssignmentMap = useMemo(() => {
+    const assignments = new Map<string, { activity?: DashboardStats["activities"][number]; rank?: number }>();
+    const periods = Array.from(new Set(cardConfigs.map((card) => card.period)));
+
+    periods.forEach((period) => {
+      const periodStats = statsByPeriod[period] || stats;
+      const cardsForPeriod = cardConfigs.filter(
+        (card) => card.type === "activity" && card.period === period
+      );
+      const customIds = new Set(
+        cardsForPeriod
+          .filter((card) => (card.activityMode ?? (card.activityId ? "custom" : "auto")) === "custom")
+          .map((card) => card.activityId)
+          .filter(Boolean) as string[]
+      );
+
+      const available = (periodStats.activities || []).filter(
+        (activity) => !customIds.has(activity.id)
+      );
+      const used = new Set<string>();
+      let rank = 0;
+
+      cardsForPeriod.forEach((card) => {
+        const mode = card.activityMode ?? (card.activityId ? "custom" : "auto");
+        if (mode !== "auto") return;
+
+        const metric = card.activityMetric || "reps";
+        const match =
+          available.find(
+            (activity) =>
+              !used.has(activity.id) && resolveMetric(activity, metric) === metric
+          ) ||
+          available.find((activity) => !used.has(activity.id));
+
+        if (match) {
+          used.add(match.id);
+          rank += 1;
+          assignments.set(card.id, { activity: match, rank });
+        } else {
+          assignments.set(card.id, { activity: undefined });
+        }
+      });
+    });
+
+    return assignments;
+  }, [cardConfigs, statsByPeriod, stats]);
+
   const renderStatCard = (config: StatCardConfig) => {
     const periodStats = statsByPeriod[config.period] || stats;
     let title = "";
     let value = "";
     let trend = "";
+    let meta = "";
     let Icon = Trophy;
 
     switch (config.type) {
@@ -538,22 +561,124 @@ export function Dashboard() {
         title = t("dashboard.totalPoints", "Gesamtpunkte");
         value = periodStats.totalPoints.toLocaleString();
         trend = `+${periodStats.periodPoints} ${getPeriodLabel(config.period)}`;
+        meta = getPeriodLabel(config.period);
         Icon = Trophy;
         break;
       case "activity": {
-        if (!config.activityType) return null;
-        const activity = periodStats.activities[config.activityType];
-        title = t(`dashboard.${config.activityType}`, config.activityType);
-        if (
-          config.activityType === "running" ||
-          config.activityType === "cycling"
-        ) {
-          value = `${activity?.total || 0} km`;
-          trend = `+${activity?.period || 0} km ${getPeriodLabel(config.period)}`;
-        } else {
-          value = (activity?.total || 0).toString();
-          trend = `+${activity?.period || 0} ${getPeriodLabel(config.period)}`;
+        const distanceUnit = getPrimaryDistanceUnit(
+          user?.preferences?.units?.distance
+        );
+        const distanceLabel =
+          distanceUnit === "miles"
+            ? t("training.form.units.milesShort", "mi")
+            : t("training.form.units.kilometersShort", "km");
+
+        const mode = config.activityMode ?? (config.activityId ? "custom" : "auto");
+        const autoAssignment = autoAssignmentMap.get(config.id);
+        const autoRank = autoAssignment?.rank;
+        const selectedExercise = config.activityId
+          ? exerciseOptions.find((item) => item.id === config.activityId)
+          : undefined;
+
+        const activity =
+          mode === "custom" && config.activityId
+            ? periodStats.activities.find((item) => item.id === config.activityId) ??
+            (selectedExercise
+              ? {
+                id: selectedExercise.id,
+                name: selectedExercise.name,
+                measurementType: selectedExercise.measurementType,
+                supportsTime: selectedExercise.supportsTime,
+                supportsDistance: selectedExercise.supportsDistance,
+                totalPoints: 0,
+                periodPoints: 0,
+                totalReps: 0,
+                periodReps: 0,
+                totalDuration: 0,
+                periodDuration: 0,
+                totalDistance: 0,
+                periodDistance: 0,
+              }
+              : undefined)
+            : autoAssignment?.activity;
+
+        const periodLabel = getPeriodLabel(config.period);
+
+        if (!activity) {
+          const manualTitle =
+            selectedExercise?.name ||
+            t("dashboard.manualExercise", "Manuelle Übung");
+          const autoTitle = t("dashboard.topExercise", "Top-Übung");
+          title = mode === "custom" ? manualTitle : autoTitle;
+          value = "0";
+          trend = `+0 ${periodLabel}`;
+          meta =
+            mode === "custom"
+              ? `${t(
+                "dashboard.cardMeta.manualSelected",
+                "Manuell ausgewählt"
+              )} · ${periodLabel}`
+              : `${t(
+                "dashboard.cardMeta.autoRank",
+                "Top‑Übung automatisch #{{rank}}",
+                { rank: autoRank ?? 1 }
+              )} · ${periodLabel}`;
+          Icon = Dumbbell;
+          break;
         }
+
+        const resolvedMetric = resolveMetric(activity, config.activityMetric);
+        const totalValue =
+          resolvedMetric === "time"
+            ? (activity.totalDuration || 0) / 60
+            : resolvedMetric === "distance"
+              ? distanceUnit === "miles"
+                ? (activity.totalDistance || 0) / 1.60934
+                : activity.totalDistance || 0
+              : activity.totalReps || 0;
+        const periodValue =
+          resolvedMetric === "time"
+            ? (activity.periodDuration || 0) / 60
+            : resolvedMetric === "distance"
+              ? distanceUnit === "miles"
+                ? (activity.periodDistance || 0) / 1.60934
+                : activity.periodDistance || 0
+              : activity.periodReps || 0;
+
+        const manualTitle =
+          selectedExercise?.name ||
+          activity.name ||
+          t("dashboard.manualExercise", "Manuelle Übung");
+        const autoTitle = activity.name || t("dashboard.topExercise", "Top-Übung");
+        title = mode === "custom" ? manualTitle : autoTitle;
+        value =
+          resolvedMetric === "distance"
+            ? `${Math.round(totalValue * 10) / 10} ${distanceLabel}`
+            : resolvedMetric === "time"
+              ? `${Math.round(totalValue)} ${t("training.form.units.minutesShort", "Min")}`
+              : `${Math.round(totalValue)}`;
+        trend =
+          resolvedMetric === "distance"
+            ? `+${Math.round(periodValue * 10) / 10} ${distanceLabel} ${getPeriodLabel(
+              config.period
+            )}`
+            : resolvedMetric === "time"
+              ? `+${Math.round(periodValue)} ${t(
+                "training.form.units.minutesShort",
+                "Min"
+              )} ${getPeriodLabel(config.period)}`
+              : `+${Math.round(periodValue)} ${getPeriodLabel(config.period)}`;
+        meta =
+          mode === "custom"
+            ? `${t(
+              "dashboard.cardMeta.manualSelected",
+              "Manuell ausgewählt"
+            )} · ${periodLabel}`
+            : `${t(
+              "dashboard.cardMeta.autoRank",
+              "Top‑Übung automatisch #{{rank}}",
+              { rank: autoRank ?? 1 }
+            )} · ${periodLabel}`;
         Icon = Dumbbell;
         break;
       }
@@ -561,12 +686,14 @@ export function Dashboard() {
         title = t("dashboard.rank", "Rang");
         value = `#${periodStats.userRank}`;
         trend = t("dashboard.ofAthletes", { count: periodStats.totalUsers });
+        meta = getPeriodLabel(config.period);
         Icon = BarChart;
         break;
       case "workouts":
         title = t("dashboard.workouts", "Anzahl Trainings");
         value = periodStats.totalWorkouts.toString();
         trend = `+${periodStats.periodWorkouts} ${getPeriodLabel(config.period)}`;
+        meta = getPeriodLabel(config.period);
         Icon = TrendingUp;
         break;
     }
@@ -578,6 +705,7 @@ export function Dashboard() {
         value={value}
         icon={Icon}
         trend={trend}
+        meta={meta}
         color={config.color}
       />
     );
@@ -647,6 +775,9 @@ export function Dashboard() {
         onOpenChange={setSettingsOpen}
         cards={cardConfigs}
         onSave={handleSaveCardConfigs}
+        onReset={() => handleSaveCardConfigs(DEFAULT_CARDS)}
+        exercises={exerciseOptions}
+        facets={exerciseFacets}
       />
 
       <WeeklyGoalsDialog
@@ -654,12 +785,14 @@ export function Dashboard() {
         onOpenChange={setGoalsDialogOpen}
         goals={goals}
         onSave={handleSaveGoals}
+        showPoints={false}
       />
 
       <WeeklyPointsGoalDialog
         open={pointsGoalDialogOpen}
         onOpenChange={setPointsGoalDialogOpen}
         currentGoal={goals.points.target}
+        defaultGoal={DEFAULT_WEEKLY_POINTS_GOAL}
         onSave={handleSavePointsGoal}
       />
 
@@ -669,7 +802,7 @@ export function Dashboard() {
         <WeeklyGoalsCard
           className="col-span-1 md:col-span-1 lg:col-span-1 lg:row-span-2"
           goals={goals}
-          progress={weeklyProgress}
+          exerciseNameMap={exerciseNameMap}
           onOpenSettings={() => setGoalsDialogOpen(true)}
         />
 

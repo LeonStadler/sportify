@@ -64,13 +64,26 @@ export function MobileBottomNav() {
       title: t("navigation.exercises", "Übungen"),
       url: "/exercises",
       icon: Dumbbell,
+      className: "max-[440px]:hidden",
     },
     {
       title: t("navigation.stats"),
       url: "/stats",
       icon: BarChart,
+      className: "max-[520px]:hidden",
     },
   ];
+  const mobileNavItems = isAdmin
+    ? [
+      ...navItems,
+      {
+        title: t("navigation.admin"),
+        url: "/admin",
+        icon: Shield,
+        className: "max-[480px]:hidden",
+      },
+    ]
+    : navItems;
 
   const adminItems = [
     {
@@ -100,14 +113,14 @@ export function MobileBottomNav() {
   }
 
   return (
-    <nav 
-      className="fixed bottom-0 left-0 bg-background/95 backdrop-blur-sm border-t border-border px-2 py-2 md:hidden z-50" 
+    <nav
+      className="fixed bottom-0 left-0 bg-background/95 backdrop-blur-sm border-t border-border px-2 py-2 md:hidden z-50"
       style={{ width: '100vw' }}
       role="navigation"
       aria-label={t("navigation.mobileNavigation", "Mobile Navigation")}
     >
       <div className="flex justify-around items-center">
-        {navItems.map((item) => {
+        {mobileNavItems.map((item) => {
           const isActive = location.pathname === item.url;
           return (
             <Link
@@ -116,7 +129,7 @@ export function MobileBottomNav() {
               className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${isActive
                 ? "text-primary bg-primary/10"
                 : "text-muted-foreground hover:text-foreground"
-                }`}
+                } ${item.className ?? ""}`}
             >
               <item.icon size={20} />
               <span className="text-xs font-medium">{item.title}</span>

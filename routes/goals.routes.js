@@ -10,45 +10,95 @@ export const createGoalsRouter = (pool) => {
         try {
             // Get user goals from database or use defaults
             const userQuery = `
-                SELECT weekly_goals FROM users WHERE id = $1
+                SELECT weekly_goals, preferences FROM users WHERE id = $1
             `;
             const { rows: userRows } = await pool.query(userQuery, [req.user.id]);
             const userWeeklyGoals = userRows[0]?.weekly_goals || null;
+            const preferences = userRows[0]?.preferences || {};
+            const parsedPreferences =
+                typeof preferences === "string" ? JSON.parse(preferences) : preferences;
+            const distanceUnit = parsedPreferences?.units?.distance || "km";
 
             // Default goals if not set
             const defaultGoals = {
-                pullups: { target: 100, current: 0 },
-                pushups: { target: 400, current: 0 },
-                running: { target: 25, current: 0 },
-                cycling: { target: 100, current: 0 },
-                points: { target: DEFAULT_WEEKLY_POINTS_GOAL, current: 0 }
+                points: { target: DEFAULT_WEEKLY_POINTS_GOAL, current: 0 },
+                exercises: []
             };
 
-            const goals = userWeeklyGoals ? { ...defaultGoals, ...userWeeklyGoals } : defaultGoals;
+            const normalizedGoals = userWeeklyGoals && typeof userWeeklyGoals === 'object'
+                ? userWeeklyGoals
+                : {};
+            const goals = {
+                points: {
+                    target: Number(normalizedGoals?.points?.target ?? defaultGoals.points.target),
+                    current: 0
+                },
+                exercises: Array.isArray(normalizedGoals?.exercises) ? normalizedGoals.exercises : []
+            };
 
             // Get current progress for current week (Monday to Sunday)
             const query = `
                 SELECT 
-                    COALESCE(SUM(CASE WHEN wa.activity_type = 'pullups' THEN wa.quantity ELSE 0 END), 0) as current_pullups,
-                    COALESCE(SUM(CASE WHEN wa.activity_type = 'pushups' THEN wa.quantity ELSE 0 END), 0) as current_pushups,
-                    COALESCE(SUM(CASE WHEN wa.activity_type = 'running' THEN wa.quantity ELSE 0 END), 0) as current_running,
-                    COALESCE(SUM(CASE WHEN wa.activity_type = 'cycling' THEN wa.quantity ELSE 0 END), 0) as current_cycling,
                     COALESCE(SUM(wa.points_earned), 0) as current_points
                 FROM workouts w
-                LEFT JOIN workout_activities wa ON w.id = wa.workout_id
+                LEFT JOIN workout_activities wa ON w.id = wa.workout_id AND wa.exercise_id IS NOT NULL
                 WHERE w.user_id = $1 
                     AND w.start_time::date >= DATE_TRUNC('week', CURRENT_DATE)
                     AND w.start_time::date < DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '1 week'
             `;
 
-            const { rows } = await pool.query(query, [req.user.id]);
-            const progress = rows[0];
+            const [pointsResult, activityTotals] = await Promise.all([
+                pool.query(query, [req.user.id]),
+                pool.query(
+                    `
+                    SELECT
+                      wa.exercise_id,
+                      COALESCE(SUM(wa.reps), 0) AS total_reps,
+                      COALESCE(SUM(wa.duration), 0) AS total_duration,
+                      COALESCE(SUM(wa.distance), 0) AS total_distance
+                    FROM workouts w
+                    LEFT JOIN workout_activities wa ON w.id = wa.workout_id
+                    WHERE w.user_id = $1 
+                      AND w.start_time::date >= DATE_TRUNC('week', CURRENT_DATE)
+                      AND w.start_time::date < DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '1 week'
+                      AND wa.exercise_id IS NOT NULL
+                    GROUP BY wa.exercise_id
+                    `,
+                    [req.user.id]
+                )
+            ]);
 
-            goals.pullups.current = parseInt(progress.current_pullups) || 0;
-            goals.pushups.current = parseInt(progress.current_pushups) || 0;
-            goals.running.current = parseInt(progress.current_running) || 0;
-            goals.cycling.current = parseInt(progress.current_cycling) || 0;
+            const progress = pointsResult.rows[0];
+            const totalsMap = new Map(
+                activityTotals.rows.map((row) => [
+                    row.exercise_id,
+                    {
+                        reps: Number(row.total_reps) || 0,
+                        duration: Number(row.total_duration) || 0,
+                        distance: Number(row.total_distance) || 0,
+                    }
+                ])
+            );
+
             goals.points.current = parseInt(progress.current_points) || 0;
+            goals.exercises = goals.exercises.map((entry) => ({
+                ...entry,
+                current: (() => {
+                    const totals = totalsMap.get(entry.exerciseId) || { reps: 0, duration: 0, distance: 0 };
+                    const unit = entry.unit || "reps";
+                    if (unit === "time") {
+                        return Math.round((totals.duration || 0) / 60);
+                    }
+                    if (unit === "distance") {
+                        const kmValue = totals.distance || 0;
+                        if (distanceUnit === "miles") {
+                            return kmValue / 1.60934;
+                        }
+                        return kmValue;
+                    }
+                    return totals.reps || 0;
+                })()
+            }));
 
             res.json(goals);
         } catch (error) {
@@ -60,23 +110,29 @@ export const createGoalsRouter = (pool) => {
     // PUT /api/goals - Update user goals
     router.put('/', authMiddleware, async (req, res) => {
         try {
-            const { pullups, pushups, running, cycling, points } = req.body;
+            const { points, exercises } = req.body;
 
-            // Validate input
-            if (typeof pullups?.target !== 'number' || pullups.target < 0 ||
-                typeof pushups?.target !== 'number' || pushups.target < 0 ||
-                typeof running?.target !== 'number' || running.target < 0 ||
-                typeof cycling?.target !== 'number' || cycling.target < 0 ||
-                typeof points?.target !== 'number' || points.target < 0) {
-                return res.status(400).json({ error: 'Ungültige Zielwerte. Alle Ziele müssen nicht-negative Zahlen sein.' });
+            if (typeof points?.target !== 'number' || points.target < 0) {
+                return res.status(400).json({ error: 'Ungültiges Punkte‑Ziel.' });
             }
 
+            if (exercises && !Array.isArray(exercises)) {
+                return res.status(400).json({ error: 'Ungültige Übungsziele.' });
+            }
+
+            const normalizedExercises = Array.isArray(exercises)
+                ? exercises.slice(0, 5).map((entry) => ({
+                    exerciseId: String(entry.exerciseId || ''),
+                    target: Number(entry.target) || 0,
+                    unit: entry.unit === 'time' || entry.unit === 'distance' || entry.unit === 'reps'
+                        ? entry.unit
+                        : 'reps'
+                }))
+                : [];
+
             const weeklyGoals = {
-                pullups: { target: pullups.target },
-                pushups: { target: pushups.target },
-                running: { target: running.target },
-                cycling: { target: cycling.target },
-                points: { target: points.target }
+                points: { target: points.target },
+                exercises: normalizedExercises
             };
 
             // Update user's weekly_goals in database
@@ -91,27 +147,74 @@ export const createGoalsRouter = (pool) => {
             // Return updated goals with current progress
             const getQuery = `
                 SELECT 
-                    COALESCE(SUM(CASE WHEN wa.activity_type = 'pullups' THEN wa.quantity ELSE 0 END), 0) as current_pullups,
-                    COALESCE(SUM(CASE WHEN wa.activity_type = 'pushups' THEN wa.quantity ELSE 0 END), 0) as current_pushups,
-                    COALESCE(SUM(CASE WHEN wa.activity_type = 'running' THEN wa.quantity ELSE 0 END), 0) as current_running,
-                    COALESCE(SUM(CASE WHEN wa.activity_type = 'cycling' THEN wa.quantity ELSE 0 END), 0) as current_cycling,
                     COALESCE(SUM(wa.points_earned), 0) as current_points
                 FROM workouts w
-                LEFT JOIN workout_activities wa ON w.id = wa.workout_id
+                LEFT JOIN workout_activities wa ON w.id = wa.workout_id AND wa.exercise_id IS NOT NULL
                 WHERE w.user_id = $1 
                     AND w.start_time::date >= DATE_TRUNC('week', CURRENT_DATE)
                     AND w.start_time::date < DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '1 week'
             `;
 
-            const { rows } = await pool.query(getQuery, [req.user.id]);
-            const progress = rows[0];
+            const [pointsResult, activityTotals] = await Promise.all([
+                pool.query(getQuery, [req.user.id]),
+                pool.query(
+                    `
+                    SELECT
+                      wa.exercise_id,
+                      COALESCE(SUM(wa.reps), 0) AS total_reps,
+                      COALESCE(SUM(wa.duration), 0) AS total_duration,
+                      COALESCE(SUM(wa.distance), 0) AS total_distance
+                    FROM workouts w
+                    LEFT JOIN workout_activities wa ON w.id = wa.workout_id
+                    WHERE w.user_id = $1 
+                      AND w.start_time::date >= DATE_TRUNC('week', CURRENT_DATE)
+                      AND w.start_time::date < DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '1 week'
+                      AND wa.exercise_id IS NOT NULL
+                    GROUP BY wa.exercise_id
+                    `,
+                    [req.user.id]
+                )
+            ]);
+            const progress = pointsResult.rows[0];
+            const { rows: prefRows } = await pool.query(
+                `SELECT preferences FROM users WHERE id = $1`,
+                [req.user.id]
+            );
+            const prefValue = prefRows[0]?.preferences || {};
+            const parsedPref = typeof prefValue === "string" ? JSON.parse(prefValue) : prefValue;
+            const distanceUnit = parsedPref?.units?.distance || "km";
+
+            const totalsMap = new Map(
+                activityTotals.rows.map((row) => [
+                    row.exercise_id,
+                    {
+                        reps: Number(row.total_reps) || 0,
+                        duration: Number(row.total_duration) || 0,
+                        distance: Number(row.total_distance) || 0,
+                    }
+                ])
+            );
 
             const response = {
-                pullups: { target: pullups.target, current: parseInt(progress.current_pullups) || 0 },
-                pushups: { target: pushups.target, current: parseInt(progress.current_pushups) || 0 },
-                running: { target: running.target, current: parseInt(progress.current_running) || 0 },
-                cycling: { target: cycling.target, current: parseInt(progress.current_cycling) || 0 },
-                points: { target: points.target, current: parseInt(progress.current_points) || 0 }
+                points: { target: points.target, current: parseInt(progress.current_points) || 0 },
+                exercises: normalizedExercises.map((entry) => ({
+                    ...entry,
+                    current: (() => {
+                        const totals = totalsMap.get(entry.exerciseId) || { reps: 0, duration: 0, distance: 0 };
+                        const unit = entry.unit || "reps";
+                        if (unit === "time") {
+                            return Math.round((totals.duration || 0) / 60);
+                        }
+                        if (unit === "distance") {
+                            const kmValue = totals.distance || 0;
+                            if (distanceUnit === "miles") {
+                                return kmValue / 1.60934;
+                            }
+                            return kmValue;
+                        }
+                        return totals.reps || 0;
+                    })()
+                }))
             };
 
             res.json(response);
@@ -123,4 +226,3 @@ export const createGoalsRouter = (pool) => {
 
     return router;
 };
-

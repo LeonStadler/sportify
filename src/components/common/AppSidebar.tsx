@@ -103,7 +103,7 @@ export function AppSidebar() {
         icon: BarChart,
       },
       {
-        title: "Freunde",
+        title: t("navigation.friends"),
         url: "/friends",
         icon: Users,
       },
@@ -141,15 +141,19 @@ export function AppSidebar() {
   }
 
   return (
-    <Sidebar 
-      id="app-sidebar" 
+    <Sidebar
+      id="app-sidebar"
       className="border-r border-border bg-background"
       role="navigation"
-      aria-label={t("navigation.mainNavigation", "Hauptnavigation")}
+      aria-label={t("navigation.mainNavigation")}
     >
       <SidebarHeader className="border-b border-border bg-background">
         <div className="p-6">
-          <LogoFull className="h-12" />
+          <LogoFull
+            className="h-12"
+            alt={t("profile.logo.title")}
+            byline={t("profile.logo.byline")}
+          />
         </div>
       </SidebarHeader>
 
@@ -157,7 +161,7 @@ export function AppSidebar() {
         <div className="flex-1">
           <SidebarGroup>
             <SidebarGroupLabel className="text-muted-foreground text-xs uppercase tracking-wider px-6 py-3">
-              Navigation
+              {t("navigation.navigation")}
             </SidebarGroupLabel>
             <SidebarGroupContent className="px-3">
               <SidebarMenu>
@@ -202,7 +206,7 @@ export function AppSidebar() {
               <SidebarGroup>
                 <SidebarGroupLabel className="text-muted-foreground text-xs uppercase tracking-wider px-6 py-3">
                   <Shield size={20} className="inline mr-2" />
-                  Administration
+                  {t("navigation.administration")}
                 </SidebarGroupLabel>
                 <SidebarGroupContent className="px-3">
                   <SidebarMenu>
@@ -235,7 +239,7 @@ export function AppSidebar() {
         <SidebarSeparator className="mx-6 my-2" />
         <SidebarGroup className="mt-auto">
           <SidebarGroupLabel className="text-muted-foreground text-xs uppercase tracking-wider px-6 py-3">
-            Einstellungen
+            {t("navigation.settingsGroup")}
           </SidebarGroupLabel>
           <SidebarGroupContent className="px-3">
             <SidebarMenu>
@@ -246,8 +250,8 @@ export function AppSidebar() {
                     <Globe size={20} />
                     <span>{t("settings.language")}</span>
                   </div>
-                  <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
-                    <LanguageSwitcher />
+                  <div className="flex items-center gap-2 px-2 py-1 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
+                    <LanguageSwitcher variant="sidebar" />
                   </div>
                 </div>
               </SidebarMenuItem>
@@ -259,8 +263,8 @@ export function AppSidebar() {
                     <Palette size={20} />
                     <span>{t("settings.theme")}</span>
                   </div>
-                  <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
-                    <ThemeSwitcher variant="toggle" />
+                  <div className="flex items-center gap-2 px-2 py-1 rounded-lg border border-border/50 bg-background/50 hover:bg-accent transition-colors">
+                    <ThemeSwitcher variant="toggle" size="sm" />
                   </div>
                 </div>
               </SidebarMenuItem>
@@ -276,7 +280,7 @@ export function AppSidebar() {
               <button
                 type="button"
                 className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-accent transition-colors min-w-0 flex-1 overflow-hidden text-left"
-                aria-label={t("navigation.profile", "Mein Account")}
+                aria-label={t("navigation.accountMenu")}
               >
                 <Avatar className="h-9 w-9 shrink-0">
                   {user?.avatar && parseAvatarConfig(user.avatar) ? (
@@ -300,23 +304,23 @@ export function AppSidebar() {
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56 mb-2" side="top" align="start">
               <DropdownMenuLabel>
-                {t("navigation.profile", "Mein Account")}
+                {t("navigation.accountMenu")}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => navigate("/profile")}>
                 <User className="w-4 h-4 mr-2" />
-                <span>{t("navigation.profile", "Profil")}</span>
+                <span>{t("navigation.profile")}</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => navigate("/profile?tab=preferences")}
               >
                 <Settings className="w-4 h-4 mr-2" />
-                <span>{t("navigation.settings", "Einstellungen")}</span>
+                <span>{t("navigation.settings")}</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="w-4 h-4 mr-2" />
-                <span>{t("navigation.logout", "Abmelden")}</span>
+                <span>{t("navigation.logout")}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

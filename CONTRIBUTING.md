@@ -4,4 +4,4 @@ Dieses Projekt ist ein persönliches Funktionsprojekt und nimmt derzeit keine ex
 
 This project is a personal fun project and currently does not accept external contributions.
 
-Für Fragen oder Feedback: contact@leon-stadler.com
+Für Fragen oder Feedback: sportify@leon-stadler.com

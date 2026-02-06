@@ -190,6 +190,18 @@ const Sidebar = React.forwardRef<
   ) => {
     const { isMobile, state, openMobile, setOpenMobile, buttonClickedRef, expectedStateRef } = useSidebar();
     const isFloatingLike = variant === "floating" || variant === "inset";
+    const handleOpenChange = React.useCallback(
+      (open: boolean) => {
+        // Wenn Button geklickt wurde, ignoriere onOpenChange komplett
+        // (der State wurde bereits durch toggleSidebar gesetzt)
+        if (buttonClickedRef.current) {
+          return;
+        }
+        // Erlaube alle Änderungen (Overlay-Klick zum Schließen, etc.)
+        setOpenMobile(open);
+      },
+      [setOpenMobile, buttonClickedRef]
+    );
 
     if (collapsible === "none") {
       return (
@@ -207,17 +219,6 @@ const Sidebar = React.forwardRef<
     }
 
     if (isMobile) {
-      // Handler für onOpenChange
-      const handleOpenChange = React.useCallback((open: boolean) => {
-        // Wenn Button geklickt wurde, ignoriere onOpenChange komplett
-        // (der State wurde bereits durch toggleSidebar gesetzt)
-        if (buttonClickedRef.current) {
-          return;
-        }
-        // Erlaube alle Änderungen (Overlay-Klick zum Schließen, etc.)
-        setOpenMobile(open);
-      }, [setOpenMobile]);
-
       return (
         <Sheet
           open={openMobile}

@@ -2,64 +2,48 @@ import { WeeklyGoals } from "@/components/settings/WeeklyGoalsForm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { useAuth } from "@/hooks/use-auth";
+import { getPrimaryDistanceUnit } from "@/utils/units";
 import { Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-export interface WeeklyProgress {
-  pullups: number;
-  pushups: number;
-  situps: number;
-  running: number;
-  cycling: number;
-}
-
 interface WeeklyGoalsCardProps {
   goals: WeeklyGoals;
-  progress: WeeklyProgress;
+  exerciseNameMap?: Record<string, string>;
   onOpenSettings: () => void;
   className?: string;
 }
 
 export function WeeklyGoalsCard({
   goals,
-  progress,
+  exerciseNameMap,
   onOpenSettings,
   className,
 }: WeeklyGoalsCardProps) {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const distanceUnit = getPrimaryDistanceUnit(user?.preferences?.units?.distance);
 
-  const entries = [
-    {
-      label: t("dashboard.pullups"),
-      unit: "",
-      goal: goals.pullups.target,
-      current: progress.pullups ?? 0,
-    },
-    {
-      label: t("dashboard.pushups"),
-      unit: "",
-      goal: goals.pushups.target,
-      current: progress.pushups ?? 0,
-    },
-    {
-      label: t("dashboard.situps", "Sit-ups"),
-      unit: "",
-      goal: goals.situps.target,
-      current: progress.situps ?? 0,
-    },
-    {
-      label: t("dashboard.running"),
-      unit: "km",
-      goal: goals.running.target,
-      current: progress.running ?? 0,
-    },
-    {
-      label: t("dashboard.cycling"),
-      unit: "km",
-      goal: goals.cycling.target,
-      current: progress.cycling ?? 0,
-    },
-  ];
+  const entries = (goals.exercises || [])
+    .filter((entry) => entry.exerciseId)
+    .map((entry) => {
+      const label =
+        exerciseNameMap?.[entry.exerciseId] || t("weeklyGoals.dialog.exercise");
+      const unitLabel =
+        entry.unit === "distance"
+          ? distanceUnit === "miles"
+            ? t("training.form.units.milesShort", "mi")
+            : t("training.form.units.kilometersShort", "km")
+          : entry.unit === "time"
+            ? t("training.form.units.minutesShort", "Min")
+            : t("training.form.units.repetitionsShort", "Wdh.");
+      return {
+        label,
+        unit: unitLabel,
+        goal: entry.target ?? 0,
+        current: entry.current ?? 0,
+      };
+    });
 
   return (
     <Card className={className + " relative"}>
@@ -72,20 +56,22 @@ export function WeeklyGoalsCard({
           size="icon"
           className="absolute -top-2 right-0"
           onClick={onOpenSettings}
-          aria-label={t("weeklyGoals.dialog.title", "Wochenziele einstellen")}
-          title={t("weeklyGoals.dialog.title", "Wochenziele einstellen")}
+          aria-label={t("weeklyGoals.dialog.title")}
+          title={t("weeklyGoals.dialog.title")}
         >
           <Settings className="h-4 w-4" aria-hidden="true" />
         </Button>
       </CardHeader>
       <CardContent className="space-y-4">
+        {entries.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            {t("weeklyGoals.dialog.noExerciseGoalsSet")}
+          </p>
+        )}
         {entries.map((entry) => (
           <div key={entry.label}>
             <div className="flex justify-between text-sm mb-2">
-              <span>
-                {entry.label} ({t("dashboard.goal")}: {entry.goal}
-                {entry.unit && ` ${entry.unit}`})
-              </span>
+              <span>{entry.label}</span>
               <span className="font-medium">
                 {entry.current}/{entry.goal}
                 {entry.unit && ` ${entry.unit}`}
@@ -109,4 +95,3 @@ export function WeeklyGoalsCard({
     </Card>
   );
 }
-

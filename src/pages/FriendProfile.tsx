@@ -3,11 +3,15 @@ import { Badge as UiBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/hooks/use-auth";
+import { useDateTimeFormatter } from "@/hooks/use-date-time-formatter";
 import { API_URL } from "@/lib/api";
 import { parseAvatarConfig } from "@/lib/avatar";
+import { getBadgeText } from "@/lib/badges";
+import { convertDistance, getPrimaryDistanceUnit } from "@/utils/units";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
-import { ArrowLeft, Award, Dumbbell, Medal } from "lucide-react";
+import { ArrowLeft, Award, Dumbbell, Home, Medal, UserX } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import NiceAvatar from "react-nice-avatar";
@@ -90,21 +94,12 @@ const getInitials = (name: string) => {
     .toUpperCase();
 };
 
-const getActivityIcon = (activityType: string) => {
-  switch (activityType) {
-    case "pullups":
-      return "💪";
-    case "pushups":
-      return "🔥";
-    case "situps":
-      return "🚀";
-    case "running":
-      return "🏃";
-    case "cycling":
-      return "🚴";
-    default:
-      return "💪";
-  }
+const getActivityName = (activityType: string, t: (key: string) => string) => {
+  const translationKey = `activityFeed.activityTypes.${activityType.toLowerCase()}`;
+  const translation = t(translationKey);
+  return translation !== translationKey
+    ? translation
+    : t("activityFeed.activityTypes.unknown");
 };
 
 const getActivityColor = (activityType: string) => {
@@ -124,11 +119,16 @@ const getActivityColor = (activityType: string) => {
   }
 };
 
-const formatAmount = (activityType: string, amount: number) => {
+const formatAmount = (
+  activityType: string,
+  amount: number,
+  distanceUnit: string,
+  distanceLabel: string
+) => {
   switch (activityType) {
     case "running":
     case "cycling":
-      return `${amount} km`;
+      return `${convertDistance(amount, "km", distanceUnit)} ${distanceLabel}`;
     default:
       return `${amount}×`;
   }
@@ -136,23 +136,36 @@ const formatAmount = (activityType: string, amount: number) => {
 
 export function FriendProfile() {
   const { friendId } = useParams();
-  const { t, i18n } = useTranslation();
+  const { user } = useAuth();
+  const { t } = useTranslation();
+  const { formatDateTime } = useDateTimeFormatter();
+  const distanceUnit = getPrimaryDistanceUnit(user?.preferences?.units?.distance);
+  const distanceLabel =
+    distanceUnit === "miles"
+      ? t("training.form.units.milesShort", "mi")
+      : t("training.form.units.kilometersShort", "km");
   const [profile, setProfile] = useState<FriendProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<"not-friends" | "generic" | null>(
+    null
+  );
 
   useEffect(() => {
     const controller = new AbortController();
 
     const loadProfile = async () => {
       if (!friendId) {
-        setError("Keine Freundes-ID angegeben.");
+        setErrorKind("generic");
+        setError(t("friendProfile.errors.missingId"));
         setLoading(false);
         return;
       }
 
       setLoading(true);
       setError(null);
+      setErrorKind(null);
+      let nextErrorKind: "not-friends" | "generic" = "generic";
 
       try {
         const response = await fetch(`${API_URL}/profile/friends/${friendId}`, {
@@ -163,7 +176,13 @@ export function FriendProfile() {
         if (!response.ok) {
           const payload = await response.json().catch(() => ({}));
           const message =
-            payload?.error || "Profil konnte nicht geladen werden.";
+            payload?.error || t("friendProfile.errors.loadFailed");
+          if (
+            response.status === 403 &&
+            /nicht befreundet|not friends/i.test(message)
+          ) {
+            nextErrorKind = "not-friends";
+          }
           throw new Error(message);
         }
 
@@ -171,10 +190,11 @@ export function FriendProfile() {
         setProfile(data);
       } catch (fetchError) {
         if (controller.signal.aborted) return;
+        setErrorKind(nextErrorKind);
         setError(
           fetchError instanceof Error
             ? fetchError.message
-            : "Unbekannter Fehler beim Laden des Profils."
+            : t("friendProfile.errors.unknown")
         );
       } finally {
         if (!controller.signal.aborted) {
@@ -186,7 +206,7 @@ export function FriendProfile() {
     loadProfile();
 
     return () => controller.abort();
-  }, [friendId]);
+  }, [friendId, t]);
 
   const sortedBadges = useMemo(() => {
     if (!profile?.badges) return [];
@@ -233,6 +253,51 @@ export function FriendProfile() {
     }
 
     if (error) {
+      if (errorKind === "not-friends") {
+        return (
+          <div className="min-h-[60vh] flex items-center justify-center bg-background">
+            <div className="text-center max-w-md mx-auto px-4">
+              <h1 className="text-8xl md:text-9xl font-bold mb-4 text-primary">
+                403
+              </h1>
+              <h2 className="text-2xl font-semibold mb-2 text-foreground">
+                {t("friendProfile.notFriends.title", "Nur für Freunde")}
+              </h2>
+              <p className="text-lg text-muted-foreground mb-8">
+                {t(
+                  "friendProfile.notFriends.description",
+                  "Dieses Profil ist nur für Freunde sichtbar."
+                )}
+              </p>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <Button
+                  asChild
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                  size="lg"
+                >
+                  <Link
+                    to="/friends"
+                    className="inline-flex items-center gap-2"
+                  >
+                    <UserX className="w-5 h-5" />
+                    {t(
+                      "friendProfile.notFriends.backToFriends",
+                      "Zu den Freunden"
+                    )}
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="lg">
+                  <Link to="/" className="inline-flex items-center gap-2">
+                    <Home className="w-5 h-5" />
+                    {t("notFound.backHome", "Zur Startseite")}
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <Card>
           <CardContent className="p-8 text-center text-destructive">
@@ -246,7 +311,7 @@ export function FriendProfile() {
       return (
         <Card>
           <CardContent className="p-8 text-center text-muted-foreground">
-            Kein Profil gefunden.
+            {t("friendProfile.errors.notFound")}
           </CardContent>
         </Card>
       );
@@ -275,14 +340,17 @@ export function FriendProfile() {
                 </h1>
                 {profile.joinedAt && (
                   <p className="text-sm text-muted-foreground">
-                    Mitglied seit {formatDate(profile.joinedAt)}
+                    {t("friendProfile.joinedSince", {
+                      date: formatDate(profile.joinedAt),
+                    })}
                   </p>
                 )}
               </div>
             </div>
             <Button asChild variant="outline">
               <Link to="/friends">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Zurück zu Freunde
+                <ArrowLeft className="mr-2 h-4 w-4" />{" "}
+                {t("friendProfile.backToFriends")}
               </Link>
             </Button>
           </CardContent>
@@ -335,7 +403,8 @@ export function FriendProfile() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                <Medal className="h-5 w-5 text-primary" /> Badges
+                <Medal className="h-5 w-5 text-primary" />{" "}
+                {t("profile.achievements.badges")}
               </CardTitle>
               <UiBadge variant="outline">{sortedBadges.length}</UiBadge>
             </CardHeader>
@@ -345,35 +414,40 @@ export function FriendProfile() {
                   {t("friendProfile.noBadges", "Noch keine Badges.")}
                 </p>
               ) : (
-                sortedBadges.map((badge) => (
-                  <div
-                    key={badge.id}
-                    className="flex items-center justify-between rounded-lg border bg-card p-3"
-                  >
-                    <div>
-                      <p className="font-medium leading-none">{badge.label}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {badge.category}
-                        {badge.level
-                          ? ` · ${t("friendProfile.level", "Stufe")} ${badge.level}`
-                          : null}
-                      </p>
-                      {badge.earnedAt && (
-                        <p className="text-xs text-muted-foreground">
-                          {formatDate(badge.earnedAt)}
+                sortedBadges.map((badge) => {
+                  const badgeText = getBadgeText(badge, t);
+                  return (
+                    <div
+                      key={badge.id}
+                      className="flex items-center justify-between rounded-lg border bg-card p-3"
+                    >
+                      <div>
+                        <p className="font-medium leading-none">
+                          {badgeText.label}
                         </p>
-                      )}
+                        <p className="text-xs text-muted-foreground">
+                          {badgeText.category || badge.category}
+                          {badge.level
+                            ? ` · ${t("friendProfile.level", "Stufe")} ${badge.level}`
+                            : null}
+                        </p>
+                        {badge.earnedAt && (
+                          <p className="text-xs text-muted-foreground">
+                            {formatDate(badge.earnedAt)}
+                          </p>
+                        )}
+                      </div>
+                      {badge.icon ? (
+                        <UiBadge
+                          variant="secondary"
+                          className="text-xs uppercase"
+                        >
+                          {badgeText.icon || badge.icon.replace("badge-", "")}
+                        </UiBadge>
+                      ) : null}
                     </div>
-                    {badge.icon ? (
-                      <UiBadge
-                        variant="secondary"
-                        className="text-xs uppercase"
-                      >
-                        {badge.icon}
-                      </UiBadge>
-                    ) : null}
-                  </div>
-                ))
+                  );
+                })
               )}
             </CardContent>
           </Card>
@@ -421,25 +495,27 @@ export function FriendProfile() {
                           variant="secondary"
                           className={`text-xs py-0.5 px-2 ${getActivityColor(activity.activityType)}`}
                         >
-                          {getActivityIcon(activity.activityType)}{" "}
-                          {formatAmount(activity.activityType, activity.amount)}
+                          {getActivityName(activity.activityType, t)}{" "}
+                          {formatAmount(
+                            activity.activityType,
+                            activity.amount,
+                            distanceUnit,
+                            distanceLabel
+                          )}
                         </UiBadge>
                       ))}
                     </div>
                   )}
                   <p className="text-xs text-muted-foreground">
                     {workout.startTimeTimestamp
-                      ? new Date(workout.startTimeTimestamp).toLocaleDateString(
-                          i18n.language === "en" ? "en-US" : "de-DE",
-                          {
-                            weekday: "short",
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          }
-                        )
+                      ? formatDateTime(workout.startTimeTimestamp, {
+                          weekday: "short",
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
                       : t("training.unknownDate", "Unbekanntes Datum")}
                   </p>
                 </div>

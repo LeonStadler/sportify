@@ -1,8 +1,7 @@
 export interface WeeklyChallengeTargets {
   pullups: number;
   pushups: number;
-  running: number;
-  cycling: number;
+  situps: number;
   points: number;
 }
 
@@ -15,8 +14,7 @@ export interface WeeklyChallengeActivityProgress {
 export interface WeeklyChallengeProgressSummary {
   pullups: number;
   pushups: number;
-  running: number;
-  cycling: number;
+  situps: number;
   workoutsCompleted: number;
   totalPoints: number;
   completionPercentage: number;
@@ -27,8 +25,8 @@ export interface WeeklyChallengeLeaderboardEntry {
   displayName: string;
   avatarUrl: string | null;
   totalPoints: number;
-  totalRunning: number;
   totalPullups: number;
+  totalSitups: number;
   rank: number;
   isCurrentUser: boolean;
 }
@@ -44,7 +42,7 @@ export interface WeeklyChallengeResponse {
   targets: WeeklyChallengeTargets;
   progress: WeeklyChallengeProgressSummary;
   activities: Record<
-    "pullups" | "pushups" | "running" | "cycling",
+    "pullups" | "pushups" | "situps",
     WeeklyChallengeActivityProgress
   >;
   leaderboard: WeeklyChallengeLeaderboardEntry[];

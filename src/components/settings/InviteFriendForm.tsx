@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/use-auth';
 import { Mail } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 interface InviteFriendFormProps {
@@ -23,6 +24,7 @@ interface InviteFriendFormProps {
 
 export function InviteFriendForm({ onSuccess, className }: InviteFriendFormProps) {
     const { inviteFriend, sendFriendRequest, isLoading } = useAuth();
+    const { t } = useTranslation();
     const [email, setEmail] = useState('');
     const [showUserExistsDialog, setShowUserExistsDialog] = useState(false);
     const [existingUserInfo, setExistingUserInfo] = useState<{
@@ -36,14 +38,14 @@ export function InviteFriendForm({ onSuccess, className }: InviteFriendFormProps
         e.preventDefault();
 
         if (!email.trim()) {
-            toast.error('Bitte gib eine E-Mail-Adresse ein.');
+            toast.error(t('inviteFriendForm.errors.enterEmail'));
             return;
         }
 
         // Einfache E-Mail-Validierung
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
-            toast.error('Bitte gib eine gültige E-Mail-Adresse ein.');
+            toast.error(t('inviteFriendForm.errors.invalidEmail'));
             return;
         }
 
@@ -64,8 +66,12 @@ export function InviteFriendForm({ onSuccess, className }: InviteFriendFormProps
             
             // Wenn bereits eine Einladung existiert, zeige Info-Nachricht
             if (result?.type === 'invitation_exists') {
-                toast.info('Einladung bereits gesendet', {
-                    description: result.message || `Es wurde bereits eine Einladung an ${email} gesendet.`,
+                toast.info(t('inviteFriendForm.info.inviteAlreadySentTitle'), {
+                    description:
+                        result.message ||
+                        t('inviteFriendForm.info.inviteAlreadySentDesc', {
+                            email,
+                        }),
                 });
                 setEmail('');
                 return;
@@ -73,12 +79,16 @@ export function InviteFriendForm({ onSuccess, className }: InviteFriendFormProps
             
             // Zeige unterschiedliche Nachrichten basierend auf Ergebnis
             if (result?.type === 'friend_request') {
-                toast.success('Freundschaftsanfrage gesendet', {
-                    description: `Eine Freundschaftsanfrage wurde an ${email} gesendet.`,
+                toast.success(t('inviteFriendForm.success.requestSentTitle'), {
+                    description: t('inviteFriendForm.success.requestSentDesc', {
+                        target: email,
+                    }),
                 });
             } else {
-                toast.success('Einladung gesendet', {
-                    description: `Eine Einladung wurde an ${email} gesendet.`,
+                toast.success(t('inviteFriendForm.success.inviteSentTitle'), {
+                    description: t('inviteFriendForm.success.inviteSentDesc', {
+                        target: email,
+                    }),
                 });
             }
             setEmail('');
@@ -86,8 +96,11 @@ export function InviteFriendForm({ onSuccess, className }: InviteFriendFormProps
                 onSuccess();
             }
         } catch (error) {
-            toast.error('Fehler beim Senden der Einladung', {
-                description: error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.',
+            toast.error(t('inviteFriendForm.errors.sendInvite'), {
+                description:
+                    error instanceof Error
+                        ? error.message
+                        : t('inviteFriendForm.errors.unknown'),
             });
         }
     };
@@ -97,7 +110,9 @@ export function InviteFriendForm({ onSuccess, className }: InviteFriendFormProps
         <form onSubmit={handleSubmit} className={className}>
             <div className="space-y-3">
                 <div>
-                    <Label htmlFor="invite-email">E-Mail-Adresse</Label>
+                    <Label htmlFor="invite-email">
+                        {t('inviteFriendForm.emailLabel')}
+                    </Label>
                     <div className="relative">
                         <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                         <Input
@@ -105,18 +120,20 @@ export function InviteFriendForm({ onSuccess, className }: InviteFriendFormProps
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            placeholder="freund@example.com"
+                            placeholder={t('inviteFriendForm.emailPlaceholder')}
                             className="pl-10"
                             disabled={isLoading}
                         />
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                        Die Person kann sich bei der Registrierung selbst ihren Namen angeben.
+                        {t('inviteFriendForm.nameHint')}
                     </p>
                 </div>
 
                 <Button type="submit" className="w-full" disabled={isLoading || !email.trim()}>
-                    {isLoading ? 'Wird gesendet...' : 'Einladung senden'}
+                    {isLoading
+                        ? t('inviteFriendForm.actions.sending')
+                        : t('inviteFriendForm.actions.sendInvite')}
                 </Button>
             </div>
         </form>
@@ -124,16 +141,22 @@ export function InviteFriendForm({ onSuccess, className }: InviteFriendFormProps
         <AlertDialog open={showUserExistsDialog} onOpenChange={setShowUserExistsDialog}>
             <AlertDialogContent>
                 <AlertDialogHeader>
-                    <AlertDialogTitle>Benutzer bereits registriert</AlertDialogTitle>
+                    <AlertDialogTitle>
+                        {t('inviteFriendForm.userExists.title')}
+                    </AlertDialogTitle>
                     <AlertDialogDescription>
-                        Die E-Mail-Adresse <strong>{existingUserInfo?.email}</strong> ist bereits bei Sportify registriert.
+                        {t('inviteFriendForm.userExists.description', {
+                            email: existingUserInfo?.email,
+                        })}{' '}
                         {existingUserInfo?.displayName && (
                             <>
-                                {' '}Der Benutzer heißt <strong>{existingUserInfo.displayName}</strong>.
+                                {t('inviteFriendForm.userExists.nameLabel', {
+                                    name: existingUserInfo.displayName,
+                                })}{' '}
                             </>
                         )}
                         <br /><br />
-                        Möchtest du stattdessen eine Freundschaftsanfrage an diese Person senden?
+                        {t('inviteFriendForm.userExists.question')}
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -142,7 +165,7 @@ export function InviteFriendForm({ onSuccess, className }: InviteFriendFormProps
                         setExistingUserInfo(null);
                         setEmail('');
                     }}>
-                        Abbrechen
+                        {t('inviteFriendForm.actions.cancel')}
                     </AlertDialogCancel>
                     <AlertDialogAction
                         onClick={async () => {
@@ -151,9 +174,15 @@ export function InviteFriendForm({ onSuccess, className }: InviteFriendFormProps
                             setIsSendingRequest(true);
                             try {
                                 await sendFriendRequest(existingUserInfo.userId);
-                                toast.success('Freundschaftsanfrage gesendet', {
-                                    description: `Eine Freundschaftsanfrage wurde an ${existingUserInfo.displayName} gesendet.`,
-                                });
+                                toast.success(
+                                    t('inviteFriendForm.success.requestSentTitle'),
+                                    {
+                                        description: t(
+                                            'inviteFriendForm.success.requestSentDesc',
+                                            { target: existingUserInfo.displayName }
+                                        ),
+                                    }
+                                );
                                 setShowUserExistsDialog(false);
                                 setExistingUserInfo(null);
                                 setEmail('');
@@ -161,16 +190,24 @@ export function InviteFriendForm({ onSuccess, className }: InviteFriendFormProps
                                     onSuccess();
                                 }
                             } catch (error) {
-                                toast.error('Fehler beim Senden der Freundschaftsanfrage', {
-                                    description: error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten.',
-                                });
+                                toast.error(
+                                    t('inviteFriendForm.errors.sendRequest'),
+                                    {
+                                        description:
+                                            error instanceof Error
+                                                ? error.message
+                                                : t('inviteFriendForm.errors.unknown'),
+                                    }
+                                );
                             } finally {
                                 setIsSendingRequest(false);
                             }
                         }}
                         disabled={isSendingRequest}
                     >
-                        {isSendingRequest ? 'Wird gesendet...' : 'Freundschaftsanfrage senden'}
+                        {isSendingRequest
+                            ? t('inviteFriendForm.actions.sending')
+                            : t('inviteFriendForm.actions.sendRequest')}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
@@ -178,4 +215,3 @@ export function InviteFriendForm({ onSuccess, className }: InviteFriendFormProps
         </>
     );
 }
-

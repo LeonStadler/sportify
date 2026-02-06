@@ -18,13 +18,16 @@ import {
 import { Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ExercisePicker } from "@/components/exercises/ExercisePicker";
 
 export interface StatCardConfig {
   id: string;
-  type: 'points' | 'activity' | 'rank' | 'workouts';
-  period: 'week' | 'month' | 'quarter' | 'year';
-  activityType?: 'pullups' | 'pushups' | 'running' | 'cycling' | 'situps';
-  color: 'orange' | 'blue' | 'green' | 'purple';
+  type: "points" | "activity" | "rank" | "workouts";
+  period: "week" | "month" | "quarter" | "year";
+  activityId?: string;
+  activityMode?: "auto" | "custom";
+  activityMetric?: "reps" | "time" | "distance";
+  color: "orange" | "blue" | "green" | "purple" | "teal" | "rose" | "slate";
 }
 
 interface DashboardSettingsDialogProps {
@@ -32,6 +35,16 @@ interface DashboardSettingsDialogProps {
   onOpenChange: (open: boolean) => void;
   cards: StatCardConfig[];
   onSave: (cards: StatCardConfig[]) => void;
+  onReset?: () => void;
+  exercises: Array<{
+    id: string;
+    name: string;
+    measurementType?: string | null;
+    supportsSets?: boolean | null;
+    supportsTime?: boolean | null;
+    supportsDistance?: boolean | null;
+  }>;
+  facets: { categories: string[]; muscleGroups: string[]; equipment: string[] };
 }
 
 export function DashboardSettingsDialog({
@@ -39,9 +52,21 @@ export function DashboardSettingsDialog({
   onOpenChange,
   cards,
   onSave,
+  onReset,
+  exercises,
+  facets,
 }: DashboardSettingsDialogProps) {
   const { t } = useTranslation();
   const [localCards, setLocalCards] = useState<StatCardConfig[]>(cards);
+  const colorClasses: Record<StatCardConfig["color"], string> = {
+    orange: "bg-orange-500",
+    blue: "bg-blue-500",
+    green: "bg-green-500",
+    purple: "bg-purple-500",
+    teal: "bg-teal-500",
+    rose: "bg-rose-500",
+    slate: "bg-slate-500",
+  };
 
   useEffect(() => {
     setLocalCards(cards);
@@ -51,6 +76,31 @@ export function DashboardSettingsDialog({
     const newCards = [...localCards];
     newCards[index] = { ...newCards[index], ...updates };
     setLocalCards(newCards);
+  };
+
+  const getAvailableMetrics = (exerciseId?: string) => {
+    const exercise = exercises.find((item) => item.id === exerciseId);
+    if (!exercise) return ["reps"] as StatCardConfig["activityMetric"][];
+    const supportsDistance =
+      exercise.supportsDistance || exercise.measurementType === "distance";
+    const supportsTime = exercise.supportsTime || exercise.measurementType === "time";
+    const supportsReps =
+      exercise.measurementType === "reps" ||
+      exercise.supportsSets ||
+      (!supportsDistance && !supportsTime);
+    const metrics: StatCardConfig["activityMetric"][] = [];
+    if (supportsReps) metrics.push("reps");
+    if (supportsTime) metrics.push("time");
+    if (supportsDistance) metrics.push("distance");
+    return metrics;
+  };
+
+  const getDefaultMetric = (exerciseId?: string) => {
+    const metrics = getAvailableMetrics(exerciseId);
+    if (metrics.includes("distance")) return "distance";
+    if (metrics.includes("reps")) return "reps";
+    if (metrics.includes("time")) return "time";
+    return "reps";
   };
 
   const handleSave = () => {
@@ -104,15 +154,36 @@ export function DashboardSettingsDialog({
         <div className="space-y-6 py-4">
           {localCards.map((card, index) => {
             const baseId = `dashboard-card-${card.id}`;
+            const selectedExercise = exercises.find((exercise) => exercise.id === card.activityId);
             return (
             <div
               key={card.id}
-              className="p-4 border rounded-lg space-y-4 bg-muted/30"
+              className="p-4 border rounded-lg space-y-4 bg-card shadow-sm"
             >
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-sm">
-                  {t('dashboard.settings.card', 'Kachel')} {index + 1}
-                </h3>
+              <div className="flex items-start gap-3">
+                <span
+                  className={`mt-1 h-8 w-1.5 rounded-full ${
+                    colorClasses[card.color] ?? colorClasses.orange
+                  }`}
+                />
+                <div className="space-y-1">
+                  <h3 className="font-semibold text-sm">
+                    {t("dashboard.settings.card", "Kachel")} {index + 1}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    {getTypeLabel(card.type)} · {getPeriodLabel(card.period)}
+                  </p>
+                  {card.type === "activity" && (
+                    <p className="text-xs text-muted-foreground">
+                      {card.activityMode === "custom"
+                        ? t("dashboard.cardMeta.manual", "Manuell")
+                        : t("dashboard.cardMeta.auto", "Auto")}
+                      {card.activityMode === "custom" && selectedExercise?.name
+                        ? ` · ${selectedExercise.name}`
+                        : ""}
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -124,8 +195,15 @@ export function DashboardSettingsDialog({
                     value={card.type}
                     onValueChange={(value) =>
                       updateCard(index, {
-                        type: value as StatCardConfig['type'],
-                        activityType: value === 'activity' ? card.activityType : undefined,
+                        type: value as StatCardConfig["type"],
+                        activityId:
+                          value === "activity" ? card.activityId : undefined,
+                        activityMode:
+                          value === "activity" ? card.activityMode || "auto" : undefined,
+                        activityMetric:
+                          value === "activity"
+                            ? card.activityMetric || getDefaultMetric(card.activityId)
+                            : undefined,
                       })
                     }
                   >
@@ -149,41 +227,84 @@ export function DashboardSettingsDialog({
                   </Select>
                 </div>
 
-                {card.type === 'activity' && (
-                  <div className="space-y-2">
-                    <Label htmlFor={`${baseId}-activity`}>
-                      {t('dashboard.settings.activityType', 'Übung')}
-                    </Label>
-                    <Select
-                      value={card.activityType || 'pullups'}
-                      onValueChange={(value) =>
-                        updateCard(index, {
-                          activityType: value as StatCardConfig['activityType'],
-                        })
-                      }
-                    >
-                      <SelectTrigger id={`${baseId}-activity`}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pullups">
-                          {t('dashboard.pullups', 'Klimmzüge')}
-                        </SelectItem>
-                        <SelectItem value="pushups">
-                          {t('dashboard.pushups', 'Liegestütze')}
-                        </SelectItem>
-                        <SelectItem value="running">
-                          {t('dashboard.running', 'Laufen')}
-                        </SelectItem>
-                        <SelectItem value="cycling">
-                          {t('dashboard.cycling', 'Radfahren')}
-                        </SelectItem>
-                        <SelectItem value="situps">
-                          {t('dashboard.situps', 'Sit-ups')}
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                {card.type === "activity" && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor={`${baseId}-activity-mode`}>
+                        {t("dashboard.settings.activityMode", "Auswahl")}
+                      </Label>
+                      <Select
+                        value={card.activityMode || "auto"}
+                        onValueChange={(value) =>
+                          updateCard(index, {
+                            activityMode: value as StatCardConfig["activityMode"],
+                          })
+                        }
+                      >
+                        <SelectTrigger id={`${baseId}-activity-mode`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="auto">
+                            {t("dashboard.settings.activityAuto", "Top‑Übung automatisch")}
+                          </SelectItem>
+                          <SelectItem value="custom">
+                            {t("dashboard.settings.activityCustom", "Übung auswählen")}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {card.activityMode !== "auto" && (
+                      <div className="space-y-2">
+                        <Label htmlFor={`${baseId}-activity`}>
+                          {t("dashboard.settings.activityType", "Übung")}
+                        </Label>
+                        <ExercisePicker
+                          value={card.activityId}
+                          onSelect={(value) =>
+                            updateCard(index, {
+                              activityId: value,
+                              activityMetric: getDefaultMetric(value),
+                              activityMode: "custom",
+                            })
+                          }
+                          exercises={exercises}
+                          facets={facets}
+                          enableFilters
+                        />
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`${baseId}-activity-metric`}>
+                        {t("dashboard.settings.activityMetric", "Wert")}
+                      </Label>
+                      <Select
+                        value={card.activityMetric || getDefaultMetric(card.activityId)}
+                        onValueChange={(value) =>
+                          updateCard(index, {
+                            activityMetric: value as StatCardConfig["activityMetric"],
+                          })
+                        }
+                      >
+                        <SelectTrigger id={`${baseId}-activity-metric`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {getAvailableMetrics(card.activityId).map((metric) => (
+                            <SelectItem key={metric} value={metric}>
+                              {metric === "distance"
+                                ? t("training.form.units.kilometersShort", "km")
+                                : metric === "time"
+                                  ? t("training.form.units.minutesShort", "Min")
+                                  : t("training.form.units.repetitionsShort", "Wdh.")}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
                 )}
 
                 <div className="space-y-2">
@@ -235,16 +356,46 @@ export function DashboardSettingsDialog({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="orange">
-                        {t('dashboard.settings.colors.orange', 'Orange')}
+                        <span className="inline-flex items-center gap-2">
+                          <span className="h-2.5 w-2.5 rounded-full bg-orange-500" />
+                          {t('dashboard.settings.colors.orange', 'Orange')}
+                        </span>
                       </SelectItem>
                       <SelectItem value="blue">
-                        {t('dashboard.settings.colors.blue', 'Blau')}
+                        <span className="inline-flex items-center gap-2">
+                          <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
+                          {t('dashboard.settings.colors.blue', 'Blau')}
+                        </span>
                       </SelectItem>
                       <SelectItem value="green">
-                        {t('dashboard.settings.colors.green', 'Grün')}
+                        <span className="inline-flex items-center gap-2">
+                          <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
+                          {t('dashboard.settings.colors.green', 'Grün')}
+                        </span>
                       </SelectItem>
                       <SelectItem value="purple">
-                        {t('dashboard.settings.colors.purple', 'Lila')}
+                        <span className="inline-flex items-center gap-2">
+                          <span className="h-2.5 w-2.5 rounded-full bg-purple-500" />
+                          {t('dashboard.settings.colors.purple', 'Lila')}
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="teal">
+                        <span className="inline-flex items-center gap-2">
+                          <span className="h-2.5 w-2.5 rounded-full bg-teal-500" />
+                          {t('dashboard.settings.colors.teal', 'Türkis')}
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="rose">
+                        <span className="inline-flex items-center gap-2">
+                          <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
+                          {t('dashboard.settings.colors.rose', 'Rosa')}
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="slate">
+                        <span className="inline-flex items-center gap-2">
+                          <span className="h-2.5 w-2.5 rounded-full bg-slate-500" />
+                          {t('dashboard.settings.colors.slate', 'Grau')}
+                        </span>
                       </SelectItem>
                     </SelectContent>
                   </Select>
@@ -255,6 +406,17 @@ export function DashboardSettingsDialog({
         </div>
 
         <DialogFooter>
+          {onReset && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                onReset();
+                onOpenChange(false);
+              }}
+            >
+              {t('common.reset', 'Zurücksetzen')}
+            </Button>
+          )}
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t('common.cancel', 'Abbrechen')}
           </Button>

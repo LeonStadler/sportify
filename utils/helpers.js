@@ -563,8 +563,7 @@ export const WEEK_WINDOW_CONDITION = `
 export const weeklyChallengeTargets = {
     pullups: 200,
     pushups: 400,
-    running: 30,
-    cycling: 120,
+    situps: 300,
     points: 1500
 };
 

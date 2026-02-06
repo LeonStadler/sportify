@@ -34,6 +34,10 @@ const ensureCoreSchema = async (pool) => {
             rest_between_sets_seconds INTEGER,
             rest_between_activities_seconds INTEGER,
             rest_between_rounds_seconds INTEGER,
+            category VARCHAR(50),
+            discipline VARCHAR(50),
+            movement_pattern VARCHAR(50),
+            movement_patterns TEXT[],
             visibility VARCHAR(20) NOT NULL DEFAULT 'private',
             is_template BOOLEAN NOT NULL DEFAULT false,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -72,6 +76,36 @@ const ensureCoreSchema = async (pool) => {
         'CREATE INDEX IF NOT EXISTS idx_workout_activities_workout_id ON workout_activities(workout_id)'
     );
 
+    // Legacy schema compatibility: some databases still have activity_type as enum.
+    // We need text/varchar to store DB exercise UUIDs as activity identifiers.
+    try {
+        const { rows: activityTypeRows } = await pool.query(`
+            SELECT data_type, udt_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'workout_activities'
+              AND column_name = 'activity_type'
+            LIMIT 1
+        `);
+        const activityTypeColumn = activityTypeRows[0];
+        if (
+            activityTypeColumn &&
+            (String(activityTypeColumn.data_type).toUpperCase() === 'USER-DEFINED' ||
+                activityTypeColumn.udt_name === 'activity_type')
+        ) {
+            await pool.query(`
+                ALTER TABLE workout_activities
+                ALTER COLUMN activity_type TYPE VARCHAR(100)
+                USING activity_type::text
+            `);
+        }
+    } catch (error) {
+        console.warn(
+            '[Migration] Konnte workout_activities.activity_type nicht auf VARCHAR migrieren:',
+            error.message
+        );
+    }
+
     // Übungen/Konfiguration
     await pool.query(`
         CREATE TABLE IF NOT EXISTS exercises (
@@ -84,6 +118,7 @@ const ensureCoreSchema = async (pool) => {
             movement_pattern VARCHAR(50),
             measurement_type VARCHAR(20),
             points_per_unit DECIMAL(10, 2) NOT NULL DEFAULT 1.0,
+            points_source VARCHAR(20) NOT NULL DEFAULT 'auto',
             unit TEXT NOT NULL DEFAULT 'Wiederholungen',
             has_weight BOOLEAN DEFAULT false,
             has_set_mode BOOLEAN DEFAULT true,
@@ -328,10 +363,13 @@ export const ensureAllTablesExist = async (pool) => {
         'outbound_emails': ['id', 'recipient', 'subject', 'body', 'sent_at'],
         'invitations': ['id', 'email', 'token_hash', 'expires_at', 'status', 'used', 'used_at'],
         'user_backup_codes': ['id', 'user_id', 'code_hash', 'used_at'],
-        'workouts': ['id', 'user_id', 'title', 'start_time', 'duration', 'use_end_time', 'difficulty', 'session_type', 'rounds', 'rest_between_sets_seconds', 'rest_between_activities_seconds', 'rest_between_rounds_seconds', 'visibility', 'is_template', 'created_at'],
+        'workouts': ['id', 'user_id', 'title', 'start_time', 'duration', 'use_end_time', 'difficulty', 'session_type', 'rounds', 'rest_between_sets_seconds', 'rest_between_activities_seconds', 'rest_between_rounds_seconds', 'category', 'discipline', 'movement_pattern', 'movement_patterns', 'visibility', 'source_template_root_id', 'created_at'],
         'workout_activities': ['id', 'workout_id', 'activity_type', 'quantity', 'points_earned', 'order_index', 'exercise_id', 'measurement_type', 'reps', 'weight', 'distance', 'duration', 'rest_between_sets_seconds', 'rest_after_seconds', 'effort', 'superset_group'],
-        'exercises': ['id', 'name', 'slug', 'category', 'measurement_type', 'points_per_unit', 'unit', 'status', 'is_active'],
+        'workout_templates': ['id', 'user_id', 'title', 'start_time', 'duration', 'use_end_time', 'difficulty', 'session_type', 'rounds', 'rest_between_sets_seconds', 'rest_between_activities_seconds', 'rest_between_rounds_seconds', 'category', 'discipline', 'movement_pattern', 'movement_patterns', 'visibility', 'source_template_root_id', 'created_at'],
+        'workout_template_activities': ['id', 'template_id', 'activity_type', 'quantity', 'points_earned', 'order_index', 'exercise_id', 'measurement_type', 'reps', 'weight', 'distance', 'duration', 'rest_between_sets_seconds', 'rest_after_seconds', 'effort', 'superset_group'],
+        'exercises': ['id', 'name', 'slug', 'category', 'measurement_type', 'points_per_unit', 'points_source', 'unit', 'status', 'is_active'],
         'exercise_aliases': ['id', 'exercise_id', 'alias', 'alias_slug', 'created_at'],
+        'exercise_favorites': ['id', 'user_id', 'exercise_id', 'created_at'],
         'exercise_reports': ['id', 'exercise_id', 'reported_by', 'reason', 'status', 'created_at'],
         'exercise_edit_requests': ['id', 'exercise_id', 'requested_by', 'change_request', 'status', 'created_at'],
         'notifications': ['id', 'user_id', 'type', 'title', 'message', 'payload', 'created_at'],

@@ -260,12 +260,14 @@ export const LoginForm: React.FC<LoginFormProps> = ({
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-primary">
               <Shield className="h-5 w-5" />
-              <h3 className="font-semibold">Zwei-Faktor-Authentifizierung</h3>
+              <h3 className="font-semibold">
+                {t("auth.twoFactorLogin.title")}
+              </h3>
             </div>
 
             <Alert>
               <AlertDescription>
-                Bitte gib den 6-stelligen Code aus deiner Authenticator-App ein, um die Anmeldung abzuschließen.
+                {t("auth.twoFactorLogin.description")}
               </AlertDescription>
             </Alert>
 
@@ -279,13 +281,15 @@ export const LoginForm: React.FC<LoginFormProps> = ({
               {!showBackupCodeField ? (
                 <>
                   <div className="space-y-2">
-                    <Label htmlFor="twoFactorCode">2FA-Code</Label>
+                    <Label htmlFor="twoFactorCode">
+                      {t("auth.twoFactorLogin.codeLabel")}
+                    </Label>
                     <Input
                       id="twoFactorCode"
                       type="text"
                       inputMode="numeric"
                       pattern="[0-9]*"
-                      placeholder="000000"
+                      placeholder={t("auth.twoFactorLogin.codePlaceholder")}
                       maxLength={6}
                       value={twoFactorCode}
                       onChange={(e) => handleTwoFactorInput(e.target.value)}
@@ -294,7 +298,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
                       autoComplete="one-time-code"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Gib den 6-stelligen Code aus deiner Authenticator-App ein
+                      {t("auth.twoFactorLogin.codeHint")}
                     </p>
                   </div>
 
@@ -304,24 +308,26 @@ export const LoginForm: React.FC<LoginFormProps> = ({
                       onClick={handleShowBackupCode}
                       className="text-sm text-muted-foreground hover:text-primary underline"
                     >
-                      2FA verloren?
+                      {t("auth.twoFactorLogin.lost2fa")}
                     </button>
                   </div>
                 </>
               ) : (
                 <div className="space-y-2">
-                  <Label htmlFor="backupCode">Backup-Code</Label>
+                  <Label htmlFor="backupCode">
+                    {t("auth.twoFactorLogin.backupCodeLabel")}
+                  </Label>
                   <Input
                     id="backupCode"
                     type="text"
-                    placeholder="XXXX-XXXX-XXXX"
+                    placeholder={t("auth.twoFactorLogin.backupCodePlaceholder")}
                     value={backupCode}
                     onChange={(e) => handleBackupCodeInput(e.target.value)}
                     className="font-mono"
                     autoFocus
                   />
                   <p className="text-xs text-muted-foreground">
-                    Gib einen deiner Backup-Codes ein, die du beim Einrichten der 2FA erhalten hast
+                    {t("auth.twoFactorLogin.backupCodeHint")}
                   </p>
                   <button
                     type="button"
@@ -332,7 +338,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
                     }}
                     className="text-sm text-muted-foreground hover:text-primary underline"
                   >
-                    Zurück zum 2FA-Code
+                    {t("auth.twoFactorLogin.backToCode")}
                   </button>
                 </div>
               )}
@@ -344,7 +350,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
                   onClick={handleBackToEmailPassword}
                   className="flex-1"
                 >
-                  Zurück
+                  {t("auth.twoFactorLogin.back")}
                 </Button>
                 <Button
                   type="submit"
@@ -352,7 +358,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
                   disabled={isLoggingIn || (!showBackupCodeField && !twoFactorCode) || (showBackupCodeField && !backupCode)}
                 >
                   {isLoggingIn && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Anmelden
+                  {t("auth.twoFactorLogin.submit")}
                 </Button>
               </div>
             </form>

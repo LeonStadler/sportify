@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
+import { useDateTimeFormatter } from "@/hooks/use-date-time-formatter";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
 import { parseAvatarConfig } from "@/lib/avatar";
@@ -21,29 +22,13 @@ import {
   getRangeForPeriod,
   toDateParam,
 } from "@/utils/dateRanges";
+import { convertDistance, getPrimaryDistanceUnit } from "@/utils/units";
 import { Dumbbell, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { useTranslation } from "react-i18next";
 import NiceAvatar from "react-nice-avatar";
 import { Link, useNavigate } from "react-router-dom";
-
-const getActivityIcon = (activityType: string) => {
-  switch (activityType) {
-    case "pullups":
-      return "💪";
-    case "pushups":
-      return "🔥";
-    case "situps":
-      return "🚀";
-    case "running":
-      return "🏃";
-    case "cycling":
-      return "🚴";
-    default:
-      return "💪";
-  }
-};
 
 const getActivityName = (activityType: string, t: (key: string) => string) => {
   const translationKey = `activityFeed.activityTypes.${activityType.toLowerCase()}`;
@@ -70,11 +55,16 @@ const getActivityColor = (activityType: string) => {
   }
 };
 
-const formatAmount = (activityType: string, amount: number) => {
+const formatAmount = (
+  activityType: string,
+  amount: number,
+  distanceUnit: string,
+  distanceLabel: string
+) => {
   switch (activityType) {
     case "running":
     case "cycling":
-      return `${amount} km`;
+      return `${convertDistance(amount, "km", distanceUnit)} ${distanceLabel}`;
     default:
       return `${amount}×`;
   }
@@ -83,7 +73,7 @@ const formatAmount = (activityType: string, amount: number) => {
 const formatTimeAgo = (
   dateString: string | null | undefined,
   t: (key: string, params?: Record<string, unknown>) => string,
-  locale: string
+  formatDateTime: (value: Date | string | number, options?: Intl.DateTimeFormatOptions) => string
 ) => {
   if (!dateString) {
     return t("activityFeed.timeAgoShort.unknown");
@@ -95,7 +85,7 @@ const formatTimeAgo = (
     return t("activityFeed.timeAgoShort.unknown");
   }
 
-  return date.toLocaleDateString(locale === "en" ? "en-US" : "de-DE", {
+  return formatDateTime(date, {
     weekday: "short",
     day: "2-digit",
     month: "short",
@@ -115,7 +105,13 @@ export function FriendsActivities() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { t, i18n } = useTranslation();
+  const { formatDateTime } = useDateTimeFormatter();
   const navigate = useNavigate();
+  const distanceUnit = getPrimaryDistanceUnit(user?.preferences?.units?.distance);
+  const distanceLabel =
+    distanceUnit === "miles"
+      ? t("training.form.units.milesShort", "mi")
+      : t("training.form.units.kilometersShort", "km");
 
   const [workouts, setWorkouts] = useState<FeedWorkout[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -281,13 +277,6 @@ export function FriendsActivities() {
           onOffsetChange={handleOffsetChange}
           t={t}
           locale={i18n.language}
-          presets={[
-            { value: "all", label: t("filters.period.all") },
-            { value: "week", label: t("filters.period.week") },
-            { value: "month", label: t("filters.period.month") },
-            { value: "year", label: t("filters.period.year") },
-            { value: "custom", label: t("filters.period.custom") },
-          ]}
           formatDate={formatDate}
         />
       }
@@ -468,7 +457,7 @@ export function FriendsActivities() {
                         {formatTimeAgo(
                           workout.startTimeTimestamp,
                           t,
-                          i18n.language
+                          formatDateTime
                         )}
                       </span>
                     </div>
@@ -484,9 +473,13 @@ export function FriendsActivities() {
                         variant="secondary"
                         className={`text-xs py-0.5 px-2 ${getActivityColor(activity.activityType)}`}
                       >
-                        {getActivityIcon(activity.activityType)}{" "}
-                        {getActivityName(activity.activityType, t)}:{" "}
-                        {formatAmount(activity.activityType, activity.amount)}
+                        {getActivityName(activity.activityType, t)}{" "}
+                        {formatAmount(
+                          activity.activityType,
+                          activity.amount,
+                          distanceUnit,
+                          distanceLabel
+                        )}
                         <span className="ml-1 opacity-75">
                           ({activity.points})
                         </span>

@@ -5,6 +5,25 @@ import { sendEmail } from "./emailService.js";
 const MAX_EMAIL_RETRIES = 3;
 const RETRY_DELAY_BASE_MS = 60000; // 1 Minute
 
+const parsePreferences = (value) => {
+  if (!value) return {};
+  if (typeof value === "object" && !Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? parsed
+        : {};
+    } catch (_error) {
+      return {};
+    }
+  }
+  return {};
+};
+
+const hasSummaryEmailsEnabled = (preferences) =>
+  preferences?.notifications?.email !== false;
+
 export const queueEmailSummary = async (
   pool,
   { userId, recipient, subject, body, html, scheduledAt = new Date() }
@@ -69,6 +88,18 @@ export const markEmailAsProcessed = async (
   }
 };
 
+const markEmailAsSkipped = async (pool, id, reason) => {
+  await pool.query(
+    `UPDATE email_queue
+       SET status = 'skipped',
+           processed_at = NOW(),
+           attempts = attempts + 1,
+           error = $2
+       WHERE id = $1`,
+    [id, reason || "Skipped"]
+  );
+};
+
 export const claimPendingEmails = async (pool, { limit = 25 } = {}) => {
   // Claim rows up-front to prevent double processing across concurrent workers
   // Include retry emails that are due
@@ -99,6 +130,20 @@ export const processEmailQueue = async (pool, { limit = 25 } = {}) => {
 
   for (const email of pendingEmails) {
     try {
+      if (email.user_id) {
+        const { rows } = await pool.query(
+          `SELECT preferences FROM users WHERE id = $1`,
+          [email.user_id]
+        );
+        const preferences = parsePreferences(rows[0]?.preferences);
+        if (!hasSummaryEmailsEnabled(preferences)) {
+          const reason = "Skipped: summary emails disabled by user preference";
+          await markEmailAsSkipped(pool, email.id, reason);
+          results.push({ id: email.id, status: "skipped", reason });
+          continue;
+        }
+      }
+
       await sendEmail({
         recipient: email.recipient,
         subject: email.subject,

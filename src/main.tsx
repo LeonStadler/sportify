@@ -4,7 +4,8 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 
-import { Toaster } from '@/components/ui/sonner';
+import { Toaster as SonnerToaster } from '@/components/ui/sonner';
+import { Toaster as ShadcnToaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { registerServiceWorker } from '@/utils/serviceWorker';
 import { initSvgThemeListener } from '@/utils/updateSvgTheme';
@@ -37,10 +38,16 @@ createRoot(document.getElementById('root')!).render(
       storageKey="sportify-theme"
     >
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
+        <BrowserRouter
+          future={{
+            v7_startTransition: true,
+            v7_relativeSplatPath: true,
+          }}
+        >
           <AuthProvider>
             <App />
-            <Toaster />
+            <SonnerToaster />
+            <ShadcnToaster />
           </AuthProvider>
         </BrowserRouter>
       </QueryClientProvider>

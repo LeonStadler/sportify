@@ -93,12 +93,14 @@ export const WorkoutReactions = ({
           ? await removeReaction(workoutId)
           : await createReaction(workoutId, emoji);
       updateReactions(nextReactions);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating reaction:", error);
       toast({
         title: t("reactions.errorTitle", "Fehler"),
         description:
-          error?.message || t("reactions.errorMessage", "Aktion fehlgeschlagen."),
+          error instanceof Error
+            ? error.message
+            : t("reactions.errorMessage", "Aktion fehlgeschlagen."),
         variant: "destructive",
       });
     } finally {

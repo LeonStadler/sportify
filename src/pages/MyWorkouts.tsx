@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
+import { useDateTimeFormatter } from "@/hooks/use-date-time-formatter";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL } from "@/lib/api";
 import type { Workout, WorkoutReaction } from "@/types/workout";
@@ -18,28 +19,11 @@ import {
   getRangeForPeriod,
   toDateParam,
 } from "@/utils/dateRanges";
-import { convertDistance, convertWeightFromKg } from "@/utils/units";
-import { Dumbbell } from "lucide-react";
+import { convertDistance, convertWeightFromKg, getPrimaryDistanceUnit } from "@/utils/units";
+import { Clock, Dumbbell, Star } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { useTranslation } from "react-i18next";
-
-const getActivityIcon = (activityType: string) => {
-  switch (activityType) {
-    case "pullups":
-      return "💪";
-    case "pushups":
-      return "🔥";
-    case "situps":
-      return "🚀";
-    case "running":
-      return "🏃";
-    case "cycling":
-      return "🚴";
-    default:
-      return "💪";
-  }
-};
 
 const getActivityName = (activityType: string, t: (key: string) => string) => {
   const translationKey = `activityFeed.activityTypes.${activityType.toLowerCase()}`;
@@ -80,6 +64,9 @@ const translateUnit = (unit: string, t: (key: string) => string) => {
   if (normalizedUnit === "m" || normalizedUnit === "meter" || normalizedUnit === "meters") {
     return t("training.form.units.meters");
   }
+  if (normalizedUnit === "yards" || normalizedUnit === "yard" || normalizedUnit === "yd") {
+    return t("training.form.units.yards", "Yards");
+  }
   if (normalizedUnit === "meilen" || normalizedUnit === "miles") {
     return t("training.form.units.miles");
   }
@@ -107,7 +94,7 @@ const formatAmount = (
 const formatTimeAgo = (
   dateString: string | null | undefined,
   t: (key: string, params?: Record<string, unknown>) => string,
-  locale: string
+  formatDateTime: (value: Date | string | number, options?: Intl.DateTimeFormatOptions) => string
 ) => {
   if (!dateString) {
     return t("activityFeed.timeAgoShort.unknown");
@@ -119,7 +106,7 @@ const formatTimeAgo = (
     return t("activityFeed.timeAgoShort.unknown");
   }
 
-  return date.toLocaleDateString(locale === "en" ? "en-US" : "de-DE", {
+  return formatDateTime(date, {
     weekday: "short",
     day: "2-digit",
     month: "short",
@@ -145,6 +132,19 @@ const formatDuration = (minutes?: number, t?: (key: string, params?: Record<stri
     return `${hours}h ${remainingMinutes}min`;
   }
   return `${minutes}min`;
+};
+
+const getSourceTemplateCredit = (
+  workout: Workout,
+  t: (key: string, options?: Record<string, unknown>) => string
+) => {
+  if (!workout.sourceTemplateId || !workout.sourceTemplateOwnerDisplayName) {
+    return null;
+  }
+  return t("training.sourceTemplateCredit", {
+    name: workout.sourceTemplateOwnerDisplayName,
+    defaultValue: "Vorlage von {{name}}",
+  });
 };
 
 const getVisibilityLabel = (value?: string) => {
@@ -178,8 +178,9 @@ export function MyWorkouts() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { t, i18n } = useTranslation();
+  const { formatDate, formatDateTime } = useDateTimeFormatter();
   const weightUnit = user?.preferences?.units?.weight || "kg";
-  const distanceUnit = user?.preferences?.units?.distance || "km";
+  const distanceUnit = getPrimaryDistanceUnit(user?.preferences?.units?.distance);
 
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -196,8 +197,6 @@ export function MyWorkouts() {
     hasPrev: false,
   });
 
-  const formatDate = (date: Date) =>
-    date.toLocaleDateString(i18n.language === "en" ? "en-US" : "de-DE");
 
   const resolvedRange = useMemo(
     () => getNormalizedRange(getRangeForPeriod(period, customRange, offset)),
@@ -334,13 +333,6 @@ export function MyWorkouts() {
           onOffsetChange={handleOffsetChange}
           t={t}
           locale={i18n.language}
-          presets={[
-            { value: "all", label: t("filters.period.all") },
-            { value: "week", label: t("filters.period.week") },
-            { value: "month", label: t("filters.period.month") },
-            { value: "year", label: t("filters.period.year") },
-            { value: "custom", label: t("filters.period.custom") },
-          ]}
           formatDate={formatDate}
         />
       }
@@ -439,7 +431,10 @@ export function MyWorkouts() {
                         )}
                         {workout.duration && (
                           <Badge variant="outline" className="text-xs ml-2">
-                            ⏱️ {formatDuration(workout.duration, t)}
+                            <span className="inline-flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {formatDuration(workout.duration, t)}
+                            </span>
                           </Badge>
                         )}
                       </div>
@@ -449,10 +444,16 @@ export function MyWorkouts() {
                         {formatTimeAgo(
                           workout.startTimeTimestamp || null,
                           t,
-                          i18n.language
+                          formatDateTime
                         )}
                       </span>
                     </div>
+                    {getSourceTemplateCredit(workout, t) && (
+                      <div className="mt-1 text-xs text-muted-foreground inline-flex items-center gap-1">
+                        <Star className="h-3 w-3 text-yellow-500" />
+                        {getSourceTemplateCredit(workout, t)}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -495,8 +496,7 @@ export function MyWorkouts() {
                           variant="secondary"
                           className={`text-xs py-0.5 px-2 ${getActivityColor(activity.activityType)}`}
                         >
-                          {getActivityIcon(activity.activityType)}{" "}
-                          {getActivityName(activity.activityType, t)}:{" "}
+                          {getActivityName(activity.activityType, t)}{" "}
                           {formatAmount(activity.activityType, activity.amount, activity.unit, t, distanceUnit)}
                           {setsDisplay && (
                             <span className="ml-1 opacity-75">

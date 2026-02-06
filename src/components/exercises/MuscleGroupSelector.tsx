@@ -4,6 +4,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { getExerciseMuscleGroupLabel } from "@/components/exercises/exerciseLabels";
 
 type MuscleGroupTree = Array<{
   label: string;
@@ -51,7 +52,7 @@ export function MuscleGroupSelector({
 
   const labelText =
     value.length > 0
-      ? value.join(", ")
+      ? value.map((item) => getExerciseMuscleGroupLabel(item, t)).join(", ")
       : placeholder || t("exerciseLibrary.muscleGroupsPlaceholder", "Muskelgruppen auswählen");
 
   return (
@@ -93,7 +94,9 @@ export function MuscleGroupSelector({
                       checked={allSelected ? true : someSelected ? "indeterminate" : false}
                       onCheckedChange={() => toggleGroup(group.label, group.children)}
                     />
-                    <span className="font-medium">{group.label}</span>
+                    <span className="font-medium">
+                      {getExerciseMuscleGroupLabel(group.label, t)}
+                    </span>
                   </label>
                   {!isSingle && (
                     <Button
@@ -120,7 +123,7 @@ export function MuscleGroupSelector({
                           checked={selectedSet.has(child)}
                           onCheckedChange={() => toggleChild(child)}
                         />
-                        {child}
+                        {getExerciseMuscleGroupLabel(child, t)}
                       </label>
                     ))}
                   </div>

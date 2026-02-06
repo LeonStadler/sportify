@@ -11,7 +11,7 @@
   "contributors": [
     {
       "name": "Leon Stadler",
-      "email": "contact@leon-stadler.com",
+      "email": "sportify@leon-stadler.com",
       "url": "https://leon-stadler.com"
     }
   ],
@@ -33,6 +33,10 @@
     "dev:backend": "nodemon server.js",
     "build": "tsc -b && vite build",
     "build:dev": "vite build --mode development",
+    "docs:sync": "node scripts/sync-docs-to-docusaurus.js",
+    "docs:build": "npm --prefix docs-site install && npm --prefix docs-site run build",
+    "docs:check": "npm run docs:sync && npm run docs:build",
+    "build:with-docs": "npm run docs:check && npm run build && node scripts/copy-docs-build.js",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "lint:check": "eslint .",
     "test": "npm run test:node && vitest run",
@@ -90,6 +94,7 @@
     "date-fns": "^3.6.0",
     "dotenv": "^16.5.0",
     "embla-carousel-react": "^8.3.0",
+    "exceljs": "^4.4.0",
     "express": "^5.1.0",
     "i18next": "^23.7.16",
     "i18next-browser-languagedetector": "^7.2.0",

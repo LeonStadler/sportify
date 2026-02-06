@@ -1,14 +1,17 @@
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { DEFAULT_WEEKLY_POINTS_GOAL } from "@/config/events";
 import { useToast } from "@/hooks/use-toast";
+import { API_URL } from "@/lib/api";
+import type { Exercise, ExerciseListResponse } from "@/types/exercise";
 import { Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -19,6 +22,7 @@ interface WeeklyGoalsDialogProps {
   onOpenChange: (open: boolean) => void;
   goals: WeeklyGoals;
   onSave: (goals: WeeklyGoals) => Promise<void>;
+  showPoints?: boolean;
 }
 
 export type { WeeklyGoals };
@@ -28,44 +32,164 @@ export function WeeklyGoalsDialog({
   onOpenChange,
   goals,
   onSave,
+  showPoints = true,
 }: WeeklyGoalsDialogProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const resolveDefaultExercises = (items: Exercise[]) => {
+    const defaults = [
+      { id: "pullups", target: 30, unit: "reps" as const },
+      { id: "pushups", target: 100, unit: "reps" as const },
+      { id: "situps", target: 100, unit: "reps" as const },
+    ];
+
+    return defaults
+      .map((def) => {
+        const match = items.find((exercise) => exercise.id === def.id);
+        if (!match) return null;
+        return {
+          exerciseId: match.id,
+          target: def.target,
+          current: 0,
+          unit: def.unit,
+        };
+      })
+      .filter(Boolean) as WeeklyGoals["exercises"];
+  };
+
+  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [facets, setFacets] = useState<ExerciseListResponse["facets"]>();
+
   const defaultGoals: WeeklyGoals = {
-    pullups: { target: 100, current: goals.pullups?.current ?? 0 },
-    pushups: { target: 400, current: goals.pushups?.current ?? 0 },
-    situps: { target: 200, current: goals.situps?.current ?? 0 },
-    running: { target: 25, current: goals.running?.current ?? 0 },
-    cycling: { target: 100, current: goals.cycling?.current ?? 0 },
     points: {
       target: DEFAULT_WEEKLY_POINTS_GOAL,
       current: goals.points?.current ?? 0,
     },
+    exercises: resolveDefaultExercises(exercises),
   };
   const [localGoals, setLocalGoals] = useState<WeeklyGoals>({
-    ...goals,
-    situps: goals.situps ?? { target: 0, current: 0 },
     points: goals.points ?? { target: DEFAULT_WEEKLY_POINTS_GOAL, current: 0 },
+    exercises: goals.exercises ?? [],
   });
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     setLocalGoals({
-      ...goals,
-      situps: goals.situps ?? { target: 0, current: 0 },
       points: goals.points ?? { target: DEFAULT_WEEKLY_POINTS_GOAL, current: 0 },
+      exercises: goals.exercises ?? [],
     });
   }, [goals, open]);
 
-  const updateGoal = (activity: keyof WeeklyGoals, target: number) => {
+  useEffect(() => {
+    if (!open) return;
+    const loadExercises = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await fetch(`${API_URL}/exercises?limit=500&includeMeta=true`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) {
+          return;
+        }
+        const data: ExerciseListResponse = await response.json();
+        setExercises(Array.isArray(data.exercises) ? data.exercises : []);
+        setFacets(data.facets);
+      } catch (error) {
+        console.error("Load exercises error:", error);
+      }
+    };
+    loadExercises();
+  }, [open]);
+
+  const getDefaultUnit = (exercise?: Exercise | null) => {
+    if (!exercise) return "reps" as WeeklyGoals["exercises"][number]["unit"];
+    const supportsDistance = exercise.supportsDistance || exercise.measurementType === "distance";
+    const supportsTime = exercise.supportsTime || exercise.measurementType === "time";
+    if (supportsDistance && supportsTime) return "distance";
+    if (supportsTime) return "time";
+    if (supportsDistance) return "distance";
+    return "reps";
+  };
+
+  const updatePointsGoal = (target: number) => {
     setLocalGoals((prev) => ({
       ...prev,
-      [activity]: { ...prev[activity], target: Math.max(0, target) },
+      points: { ...prev.points, target: Math.max(0, target) },
     }));
   };
 
-  const handleReset = () => {
-    setLocalGoals(defaultGoals);
+  const updateExerciseGoal = (index: number, exerciseId: string) => {
+    const exercise = exercises.find((ex) => ex.id === exerciseId);
+    setLocalGoals((prev) => {
+      const next = [...prev.exercises];
+      next[index] = {
+        ...next[index],
+        exerciseId,
+        unit: getDefaultUnit(exercise),
+      };
+      return { ...prev, exercises: next };
+    });
+  };
+
+  const updateExerciseUnit = (
+    index: number,
+    unit: WeeklyGoals["exercises"][number]["unit"]
+  ) => {
+    setLocalGoals((prev) => {
+      const next = [...prev.exercises];
+      next[index] = { ...next[index], unit };
+      return { ...prev, exercises: next };
+    });
+  };
+
+  const updateExerciseTarget = (index: number, target: number) => {
+    setLocalGoals((prev) => {
+      const next = [...prev.exercises];
+      next[index] = { ...next[index], target: Math.max(0, target) };
+      return { ...prev, exercises: next };
+    });
+  };
+
+  const addExerciseGoal = () => {
+    setLocalGoals((prev) => ({
+      ...prev,
+      exercises: [...prev.exercises, { exerciseId: "", target: 0, unit: "reps" }],
+    }));
+  };
+
+  const removeExerciseGoal = (index: number) => {
+    setLocalGoals((prev) => ({
+      ...prev,
+      exercises: prev.exercises.filter((_, idx) => idx !== index),
+    }));
+  };
+
+  const handleReset = async () => {
+    setIsSaving(true);
+    const resetGoals: WeeklyGoals = {
+      points: {
+        target: DEFAULT_WEEKLY_POINTS_GOAL,
+        current: localGoals.points?.current ?? 0,
+      },
+      exercises: resolveDefaultExercises(exercises),
+    };
+
+    try {
+      await onSave(resetGoals);
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Error resetting goals:", error);
+      toast({
+        title: t("common.error"),
+        description:
+          error instanceof Error
+            ? error.message
+            : t("weeklyGoals.saveError"),
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSave = async () => {
@@ -76,14 +200,11 @@ export function WeeklyGoalsDialog({
     } catch (error) {
       console.error("Error saving goals:", error);
       toast({
-        title: t("common.error", "Fehler"),
+        title: t("common.error"),
         description:
           error instanceof Error
             ? error.message
-            : t(
-              "weeklyGoals.saveError",
-              "Fehler beim Speichern der Wochenziele"
-            ),
+            : t("weeklyGoals.saveError"),
         variant: "destructive",
       });
     } finally {
@@ -92,46 +213,58 @@ export function WeeklyGoalsDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            {t("weeklyGoals.dialog.title", "Wochenziele einstellen")}
-          </DialogTitle>
-          <DialogDescription>
-            {t(
-              "weeklyGoals.dialog.description",
-              "Passe deine wöchentlichen Ziele nach deinen Wünschen an."
-            )}
-          </DialogDescription>
-        </DialogHeader>
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent>
+        <div className="mx-auto w-full max-w-lg max-h-[85vh] overflow-y-auto">
+          <DrawerHeader>
+            <DrawerTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              {t("weeklyGoals.dialog.title")}
+            </DrawerTitle>
+            <DrawerDescription>
+              {t("weeklyGoals.dialog.description")}
+            </DrawerDescription>
+          </DrawerHeader>
 
-        <WeeklyGoalsForm goals={localGoals} onChange={updateGoal} />
+          <div className="px-4 pb-2">
+            <WeeklyGoalsForm
+              goals={localGoals}
+              exercises={exercises}
+              facets={facets}
+              onChangePoints={updatePointsGoal}
+              onChangeExercise={updateExerciseGoal}
+              onChangeExerciseUnit={updateExerciseUnit}
+              onChangeExerciseTarget={updateExerciseTarget}
+              onAddExercise={addExerciseGoal}
+              onRemoveExercise={removeExerciseGoal}
+              showPoints={showPoints}
+            />
+          </div>
 
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isSaving}
-          >
-            {t("common.cancel", "Abbrechen")}
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={handleReset}
-            disabled={isSaving}
-          >
-            {t("common.reset", "Zurücksetzen")}
-          </Button>
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving
-              ? t("common.saving", "Wird gespeichert...")
-              : t("common.save", "Speichern")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <DrawerFooter className="gap-2 flex-row flex-wrap">
+            <DrawerClose asChild>
+              <Button
+                variant="outline"
+                disabled={isSaving}
+              >
+                {t("common.cancel")}
+              </Button>
+            </DrawerClose>
+            <Button
+              variant="secondary"
+              onClick={handleReset}
+              disabled={isSaving}
+            >
+              {t("common.reset")}
+            </Button>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving
+                ? t("common.saving")
+                : t("common.save")}
+            </Button>
+          </DrawerFooter>
+        </div>
+      </DrawerContent>
+    </Drawer>
   );
 }
-

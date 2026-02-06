@@ -1,14 +1,13 @@
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { Slider } from "@/components/ui/slider";
 import { Trophy } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -19,6 +18,7 @@ interface WeeklyPointsGoalDialogProps {
   onOpenChange: (open: boolean) => void;
   currentGoal: number;
   onSave: (points: number) => Promise<void>;
+  defaultGoal?: number;
 }
 
 export function WeeklyPointsGoalDialog({
@@ -26,6 +26,7 @@ export function WeeklyPointsGoalDialog({
   onOpenChange,
   currentGoal,
   onSave,
+  defaultGoal = 0,
 }: WeeklyPointsGoalDialogProps) {
   const { t } = useTranslation();
   const [points, setPoints] = useState(currentGoal);
@@ -49,78 +50,90 @@ export function WeeklyPointsGoalDialog({
     }
   };
 
+  const handleReset = async () => {
+    setIsSaving(true);
+    try {
+      await onSave(defaultGoal);
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Failed to reset points goal", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader className="text-left">
-          <DialogTitle className="flex items-center gap-2">
-            <Trophy className="h-5 w-5 text-yellow-500" />
-            {t("weeklyGoals.pointsTitle", "Set weekly points goal")}
-          </DialogTitle>
-          <DialogDescription className="text-left">
-            {t(
-              "weeklyGoals.pointsDescription",
-              "Set your personal points goal for this week."
-            )}
-          </DialogDescription>
-        </DialogHeader>
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent>
+        <div className="mx-auto w-full max-w-sm">
+          <DrawerHeader>
+            <DrawerTitle className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-yellow-500" />
+              {t("weeklyGoals.pointsTitle")}
+            </DrawerTitle>
+            <DrawerDescription>
+              {t("weeklyGoals.pointsDescription")}
+            </DrawerDescription>
+          </DrawerHeader>
 
-        <div className="grid gap-6 py-4">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label
-                htmlFor="points-goal"
-                id="points-goal-label"
-                className="text-base font-medium"
-              >
-                {t("weeklyGoals.pointsLabel", "Punkte")}
-              </Label>
-              <div className="w-20">
-                <Input
-                  id="points-goal"
-                  type="number"
-                  value={points}
-                  onChange={(e) => setPoints(Number(e.target.value))}
-                  className="h-8 text-right"
-                />
+          <div className="grid gap-6 px-4 pb-4">
+            <div className="space-y-4">
+              <div className="flex flex-col items-center gap-4 py-2">
+                <span className="sr-only" id="points-goal-label">
+                  {t("weeklyGoals.pointsLabel")}
+                </span>
+                <span
+                  className="text-4xl font-bold tabular-nums text-foreground"
+                  aria-hidden
+                >
+                  {points}
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  {t("weeklyGoals.dialog.pointsUnit")}
+                </span>
               </div>
+              <Slider
+                value={[points]}
+                onValueChange={(vals) => setPoints(vals[0])}
+                max={5000}
+                step={25}
+                className="py-2"
+                aria-labelledby="points-goal-label"
+                aria-describedby="points-goal-hint"
+              />
+              <p
+                className="text-xs text-muted-foreground text-center"
+                id="points-goal-hint"
+              >
+                {t("weeklyGoals.pointsHint")}
+              </p>
             </div>
-            <Slider
-              value={[points]}
-              onValueChange={(vals) => setPoints(vals[0])}
-              max={3000}
-              step={50}
-              className="py-2"
-              aria-labelledby="points-goal-label"
-              aria-describedby="points-goal-hint"
-            />
-            <p
-              className="text-xs text-muted-foreground text-center"
-              id="points-goal-hint"
-            >
-              {t(
-                "weeklyGoals.pointsHint",
-                "Standard-Challenge ist meist 1500 Punkte."
-              )}
-            </p>
           </div>
-        </div>
 
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isSaving}
-          >
-            {t("common.cancel", "Abbrechen")}
-          </Button>
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving
-              ? t("common.saving", "Speichert...")
-              : t("common.save", "Speichern")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <DrawerFooter className="flex flex-col gap-3">
+            <Button onClick={handleSave} disabled={isSaving} className="w-full">
+              {isSaving
+                ? t("common.saving")
+                : t("common.save")}
+            </Button>
+            <div className="grid grid-cols-2 gap-2 w-full">
+              <DrawerClose asChild>
+                <Button variant="outline" disabled={isSaving} className="w-full">
+                  {t("common.cancel")}
+                </Button>
+              </DrawerClose>
+              <Button
+                variant="secondary"
+                onClick={handleReset}
+                disabled={isSaving}
+                className="w-full"
+              >
+                {t("common.reset")}
+              </Button>
+            </div>
+          </DrawerFooter>
+        </div>
+      </DrawerContent>
+    </Drawer>
   );
 }

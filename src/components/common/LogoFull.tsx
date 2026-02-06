@@ -1,6 +1,7 @@
 interface LogoFullProps {
   className?: string;
   alt?: string;
+  byline?: string;
 }
 
 /**
@@ -8,7 +9,11 @@ interface LogoFullProps {
  * Dadurch kann das SVG auf CSS-Variablen zugreifen und automatisch
  * zwischen Dark- und Light-Mode wechseln
  */
-export function LogoFull({ className = "", alt = "Sportify" }: LogoFullProps) {
+export function LogoFull({
+  className = "",
+  alt = "Sportify",
+  byline = "by Leon Stadler",
+}: LogoFullProps) {
   return (
     <svg
       width="200"
@@ -72,7 +77,7 @@ export function LogoFull({ className = "", alt = "Sportify" }: LogoFullProps) {
         Sportify
       </text>
       <text x="60" y="46" fontSize="10" className="logo-subtext">
-        by Leon Stadler
+        {byline}
       </text>
     </svg>
   );

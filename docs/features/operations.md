@@ -4,6 +4,10 @@
 
 Systembetrieb, Cron‑Jobs und E‑Mail‑Dispatch.
 
+> **Hinweis:** Diese Seite bietet eine kurze Übersicht. Für detaillierte Informationen siehe:
+> - [Betrieb & Monitoring](../operations.md) - Vollständige Dokumentation des Job-Systems
+> - [Events API](../api/events.md) - API-Referenz für alle Endpunkte
+
 ## API‑Endpunkte
 
 - `POST /api/events/weekly`

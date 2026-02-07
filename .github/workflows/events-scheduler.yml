@@ -138,7 +138,19 @@ jobs:
         shell: bash
         run: |
           # Set EVENTS_BASE_URL from FRONTEND_URL (secret or repository variable)
-          echo "EVENTS_BASE_URL=${{ secrets['FRONTEND_URL'] || vars.FRONTEND_URL || '' }}" >> "$GITHUB_ENV"
+          # The API endpoints are under /api/events, so we use the base URL
+          FRONTEND_URL="${{ secrets['FRONTEND_URL'] || vars.FRONTEND_URL || '' }}"
+          if [ -n "${FRONTEND_URL}" ]; then
+            # Remove trailing slash if present
+            FRONTEND_URL="${FRONTEND_URL%/}"
+            # Ensure it starts with http:// or https://
+            if [[ ! "${FRONTEND_URL}" =~ ^https?:// ]]; then
+              FRONTEND_URL="https://${FRONTEND_URL}"
+            fi
+            echo "EVENTS_BASE_URL=${FRONTEND_URL}" >> "$GITHUB_ENV"
+          else
+            echo "EVENTS_BASE_URL=" >> "$GITHUB_ENV"
+          fi
           
           # Set EVENTS_CRON_SECRET from secrets
           echo "EVENTS_CRON_SECRET=${{ secrets['EVENTS_CRON_SECRET'] }}" >> "$GITHUB_ENV"
@@ -234,4 +246,28 @@ jobs:
           fi
           
           # Success - remove HTTP_CODE line from output for cleaner logs
-          echo "$response" | grep -v "HTTP_CODE:"
+          clean_response=$(echo "$response" | grep -v "HTTP_CODE:")
+          echo "$clean_response"
+          
+          # Parse and log response details
+          if echo "$clean_response" | grep -q '"skipped"'; then
+            if echo "$clean_response" | grep -q '"reason"'; then
+              reason=$(echo "$clean_response" | grep -o '"reason":"[^"]*"' | cut -d'"' -f4)
+              echo "::notice::Job was skipped: $reason"
+              if [ "$reason" = "already-processed" ]; then
+                echo "::info::This week/month was already processed. Use force=true to reprocess."
+              fi
+            fi
+          fi
+          
+          # Log job execution details
+          if echo "$clean_response" | grep -q '"processedUsers"'; then
+            users=$(echo "$clean_response" | grep -o '"processedUsers":[0-9]*' | cut -d: -f2)
+            echo "::info::Job processed $users users"
+          fi
+          
+          if echo "$clean_response" | grep -q '"processed"'; then
+            emails=$(echo "$clean_response" | grep -o '"processed":[0-9]*' | cut -d: -f2)
+            failed=$(echo "$clean_response" | grep -o '"failed":[0-9]*' | cut -d: -f2 || echo "0")
+            echo "::info::Email dispatch: $emails processed, $failed failed"
+          fi

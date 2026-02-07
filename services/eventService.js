@@ -95,40 +95,56 @@ const ensureJobRun = async (
   scheduledFor,
   { force = false, metadata = {} } = {}
 ) => {
-  const { rows } = await pool.query(
-    `INSERT INTO job_runs (id, job_name, scheduled_for, metadata)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (job_name, scheduled_for)
-         DO NOTHING
-         RETURNING id`,
-    [randomUUID(), jobName, scheduledFor, JSON.stringify(metadata)]
-  );
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO job_runs (id, job_name, scheduled_for, status, metadata)
+           VALUES ($1, $2, $3, 'running', $4)
+           ON CONFLICT (job_name, scheduled_for)
+           DO NOTHING
+           RETURNING id`,
+      [randomUUID(), jobName, scheduledFor, JSON.stringify(metadata)]
+    );
 
-  if (rows.length > 0) {
-    return { id: rows[0].id, skipped: false };
+    if (rows.length > 0) {
+      console.log(`Job run created: ${jobName} for ${scheduledFor} (ID: ${rows[0].id})`);
+      return { id: rows[0].id, skipped: false };
+    }
+
+    if (!force) {
+      console.log(`Job run skipped: ${jobName} for ${scheduledFor} (already exists)`);
+      return { id: null, skipped: true };
+    }
+
+    const { rows: existing } = await pool.query(
+      `SELECT id, status FROM job_runs WHERE job_name = $1 AND scheduled_for = $2`,
+      [jobName, scheduledFor]
+    );
+
+    if (existing.length === 0) {
+      // Should not happen, but create if missing
+      const { rows: newRows } = await pool.query(
+        `INSERT INTO job_runs (id, job_name, scheduled_for, status, metadata)
+             VALUES ($1, $2, $3, 'running', $4)
+             RETURNING id`,
+        [randomUUID(), jobName, scheduledFor, JSON.stringify(metadata)]
+      );
+      console.log(`Job run created (force): ${jobName} for ${scheduledFor} (ID: ${newRows[0].id})`);
+      return { id: newRows[0].id, skipped: false };
+    }
+
+    await pool.query(
+      `UPDATE job_runs
+           SET status = 'running', started_at = NOW(), metadata = $2
+           WHERE id = $1`,
+      [existing[0].id, JSON.stringify(metadata)]
+    );
+
+    console.log(`Job run restarted (force): ${jobName} for ${scheduledFor} (ID: ${existing[0].id}, previous status: ${existing[0].status})`);
+    return { id: existing[0].id, skipped: false };
+  } catch (error) {
+    console.error(`Error ensuring job run for ${jobName}:`, error);
+    throw error;
   }
-
-  if (!force) {
-    return { id: null, skipped: true };
-  }
-
-  const { rows: existing } = await pool.query(
-    `SELECT id FROM job_runs WHERE job_name = $1 AND scheduled_for = $2`,
-    [jobName, scheduledFor]
-  );
-
-  if (existing.length === 0) {
-    return { id: null, skipped: false };
-  }
-
-  await pool.query(
-    `UPDATE job_runs
-         SET status = 'running', started_at = NOW(), metadata = $2
-         WHERE id = $1`,
-    [existing[0].id, JSON.stringify(metadata)]
-  );
-
-  return { id: existing[0].id, skipped: false };
 };
 
 const finalizeJobRun = async (

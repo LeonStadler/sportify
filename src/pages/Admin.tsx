@@ -252,34 +252,25 @@ interface AdminOverviewStats {
 }
 
 interface MonitoringJobStat {
-  jobName: string;
-  job_name?: string; // Fallback für snake_case
+  job_name: string;
   status: string;
   count: number | string;
-  lastRun: string | null;
-  last_run?: string | null; // Fallback für snake_case
-  failedCount?: number | string;
-  failed_count?: number | string; // Fallback für snake_case
-  runningCount?: number | string;
-  running_count?: number | string; // Fallback für snake_case
-  completedCount?: number | string;
-  completed_count?: number | string; // Fallback für snake_case
+  last_run: string | null;
+  failed_count?: number | string;
+  running_count?: number | string;
+  completed_count?: number | string;
 }
 
 interface MonitoringJobFailure {
-  jobName?: string;
-  job_name?: string; // Fallback für snake_case
+  job_name: string;
   count: number | string;
 }
 
 interface MonitoringJobEntry {
   id: string;
-  jobName?: string;
-  job_name?: string; // Fallback für snake_case
-  scheduledFor?: string | null;
-  scheduled_for?: string | null; // Fallback für snake_case
-  startedAt?: string | null;
-  started_at?: string | null; // Fallback für snake_case
+  job_name: string;
+  scheduled_for?: string | null;
+  started_at?: string | null;
 }
 
 interface MonitoringEmailStat {
@@ -1983,7 +1974,7 @@ export function Admin() {
   const moderationOpenEdits = exerciseEditRequests.length;
   const moderationOpenTotal = moderationOpenReports + moderationOpenEdits;
   const monitoringJobFailureCount = monitoringJobs.recentFailures.reduce(
-    (sum, failure) => sum + parseMonitoringCount(failure.count ?? 0),
+    (sum, failure) => sum + parseMonitoringCount(failure.count),
     0
   );
   const monitoringStuckCount = monitoringJobs.stuckJobs.length;
@@ -2477,20 +2468,17 @@ export function Admin() {
                               <p className="text-xs uppercase tracking-wide text-muted-foreground">
                                 {t("admin.overview.monitoring.latestJobs", "Letzte Job-Fehler")}
                               </p>
-                              {recentMonitoringFailures.map((failure) => {
-                                const jobName = failure.jobName || failure.job_name || "Unbekannt";
-                                return (
-                                  <div
-                                    key={jobName}
-                                    className="flex items-center justify-between rounded-md border bg-background/80 p-2"
-                                  >
-                                    <p className="text-sm font-medium">{jobName}</p>
-                                    <Badge variant="outline">
-                                      {parseMonitoringCount(failure.count)}
-                                    </Badge>
-                                  </div>
-                                );
-                              })}
+                              {recentMonitoringFailures.map((failure) => (
+                                <div
+                                  key={failure.job_name}
+                                  className="flex items-center justify-between rounded-md border bg-background/80 p-2"
+                                >
+                                  <p className="text-sm font-medium">{failure.job_name}</p>
+                                  <Badge variant="outline">
+                                    {parseMonitoringCount(failure.count)}
+                                  </Badge>
+                                </div>
+                              ))}
                             </div>
                           )}
                           {recentMonitoringEmails.length > 0 && (
@@ -3855,90 +3843,47 @@ export function Admin() {
                         </div>
                       )}
 
-                      {monitoringJobs.stats.length === 0 ? (
-                        <div className="rounded-lg border bg-muted/30 p-6 text-center">
-                          <p className="text-sm text-muted-foreground mb-2">
-                            {t("admin.monitoring.jobs.empty", "Keine Job-Statistiken verfügbar.")}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {t(
-                              "admin.monitoring.jobs.emptyHint",
-                              "Es wurden noch keine Jobs in den letzten 30 Tagen ausgeführt oder es gibt keine job_runs Tabelle in der Datenbank."
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {monitoringJobs.stats.map((stat: MonitoringJobStat) => (
+                          <div
+                            key={`${stat.job_name}-${stat.status}`}
+                            className="p-4 border rounded-lg"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-medium">
+                                  {stat.job_name}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {stat.status}
+                                </p>
+                              </div>
+                              <Badge
+                                variant={
+                                  stat.status === "completed"
+                                    ? "default"
+                                    : stat.status === "failed"
+                                      ? "destructive"
+                                      : "secondary"
+                                }
+                              >
+                                {stat.count}
+                              </Badge>
+                            </div>
+                            {stat.last_run && (
+                              <p className="text-xs text-muted-foreground mt-2">
+                                {t("admin.monitoring.jobs.lastRun", "Letzter Lauf")}:{" "}
+                                {formatDateTime(stat.last_run)}
+                              </p>
                             )}
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {monitoringJobs.stats.map((stat: MonitoringJobStat) => {
-                              const jobName = stat.jobName || stat.job_name || "Unbekannt";
-                              const lastRun = stat.lastRun || stat.last_run;
-                              const failedCount = stat.failedCount ?? stat.failed_count;
-                              const runningCount = stat.runningCount ?? stat.running_count;
-                              const completedCount = stat.completedCount ?? stat.completed_count;
-                              
-                              return (
-                                <div
-                                  key={`${jobName}-${stat.status}`}
-                                  className="p-4 border rounded-lg bg-background/50"
-                                >
-                                  <div className="flex items-center justify-between mb-2">
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-sm font-medium truncate" title={jobName}>
-                                        {jobName}
-                                      </p>
-                                      <p className="text-xs text-muted-foreground capitalize">
-                                        {stat.status}
-                                      </p>
-                                    </div>
-                                    <Badge
-                                      variant={
-                                        stat.status === "completed"
-                                          ? "default"
-                                          : stat.status === "failed"
-                                            ? "destructive"
-                                            : stat.status === "running"
-                                              ? "secondary"
-                                              : "outline"
-                                      }
-                                      className="ml-2 flex-shrink-0"
-                                    >
-                                      {parseMonitoringCount(stat.count)}
-                                    </Badge>
-                                  </div>
-                                  {lastRun && (
-                                    <p className="text-xs text-muted-foreground mt-2">
-                                      {t("admin.monitoring.jobs.lastRun", "Letzter Lauf")}:{" "}
-                                      {formatDateTime(new Date(lastRun))}
-                                    </p>
-                                  )}
-                                  {failedCount !== undefined && parseMonitoringCount(failedCount ?? 0) > 0 && (
-                                    <p className="text-xs text-destructive mt-1">
-                                      {t("admin.monitoring.jobs.failed", "{{count}} fehlgeschlagen", {
-                                        count: parseMonitoringCount(failedCount),
-                                      })}
-                                    </p>
-                                  )}
-                                  {runningCount !== undefined && parseMonitoringCount(runningCount ?? 0) > 0 && (
-                                    <p className="text-xs text-blue-600 mt-1">
-                                      {t("admin.monitoring.jobs.running", "{{count}} laufend", {
-                                        count: parseMonitoringCount(runningCount),
-                                      })}
-                                    </p>
-                                  )}
-                                  {completedCount !== undefined && parseMonitoringCount(completedCount ?? 0) > 0 && (
-                                    <p className="text-xs text-emerald-600 mt-1">
-                                      {t("admin.monitoring.jobs.completed", "{{count}} erfolgreich", {
-                                        count: parseMonitoringCount(completedCount),
-                                      })}
-                                    </p>
-                                  )}
-                                </div>
-                              );
-                            })}
                           </div>
-                        </div>
-                      )}
+                        ))}
+                        {monitoringJobs.stats.length === 0 && (
+                          <div className="text-sm text-muted-foreground">
+                            {t("admin.monitoring.jobs.empty", "Keine Job-Statistiken verfügbar.")}
+                          </div>
+                        )}
+                      </div>
 
                       {monitoringJobs.recentFailures.length > 0 && (
                         <div ref={monitoringFailuresRef} className="mt-4">
@@ -3946,24 +3891,21 @@ export function Admin() {
                             {t("admin.monitoring.jobs.recentFailures", "Fehler der letzten 7 Tage")}
                           </h4>
                           <div className="space-y-2">
-                          {monitoringJobs.recentFailures.map(
-                            (failure: MonitoringJobFailure) => {
-                              const jobName = failure.jobName || failure.job_name || "Unbekannt";
-                              return (
+                            {monitoringJobs.recentFailures.map(
+                              (failure: MonitoringJobFailure) => (
                                 <div
-                                  key={jobName}
+                                  key={failure.job_name}
                                   className="flex items-center justify-between p-2 bg-destructive/10 rounded"
                                 >
                                   <span className="text-sm">
-                                    {jobName}
+                                    {failure.job_name}
                                   </span>
                                   <Badge variant="destructive">
-                                    {parseMonitoringCount(failure.count)}
+                                    {failure.count}
                                   </Badge>
                                 </div>
-                              );
-                            }
-                          )}
+                              )
+                            )}
                           </div>
                         </div>
                       )}

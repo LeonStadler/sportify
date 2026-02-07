@@ -914,11 +914,9 @@ export const createAdminRouter = (pool) => {
       res.json({ success: true, blocked });
     } catch (error) {
       console.error("Admin block user error:", error);
-      res
-        .status(500)
-        .json({
-          error: "Serverfehler beim Blockieren/Entsperren des Benutzers.",
-        });
+      res.status(500).json({
+        error: "Serverfehler beim Blockieren/Entsperren des Benutzers.",
+      });
     }
   });
 
@@ -2136,13 +2134,9 @@ Die Einladung läuft am ${expiresDate} ab.`;
             `);
 
       res.json({
-        jobs: {
-          stats: jobStats.stats.map((row) => toCamelCase(row)),
-          recentFailures: jobStats.recentFailures.map((row) => toCamelCase(row)),
-          stuckJobs: jobStats.stuckJobs.map((row) => toCamelCase(row)),
-        },
+        jobs: jobStats,
         emails: {
-          stats: emailStats.map((row) => toCamelCase(row)),
+          stats: emailStats,
           recent: recentEmails.map((row) => toCamelCase(row)),
         },
       });

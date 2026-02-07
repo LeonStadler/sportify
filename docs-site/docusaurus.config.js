@@ -4,10 +4,9 @@
 import { themes as prismThemes } from "prism-react-renderer";
 
 // Basis-URL aus Umgebung (wie FRONTEND_URL im Rest des Projekts), ohne trailing slash
-const siteBaseUrl = (process.env.FRONTEND_URL || "https://sportify.leon-stadler.com").replace(
-  /\/$/,
-  ""
-);
+const siteBaseUrl = (
+  process.env.FRONTEND_URL || "https://sportify.leon-stadler.com"
+).replace(/\/$/, "");
 
 const config = {
   title: "Sportify Dokumentation",
@@ -44,8 +43,13 @@ const config = {
         docs: {
           sidebarPath: "./sidebars.js",
           routeBasePath: "/",
-          editUrl:
-            "https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/",
+          editUrl: ({ docPath }) => {
+            // Entferne "docs/" Präfix falls vorhanden, da editUrl bereits auf docs zeigt
+            const cleanPath = docPath.startsWith("docs/") 
+              ? docPath.slice(5) 
+              : docPath;
+            return `https://github.com/LeonStadler/sportify/tree/main/docs/${cleanPath}`;
+          },
         },
         blog: false,
         theme: {

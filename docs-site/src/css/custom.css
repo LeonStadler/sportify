@@ -1,6 +1,36 @@
 /* Sportify Docusaurus Theme */
 
-/* Inter Font wird über Google Fonts CDN geladen (siehe docusaurus.config.js) */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/inter-400.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/inter-500.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/inter-600.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/inter-700.ttf") format("truetype");
+}
 
 :root {
   --sportify-bg: hsl(0 0% 100%);
@@ -109,7 +139,10 @@ body {
   text-decoration: none;
   border-radius: 12px;
   padding: 0.75rem 1rem;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
   width: 100%;
   min-height: 160px;
   height: 100%;

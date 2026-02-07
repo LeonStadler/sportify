@@ -1461,6 +1461,12 @@ const resources = {
         time: "Zeit",
         distance: "Distanz",
         route: "Route",
+        pointsPerUnit: "Punkte pro Einheit",
+        unitOptions: "Einheiten-Optionen",
+        hasWeight: "Gewicht möglich",
+        hasSetMode: "Set-Modus",
+        aliases: "Aliase",
+        isActive: "Aktiv",
         similar: "Ähnliche Übungen",
         create: "Übung erstellen",
         nameRequired: "Bitte gib einen Namen an.",
@@ -1623,6 +1629,59 @@ const resources = {
             exportXlsx: "Excel-Vorlage exportieren",
             note: "Pflichtfelder sind alle Spalten außer Beschreibung. Ungültige Einträge werden übersprungen. Die Excel-Vorlage enthält Auswahlfelder.",
           },
+          exportSelected: {
+            button: "Ausgewählte exportieren",
+            clear: "Auswahl aufheben",
+            hint: "Übungen unten einzeln per Checkbox auswählen, dann „Ausgewählte exportieren“. Der Export enthält alle Daten verlustfrei für Import auf einer anderen Instanz.",
+            success: "Export abgeschlossen",
+            count: "{{count}} Übungen exportiert.",
+          },
+          importReview: {
+            title: "Import-Review",
+            description:
+              "Prüfe die Übungen vor dem Import, wähle Einträge ab und entscheide Updates.",
+            mode: "Modus",
+            modeAuto: "Auto-Merge",
+            modeManual: "Manuell",
+            scope: "Ansicht",
+            scopeAll: "Alle",
+            scopeConflicts: "Nur Konflikte",
+            showNew: "Neue anzeigen",
+            hideNew: "Neue ausblenden",
+            summaryNew: "Neu",
+            summaryUpdate: "Updates",
+            summaryInvalid: "Ungültig",
+            conflictsHint:
+              "Nur Konflikte werden angezeigt. Neue Übungen werden trotzdem importiert.",
+            search: "Suche...",
+            group: "Gruppieren",
+            grouped: "Gruppiert",
+            compact: "Kompakt",
+            detail: "Detail",
+            report: "Import-Report speichern",
+            reportBoth: "Beides",
+            status: "Status",
+            statusNew: "Neu",
+            statusUpdate: "Update",
+            statusInvalid: "Ungültig",
+            merge: "Vergleichen",
+            selected: "Ausgewählt",
+            import: "Import starten",
+            mergeTitle: "Feldvergleich",
+            mergeDescription:
+              "Wähle pro Feld, ob der bestehende oder der importierte Wert verwendet wird.",
+            incoming: "Import",
+            keep: "Behalten",
+            useImport: "Import",
+            showAllFields: "Alle Felder anzeigen",
+            noChanges: "Keine Unterschiede gefunden.",
+            onlyChanged: "Nur Unterschiede anzeigen",
+            downloadReport: "Import-Report als Datei herunterladen",
+            checklistTitle: "Test-Checkliste",
+            checklistItem1: "Mindestens 1 Übung ausgewählt",
+            checklistItem2: "Update-Übungen geprüft (falls vorhanden)",
+            checklistItem3: "Import startet ohne Fehler",
+          },
           merge: {
             title: "Zusammenführen",
             source: "Quell-Übung",
@@ -1636,7 +1695,8 @@ const resources = {
               "Die Quell-Übung wird in die Ziel-Übung übernommen. Alle Verknüpfungen werden auf die Ziel-Übung verschoben, die Quell-Übung wird deaktiviert.",
             validation: "Bitte wähle unterschiedliche Quell- und Ziel-Übungen.",
           },
-          deleteConfirm: "Möchtest du diese Übung wirklich löschen?",
+          deleteConfirm:
+            "Möchtest du diese Übung wirklich endgültig löschen? Verknüpfte Trainings bleiben erhalten, die Übung wird entfernt.",
           actions: {
             details: "Details",
             edit: "Bearbeiten",
@@ -1655,7 +1715,7 @@ const resources = {
         },
         success: {
           deleteTitle: "Übung gelöscht",
-          deleteDescription: "Die Übung wurde deaktiviert.",
+          deleteDescription: "Die Übung wurde dauerhaft gelöscht.",
           title: "Erfolg",
           cleanupJobs: "Stuck Jobs wurden bereinigt",
           mergeTitle: "Merge erfolgreich",
@@ -1939,6 +1999,130 @@ const resources = {
           fix: "Bugfix",
         },
         entries: {
+          v210: {
+            title: "Neues Scoring-System",
+            description:
+              "Transparente Punkte-Logik, dynamische Gewichtung und konsistente Darstellung in Scoreboard und Statistiken.",
+            highlights: {
+              0: "Punkte-Logik: Klarere Aufschlüsselung der Punkte-Quellen für bessere Nachvollziehbarkeit",
+              1: "Gewichtung: Ausdauer, Kraft und gemischte Workouts fairer vergleichbar",
+              2: "Profil-Einfluss: Relevante Profilwerte (z. B. Gewicht) fließen kontrolliert ein",
+              3: "Scoreboard & Stats: Einheitliche Darstellung in Rangliste, Monats- und Gesamtansicht",
+              4: "UX: Erklärungstexte/Tooltips für das neue Scoring",
+            },
+          },
+          v205: {
+            title: "Dokumentation & Plattform",
+            description:
+              "Docusaurus‑Plattform aufgebaut und die Dokumentation in Kernbereiche gegliedert.",
+            highlights: {
+              0: "Docusaurus: Doku‑Plattform unter `/docs` (z. B. deinname/docs) erreichbar",
+              1: "Bereiche: Grundlagen, Design, API, Features, Systeme ausgebaut",
+              2: "Überarbeitet: Inhalte strukturiert, vereinheitlicht und aktualisiert",
+              3: "Guides: Onboarding, Glossar und Best Practices ergänzt",
+              4: "Referenzen: API-Übersichten, Datenflüsse und Systemgrenzen dokumentiert",
+            },
+          },
+          v200: {
+            title: "Dynamische Übungs-DB & Workout-Vorlagen",
+            description:
+              "Eigene Übungen anlegen und überall nutzen: Statistiken, Scoreboard, Wochenziele, Dashboard, Workouts und Vorlagen. Keine festen 5–6 Übungen mehr – alles dynamisch. Umfangreiches Vorlagen-System mit Teilen, Duplizieren und Favoriten.",
+            highlights: {
+              0: "Eigene Übungen: Anlegen, Durchsuchen, Filtern (Kategorie, Muskelgruppe, Ausrüstung), Favoriten – überall in der App nutzbar",
+              1: "Workouts & Vorlagen: Übungen aus der DB beim Erstellen von Workouts; ähnliche Namen beim Anlegen neuer Übungen, um Duplikate zu vermeiden",
+              2: "Übungen melden: Meldung und Änderungsvorschläge für bestehende Übungen",
+              3: "Workout-Vorlagen: Erstellen (auch aus Training), duplizieren, bearbeiten; Erstellername bei Duplikaten; Teilen: öffentlich, nur Freunde oder privat",
+              4: "Vorlagen: Durchsuchen, filtern, als Favoriten speichern; funktioniert mit dem Trainingstagebuch",
+              5: "Import/Export: Übungen (Admin) per Excel importieren und exportieren",
+              6: "Design: Emojis bei Aktivitäten und Kacheln entfernt für einheitliches Erscheinungsbild",
+            },
+          },
+          v199: {
+            title: "Scoring, Rangliste & Einstellungen",
+            description:
+              "Neues Scoring-System mit dynamischem Monatsscoring, Scoreboard mit Top-Übungen und Zeitraum „Gesamt“, individuelle Wochenziele, Privatsphäre und Theme/Sprache geräteübergreifend.",
+            highlights: {
+              0: "Scoring: Überarbeitetes Monatsscoring; Profil (z. B. Gewicht) für Scoring; Scoreboard mit Top-3 und individuellen Übungen, Zeitraum „Gesamt“, Standard Monat",
+              1: "Wochenziele & Kacheln: Individuelle Wochen-Übungsziele, Wochen-Challenge, überarbeitete Kacheln (Top-Übung), kleines Kachel-Design-Update",
+              2: "Avatar & Einstellungen: Überarbeitete Avatar-Einstellungen und Verläufe; Zeichnen, Profil; Theme und Sprache einheitlich und geräteübergreifend",
+              3: "Privatsphäre: E-Mail-Benachrichtigungen deaktivierbar; Profil privat oder aus globaler Rangliste ausblendbar",
+              4: "Globale Ansicht: Rangliste auch anzeigbar, wenn man selbst nicht in der globalen Statistik erscheint",
+              5: "2FA: Probleme behoben; Übersetzungen ergänzt",
+            },
+          },
+          v198: {
+            title: "Profile, Kacheln & Ziele",
+            description:
+              "Individuelle Wochenziele, überarbeitete Kacheln, Avatar/Gradients und dynamische Monatsdarstellung.",
+            highlights: {
+              0: "Wochenziele: Angepasste Wochen-Übungsziele und Wochen-Challenge mit klarem Fortschritt",
+              1: "Kacheln: Überarbeitete Top-Übung- und Dashboard-Kacheln; kleine Design-Verbesserungen",
+              2: "Avatar & Drawing: Überarbeitete Avatar-Einstellungen und Verläufe; Drawing-Settings verbessert",
+              3: "Monatsscoring: Dynamischere Monatsdarstellung für bessere Vergleichbarkeit",
+            },
+          },
+          v197: {
+            title: "Einheiten, Aktivitätslogik & Stabilität",
+            description:
+              "Einheitenpräferenzen vereinheitlicht, Aktivitätslogik verbessert, Rangliste stabiler und Backend-Migrationen robuster.",
+            highlights: {
+              0: "Einheiten: Projektweit einheitlich (km/m, min, kg) in Workouts, Profil und Statistiken",
+              1: "Aktivitäten: Activity-Type aus Übungs-DB; Workout-Summen (Totals) berechnet",
+              2: "Rangliste: Verbesserte Ranglogik und Nutzeranzeige",
+              3: "Backend & Übersetzungen: Build-Zeit-Migrationen für Vercel, stabilere Migrations-Config, Yards-Übersetzungen",
+            },
+          },
+          v196: {
+            title: "Workout-Vorlagen & Training",
+            description:
+              "Bessere Vorlagenverwaltung, klareres Training-Layout und erweiterte Admin-Statistiken.",
+            highlights: {
+              0: "Vorlagen: Erweiterte Filterung, Quell-Vorlage und Favoriten; Erstellung/Verwaltung verbessert",
+              1: "Training: Refaktor der Training-Seite für bessere Responsivität und Struktur",
+              2: "Workouts: Klassifizierung und Einheiten-Normalisierung für bessere Auswertung",
+              3: "Admin: Übersichts-Statistik für Dashboard; Nickname-Validierung und Fehlerbehandlung bei Auth/Profil",
+            },
+          },
+          v195: {
+            title: "Übungsverwaltung & Datenqualität",
+            description:
+              "Neue Filter- und Suchmöglichkeiten, bessere Übungsdetails und Admin-Import/Export.",
+            highlights: {
+              0: "Übungs-Management: Filter/Sortierung nach Kategorie, Muskelgruppe, Equipment, Movement-Pattern, Messart",
+              1: "Übungsdetails: UI-Verbesserungen und mehr Responsivität",
+              2: "Import/Export: Übungen (Admin) per Excel importieren/exportieren",
+              3: "Punkte-Quelle & Favoriten: `points_source` und Exercise-Favorites eingeführt",
+            },
+          },
+          v194: {
+            title: "Dokumentation & /docs",
+            description:
+              "Zusätzliche, strukturierte Dokumentation unter `/docs` für Produkt und Technik.",
+            highlights: {
+              0: "Neue /docs-Struktur: Produkt- und Technikdoku an einem Ort",
+              1: "Deployment & Migration: Doku für Datenbank, Build und Serverless-Migrationen",
+            },
+          },
+          v193: {
+            title: "UI/UX & Freundesprofile",
+            description:
+              "Wochenziele im Drawer, besseres Dashboard-Layout und verbessertes FriendProfile.",
+            highlights: {
+              0: "Weekly Goals UX: Drawer-Flow für schnellere Einstellungen",
+              1: "Dashboard: Leaderboard- und Monatsziel-Karten klarer strukturiert",
+              2: "FriendProfile: Nicht-Freunde-Handling und Lokalisierung",
+            },
+          },
+          v192: {
+            title: "PWA, Safe-Area & Öffentliche Seiten",
+            description:
+              "Notch-Optimierungen, saubere Public Pages und stabilere Navigation.",
+            highlights: {
+              0: "Safe-Area: Bessere iOS/PWA-Notch-Unterstützung",
+              1: "Public Pages: Scroll- und Titel-Darstellung korrigiert",
+              2: "Navigation: UI-Komponenten refaktoriert für bessere Responsivität",
+            },
+          },
           v190: {
             title: "Reaktionen auf Workouts",
             description:
@@ -4515,6 +4699,12 @@ const resources = {
         time: "Time",
         distance: "Distance",
         route: "Route",
+        pointsPerUnit: "Points per unit",
+        unitOptions: "Unit options",
+        hasWeight: "Weight enabled",
+        hasSetMode: "Set mode",
+        aliases: "Aliases",
+        isActive: "Active",
         similar: "Similar exercises",
         create: "Create exercise",
         nameRequired: "Please enter a name.",
@@ -4677,6 +4867,59 @@ const resources = {
             exportXlsx: "Export Excel template",
             note: "All columns except description are required. Invalid entries are skipped. The Excel template includes dropdown selections.",
           },
+          exportSelected: {
+            button: "Export selected",
+            clear: "Clear selection",
+            hint: "Select exercises below with the checkboxes, then click „Export selected“. The export contains all data losslessly for import on another instance.",
+            success: "Export complete",
+            count: "{{count}} exercises exported.",
+          },
+          importReview: {
+            title: "Import review",
+            description:
+              "Review exercises before import, deselect entries, and decide updates.",
+            mode: "Mode",
+            modeAuto: "Auto merge",
+            modeManual: "Manual",
+            scope: "View",
+            scopeAll: "All",
+            scopeConflicts: "Conflicts only",
+            showNew: "Show new",
+            hideNew: "Hide new",
+            summaryNew: "New",
+            summaryUpdate: "Updates",
+            summaryInvalid: "Invalid",
+            conflictsHint:
+              "Only conflicts are shown. New exercises are still imported.",
+            search: "Search...",
+            group: "Group",
+            grouped: "Grouped",
+            compact: "Compact",
+            detail: "Detail",
+            report: "Save import report",
+            reportBoth: "Both",
+            status: "Status",
+            statusNew: "New",
+            statusUpdate: "Update",
+            statusInvalid: "Invalid",
+            merge: "Compare",
+            selected: "Selected",
+            import: "Start import",
+            mergeTitle: "Field comparison",
+            mergeDescription:
+              "Choose per field whether to keep the existing or use the import value.",
+            incoming: "Import",
+            keep: "Keep",
+            useImport: "Import",
+            showAllFields: "Show all fields",
+            noChanges: "No differences found.",
+            onlyChanged: "Show differences only",
+            downloadReport: "Download import report file",
+            checklistTitle: "Test checklist",
+            checklistItem1: "At least one exercise selected",
+            checklistItem2: "Updates reviewed (if present)",
+            checklistItem3: "Import runs without errors",
+          },
           merge: {
             title: "Merge",
             source: "Source exercise",
@@ -4690,7 +4933,8 @@ const resources = {
               "The source exercise will be merged into the target. All references move to the target and the source exercise is deactivated.",
             validation: "Please choose different source and target exercises.",
           },
-          deleteConfirm: "Do you really want to delete this exercise?",
+          deleteConfirm:
+            "Do you really want to permanently delete this exercise? Linked workouts will remain; the exercise will be removed.",
           actions: {
             details: "Details",
             edit: "Edit",
@@ -4709,7 +4953,7 @@ const resources = {
         },
         success: {
           deleteTitle: "Exercise deleted",
-          deleteDescription: "The exercise has been deactivated.",
+          deleteDescription: "The exercise has been permanently deleted.",
           title: "Success",
           cleanupJobs: "Stuck jobs were cleaned up.",
           mergeTitle: "Merge successful",
@@ -4986,6 +5230,130 @@ const resources = {
           fix: "Bugfix",
         },
         entries: {
+          v210: {
+            title: "New scoring system",
+            description:
+              "Transparent point logic, dynamic weighting and consistent display across scoreboard and stats.",
+            highlights: {
+              0: "Point logic: Clearer breakdown of point sources for better transparency",
+              1: "Weighting: Endurance, strength and mixed workouts are more fairly comparable",
+              2: "Profile influence: Relevant profile values (e.g. weight) are applied consistently",
+              3: "Scoreboard & stats: Unified display for rankings, monthly and all-time views",
+              4: "UX: Explanations/tooltips for the new scoring",
+            },
+          },
+          v205: {
+            title: "Documentation & platform",
+            description:
+              "Docusaurus platform set up and documentation organized into core areas.",
+            highlights: {
+              0: "Docusaurus: Docs platform available at `/docs` (e.g. yourdomain/docs)",
+              1: "Sections: Fundamentals, Design, API, Features, Systems expanded",
+              2: "Reworked: Content structured, unified and updated",
+              3: "Guides: Onboarding, glossary and best practices added",
+              4: "References: API overviews, data flows and system boundaries documented",
+            },
+          },
+          v200: {
+            title: "Dynamic exercise DB & workout templates",
+            description:
+              "Create your own exercises and use them everywhere: stats, scoreboard, weekly goals, dashboard, workouts and templates. No more fixed 5–6 exercises – everything is dynamic. Comprehensive template system with sharing, duplicating and favorites.",
+            highlights: {
+              0: "Custom exercises: Create, browse, filter (category, muscle group, equipment), favorites – usable everywhere in the app",
+              1: "Workouts & templates: Pick exercises from the DB when creating workouts; similar-name suggestions when creating new exercises to avoid duplicates",
+              2: "Report exercises: Report and suggest changes for existing exercises",
+              3: "Workout templates: Create (including from a workout), duplicate, edit; original author shown on duplicates; share: public, friends only or private",
+              4: "Templates: Browse, filter, save as favorites; works with the training diary",
+              5: "Import/export: Import and export exercises (admin) via Excel",
+              6: "Design: Emojis removed from activities and tiles for a consistent look",
+            },
+          },
+          v199: {
+            title: "Scoring, leaderboard & settings",
+            description:
+              'New scoring system with dynamic monthly scoring, scoreboard with top exercises and "All time" range, individual weekly goals, privacy and theme/language sync across devices.',
+            highlights: {
+              0: 'Scoring: Overhauled monthly scoring; profile (e.g. weight) for scoring; scoreboard with top 3 and individual exercises, "All time" range, default month',
+              1: "Weekly goals & tiles: Individual weekly exercise goals, weekly challenge, overhauled tiles (top exercise), small tile design update",
+              2: "Avatar & settings: Overhauled avatar settings and gradients; drawing, profile; theme and language consistent and cross-device",
+              3: "Privacy: Email notifications can be disabled; profile can be private or hidden from global leaderboard",
+              4: "Global view: Leaderboard viewable even when you are not in global stats",
+              5: "2FA: Issues fixed; translations added",
+            },
+          },
+          v198: {
+            title: "Profiles, tiles & goals",
+            description:
+              "Individual weekly goals, refreshed tiles, avatar/gradients and a more dynamic monthly view.",
+            highlights: {
+              0: "Weekly goals: Refined weekly exercise goals and weekly challenge with clearer progress",
+              1: "Tiles: Overhauled top-exercise and dashboard tiles; small UI polish",
+              2: "Avatar & drawing: Updated avatar settings and gradients; drawing settings improved",
+              3: "Monthly scoring: More dynamic monthly presentation for easier comparisons",
+            },
+          },
+          v197: {
+            title: "Units, activity logic & stability",
+            description:
+              "Unified units, improved activity logic, more stable leaderboard and robust build migrations.",
+            highlights: {
+              0: "Units: Consistent project-wide (km/m, min, kg) in workouts, profile and stats",
+              1: "Activities: Activity type from exercise DB; workout totals calculated",
+              2: "Leaderboard: Improved ranking logic and user display",
+              3: "Backend & translations: Build-time migrations for Vercel, sturdier migration config, yards translations",
+            },
+          },
+          v196: {
+            title: "Workout templates & training",
+            description:
+              "Better template management, clearer training layout and expanded admin stats.",
+            highlights: {
+              0: "Templates: Extended filtering, source template and favorites; better creation/management",
+              1: "Training: Refactored training page for clearer structure and responsiveness",
+              2: "Workouts: Classification and unit normalization for better analytics",
+              3: "Admin: Overview stats for dashboard; nickname validation and error handling in auth/profile",
+            },
+          },
+          v195: {
+            title: "Exercise management & data quality",
+            description:
+              "New filtering/search, improved exercise details and admin import/export.",
+            highlights: {
+              0: "Exercise management: Filters/sorting by category, muscle group, equipment, movement pattern, measurement type",
+              1: "Exercise details: UI improvements and better responsiveness",
+              2: "Import/export: Admin Excel import/export for exercises",
+              3: "Points source & favorites: `points_source` and exercise favorites introduced",
+            },
+          },
+          v194: {
+            title: "Documentation & /docs",
+            description:
+              "Additional structured documentation under `/docs` for product and technical details.",
+            highlights: {
+              0: "New /docs structure: Product and engineering docs in one place",
+              1: "Deployment & migrations: Docs for database, build and serverless migrations",
+            },
+          },
+          v193: {
+            title: "UI/UX & friend profiles",
+            description:
+              "Weekly goals in a drawer, clearer dashboard layout and better FriendProfile handling.",
+            highlights: {
+              0: "Weekly goals UX: Drawer flow for faster adjustments",
+              1: "Dashboard: Leaderboard and monthly goal cards reorganized",
+              2: "FriendProfile: Non-friends handling and localization",
+            },
+          },
+          v192: {
+            title: "PWA, safe area & public pages",
+            description:
+              "Notch optimizations, clean public pages and sturdier navigation.",
+            highlights: {
+              0: "Safe area: Better iOS/PWA notch support",
+              1: "Public pages: Scroll and title rendering corrected",
+              2: "Navigation: UI components refactored for better responsiveness",
+            },
+          },
           v190: {
             title: "Workout Reactions",
             description:

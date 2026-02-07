@@ -45,8 +45,8 @@ const config = {
           routeBasePath: "/",
           editUrl: ({ docPath }) => {
             // Entferne "docs/" Präfix falls vorhanden, da editUrl bereits auf docs zeigt
-            const cleanPath = docPath.startsWith("docs/") 
-              ? docPath.slice(5) 
+            const cleanPath = docPath.startsWith("docs/")
+              ? docPath.slice(5)
               : docPath;
             return `https://github.com/LeonStadler/sportify/tree/main/docs/${cleanPath}`;
           },

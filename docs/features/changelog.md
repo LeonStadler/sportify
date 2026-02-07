@@ -30,7 +30,7 @@ Keine.
 
 ### Dokumentation & Plattform
 
-- **Docusaurus‑Plattform**: Initiale Doku‑Plattform aufgebaut; erreichbar unter `/docs` (z. B. `deinname/docs`).
+- **Docusaurus‑Plattform**: Initiale Doku‑Plattform aufgebaut; erreichbar unter `/docs`.
 - **Bereiche erweitert**: Dokumentation in **Grundlagen**, **Design**, **API**, **Features** und **Systeme** deutlich ausgebaut.
 - **Überarbeitet**: Inhalte strukturiert, vereinheitlicht und aktualisiert für bessere Orientierung.
 - **Guides**: Onboarding, Glossar und Best Practices ergänzt, damit neue Teammitglieder schneller onboarden.

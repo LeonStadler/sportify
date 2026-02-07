@@ -1,9 +1,9 @@
 import express from "express";
-import { processEmailQueue } from "../services/emailQueueService.js";
 import { verifySummaryUnsubscribeToken } from "../services/emailPreferencesService.js";
+import { processEmailQueue } from "../services/emailQueueService.js";
 import {
-  processMonthlyEvents,
-  processWeeklyEvents,
+    processMonthlyEvents,
+    processWeeklyEvents,
 } from "../services/eventService.js";
 import { cleanupStuckJobs } from "../services/jobCleanupService.js";
 import { getFrontendUrl } from "../utils/helpers.js";
@@ -51,7 +51,7 @@ export const createEventsRouter = (pool) => {
       message = "Du wirst keine Zusammenfassungs-E-Mails mehr erhalten.",
       actionLabel = "Zu Sportify",
       actionUrl = "/",
-    } = {}
+    } = {},
   ) => {
     const escapeHtml = (value) =>
       String(value)
@@ -112,15 +112,14 @@ export const createEventsRouter = (pool) => {
       const { userId } = verifySummaryUnsubscribeToken(token);
       const { rows } = await pool.query(
         `SELECT id, preferences FROM users WHERE id = $1`,
-        [userId]
+        [userId],
       );
 
       if (!rows.length) {
         return renderUnsubscribePage(res, {
           status: 404,
           title: "Benutzer nicht gefunden",
-          message:
-            "Zu diesem Link konnte kein Benutzerkonto gefunden werden.",
+          message: "Zu diesem Link konnte kein Benutzerkonto gefunden werden.",
           actionLabel: "Zur Startseite",
           actionUrl: getFrontendUrl(req),
         });
@@ -147,7 +146,7 @@ export const createEventsRouter = (pool) => {
          SET preferences = $2::jsonb,
              updated_at = CURRENT_TIMESTAMP
          WHERE id = $1`,
-        [userId, JSON.stringify(updatedPreferences)]
+        [userId, JSON.stringify(updatedPreferences)],
       );
 
       return renderUnsubscribePage(res, {

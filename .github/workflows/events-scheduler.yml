@@ -7,8 +7,8 @@ name: Events Scheduler
 # Scheduled workflows may be automatically disabled after 60 days of inactivity in public repos.
 on:
   schedule:
-    - cron: "5 0 * * 1"    # Weekly: Monday 00:05 UTC
-    - cron: "10 0 1 * *"   # Monthly: 1st of month 00:10 UTC
+    - cron: "5 0 * * 1" # Weekly: Monday 00:05 UTC
+    - cron: "10 0 1 * *" # Monthly: 1st of month 00:10 UTC
     - cron: "*/15 * * * *" # Email dispatch: Every 15 minutes
   workflow_dispatch:
     inputs:
@@ -44,10 +44,10 @@ jobs:
           WEEKLY_SCHEDULE="5 0 * * 1"
           MONTHLY_SCHEDULE="10 0 1 * *"
           EMAIL_SCHEDULE="*/15 * * * *"
-          
+
           matrix_entries=()
           matrix_reason=""
-          
+
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             # For workflow_dispatch: include only entries whose input is true
             # Boolean inputs are converted to "true"/"false" strings by GitHub Actions
@@ -80,7 +80,7 @@ jobs:
               matrix_reason="missing_schedule"
             fi
           fi
-          
+
           # Build matrix JSON (compact output to avoid multiline issues in $GITHUB_OUTPUT)
           if [ ${#matrix_entries[@]} -eq 0 ]; then
             if [ -n "$matrix_reason" ]; then
@@ -101,7 +101,7 @@ jobs:
             matrix_json+="]}"
             matrix_empty="false"
           fi
-          
+
           echo "matrix=$matrix_json" >> "$GITHUB_OUTPUT"
           echo "matrix_empty=$matrix_empty" >> "$GITHUB_OUTPUT"
           echo "Generated matrix: $matrix_json"
@@ -151,10 +151,10 @@ jobs:
           else
             echo "EVENTS_BASE_URL=" >> "$GITHUB_ENV"
           fi
-          
+
           # Set EVENTS_CRON_SECRET from secrets
           echo "EVENTS_CRON_SECRET=${{ secrets['EVENTS_CRON_SECRET'] }}" >> "$GITHUB_ENV"
-      
+
       - name: Validate base URL
         shell: bash
         run: |
@@ -180,7 +180,7 @@ jobs:
           # Remove trailing slash
           EVENTS_BASE_URL="${EVENTS_BASE_URL%/}"
           echo "EVENTS_BASE_URL=${EVENTS_BASE_URL}" >> "$GITHUB_ENV"
-          
+
           # Check curl version and set CURL_OPTS accordingly (once, to avoid repeated warnings)
           # --fail-with-body requires curl 7.76.0+, otherwise use --fail
           if curl --help 2>/dev/null | grep -q "fail-with-body"; then
@@ -194,7 +194,7 @@ jobs:
         shell: bash
         run: |
           echo "Calling ${EVENTS_BASE_URL}${{ matrix.path }}"
-          
+
           # Debug: Verify secret is set (without revealing value)
           if [ -z "${EVENTS_CRON_SECRET}" ]; then
             echo "::error::EVENTS_CRON_SECRET is not set in environment"
@@ -202,10 +202,10 @@ jobs:
           fi
           secret_length=${#EVENTS_CRON_SECRET}
           echo "EVENTS_CRON_SECRET is set (length: ${secret_length} characters)"
-          
+
           # CURL_OPTS is already set in the previous step based on curl version
           # No need to check again - this avoids the warning message
-          
+
           # Use set +e around curl to ensure error handling works correctly with command substitution
           set +e
           response=$(curl ${CURL_OPTS} -X POST \
@@ -215,10 +215,10 @@ jobs:
             "${EVENTS_BASE_URL}${{ matrix.path }}" 2>&1)
           exit_code=$?
           set -e
-          
+
           # Extract HTTP status code from response
           http_code=$(echo "$response" | grep -o "HTTP_CODE:[0-9]*" | cut -d: -f2 || echo "")
-          
+
           if [ "$exit_code" -ne 0 ]; then
             echo "::error::curl failed with exit code $exit_code"
             echo "Response: $response"
@@ -231,7 +231,7 @@ jobs:
             fi
             exit $exit_code
           fi
-          
+
           # Check HTTP status code even if curl succeeded
           if [ -n "$http_code" ] && [ "$http_code" -ge 400 ]; then
             echo "::error::API returned HTTP $http_code"
@@ -244,11 +244,11 @@ jobs:
             fi
             exit 1
           fi
-          
+
           # Success - remove HTTP_CODE line from output for cleaner logs
           clean_response=$(echo "$response" | grep -v "HTTP_CODE:")
           echo "$clean_response"
-          
+
           # Parse and log response details
           if echo "$clean_response" | grep -q '"skipped"'; then
             if echo "$clean_response" | grep -q '"reason"'; then
@@ -259,13 +259,13 @@ jobs:
               fi
             fi
           fi
-          
+
           # Log job execution details
           if echo "$clean_response" | grep -q '"processedUsers"'; then
             users=$(echo "$clean_response" | grep -o '"processedUsers":[0-9]*' | cut -d: -f2)
             echo "::info::Job processed $users users"
           fi
-          
+
           if echo "$clean_response" | grep -q '"processed"'; then
             emails=$(echo "$clean_response" | grep -o '"processed":[0-9]*' | cut -d: -f2)
             failed=$(echo "$clean_response" | grep -o '"failed":[0-9]*' | cut -d: -f2 || echo "0")

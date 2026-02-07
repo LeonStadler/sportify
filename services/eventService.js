@@ -1,27 +1,27 @@
 import { randomUUID } from "crypto";
 import { addDays } from "date-fns";
 import {
-  DEFAULT_MONTHLY_POINT_CHALLENGE,
-  DEFAULT_WEEKLY_POINT_CHALLENGE,
-  DEFAULT_WEEKLY_POINTS_GOAL,
+    DEFAULT_MONTHLY_POINT_CHALLENGE,
+    DEFAULT_WEEKLY_POINT_CHALLENGE,
+    DEFAULT_WEEKLY_POINTS_GOAL,
 } from "../config/badges.js";
-import { createSummaryUnsubscribeUrl } from "./emailPreferencesService.js";
 import { sendJobFailureAlert } from "./alertService.js";
 import {
-  grantCategoryRankAward,
-  grantLeaderboardAward,
-  grantMonthlyChampionAward,
+    grantCategoryRankAward,
+    grantLeaderboardAward,
+    grantMonthlyChampionAward,
 } from "./awardService.js";
 import { badgeService } from "./badgeService.js";
+import { createSummaryUnsubscribeUrl } from "./emailPreferencesService.js";
 import { queueEmailSummary } from "./emailQueueService.js";
 import {
-  buildFriendAdjacency,
-  computeDirectLeaderboard,
-  computeRankingForGroup,
-  evaluateWeeklyGoals,
-  parseWeeklyGoals,
-  resolveMonthlyWindow,
-  resolveWeeklyWindow,
+    buildFriendAdjacency,
+    computeDirectLeaderboard,
+    computeRankingForGroup,
+    evaluateWeeklyGoals,
+    parseWeeklyGoals,
+    resolveMonthlyWindow,
+    resolveWeeklyWindow,
 } from "./eventUtils.js";
 
 const OFFSET_ENV_KEYS = [
@@ -69,7 +69,7 @@ const getSummaryUnsubscribeUrl = (userId) => {
   } catch (error) {
     console.error(
       `Could not create summary unsubscribe URL for user ${userId}:`,
-      error
+      error,
     );
     return null;
   }
@@ -93,7 +93,7 @@ const ensureJobRun = async (
   pool,
   jobName,
   scheduledFor,
-  { force = false, metadata = {} } = {}
+  { force = false, metadata = {} } = {},
 ) => {
   try {
     const { rows } = await pool.query(
@@ -102,22 +102,26 @@ const ensureJobRun = async (
            ON CONFLICT (job_name, scheduled_for)
            DO NOTHING
            RETURNING id`,
-      [randomUUID(), jobName, scheduledFor, JSON.stringify(metadata)]
+      [randomUUID(), jobName, scheduledFor, JSON.stringify(metadata)],
     );
 
     if (rows.length > 0) {
-      console.log(`Job run created: ${jobName} for ${scheduledFor} (ID: ${rows[0].id})`);
+      console.log(
+        `Job run created: ${jobName} for ${scheduledFor} (ID: ${rows[0].id})`,
+      );
       return { id: rows[0].id, skipped: false };
     }
 
     if (!force) {
-      console.log(`Job run skipped: ${jobName} for ${scheduledFor} (already exists)`);
+      console.log(
+        `Job run skipped: ${jobName} for ${scheduledFor} (already exists)`,
+      );
       return { id: null, skipped: true };
     }
 
     const { rows: existing } = await pool.query(
       `SELECT id, status FROM job_runs WHERE job_name = $1 AND scheduled_for = $2`,
-      [jobName, scheduledFor]
+      [jobName, scheduledFor],
     );
 
     if (existing.length === 0) {
@@ -126,9 +130,11 @@ const ensureJobRun = async (
         `INSERT INTO job_runs (id, job_name, scheduled_for, status, metadata)
              VALUES ($1, $2, $3, 'running', $4)
              RETURNING id`,
-        [randomUUID(), jobName, scheduledFor, JSON.stringify(metadata)]
+        [randomUUID(), jobName, scheduledFor, JSON.stringify(metadata)],
       );
-      console.log(`Job run created (force): ${jobName} for ${scheduledFor} (ID: ${newRows[0].id})`);
+      console.log(
+        `Job run created (force): ${jobName} for ${scheduledFor} (ID: ${newRows[0].id})`,
+      );
       return { id: newRows[0].id, skipped: false };
     }
 
@@ -136,10 +142,12 @@ const ensureJobRun = async (
       `UPDATE job_runs
            SET status = 'running', started_at = NOW(), metadata = $2
            WHERE id = $1`,
-      [existing[0].id, JSON.stringify(metadata)]
+      [existing[0].id, JSON.stringify(metadata)],
     );
 
-    console.log(`Job run restarted (force): ${jobName} for ${scheduledFor} (ID: ${existing[0].id}, previous status: ${existing[0].status})`);
+    console.log(
+      `Job run restarted (force): ${jobName} for ${scheduledFor} (ID: ${existing[0].id}, previous status: ${existing[0].status})`,
+    );
     return { id: existing[0].id, skipped: false };
   } catch (error) {
     console.error(`Error ensuring job run for ${jobName}:`, error);
@@ -150,20 +158,20 @@ const ensureJobRun = async (
 const finalizeJobRun = async (
   pool,
   jobRunId,
-  { status = "completed", metadata = {} } = {}
+  { status = "completed", metadata = {} } = {},
 ) => {
   if (!jobRunId) return;
   await pool.query(
     `UPDATE job_runs
          SET status = $2, completed_at = NOW(), metadata = $3
          WHERE id = $1`,
-    [jobRunId, status, JSON.stringify(metadata)]
+    [jobRunId, status, JSON.stringify(metadata)],
   );
 };
 
 const fetchFriendships = async (pool) => {
   const { rows: columns } = await pool.query(
-    `SELECT column_name FROM information_schema.columns WHERE table_name = 'friendships'`
+    `SELECT column_name FROM information_schema.columns WHERE table_name = 'friendships'`,
   );
   const columnNames = columns.map((row) => row.column_name);
   if (columnNames.length === 0) {
@@ -210,7 +218,7 @@ const buildActivityTotalsMap = (rows) => {
 
 export const processWeeklyEvents = async (
   pool,
-  { referenceDate = new Date(), force = false } = {}
+  { referenceDate = new Date(), force = false } = {},
 ) => {
   const offsetMinutes = getOffsetMinutes();
   const {
@@ -306,7 +314,7 @@ export const processWeeklyEvents = async (
       const totalWorkouts = parseNumber(row.total_workouts, 0);
       const totalExercises = Object.values(totalsByType).reduce(
         (sum, value) => sum + parseNumber(value.quantity, 0),
-        0
+        0,
       );
 
       return {
@@ -317,7 +325,7 @@ export const processWeeklyEvents = async (
         nickname: row.nickname,
         displayPreference: row.display_preference,
         summaryEmailsEnabled: hasSummaryEmailsEnabled(
-          parsePreferences(row.preferences)
+          parsePreferences(row.preferences),
         ),
         showInGlobalRankings: row.show_in_global_rankings,
         weeklyGoals: parseWeeklyGoals(row.weekly_goals),
@@ -347,7 +355,7 @@ export const processWeeklyEvents = async (
           pool,
           summary.userId,
           "weekly-goal-exercises",
-          true
+          true,
         );
         badgesEarned.push(...earned);
       }
@@ -356,7 +364,7 @@ export const processWeeklyEvents = async (
           pool,
           summary.userId,
           "weekly-goal-points",
-          true
+          true,
         );
         badgesEarned.push(...earned);
       }
@@ -365,7 +373,7 @@ export const processWeeklyEvents = async (
           pool,
           summary.userId,
           "weekly-challenge-points",
-          true
+          true,
         );
         badgesEarned.push(...earned);
       }
@@ -401,13 +409,13 @@ export const processWeeklyEvents = async (
           evaluation.pointsGoalMet,
           evaluation.challengeMet,
           JSON.stringify(badgesEarned),
-        ]
+        ],
       );
     }
 
     const leaderboardEvaluations = computeDirectLeaderboard(
       userPointMap,
-      friendGraph
+      friendGraph,
     );
     const leaderboardAwards = [];
 
@@ -428,7 +436,7 @@ export const processWeeklyEvents = async (
           leaderboard.rank,
           leaderboard.points,
           leaderboard.participantCount,
-        ]
+        ],
       );
 
       const effectiveThreshold = Math.min(3, leaderboard.participantCount);
@@ -453,7 +461,7 @@ export const processWeeklyEvents = async (
         award.rank,
         weekStart,
         weekEndInclusive,
-        award.points
+        award.points,
       );
       if (result) {
         const awards = weeklyAwardsMap.get(award.userId) || [];
@@ -468,7 +476,7 @@ export const processWeeklyEvents = async (
         `UPDATE weekly_results
                  SET awards_awarded = $3
                  WHERE user_id = $1 AND week_start = $2`,
-        [userId, toISODate(weekStart), JSON.stringify(awards)]
+        [userId, toISODate(weekStart), JSON.stringify(awards)],
       );
     }
 
@@ -554,7 +562,7 @@ export const processWeeklyEvents = async (
       } catch (error) {
         console.error(
           `Failed to queue email for user ${summary.userId}:`,
-          error
+          error,
         );
         emailResults.push({
           userId: summary.userId,
@@ -597,7 +605,7 @@ export const processWeeklyEvents = async (
 
 export const processMonthlyEvents = async (
   pool,
-  { referenceDate = new Date(), force = false } = {}
+  { referenceDate = new Date(), force = false } = {},
 ) => {
   const offsetMinutes = getOffsetMinutes();
   const {
@@ -688,7 +696,7 @@ export const processMonthlyEvents = async (
       firstName: row.first_name,
       lastName: row.last_name,
       summaryEmailsEnabled: hasSummaryEmailsEnabled(
-        parsePreferences(row.preferences)
+        parsePreferences(row.preferences),
       ),
       totalPoints: parseNumber(row.total_points, 0),
       totalsByType: activityTotalsMap.get(row.user_id) ?? {},
@@ -699,11 +707,11 @@ export const processMonthlyEvents = async (
 
     // 1. Global Rankings (Points & Activities) - Filter: showInGlobalRankings = true
     const globalParticipants = summaries.filter(
-      (s) => s.showInGlobalRankings && s.totalPoints > 0
+      (s) => s.showInGlobalRankings && s.totalPoints > 0,
     );
     const globalPointsRank = computeRankingForGroup(
       globalParticipants,
-      (s) => s.totalPoints
+      (s) => s.totalPoints,
     );
 
     const activities = ["pullups", "pushups", "situps"];
@@ -711,12 +719,11 @@ export const processMonthlyEvents = async (
     for (const activity of activities) {
       // Filter for users who actually did the activity and opted in
       const participants = summaries.filter(
-        (s) =>
-          s.showInGlobalRankings && (s.totalsByType[activity] || 0) > 0
+        (s) => s.showInGlobalRankings && (s.totalsByType[activity] || 0) > 0,
       );
       globalActivityRanks[activity] = computeRankingForGroup(
         participants,
-        (s) => s.totalsByType[activity] || 0
+        (s) => s.totalsByType[activity] || 0,
       );
     }
 
@@ -737,7 +744,7 @@ export const processMonthlyEvents = async (
           summary.userId,
           monthStart,
           monthEndInclusive,
-          summary.totalPoints
+          summary.totalPoints,
         );
         if (award) {
           awardsGranted.push(award);
@@ -748,7 +755,7 @@ export const processMonthlyEvents = async (
           pool,
           summary.userId,
           "monthly-challenge-points",
-          true
+          true,
         );
         badgesEarned.push(...badges);
       }
@@ -766,14 +773,14 @@ export const processMonthlyEvents = async (
             "global",
             monthStart,
             monthEndInclusive,
-            rankInfo.value
+            rankInfo.value,
           );
           if (award) awardsGranted.push(award);
         }
         // Activities
         for (const activity of activities) {
           const actRankInfo = globalActivityRanks[activity]?.get(
-            summary.userId
+            summary.userId,
           );
           if (actRankInfo && actRankInfo.rank <= 3) {
             const award = await grantCategoryRankAward(
@@ -784,7 +791,7 @@ export const processMonthlyEvents = async (
               "global",
               monthStart,
               monthEndInclusive,
-              actRankInfo.value
+              actRankInfo.value,
             );
             if (award) awardsGranted.push(award);
           }
@@ -800,7 +807,7 @@ export const processMonthlyEvents = async (
       // Friend Rank: Points
       const friendPointsRank = computeRankingForGroup(
         groupSummaries.filter((s) => s.totalPoints > 0),
-        (s) => s.totalPoints
+        (s) => s.totalPoints,
       );
       const myFriendRank = friendPointsRank.get(summary.userId);
       if (
@@ -816,7 +823,7 @@ export const processMonthlyEvents = async (
           "friends",
           monthStart,
           monthEndInclusive,
-          myFriendRank.value
+          myFriendRank.value,
         );
         if (award) awardsGranted.push(award);
       }
@@ -824,11 +831,11 @@ export const processMonthlyEvents = async (
       // Friend Rank: Activities
       for (const activity of activities) {
         const participants = groupSummaries.filter(
-          (s) => (s.totalsByType[activity] || 0) > 0
+          (s) => (s.totalsByType[activity] || 0) > 0,
         );
         const actRankMap = computeRankingForGroup(
           participants,
-          (s) => s.totalsByType[activity] || 0
+          (s) => s.totalsByType[activity] || 0,
         );
         const myActRank = actRankMap.get(summary.userId);
         if (
@@ -844,7 +851,7 @@ export const processMonthlyEvents = async (
             "friends",
             monthStart,
             monthEndInclusive,
-            myActRank.value
+            myActRank.value,
           );
           if (award) awardsGranted.push(award);
         }
@@ -875,7 +882,7 @@ export const processMonthlyEvents = async (
           challengeMet,
           JSON.stringify(badgesEarned),
           JSON.stringify(awardsGranted),
-        ]
+        ],
       );
     }
 
@@ -913,7 +920,7 @@ export const processMonthlyEvents = async (
           const gRank = globalPointsRank.get(summary.userId);
           if (gRank) {
             rankingLines.push(
-              `• Globaler Rang (Punkte): ${gRank.rank} von ${gRank.totalParticipants}`
+              `• Globaler Rang (Punkte): ${gRank.rank} von ${gRank.totalParticipants}`,
             );
           }
         }
@@ -923,16 +930,16 @@ export const processMonthlyEvents = async (
           const friendIds = friendGraph.get(summary.userId) ?? new Set();
           const groupIds = new Set([...friendIds, summary.userId]);
           const groupSummaries = summaries.filter(
-            (s) => groupIds.has(s.userId) && s.totalPoints > 0
+            (s) => groupIds.has(s.userId) && s.totalPoints > 0,
           );
           const friendRankMap = computeRankingForGroup(
             groupSummaries,
-            (s) => s.totalPoints
+            (s) => s.totalPoints,
           );
           const fRank = friendRankMap.get(summary.userId);
           if (fRank) {
             rankingLines.push(
-              `• Freundes-Rang (Punkte): ${fRank.rank} von ${fRank.totalParticipants}`
+              `• Freundes-Rang (Punkte): ${fRank.rank} von ${fRank.totalParticipants}`,
             );
           }
         }
@@ -981,7 +988,7 @@ export const processMonthlyEvents = async (
       } catch (error) {
         console.error(
           `Failed to queue email for user ${summary.userId}:`,
-          error
+          error,
         );
         emailResults.push({
           userId: summary.userId,

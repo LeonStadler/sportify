@@ -536,6 +536,17 @@ function ChangelogContent() {
                         </li>
                       ))}
                     </ul>
+                    {entry.version === "2.0.5" && (
+                      <div className="mt-4">
+                        <Link
+                          to="/docs"
+                          className="text-sm font-medium text-primary hover:underline inline-flex items-center gap-1"
+                        >
+                          {t("changelog.docsLink")}
+                          <span aria-hidden>→</span>
+                        </Link>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>

@@ -23,7 +23,8 @@ Abmelde‑Link für Summary‑E‑Mails. Rendert eine HTML‑Seite.
 
 Wöchentliche Auswertung. Verarbeitet alle Benutzeraktivitäten der vergangenen Woche, vergibt Badges und Awards, erstellt Leaderboards und versendet Zusammenfassungs-E-Mails.
 
-**Query/Body:** 
+**Query/Body:**
+
 - `force=true` (optional): Erzwingt erneute Ausführung auch wenn bereits verarbeitet
 
 **Response:**
@@ -37,13 +38,18 @@ Wöchentliche Auswertung. Verarbeitet alle Benutzeraktivitäten der vergangenen 
   "weekEnd": "2026-02-09T23:59:59.999Z",
   "emailResults": [
     { "userId": "...", "status": "queued" },
-    { "userId": "...", "status": "skipped", "reason": "email-notifications-disabled" },
+    {
+      "userId": "...",
+      "status": "skipped",
+      "reason": "email-notifications-disabled"
+    },
     { "userId": "...", "status": "failed", "error": "..." }
   ]
 }
 ```
 
 **Was passiert:**
+
 - Berechnet Wochenstatistiken (Punkte, Workouts, Übungen)
 - Evaluiert wöchentliche Ziele
 - Vergibt Badges (`weekly-goal-exercises`, `weekly-goal-points`, `weekly-challenge-points`)
@@ -61,7 +67,8 @@ Wöchentliche Auswertung. Verarbeitet alle Benutzeraktivitäten der vergangenen 
 
 Monatliche Auswertung. Verarbeitet alle Benutzeraktivitäten des vergangenen Monats, erstellt globale und Freundes-Rankings und vergibt monatliche Auszeichnungen.
 
-**Query/Body:** 
+**Query/Body:**
+
 - `force=true` (optional): Erzwingt erneute Ausführung auch wenn bereits verarbeitet
 
 **Response:**
@@ -78,6 +85,7 @@ Monatliche Auswertung. Verarbeitet alle Benutzeraktivitäten des vergangenen Mon
 ```
 
 **Was passiert:**
+
 - Berechnet Monatsstatistiken (Gesamtpunkte, Aktivitäten)
 - Erstellt globale Rankings (Punkte, Pullups, Pushups, Sit-ups) - Top 3
 - Erstellt Freundes-Rankings (Punkte, Aktivitäten) - Top 3
@@ -96,7 +104,8 @@ Monatliche Auswertung. Verarbeitet alle Benutzeraktivitäten des vergangenen Mon
 
 Versendet E‑Mail‑Queue. Verarbeitet ausstehende E-Mails aus der `email_queue`-Tabelle.
 
-**Query:** 
+**Query:**
+
 - `limit` (optional, default 25): Anzahl der E-Mails pro Durchlauf
 
 **Response:**
@@ -111,6 +120,7 @@ Versendet E‑Mail‑Queue. Verarbeitet ausstehende E-Mails aus der `email_queue
 ```
 
 **Was passiert:**
+
 - Liest E-Mails mit Status `pending` oder `retrying`
 - Versendet E-Mails über SMTP
 - Aktualisiert Status (`sent`, `failed`, `retrying`)
@@ -142,6 +152,7 @@ Bereinigt hängende Jobs. Findet Jobs, die länger als 1 Stunde laufen und marki
 ```
 
 **Was passiert:**
+
 - Sucht nach Jobs mit Status `running` die länger als 1 Stunde laufen
 - Markiert sie als `failed` mit Cleanup-Grund
 - Sendet Alert-E-Mail an Admin
@@ -156,11 +167,11 @@ Bereinigt hängende Jobs. Findet Jobs, die länger als 1 Stunde laufen und marki
 
 ### Umgebungsvariablen
 
-| Variable | Beschreibung | Standard |
-|----------|--------------|----------|
-| `EVENTS_CRON_SECRET` / `CRON_SECRET` | Secret für Cron-Request-Authentifizierung | - |
-| `EVENTS_BASE_URL` | Basis-URL für Event-Endpoints (z.B. `https://vertic-id.com`) | - |
-| `FRONTEND_URL` | Frontend-URL (wird als Fallback für `EVENTS_BASE_URL` verwendet) | - |
+| Variable                             | Beschreibung                                                     | Standard |
+| ------------------------------------ | ---------------------------------------------------------------- | -------- |
+| `EVENTS_CRON_SECRET` / `CRON_SECRET` | Secret für Cron-Request-Authentifizierung                        | -        |
+| `EVENTS_BASE_URL`                    | Basis-URL für Event-Endpoints (z.B. `https://vertic-id.com`)     | -        |
+| `FRONTEND_URL`                       | Frontend-URL (wird als Fallback für `EVENTS_BASE_URL` verwendet) | -        |
 
 **Wichtig:** Die API-Endpunkte laufen unter derselben Domain wie das Frontend. Wenn `FRONTEND_URL` auf `https://vertic-id.com` gesetzt ist, sind die Endpunkte unter `https://vertic-id.com/api/events/*` erreichbar. Dies wird durch die `vercel.json`-Konfiguration sichergestellt, die alle `/api/*`-Requests an die Serverless-Funktion weiterleitet.
 | `EMAIL_PREFERENCES_SECRET` | Secret für E-Mail-Abmeldungs-Tokens | - |

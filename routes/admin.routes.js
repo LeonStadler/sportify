@@ -1,4 +1,7 @@
+import { randomUUID } from "crypto";
+import ExcelJS from "exceljs";
 import express from "express";
+import multer from "multer";
 import { createAdminMiddleware } from "../middleware/adminMiddleware.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 import { sendEmailQueueAlert } from "../services/alertService.js";
@@ -11,12 +14,9 @@ import {
   cleanupStuckJobs,
   getJobStats,
 } from "../services/jobCleanupService.js";
-import { getFrontendUrl, toCamelCase } from "../utils/helpers.js";
 import { slugifyExerciseName } from "../utils/exerciseUtils.js";
+import { getFrontendUrl, toCamelCase } from "../utils/helpers.js";
 import { computePointsPerUnit } from "../utils/scoring.js";
-import { randomUUID } from "crypto";
-import ExcelJS from "exceljs";
-import multer from "multer";
 
 export const createAdminRouter = (pool) => {
   const router = express.Router();
@@ -56,7 +56,13 @@ export const createAdminRouter = (pool) => {
       "rotation",
       "isometric",
     ],
-    measurementTypes: ["reps", "time", "distance", "reps,time", "time,distance"],
+    measurementTypes: [
+      "reps",
+      "time",
+      "distance",
+      "reps,time",
+      "time,distance",
+    ],
     distanceUnits: ["km", "m", "miles"],
     timeUnits: ["min", "sec"],
     booleanValues: ["true", "false"],
@@ -110,127 +116,373 @@ export const createAdminRouter = (pool) => {
     description: "Klassische Klimmzüge an der Stange",
   });
 
-  const processExerciseImport = async (rawExercises, userId) => {
+  const isEmptyValue = (value) => {
+    if (value === null || value === undefined) return true;
+    if (typeof value === "string") return value.trim() === "";
+    if (Array.isArray(value)) return value.length === 0;
+    if (typeof value === "object") return Object.keys(value).length === 0;
+    return false;
+  };
+
+  const normalizeArray = (value) => {
+    if (Array.isArray(value)) return value;
+    return String(value || "")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  };
+
+  const buildImportPayload = (raw) => {
+    const name = String(raw?.name || "").trim();
+    const isFullExport =
+      raw &&
+      typeof raw.unit === "string" &&
+      (raw.slug || slugifyExerciseName(name));
+
+    if (isFullExport) {
+      const slug = String(raw.slug || slugifyExerciseName(name) || "").trim();
+      if (!name || !slug) {
+        return { valid: false, reason: "required", name, slug, isFullExport };
+      }
+      return {
+        valid: true,
+        isFullExport,
+        name,
+        slug,
+        aliases: Array.isArray(raw.aliases) ? raw.aliases : [],
+        values: {
+          name,
+          slug,
+          description:
+            raw.description != null ? String(raw.description).trim() : null,
+          category: String(raw.category || "").trim() || null,
+          discipline: String(raw.discipline || "").trim() || null,
+          movementPattern: String(raw.movementPattern || "").trim() || null,
+          measurementType:
+            String(raw.measurementType || "reps").trim() || "reps",
+          pointsPerUnit: Number.isFinite(Number(raw.pointsPerUnit))
+            ? Number(raw.pointsPerUnit)
+            : 1,
+          unit: String(raw.unit || "reps").trim() || "reps",
+          hasWeight: raw.hasWeight === true,
+          hasSetMode: raw.hasSetMode !== false,
+          requiresWeight: raw.requiresWeight === true,
+          allowsWeight: raw.allowsWeight === true,
+          supportsSets: raw.supportsSets !== false,
+          supportsTime: raw.supportsTime === true,
+          supportsDistance: raw.supportsDistance === true,
+          supportsGrade: raw.supportsGrade === true,
+          difficultyTier: Number.isFinite(Number(raw.difficultyTier))
+            ? Number(raw.difficultyTier)
+            : 5,
+          muscleGroups: Array.isArray(raw.muscleGroups) ? raw.muscleGroups : [],
+          equipment: Array.isArray(raw.equipment) ? raw.equipment : [],
+          unitOptions: Array.isArray(raw.unitOptions) ? raw.unitOptions : [],
+          isActive: raw.isActive !== false,
+        },
+      };
+    }
+
+    const category = String(raw?.category || "").trim();
+    const discipline = String(raw?.discipline || "").trim();
+    const movementPattern = String(raw?.movementPattern || "").trim();
+    const difficultyTier = Number(
+      raw?.difficultyTier ?? raw?.difficulty ?? NaN,
+    );
+    const measurementTypesRaw =
+      raw?.measurementTypes ?? raw?.measurementType ?? "";
+    const measurementTypes = Array.isArray(measurementTypesRaw)
+      ? measurementTypesRaw
+      : String(measurementTypesRaw)
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean);
+    const hasDistance = measurementTypes.includes("distance");
+    const hasTime = measurementTypes.includes("time");
+    const hasReps = measurementTypes.includes("reps");
+    const measurementType =
+      String(raw?.measurementType || "") ||
+      (hasDistance
+        ? "distance"
+        : hasReps && hasTime
+          ? "mixed"
+          : hasReps
+            ? "reps"
+            : "time");
+    const requiresWeight =
+      raw?.requiresWeight === true ||
+      String(raw?.requiresWeight).toLowerCase() === "true";
+    const allowsWeight =
+      raw?.allowsWeight === true ||
+      String(raw?.allowsWeight).toLowerCase() === "true";
+    const supportsSets =
+      raw?.supportsSets !== undefined
+        ? raw.supportsSets === true ||
+          String(raw.supportsSets).toLowerCase() === "true"
+        : hasReps || hasTime;
+    const supportsTime =
+      raw?.supportsTime !== undefined
+        ? raw.supportsTime === true ||
+          String(raw.supportsTime).toLowerCase() === "true"
+        : hasTime;
+    const supportsDistance =
+      raw?.supportsDistance !== undefined
+        ? raw.supportsDistance === true ||
+          String(raw.supportsDistance).toLowerCase() === "true"
+        : hasDistance;
+    const muscleGroups = normalizeArray(raw?.muscleGroups);
+    const equipment = normalizeArray(raw?.equipment);
+    const aliasList = normalizeArray(raw?.aliases);
+
+    const distanceUnit = String(raw?.distanceUnit || "km");
+    const timeUnit = String(raw?.timeUnit || "min");
+
+    const requiredOk =
+      name &&
+      category &&
+      discipline &&
+      movementPattern &&
+      measurementType &&
+      Number.isFinite(difficultyTier) &&
+      muscleGroups.length > 0 &&
+      equipment.length > 0;
+
+    if (!requiredOk) {
+      return {
+        valid: false,
+        reason: "required",
+        name,
+        slug: slugifyExerciseName(name),
+        isFullExport,
+      };
+    }
+
+    const slug = slugifyExerciseName(name);
+    if (!slug) {
+      return { valid: false, reason: "slug", name, slug, isFullExport };
+    }
+
+    const normalizedPointsSource = "auto";
+    const resolvedPointsPerUnit = computePointsPerUnit({
+      measurementType,
+      difficultyTier,
+    });
+    const resolvedUnit = hasDistance
+      ? distanceUnit
+      : hasTime
+        ? timeUnit
+        : "reps";
+    const unitOptions = hasDistance
+      ? [
+          { value: "km", label: "Kilometer" },
+          { value: "m", label: "Meter" },
+          { value: "miles", label: "Miles" },
+        ]
+      : hasTime
+        ? [
+            { value: "min", label: "Minuten" },
+            { value: "sec", label: "Sekunden" },
+          ]
+        : [];
+
+    return {
+      valid: true,
+      isFullExport,
+      name,
+      slug,
+      aliases: aliasList,
+      values: {
+        name,
+        slug,
+        description: raw?.description ? String(raw.description).trim() : null,
+        category,
+        discipline,
+        movementPattern,
+        measurementType,
+        pointsPerUnit: Number.isFinite(resolvedPointsPerUnit)
+          ? resolvedPointsPerUnit
+          : 1,
+        unit: resolvedUnit,
+        hasWeight: requiresWeight || allowsWeight,
+        hasSetMode: supportsSets,
+        requiresWeight,
+        allowsWeight,
+        supportsSets,
+        supportsTime,
+        supportsDistance,
+        supportsGrade: false,
+        difficultyTier,
+        muscleGroups,
+        equipment,
+        unitOptions,
+        isActive: true,
+        pointsSource: normalizedPointsSource,
+      },
+    };
+  };
+
+  const processExerciseImport = async (rawExercises, userId, options = {}) => {
     const results = {
       imported: 0,
+      updated: 0,
       skipped: 0,
       errors: [],
     };
+    const mode = options.mode === "manual" ? "manual" : "auto";
+    const decisions = options.decisions || {};
+
+    const mergeFields = [
+      "name",
+      "slug",
+      "description",
+      "category",
+      "discipline",
+      "movementPattern",
+      "measurementType",
+      "pointsPerUnit",
+      "unit",
+      "hasWeight",
+      "hasSetMode",
+      "requiresWeight",
+      "allowsWeight",
+      "supportsSets",
+      "supportsTime",
+      "supportsDistance",
+      "supportsGrade",
+      "difficultyTier",
+      "muscleGroups",
+      "equipment",
+      "unitOptions",
+      "isActive",
+    ];
 
     for (const raw of rawExercises) {
-      const name = String(raw?.name || "").trim();
-      const category = String(raw?.category || "").trim();
-      const discipline = String(raw?.discipline || "").trim();
-      const movementPattern = String(raw?.movementPattern || "").trim();
-      const difficultyTier = Number(raw?.difficultyTier ?? raw?.difficulty ?? NaN);
-      const measurementTypesRaw = raw?.measurementTypes ?? raw?.measurementType ?? "";
-      const measurementTypes = Array.isArray(measurementTypesRaw)
-        ? measurementTypesRaw
-        : String(measurementTypesRaw)
-            .split(",")
-            .map((item) => item.trim())
-            .filter(Boolean);
-      const hasDistance = measurementTypes.includes("distance");
-      const hasTime = measurementTypes.includes("time");
-      const hasReps = measurementTypes.includes("reps");
-      const measurementType =
-        String(raw?.measurementType || "") ||
-        (hasDistance
-          ? "distance"
-          : hasReps && hasTime
-            ? "mixed"
-            : hasReps
-              ? "reps"
-              : "time");
-      const requiresWeight =
-        raw?.requiresWeight === true ||
-        String(raw?.requiresWeight).toLowerCase() === "true";
-      const allowsWeight =
-        raw?.allowsWeight === true || String(raw?.allowsWeight).toLowerCase() === "true";
-      const supportsSets =
-        raw?.supportsSets !== undefined
-          ? raw.supportsSets === true || String(raw.supportsSets).toLowerCase() === "true"
-          : hasReps || hasTime;
-      const supportsTime =
-        raw?.supportsTime !== undefined
-          ? raw.supportsTime === true || String(raw.supportsTime).toLowerCase() === "true"
-          : hasTime;
-      const supportsDistance =
-        raw?.supportsDistance !== undefined
-          ? raw.supportsDistance === true || String(raw.supportsDistance).toLowerCase() === "true"
-          : hasDistance;
-      const muscleGroups = Array.isArray(raw?.muscleGroups)
-        ? raw.muscleGroups
-        : String(raw?.muscleGroups || "")
-            .split(",")
-            .map((item) => item.trim())
-            .filter(Boolean);
-      const equipment = Array.isArray(raw?.equipment)
-        ? raw.equipment
-        : String(raw?.equipment || "")
-            .split(",")
-            .map((item) => item.trim())
-            .filter(Boolean);
-      const aliasList = Array.isArray(raw?.aliases)
-        ? raw.aliases
-        : String(raw?.aliases || "")
-            .split(",")
-            .map((item) => item.trim())
-            .filter(Boolean);
-
-      const distanceUnit = String(raw?.distanceUnit || "km");
-      const timeUnit = String(raw?.timeUnit || "min");
-
-      const requiredOk =
-        name &&
-        category &&
-        discipline &&
-        movementPattern &&
-        measurementType &&
-        Number.isFinite(difficultyTier) &&
-        muscleGroups.length > 0 &&
-        equipment.length > 0;
-
-      if (!requiredOk) {
+      const payload = buildImportPayload(raw);
+      if (!payload.valid) {
         results.skipped += 1;
         continue;
       }
 
-      const slug = slugifyExerciseName(name);
-      if (!slug) {
-        results.skipped += 1;
-        continue;
-      }
-
-      const { rows: existing } = await pool.query(
-        "SELECT id FROM exercises WHERE LOWER(name) = LOWER($1) OR slug = $2",
-        [name, slug]
+      const { rows: existingRows } = await pool.query(
+        "SELECT * FROM exercises WHERE slug = $1 OR LOWER(name) = LOWER($2) LIMIT 1",
+        [payload.slug, payload.name],
       );
-      if (existing.length > 0) {
-        results.skipped += 1;
+
+      if (existingRows.length > 0) {
+        const existing = toCamelCase(existingRows[0]);
+        existing.unitOptions = existingRows[0].unit_options || [];
+        const decisionMap =
+          decisions[payload.slug] || decisions[payload.name] || {};
+
+        const merged = {};
+        for (const field of mergeFields) {
+          const incoming = payload.values[field];
+          const current = existing[field];
+          const decision =
+            typeof decisionMap[field] === "string"
+              ? decisionMap[field]
+              : decisionMap[field] === false
+                ? "keep"
+                : decisionMap[field] === true
+                  ? "import"
+                  : undefined;
+          if (decision === "keep") {
+            merged[field] = current;
+          } else if (decision === "import") {
+            merged[field] = incoming;
+          } else if (mode === "auto") {
+            merged[field] = isEmptyValue(incoming) ? current : incoming;
+          } else {
+            merged[field] = isEmptyValue(incoming) ? current : incoming;
+          }
+        }
+
+        await pool.query(
+          `
+            UPDATE exercises
+            SET
+              name = $2,
+              slug = $3,
+              description = $4,
+              category = $5,
+              discipline = $6,
+              movement_pattern = $7,
+              measurement_type = $8,
+              points_per_unit = $9,
+              unit = $10,
+              has_weight = $11,
+              has_set_mode = $12,
+              requires_weight = $13,
+              allows_weight = $14,
+              supports_sets = $15,
+              supports_time = $16,
+              supports_distance = $17,
+              supports_grade = $18,
+              difficulty_tier = $19,
+              muscle_groups = $20,
+              equipment = $21,
+              unit_options = $22::jsonb,
+              status = 'approved',
+              approved_by = $23,
+              is_active = $24,
+              updated_at = CURRENT_TIMESTAMP
+            WHERE id = $1
+          `,
+          [
+            existing.id,
+            merged.name,
+            merged.slug,
+            merged.description,
+            merged.category,
+            merged.discipline,
+            merged.movementPattern,
+            merged.measurementType,
+            merged.pointsPerUnit,
+            merged.unit,
+            merged.hasWeight,
+            merged.hasSetMode,
+            merged.requiresWeight,
+            merged.allowsWeight,
+            merged.supportsSets,
+            merged.supportsTime,
+            merged.supportsDistance,
+            merged.supportsGrade,
+            merged.difficultyTier,
+            merged.muscleGroups,
+            merged.equipment,
+            JSON.stringify(merged.unitOptions || []),
+            userId,
+            merged.isActive !== false,
+          ],
+        );
+
+        const aliasDecision =
+          typeof decisionMap.aliases === "string"
+            ? decisionMap.aliases
+            : decisionMap.aliases === false
+              ? "keep"
+              : decisionMap.aliases === true
+                ? "import"
+                : undefined;
+        if (
+          (mode === "auto" && !isEmptyValue(payload.aliases)) ||
+          aliasDecision === "import"
+        ) {
+          for (const alias of payload.aliases) {
+            const aliasSlug = slugifyExerciseName(String(alias));
+            if (!aliasSlug) continue;
+            await pool.query(
+              `INSERT INTO exercise_aliases (exercise_id, alias, alias_slug, created_by)
+               VALUES ($1, $2, $3, $4)
+               ON CONFLICT (exercise_id, alias_slug) DO NOTHING`,
+              [existing.id, String(alias), aliasSlug, userId],
+            );
+          }
+        }
+
+        results.updated += 1;
         continue;
       }
-
-      const normalizedPointsSource = "auto";
-      const resolvedPointsPerUnit = computePointsPerUnit({
-        measurementType,
-        difficultyTier,
-      });
-
-      const resolvedUnit = hasDistance ? distanceUnit : hasTime ? timeUnit : "reps";
-
-      const unitOptions = hasDistance
-        ? [
-            { value: "km", label: "Kilometer" },
-            { value: "m", label: "Meter" },
-            { value: "miles", label: "Miles" },
-          ]
-        : hasTime
-          ? [
-              { value: "min", label: "Minuten" },
-              { value: "sec", label: "Sekunden" },
-            ]
-          : [];
 
       const exerciseId = randomUUID();
       await pool.query(
@@ -247,6 +499,8 @@ export const createAdminRouter = (pool) => {
             points_per_unit,
             points_source,
             unit,
+            has_weight,
+            has_set_mode,
             requires_weight,
             allows_weight,
             supports_sets,
@@ -261,45 +515,46 @@ export const createAdminRouter = (pool) => {
             approved_by,
             is_active
           )
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21::jsonb,$22,$23,$24)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'auto',$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21::jsonb,$22,$23,$24)
         `,
         [
           exerciseId,
-          name,
-          slug,
-          raw?.description ? String(raw.description).trim() : null,
-          category,
-          discipline,
-          movementPattern,
-          measurementType,
-          Number.isFinite(resolvedPointsPerUnit) ? resolvedPointsPerUnit : 1,
-          normalizedPointsSource,
-          resolvedUnit,
-          requiresWeight,
-          allowsWeight,
-          supportsSets,
-          supportsTime,
-          supportsDistance,
-          false,
-          difficultyTier,
-          muscleGroups,
-          equipment,
-          JSON.stringify(unitOptions),
+          payload.values.name,
+          payload.values.slug,
+          payload.values.description,
+          payload.values.category,
+          payload.values.discipline,
+          payload.values.movementPattern,
+          payload.values.measurementType,
+          payload.values.pointsPerUnit,
+          payload.values.unit,
+          payload.values.hasWeight,
+          payload.values.hasSetMode,
+          payload.values.requiresWeight,
+          payload.values.allowsWeight,
+          payload.values.supportsSets,
+          payload.values.supportsTime,
+          payload.values.supportsDistance,
+          payload.values.supportsGrade,
+          payload.values.difficultyTier,
+          payload.values.muscleGroups,
+          payload.values.equipment,
+          JSON.stringify(payload.values.unitOptions || []),
           "approved",
           userId,
-          true,
-        ]
+          payload.values.isActive !== false,
+        ],
       );
 
-      if (aliasList.length > 0) {
-        for (const alias of aliasList) {
-          const aliasSlug = slugifyExerciseName(alias);
+      if (payload.aliases.length > 0) {
+        for (const alias of payload.aliases) {
+          const aliasSlug = slugifyExerciseName(String(alias));
           if (!aliasSlug) continue;
           await pool.query(
             `INSERT INTO exercise_aliases (exercise_id, alias, alias_slug, created_by)
              VALUES ($1, $2, $3, $4)
-             ON CONFLICT (alias_slug) DO NOTHING`,
-            [exerciseId, alias, aliasSlug, userId]
+             ON CONFLICT (exercise_id, alias_slug) DO NOTHING`,
+            [exerciseId, String(alias), aliasSlug, userId],
           );
         }
       }
@@ -308,6 +563,191 @@ export const createAdminRouter = (pool) => {
     }
 
     return results;
+  };
+
+  const parseExercisesFromXlsxBuffer = async (buffer) => {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
+    const sheet = workbook.worksheets[0];
+    if (!sheet) {
+      throw new Error("Keine Arbeitsmappe gefunden.");
+    }
+
+    const headerRow = sheet.getRow(1);
+    const headers = headerRow.values
+      .slice(1)
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+
+    if (headers.length === 0) {
+      throw new Error("Keine Spaltenüberschriften gefunden.");
+    }
+
+    const exercises = [];
+    const extractCellValue = (cell) => {
+      const value = cell?.value;
+      if (value === null || value === undefined) return "";
+      if (typeof value === "object") {
+        if (value.text) return value.text;
+        if (Array.isArray(value.richText)) {
+          return value.richText.map((item) => item.text).join("");
+        }
+        if (value.result !== undefined) return value.result;
+        if (value.formula) return value.formula;
+        if (value.hyperlink) return value.text || value.hyperlink;
+        if (value instanceof Date) return value.toISOString();
+      }
+      return value;
+    };
+
+    sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      if (rowNumber === 1) return;
+      const record = {};
+      let hasValue = false;
+      headers.forEach((header, index) => {
+        const cell = row.getCell(index + 1);
+        const cellValue = extractCellValue(cell);
+        if (
+          cellValue !== null &&
+          cellValue !== undefined &&
+          String(cellValue).trim() !== ""
+        ) {
+          hasValue = true;
+        }
+        record[header] = cellValue ?? "";
+      });
+      if (hasValue) {
+        exercises.push(record);
+      }
+    });
+
+    return exercises;
+  };
+
+  const buildImportPreview = async (rawExercises) => {
+    const items = [];
+    const slugCandidates = [];
+    const nameCandidates = [];
+    const payloads = rawExercises.map((raw) => {
+      const payload = buildImportPayload(raw);
+      if (payload.valid) {
+        slugCandidates.push(payload.slug);
+        nameCandidates.push(payload.name.toLowerCase());
+      }
+      return payload;
+    });
+
+    const { rows: existingRows } = await pool.query(
+      `SELECT * FROM exercises WHERE slug = ANY($1::text[]) OR LOWER(name) = ANY($2::text[])`,
+      [slugCandidates, nameCandidates],
+    );
+    const existingBySlug = new Map();
+    const existingByName = new Map();
+    existingRows.forEach((row) => {
+      const normalized = toCamelCase(row);
+      normalized.unitOptions = row.unit_options || [];
+      existingBySlug.set(normalized.slug, normalized);
+      existingByName.set(
+        String(normalized.name || "").toLowerCase(),
+        normalized,
+      );
+    });
+
+    const diffFields = [
+      "name",
+      "description",
+      "category",
+      "discipline",
+      "movementPattern",
+      "measurementType",
+      "pointsPerUnit",
+      "unit",
+      "hasWeight",
+      "hasSetMode",
+      "requiresWeight",
+      "allowsWeight",
+      "supportsSets",
+      "supportsTime",
+      "supportsDistance",
+      "supportsGrade",
+      "difficultyTier",
+      "muscleGroups",
+      "equipment",
+      "unitOptions",
+      "isActive",
+    ];
+
+    let countNew = 0;
+    let countUpdate = 0;
+    let countInvalid = 0;
+
+    payloads.forEach((payload) => {
+      if (!payload.valid) {
+        countInvalid += 1;
+        items.push({
+          key: payload.slug || payload.name || String(countInvalid),
+          status: "invalid",
+          reason: payload.reason || "invalid",
+          incoming: null,
+          existing: null,
+          diffs: {},
+        });
+        return;
+      }
+
+      const existing =
+        existingBySlug.get(payload.slug) ||
+        existingByName.get(payload.name.toLowerCase()) ||
+        null;
+      const status = existing ? "update" : "new";
+      if (status === "new") countNew += 1;
+      else countUpdate += 1;
+
+      const diffs = {};
+      diffFields.forEach((field) => {
+        const incoming = payload.values[field];
+        const current = existing ? existing[field] : null;
+        const changed =
+          JSON.stringify(incoming ?? null) !== JSON.stringify(current ?? null);
+        diffs[field] = {
+          incoming,
+          existing: current,
+          changed,
+          incomingEmpty: isEmptyValue(incoming),
+        };
+      });
+
+      const incomingAliases = payload.aliases || [];
+      const existingAliases = existing?.aliases || [];
+      diffs.aliases = {
+        incoming: incomingAliases,
+        existing: existingAliases,
+        changed:
+          JSON.stringify(incomingAliases ?? []) !==
+          JSON.stringify(existingAliases ?? []),
+        incomingEmpty: isEmptyValue(incomingAliases),
+      };
+
+      items.push({
+        key: payload.slug,
+        status,
+        name: payload.name,
+        slug: payload.slug,
+        incoming: payload.values,
+        existing,
+        diffs,
+      });
+    });
+
+    return {
+      items,
+      summary: {
+        total: items.length,
+        new: countNew,
+        update: countUpdate,
+        invalid: countInvalid,
+      },
+    };
   };
 
   const buildExerciseTemplateWorkbook = () => {
@@ -326,9 +766,7 @@ export const createAdminRouter = (pool) => {
     sheet.getRow(1).font = { bold: true };
 
     const example = buildExerciseExampleRow();
-    sheet.addRow(
-      EXERCISE_IMPORT_COLUMNS.map((key) => example[key] ?? "")
-    );
+    sheet.addRow(EXERCISE_IMPORT_COLUMNS.map((key) => example[key] ?? ""));
 
     const optionsSheet = workbook.addWorksheet("Options");
     optionsSheet.state = "veryHidden";
@@ -346,37 +784,37 @@ export const createAdminRouter = (pool) => {
     const categoryRange = setOptionColumn(
       1,
       "categories",
-      EXERCISE_IMPORT_OPTIONS.categories
+      EXERCISE_IMPORT_OPTIONS.categories,
     );
     const disciplineRange = setOptionColumn(
       2,
       "disciplines",
-      EXERCISE_IMPORT_OPTIONS.disciplines
+      EXERCISE_IMPORT_OPTIONS.disciplines,
     );
     const patternRange = setOptionColumn(
       3,
       "movementPatterns",
-      EXERCISE_IMPORT_OPTIONS.movementPatterns
+      EXERCISE_IMPORT_OPTIONS.movementPatterns,
     );
     const measurementRange = setOptionColumn(
       4,
       "measurementTypes",
-      EXERCISE_IMPORT_OPTIONS.measurementTypes
+      EXERCISE_IMPORT_OPTIONS.measurementTypes,
     );
     const distanceRange = setOptionColumn(
       5,
       "distanceUnits",
-      EXERCISE_IMPORT_OPTIONS.distanceUnits
+      EXERCISE_IMPORT_OPTIONS.distanceUnits,
     );
     const timeRange = setOptionColumn(
       6,
       "timeUnits",
-      EXERCISE_IMPORT_OPTIONS.timeUnits
+      EXERCISE_IMPORT_OPTIONS.timeUnits,
     );
     const booleanRange = setOptionColumn(
       7,
       "boolean",
-      EXERCISE_IMPORT_OPTIONS.booleanValues
+      EXERCISE_IMPORT_OPTIONS.booleanValues,
     );
 
     const toColumnLetter = (column) => {
@@ -395,7 +833,7 @@ export const createAdminRouter = (pool) => {
       if (columnIndex < 0) return;
       const columnLetter = toColumnLetter(columnIndex + 1);
       const formula = `=Options!$${toColumnLetter(range.columnIndex)}$${range.startRow}:$${toColumnLetter(
-        range.columnIndex
+        range.columnIndex,
       )}$${range.endRow}`;
       sheet.dataValidations.add(`${columnLetter}2:${columnLetter}1000`, {
         type: "list",
@@ -432,6 +870,7 @@ export const createAdminRouter = (pool) => {
                     is_email_verified,
                     has_2fa,
                     role,
+                    is_blocked,
                     created_at,
                     last_login_at
                 FROM users
@@ -453,6 +892,58 @@ export const createAdminRouter = (pool) => {
       res
         .status(500)
         .json({ error: "Serverfehler beim Laden der Benutzerliste." });
+    }
+  });
+
+  router.put("/users/:userId/block", adminMiddleware, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { blocked } = req.body;
+
+      if (typeof blocked !== "boolean") {
+        return res
+          .status(400)
+          .json({ error: "blocked muss ein Boolean sein." });
+      }
+
+      await pool.query(`UPDATE users SET is_blocked = $1 WHERE id = $2`, [
+        blocked,
+        userId,
+      ]);
+
+      res.json({ success: true, blocked });
+    } catch (error) {
+      console.error("Admin block user error:", error);
+      res
+        .status(500)
+        .json({
+          error: "Serverfehler beim Blockieren/Entsperren des Benutzers.",
+        });
+    }
+  });
+
+  router.put("/users/:userId/role", adminMiddleware, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { role } = req.body;
+
+      if (!role || !["user", "admin"].includes(role)) {
+        return res
+          .status(400)
+          .json({ error: "role muss 'user' oder 'admin' sein." });
+      }
+
+      await pool.query(`UPDATE users SET role = $1 WHERE id = $2`, [
+        role,
+        userId,
+      ]);
+
+      res.json({ success: true, role });
+    } catch (error) {
+      console.error("Admin change user role error:", error);
+      res
+        .status(500)
+        .json({ error: "Serverfehler beim Ändern der Benutzerrolle." });
     }
   });
 
@@ -505,7 +996,9 @@ export const createAdminRouter = (pool) => {
           pool.query("SELECT COUNT(*)::int AS total FROM workouts"),
           pool.query("SELECT COUNT(*)::int AS total FROM workout_templates"),
           pool.query("SELECT COUNT(*)::int AS total FROM exercises"),
-          pool.query("SELECT COUNT(*)::int AS total FROM training_journal_entries"),
+          pool.query(
+            "SELECT COUNT(*)::int AS total FROM training_journal_entries",
+          ),
           pool.query("SELECT COUNT(*)::int AS total FROM awards"),
           pool.query("SELECT COUNT(*)::int AS total FROM user_badges"),
           pool.query("SELECT COUNT(*)::int AS total FROM workout_activities"),
@@ -527,7 +1020,7 @@ export const createAdminRouter = (pool) => {
           error: "Serverfehler beim Laden der Admin-Übersicht.",
         });
       }
-    }
+    },
   );
 
   // GET /api/admin/exercises - Get all exercises (optional filters)
@@ -556,7 +1049,8 @@ export const createAdminRouter = (pool) => {
           ? `WHERE ${conditions.join(" AND ")}`
           : "";
 
-        const { rows } = await pool.query(`
+        const { rows } = await pool.query(
+          `
                 SELECT
                     id,
                     name,
@@ -594,7 +1088,9 @@ export const createAdminRouter = (pool) => {
                 FROM exercises
                 ${whereClause}
                 ORDER BY name ASC
-            `, params);
+            `,
+          params,
+        );
 
         const exercises = rows.map((row) => ({
           ...toCamelCase(row),
@@ -606,7 +1102,81 @@ export const createAdminRouter = (pool) => {
         console.error("Admin exercises GET error:", error);
         res.status(500).json({ error: "Serverfehler beim Laden der Übungen." });
       }
-    }
+    },
+  );
+
+  // POST /api/admin/exercises/export-selected - Export selected exercises (full data, lossless for import elsewhere)
+  router.post(
+    "/exercises/export-selected",
+    authMiddleware,
+    adminMiddleware,
+    async (req, res) => {
+      try {
+        const { ids } = req.body || {};
+        if (!Array.isArray(ids) || ids.length === 0) {
+          return res.status(400).json({ error: "Keine Übungs-IDs angegeben." });
+        }
+        const validIds = ids
+          .filter((id) => typeof id === "string" && id.trim())
+          .slice(0, 5000);
+        if (validIds.length === 0) {
+          return res.status(400).json({ error: "Keine gültigen Übungs-IDs." });
+        }
+
+        const { rows } = await pool.query(
+          `
+          SELECT
+            id,
+            name,
+            slug,
+            description,
+            category,
+            discipline,
+            movement_pattern,
+            measurement_type,
+            points_per_unit,
+            unit,
+            has_weight,
+            has_set_mode,
+            requires_weight,
+            allows_weight,
+            supports_sets,
+            supports_time,
+            supports_distance,
+            supports_grade,
+            difficulty_tier,
+            muscle_groups,
+            equipment,
+            unit_options,
+            status,
+            created_by,
+            approved_by,
+            merged_into,
+            is_active,
+            created_at,
+            updated_at,
+            COALESCE(
+              (SELECT array_agg(alias) FROM exercise_aliases ea WHERE ea.exercise_id = exercises.id),
+              '{}'::text[]
+            ) AS aliases
+          FROM exercises
+          WHERE id = ANY($1::varchar[])
+          ORDER BY name ASC
+          `,
+          [validIds],
+        );
+
+        const exercises = rows.map((row) => ({
+          ...toCamelCase(row),
+          unitOptions: row.unit_options || [],
+        }));
+
+        res.json({ exercises, meta: { exported: exercises.length } });
+      } catch (error) {
+        console.error("Admin exercises export-selected error:", error);
+        res.status(500).json({ error: "Serverfehler beim Export." });
+      }
+    },
   );
 
   // GET /api/admin/exercises/export - Export template for bulk import
@@ -621,11 +1191,11 @@ export const createAdminRouter = (pool) => {
           const workbook = buildExerciseTemplateWorkbook();
           res.setHeader(
             "Content-Type",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
           );
           res.setHeader(
             "Content-Disposition",
-            "attachment; filename=exercise-import-template.xlsx"
+            "attachment; filename=exercise-import-template.xlsx",
           );
           await workbook.xlsx.write(res);
           return res.end();
@@ -647,14 +1217,14 @@ export const createAdminRouter = (pool) => {
         res.setHeader("Content-Type", "text/csv; charset=utf-8");
         res.setHeader(
           "Content-Disposition",
-          "attachment; filename=exercise-import-template.csv"
+          "attachment; filename=exercise-import-template.csv",
         );
         return res.send(`${csvHeader}${exampleRow}\n`);
       } catch (error) {
         console.error("Admin exercises export error:", error);
         res.status(500).json({ error: "Serverfehler beim Export." });
       }
-    }
+    },
   );
 
   // POST /api/admin/exercises/import - Import exercises in bulk
@@ -664,17 +1234,40 @@ export const createAdminRouter = (pool) => {
     adminMiddleware,
     async (req, res) => {
       try {
-        const { exercises } = req.body || {};
+        const { exercises, mode, decisions } = req.body || {};
         if (!Array.isArray(exercises)) {
           return res.status(400).json({ error: "Keine Übungen angegeben." });
         }
-        const results = await processExerciseImport(exercises, req.user.id);
+        const results = await processExerciseImport(exercises, req.user.id, {
+          mode,
+          decisions,
+        });
         res.json(results);
       } catch (error) {
         console.error("Admin exercises import error:", error);
         res.status(500).json({ error: "Serverfehler beim Import." });
       }
-    }
+    },
+  );
+
+  // POST /api/admin/exercises/import-preview - Preview exercises before import
+  router.post(
+    "/exercises/import-preview",
+    authMiddleware,
+    adminMiddleware,
+    async (req, res) => {
+      try {
+        const { exercises } = req.body || {};
+        if (!Array.isArray(exercises)) {
+          return res.status(400).json({ error: "Keine Übungen angegeben." });
+        }
+        const preview = await buildImportPreview(exercises);
+        res.json({ exercises, preview });
+      } catch (error) {
+        console.error("Admin exercises import-preview error:", error);
+        res.status(500).json({ error: "Serverfehler beim Import-Preview." });
+      }
+    },
   );
 
   // POST /api/admin/exercises/import-file - Import exercises from XLSX
@@ -690,71 +1283,54 @@ export const createAdminRouter = (pool) => {
         }
         const filename = req.file.originalname?.toLowerCase() || "";
         if (!filename.endsWith(".xlsx")) {
-          return res.status(400).json({ error: "Nur .xlsx Dateien werden unterstützt." });
+          return res
+            .status(400)
+            .json({ error: "Nur .xlsx Dateien werden unterstützt." });
         }
 
-        const workbook = new ExcelJS.Workbook();
-        await workbook.xlsx.load(req.file.buffer);
-        const sheet = workbook.worksheets[0];
-        if (!sheet) {
-          return res.status(400).json({ error: "Keine Arbeitsmappe gefunden." });
-        }
-
-        const headerRow = sheet.getRow(1);
-        const headers = headerRow.values
-          .slice(1)
-          .map((value) => String(value || "").trim())
-          .filter(Boolean);
-
-        if (headers.length === 0) {
-          return res.status(400).json({ error: "Keine Spaltenüberschriften gefunden." });
-        }
-
-        const exercises = [];
-        const extractCellValue = (cell) => {
-          const value = cell?.value;
-          if (value === null || value === undefined) return "";
-          if (typeof value === "object") {
-            if (value.text) return value.text;
-            if (Array.isArray(value.richText)) {
-              return value.richText.map((item) => item.text).join("");
-            }
-            if (value.result !== undefined) return value.result;
-            if (value.formula) return value.formula;
-            if (value.hyperlink) return value.text || value.hyperlink;
-            if (value instanceof Date) return value.toISOString();
-          }
-          return value;
-        };
-
-        sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-          if (rowNumber === 1) return;
-          const record = {};
-          let hasValue = false;
-          headers.forEach((header, index) => {
-            const cell = row.getCell(index + 1);
-            const cellValue = extractCellValue(cell);
-            if (
-              cellValue !== null &&
-              cellValue !== undefined &&
-              String(cellValue).trim() !== ""
-            ) {
-              hasValue = true;
-            }
-            record[header] = cellValue ?? "";
-          });
-          if (hasValue) {
-            exercises.push(record);
-          }
+        const exercises = await parseExercisesFromXlsxBuffer(req.file.buffer);
+        const mode = req.body?.mode;
+        const decisions =
+          typeof req.body?.decisions === "string"
+            ? JSON.parse(req.body.decisions)
+            : req.body?.decisions;
+        const results = await processExerciseImport(exercises, req.user.id, {
+          mode,
+          decisions,
         });
-
-        const results = await processExerciseImport(exercises, req.user.id);
         res.json(results);
       } catch (error) {
         console.error("Admin exercises import-file error:", error);
         res.status(500).json({ error: "Serverfehler beim Import." });
       }
-    }
+    },
+  );
+
+  // POST /api/admin/exercises/import-preview-file - Preview XLSX before import
+  router.post(
+    "/exercises/import-preview-file",
+    authMiddleware,
+    adminMiddleware,
+    upload.single("file"),
+    async (req, res) => {
+      try {
+        if (!req.file) {
+          return res.status(400).json({ error: "Keine Datei angegeben." });
+        }
+        const filename = req.file.originalname?.toLowerCase() || "";
+        if (!filename.endsWith(".xlsx")) {
+          return res
+            .status(400)
+            .json({ error: "Nur .xlsx Dateien werden unterstützt." });
+        }
+        const exercises = await parseExercisesFromXlsxBuffer(req.file.buffer);
+        const preview = await buildImportPreview(exercises);
+        res.json({ exercises, preview });
+      } catch (error) {
+        console.error("Admin exercises import-preview-file error:", error);
+        res.status(500).json({ error: "Serverfehler beim Import-Preview." });
+      }
+    },
   );
 
   // POST /api/admin/exercises - Create new exercise
@@ -816,11 +1392,12 @@ export const createAdminRouter = (pool) => {
 
         const { rows: existing } = await pool.query(
           "SELECT id FROM exercises WHERE id = $1 OR slug = $2",
-          [exerciseId, exerciseSlug]
+          [exerciseId, exerciseSlug],
         );
         if (existing.length > 0) {
           return res.status(409).json({
-            error: "Eine Übung mit dieser ID oder diesem Slug existiert bereits.",
+            error:
+              "Eine Übung mit dieser ID oder diesem Slug existiert bereits.",
           });
         }
 
@@ -894,7 +1471,7 @@ export const createAdminRouter = (pool) => {
             status || "approved",
             req.user.id,
             isActive !== undefined ? isActive : true,
-          ]
+          ],
         );
 
         const aliasList = Array.isArray(aliases)
@@ -908,7 +1485,7 @@ export const createAdminRouter = (pool) => {
               `INSERT INTO exercise_aliases (exercise_id, alias, alias_slug, created_by)
                VALUES ($1, $2, $3, $4)
                ON CONFLICT (alias_slug) DO NOTHING`,
-              [exerciseId, alias, aliasSlug, req.user.id]
+              [exerciseId, alias, aliasSlug, req.user.id],
             );
           }
         }
@@ -924,7 +1501,7 @@ export const createAdminRouter = (pool) => {
           .status(500)
           .json({ error: "Serverfehler beim Erstellen der Übung." });
       }
-    }
+    },
   );
 
   // PUT /api/admin/exercises/:id - Update exercise
@@ -969,7 +1546,7 @@ export const createAdminRouter = (pool) => {
           "mergedInto",
         ];
         const fieldsToUpdate = Object.keys(updates).filter((key) =>
-          allowedFields.includes(key)
+          allowedFields.includes(key),
         );
 
         if (fieldsToUpdate.length === 0 && !aliasList) {
@@ -980,7 +1557,7 @@ export const createAdminRouter = (pool) => {
 
         const { rows: existingRows } = await pool.query(
           "SELECT measurement_type, difficulty_tier, points_source FROM exercises WHERE id = $1",
-          [id]
+          [id],
         );
         if (existingRows.length === 0) {
           return res.status(404).json({ error: "Übung nicht gefunden." });
@@ -997,7 +1574,8 @@ export const createAdminRouter = (pool) => {
           updates.measurementType ?? existing.measurement_type ?? "reps";
         const nextDifficultyTier =
           updates.difficultyTier ?? existing.difficulty_tier ?? null;
-        let nextPointsSource = normalizedPointsSource || existing.points_source || "auto";
+        let nextPointsSource =
+          normalizedPointsSource || existing.points_source || "auto";
 
         if (updates.pointsPerUnit !== undefined) {
           nextPointsSource = "manual";
@@ -1009,11 +1587,14 @@ export const createAdminRouter = (pool) => {
             difficultyTier: nextDifficultyTier,
           });
           updates.pointsSource = "auto";
-          if (!fieldsToUpdate.includes("pointsPerUnit")) fieldsToUpdate.push("pointsPerUnit");
-          if (!fieldsToUpdate.includes("pointsSource")) fieldsToUpdate.push("pointsSource");
+          if (!fieldsToUpdate.includes("pointsPerUnit"))
+            fieldsToUpdate.push("pointsPerUnit");
+          if (!fieldsToUpdate.includes("pointsSource"))
+            fieldsToUpdate.push("pointsSource");
         } else if (normalizedPointsSource === "manual") {
           updates.pointsSource = "manual";
-          if (!fieldsToUpdate.includes("pointsSource")) fieldsToUpdate.push("pointsSource");
+          if (!fieldsToUpdate.includes("pointsSource"))
+            fieldsToUpdate.push("pointsSource");
         }
 
         // Konvertiere camelCase zu snake_case für die Datenbank
@@ -1032,7 +1613,8 @@ export const createAdminRouter = (pool) => {
             else if (field === "allowsWeight") dbField = "allows_weight";
             else if (field === "supportsSets") dbField = "supports_sets";
             else if (field === "supportsTime") dbField = "supports_time";
-            else if (field === "supportsDistance") dbField = "supports_distance";
+            else if (field === "supportsDistance")
+              dbField = "supports_distance";
             else if (field === "supportsGrade") dbField = "supports_grade";
             else if (field === "difficultyTier") dbField = "difficulty_tier";
             else if (field === "muscleGroups") dbField = "muscle_groups";
@@ -1059,7 +1641,10 @@ export const createAdminRouter = (pool) => {
           return updates[field];
         });
 
-        if (fieldsToUpdate.includes("status") && updates.status === "approved") {
+        if (
+          fieldsToUpdate.includes("status") &&
+          updates.status === "approved"
+        ) {
           values.push(req.user.id);
           updatePairs += `, approved_by = $${values.length}`;
         }
@@ -1076,7 +1661,10 @@ export const createAdminRouter = (pool) => {
               `;
           ({ rows } = await pool.query(query, values));
         } else {
-          const result = await pool.query(`SELECT * FROM exercises WHERE id = $1`, [id]);
+          const result = await pool.query(
+            `SELECT * FROM exercises WHERE id = $1`,
+            [id],
+          );
           rows = result.rows;
         }
 
@@ -1085,7 +1673,10 @@ export const createAdminRouter = (pool) => {
         }
 
         if (aliasList) {
-          await pool.query(`DELETE FROM exercise_aliases WHERE exercise_id = $1`, [id]);
+          await pool.query(
+            `DELETE FROM exercise_aliases WHERE exercise_id = $1`,
+            [id],
+          );
           for (const alias of aliasList) {
             const aliasSlug = slugifyExerciseName(alias);
             if (!aliasSlug) continue;
@@ -1093,7 +1684,7 @@ export const createAdminRouter = (pool) => {
               `INSERT INTO exercise_aliases (exercise_id, alias, alias_slug, created_by)
                VALUES ($1, $2, $3, $4)
                ON CONFLICT (alias_slug) DO NOTHING`,
-              [id, alias, aliasSlug, req.user.id]
+              [id, alias, aliasSlug, req.user.id],
             );
           }
         }
@@ -1109,7 +1700,7 @@ export const createAdminRouter = (pool) => {
           .status(500)
           .json({ error: "Serverfehler beim Aktualisieren der Übung." });
       }
-    }
+    },
   );
 
   // POST /api/admin/exercises/:id/merge - Merge exercise into target
@@ -1132,11 +1723,11 @@ export const createAdminRouter = (pool) => {
 
         const { rows: sourceRows } = await client.query(
           "SELECT id, name, slug FROM exercises WHERE id = $1",
-          [id]
+          [id],
         );
         const { rows: targetRows } = await client.query(
           "SELECT id FROM exercises WHERE id = $1",
-          [targetExerciseId]
+          [targetExerciseId],
         );
         if (sourceRows.length === 0 || targetRows.length === 0) {
           await client.query("ROLLBACK");
@@ -1148,30 +1739,30 @@ export const createAdminRouter = (pool) => {
 
         await client.query(
           `UPDATE workout_activities SET exercise_id = $1 WHERE exercise_id = $2`,
-          [targetExerciseId, id]
+          [targetExerciseId, id],
         );
         await client.query(
           `UPDATE workout_activities SET activity_type = $1 WHERE activity_type = $2`,
-          [targetExerciseId, id]
+          [targetExerciseId, id],
         );
 
         await client.query(
           `UPDATE exercise_aliases SET exercise_id = $1 WHERE exercise_id = $2`,
-          [targetExerciseId, id]
+          [targetExerciseId, id],
         );
 
         await client.query(
           `INSERT INTO exercise_aliases (exercise_id, alias, alias_slug, created_by)
            VALUES ($1, $2, $3, $4)
            ON CONFLICT (alias_slug) DO NOTHING`,
-          [targetExerciseId, source.name, aliasSlug, req.user.id]
+          [targetExerciseId, source.name, aliasSlug, req.user.id],
         );
 
         await client.query(
           `UPDATE exercises
            SET merged_into = $1, is_active = false, updated_at = CURRENT_TIMESTAMP
            WHERE id = $2`,
-          [targetExerciseId, id]
+          [targetExerciseId, id],
         );
 
         await client.query("COMMIT");
@@ -1183,7 +1774,7 @@ export const createAdminRouter = (pool) => {
       } finally {
         client.release();
       }
-    }
+    },
   );
 
   // POST /api/admin/exercises/:id/deactivate - Deactivate exercise
@@ -1196,7 +1787,7 @@ export const createAdminRouter = (pool) => {
         const { id } = req.params;
         const { rows } = await pool.query(
           `UPDATE exercises SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING id`,
-          [id]
+          [id],
         );
         if (rows.length === 0) {
           return res.status(404).json({ error: "Übung nicht gefunden." });
@@ -1206,7 +1797,39 @@ export const createAdminRouter = (pool) => {
         console.error("Admin deactivate exercise error:", error);
         res.status(500).json({ error: "Serverfehler beim Deaktivieren." });
       }
-    }
+    },
+  );
+
+  // DELETE /api/admin/exercises/:id - Permanently delete exercise
+  router.delete(
+    "/exercises/:id",
+    authMiddleware,
+    adminMiddleware,
+    async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { rows } = await pool.query(
+          `SELECT id FROM exercises WHERE id = $1`,
+          [id],
+        );
+        if (rows.length === 0) {
+          return res.status(404).json({ error: "Übung nicht gefunden." });
+        }
+        await pool.query(
+          `UPDATE workout_activities SET exercise_id = NULL WHERE exercise_id = $1`,
+          [id],
+        );
+        await pool.query(
+          `UPDATE workout_template_activities SET exercise_id = NULL WHERE exercise_id = $1`,
+          [id],
+        );
+        await pool.query(`DELETE FROM exercises WHERE id = $1`, [id]);
+        res.json({ status: "ok" });
+      } catch (error) {
+        console.error("Admin delete exercise error:", error);
+        res.status(500).json({ error: "Serverfehler beim Löschen." });
+      }
+    },
   );
 
   // GET /api/admin/exercise-reports
@@ -1219,7 +1842,7 @@ export const createAdminRouter = (pool) => {
         const { status = "pending" } = req.query || {};
         const { rows } = await pool.query(
           `SELECT * FROM exercise_reports WHERE status = $1 ORDER BY created_at DESC`,
-          [status]
+          [status],
         );
         res.json(
           rows.map((row) => {
@@ -1228,15 +1851,13 @@ export const createAdminRouter = (pool) => {
               normalized.description = normalized.details;
             }
             return normalized;
-          })
+          }),
         );
       } catch (error) {
         console.error("Admin exercise reports error:", error);
-        res
-          .status(500)
-          .json({ error: "Serverfehler beim Laden der Reports." });
+        res.status(500).json({ error: "Serverfehler beim Laden der Reports." });
       }
-    }
+    },
   );
 
   // PUT /api/admin/exercise-reports/:id/resolve
@@ -1253,7 +1874,7 @@ export const createAdminRouter = (pool) => {
            SET status = $1, resolved_by = $2, resolved_at = CURRENT_TIMESTAMP
            WHERE id = $3
            RETURNING *`,
-          [status, req.user.id, id]
+          [status, req.user.id, id],
         );
         if (rows.length === 0) {
           return res.status(404).json({ error: "Report nicht gefunden." });
@@ -1265,7 +1886,7 @@ export const createAdminRouter = (pool) => {
           .status(500)
           .json({ error: "Serverfehler beim Aktualisieren des Reports." });
       }
-    }
+    },
   );
 
   // GET /api/admin/exercise-edit-requests
@@ -1278,7 +1899,7 @@ export const createAdminRouter = (pool) => {
         const { status = "pending" } = req.query || {};
         const { rows } = await pool.query(
           `SELECT * FROM exercise_edit_requests WHERE status = $1 ORDER BY created_at DESC`,
-          [status]
+          [status],
         );
         res.json(rows.map((row) => toCamelCase(row)));
       } catch (error) {
@@ -1287,7 +1908,7 @@ export const createAdminRouter = (pool) => {
           .status(500)
           .json({ error: "Serverfehler beim Laden der Änderungsanfragen." });
       }
-    }
+    },
   );
 
   // PUT /api/admin/exercise-edit-requests/:id/resolve
@@ -1305,7 +1926,7 @@ export const createAdminRouter = (pool) => {
 
         const { rows: requestRows } = await client.query(
           `SELECT * FROM exercise_edit_requests WHERE id = $1`,
-          [id]
+          [id],
         );
         if (requestRows.length === 0) {
           await client.query("ROLLBACK");
@@ -1357,9 +1978,9 @@ export const createAdminRouter = (pool) => {
             updateValues.push(request.exercise_id);
             await client.query(
               `UPDATE exercises SET ${updateFields.join(
-                ", "
+                ", ",
               )}, updated_at = CURRENT_TIMESTAMP WHERE id = $${idx}`,
-              updateValues
+              updateValues,
             );
           }
         }
@@ -1369,7 +1990,7 @@ export const createAdminRouter = (pool) => {
            SET status = $1, admin_notes = $2, reviewed_by = $3, reviewed_at = CURRENT_TIMESTAMP
            WHERE id = $4
            RETURNING *`,
-          [status, adminNotes || null, req.user.id, id]
+          [status, adminNotes || null, req.user.id, id],
         );
 
         await client.query("COMMIT");
@@ -1383,7 +2004,7 @@ export const createAdminRouter = (pool) => {
       } finally {
         client.release();
       }
-    }
+    },
   );
 
   router.post(
@@ -1402,7 +2023,7 @@ export const createAdminRouter = (pool) => {
 
         const { rows: existingUsers } = await pool.query(
           "SELECT id FROM users WHERE email = $1",
-          [email]
+          [email],
         );
         if (existingUsers.length > 0) {
           return res
@@ -1420,7 +2041,7 @@ export const createAdminRouter = (pool) => {
         const frontendUrl = getFrontendUrl(req);
         const inviteLink = `${frontendUrl}/invite/${req.user.id}`;
         const expiresDate = new Date(invitation.expires_at).toLocaleDateString(
-          "de-DE"
+          "de-DE",
         );
 
         // Plain-Text-Version für Fallback
@@ -1436,9 +2057,8 @@ Oder verwende diesen Code bei der Registrierung: ${token}
 Die Einladung läuft am ${expiresDate} ab.`;
 
         // Verwende das neue E-Mail-Template
-        const { createActionEmail } = await import(
-          "../utils/emailTemplates.js"
-        );
+        const { createActionEmail } =
+          await import("../utils/emailTemplates.js");
         const emailHtml = createActionEmail({
           greeting: `Hallo ${firstName},`,
           title: "Du wurdest zu Sportify eingeladen",
@@ -1459,12 +2079,12 @@ Die Einladung läuft am ${expiresDate} ab.`;
             html: emailHtml,
           });
           console.log(
-            `✅ Admin-Einladungs-E-Mail erfolgreich versendet an: ${email}`
+            `✅ Admin-Einladungs-E-Mail erfolgreich versendet an: ${email}`,
           );
         } catch (emailError) {
           console.error(
             `❌ Fehler beim Versenden der Admin-Einladungs-E-Mail an ${email}:`,
-            emailError
+            emailError,
           );
           console.error("   Fehler-Details:", {
             message: emailError.message,
@@ -1472,7 +2092,7 @@ Die Einladung läuft am ${expiresDate} ab.`;
             response: emailError.response,
           });
           throw new Error(
-            `Einladung wurde erstellt, aber E-Mail konnte nicht versendet werden: ${emailError.message}`
+            `Einladung wurde erstellt, aber E-Mail konnte nicht versendet werden: ${emailError.message}`,
           );
         }
 
@@ -1489,7 +2109,7 @@ Die Einladung läuft am ${expiresDate} ab.`;
           .status(500)
           .json({ error: "Serverfehler beim Senden der Einladung." });
       }
-    }
+    },
   );
 
   router.get("/monitoring", adminMiddleware, async (req, res) => {
@@ -1516,9 +2136,13 @@ Die Einladung läuft am ${expiresDate} ab.`;
             `);
 
       res.json({
-        jobs: jobStats,
+        jobs: {
+          stats: jobStats.stats.map((row) => toCamelCase(row)),
+          recentFailures: jobStats.recentFailures.map((row) => toCamelCase(row)),
+          stuckJobs: jobStats.stuckJobs.map((row) => toCamelCase(row)),
+        },
         emails: {
-          stats: emailStats,
+          stats: emailStats.map((row) => toCamelCase(row)),
           recent: recentEmails.map((row) => toCamelCase(row)),
         },
       });

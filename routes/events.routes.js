@@ -172,12 +172,21 @@ export const createEventsRouter = (pool) => {
 
   router.post("/weekly", async (req, res) => {
     if (!verifyCronRequest(req)) {
+      console.error("Weekly events: Unauthorized request", {
+        hasAuth: !!req.headers.authorization,
+        hasSecret: !!req.query.secret,
+      });
       return res.status(401).json({ error: "Unauthorized" });
     }
 
     try {
       const result = await processWeeklyEvents(pool, {
         force: req.query.force === "true" || req.body?.force === true,
+      });
+      console.log("Weekly events processed:", {
+        skipped: result.skipped,
+        processedUsers: result.processedUsers,
+        weekStart: result.weekStart,
       });
       res.json({ status: "ok", ...result });
     } catch (error) {
@@ -191,12 +200,21 @@ export const createEventsRouter = (pool) => {
 
   router.post("/monthly", async (req, res) => {
     if (!verifyCronRequest(req)) {
+      console.error("Monthly events: Unauthorized request", {
+        hasAuth: !!req.headers.authorization,
+        hasSecret: !!req.query.secret,
+      });
       return res.status(401).json({ error: "Unauthorized" });
     }
 
     try {
       const result = await processMonthlyEvents(pool, {
         force: req.query.force === "true" || req.body?.force === true,
+      });
+      console.log("Monthly events processed:", {
+        skipped: result.skipped,
+        processedUsers: result.processedUsers,
+        monthStart: result.monthStart,
       });
       res.json({ status: "ok", ...result });
     } catch (error) {

@@ -598,13 +598,13 @@ export function Exercises() {
       const distanceUnitOptions =
         preferredDistanceUnit === "miles"
           ? [
-              { value: "miles", label: t("training.form.units.miles") },
-              { value: "yards", label: t("training.form.units.yards", "Yards") },
-            ]
+            { value: "miles", label: t("training.form.units.miles") },
+            { value: "yards", label: t("training.form.units.yards", "Yards") },
+          ]
           : [
-              { value: "km", label: t("training.form.units.kilometers") },
-              { value: "m", label: t("training.form.units.meters") },
-            ];
+            { value: "km", label: t("training.form.units.kilometers") },
+            { value: "m", label: t("training.form.units.meters") },
+          ];
       const timeUnitOptions = [
         { value: "min", label: t("training.form.units.minutes", "Minuten") },
         { value: "sec", label: t("training.form.units.seconds", "Sekunden") },
@@ -719,6 +719,16 @@ export function Exercises() {
 
   const handleReport = async () => {
     if (!activeExercise) return;
+    
+    if (!reportReason || !reportReason.trim()) {
+      toast({
+        title: t("common.error"),
+        description: t("exerciseLibrary.reportReasonRequired", "Bitte geben Sie einen Grund an."),
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(`${API_URL}/exercises/${activeExercise.id}/report`, {
@@ -727,9 +737,17 @@ export function Exercises() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ reason: reportReason, details: reportDetails }),
+        body: JSON.stringify({ 
+          reason: reportReason.trim(), 
+          details: reportDetails.trim() || null 
+        }),
       });
-      if (!response.ok) throw new Error("Report failed");
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Report failed");
+      }
+      
       toast({
         title: t("exerciseLibrary.reportSent", "Report gesendet"),
         description: t(
@@ -744,7 +762,9 @@ export function Exercises() {
       console.error("Report error:", error);
       toast({
         title: t("common.error"),
-        description: t("exerciseLibrary.reportError", "Report konnte nicht gesendet werden."),
+        description: error instanceof Error 
+          ? error.message 
+          : t("exerciseLibrary.reportError", "Report konnte nicht gesendet werden."),
         variant: "destructive",
       });
     }
@@ -775,14 +795,14 @@ export function Exercises() {
     );
     const unitOptions = hasDistance
       ? [
-          {
-            value: preferredDistanceUnit,
-            label:
-              preferredDistanceUnit === "miles"
-                ? t("training.form.units.miles")
-                : t("training.form.units.kilometers"),
-          },
-        ]
+        {
+          value: preferredDistanceUnit,
+          label:
+            preferredDistanceUnit === "miles"
+              ? t("training.form.units.miles")
+              : t("training.form.units.kilometers"),
+        },
+      ]
       : hasTime
         ? [
           { value: "min", label: t("training.form.units.minutes", "Minuten") },
@@ -1291,7 +1311,10 @@ export function Exercises() {
                       onChange={(e) => setReportDetails(e.target.value)}
                       placeholder={t("exerciseLibrary.reportDetails", "Details")}
                     />
-                    <Button onClick={handleReport}>
+                    <Button 
+                      onClick={handleReport}
+                      disabled={!reportReason || !reportReason.trim()}
+                    >
                       {t("exerciseLibrary.sendReport", "Report senden")}
                     </Button>
                   </div>

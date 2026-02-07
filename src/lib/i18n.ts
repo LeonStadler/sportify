@@ -2000,7 +2000,7 @@ const resources = {
         },
         entries: {
           v210: {
-            title: "Neues Scoring-System",
+            title: "Neues Scoring-System 2.1",
             description:
               "Transparente Punkte-Logik, dynamische Gewichtung und konsistente Darstellung in Scoreboard und Statistiken.",
             highlights: {
@@ -2009,18 +2009,6 @@ const resources = {
               2: "Profil-Einfluss: Relevante Profilwerte (z. B. Gewicht) fließen kontrolliert ein",
               3: "Scoreboard & Stats: Einheitliche Darstellung in Rangliste, Monats- und Gesamtansicht",
               4: "UX: Erklärungstexte/Tooltips für das neue Scoring",
-            },
-          },
-          v205: {
-            title: "Dokumentation & Plattform",
-            description:
-              "Docusaurus‑Plattform aufgebaut und die Dokumentation in Kernbereiche gegliedert.",
-            highlights: {
-              0: "Docusaurus: Doku‑Plattform unter `/docs` (z. B. deinname/docs) erreichbar",
-              1: "Bereiche: Grundlagen, Design, API, Features, Systeme ausgebaut",
-              2: "Überarbeitet: Inhalte strukturiert, vereinheitlicht und aktualisiert",
-              3: "Guides: Onboarding, Glossar und Best Practices ergänzt",
-              4: "Referenzen: API-Übersichten, Datenflüsse und Systemgrenzen dokumentiert",
             },
           },
           v200: {
@@ -5231,7 +5219,7 @@ const resources = {
         },
         entries: {
           v210: {
-            title: "New scoring system",
+            title: "New scoring system 2.1",
             description:
               "Transparent point logic, dynamic weighting and consistent display across scoreboard and stats.",
             highlights: {
@@ -5240,18 +5228,6 @@ const resources = {
               2: "Profile influence: Relevant profile values (e.g. weight) are applied consistently",
               3: "Scoreboard & stats: Unified display for rankings, monthly and all-time views",
               4: "UX: Explanations/tooltips for the new scoring",
-            },
-          },
-          v205: {
-            title: "Documentation & platform",
-            description:
-              "Docusaurus platform set up and documentation organized into core areas.",
-            highlights: {
-              0: "Docusaurus: Docs platform available at `/docs` (e.g. yourdomain/docs)",
-              1: "Sections: Fundamentals, Design, API, Features, Systems expanded",
-              2: "Reworked: Content structured, unified and updated",
-              3: "Guides: Onboarding, glossary and best practices added",
-              4: "References: API overviews, data flows and system boundaries documented",
             },
           },
           v200: {

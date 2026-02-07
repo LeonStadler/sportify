@@ -23,6 +23,8 @@ import {
 import { ArrowDown, ArrowUp, MoreHorizontal } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { Checkbox } from "@/components/ui/checkbox";
+
 export interface ExerciseBrowseItem {
   id: string;
   name: string;
@@ -56,6 +58,9 @@ interface ExerciseBrowseGridProps {
   onToggleFavorite?: (item: ExerciseBrowseItem, next: boolean) => void;
   renderMenuItems: (item: ExerciseBrowseItem) => ReactNode;
   labels: ExerciseBrowseLabels;
+  /** When set, show checkbox per card for selection (e.g. export). */
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string, selected: boolean) => void;
 }
 
 export function ExerciseBrowseGrid({
@@ -64,8 +69,11 @@ export function ExerciseBrowseGrid({
   onToggleFavorite,
   renderMenuItems,
   labels,
+  selectedIds,
+  onToggleSelect,
 }: ExerciseBrowseGridProps) {
   const { t } = useTranslation();
+  const showSelection = selectedIds !== undefined && onToggleSelect !== undefined;
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {items.map((exercise) => (
@@ -75,11 +83,23 @@ export function ExerciseBrowseGrid({
           onClick={() => onSelect(exercise)}
         >
           <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
+            <div className="min-w-0 flex items-start gap-2">
+              {showSelection && (
+                <div onClick={(e) => e.stopPropagation()}>
+                  <Checkbox
+                    checked={selectedIds.has(exercise.id)}
+                    onCheckedChange={(checked) =>
+                      onToggleSelect(exercise.id, checked === true)
+                    }
+                  />
+                </div>
+              )}
+              <div className="min-w-0">
               <div className="font-semibold truncate">{exercise.name}</div>
               <div className="text-xs text-muted-foreground">
                 {getExerciseCategoryLabel(exercise.category, t) || "-"} ·{" "}
                 {getExerciseDisciplineLabel(exercise.discipline, t) || "-"}
+              </div>
               </div>
             </div>
             <div className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
@@ -161,6 +181,10 @@ interface ExerciseBrowseTableProps {
   onToggleFavorite?: (item: ExerciseBrowseItem, next: boolean) => void;
   renderMenuItems: (item: ExerciseBrowseItem) => ReactNode;
   labels: ExerciseBrowseLabels;
+  /** When set, show checkbox column for selection (e.g. export). */
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string, selected: boolean) => void;
+  onSelectAllOnPage?: (selected: boolean) => void;
 }
 
 export function ExerciseBrowseTable({
@@ -172,6 +196,9 @@ export function ExerciseBrowseTable({
   onToggleFavorite,
   renderMenuItems,
   labels,
+  selectedIds,
+  onToggleSelect,
+  onSelectAllOnPage,
 }: ExerciseBrowseTableProps) {
   const { t } = useTranslation();
   const sortIcon = sortDirection === "asc" ? (
@@ -179,12 +206,28 @@ export function ExerciseBrowseTable({
   ) : (
     <ArrowDown className="h-3 w-3" />
   );
+  const showSelection =
+    selectedIds !== undefined &&
+    onToggleSelect !== undefined &&
+    onSelectAllOnPage !== undefined;
+  const allOnPageSelected =
+    items.length > 0 && items.every((item) => selectedIds?.has(item.id));
 
   return (
     <div className="overflow-x-auto">
       <Table className="min-w-[720px]">
         <TableHeader>
           <TableRow>
+            {showSelection && (
+              <TableHead className="w-10 sticky left-0 z-10 bg-background">
+                <Checkbox
+                  checked={allOnPageSelected}
+                  onCheckedChange={(checked) =>
+                    onSelectAllOnPage(checked === true)
+                  }
+                />
+              </TableHead>
+            )}
             <TableHead className="sticky left-0 z-10 bg-background">
               <button
                 className="inline-flex items-center gap-1 text-left"
@@ -249,6 +292,19 @@ export function ExerciseBrowseTable({
               className="cursor-pointer"
               onClick={() => onSelect(exercise)}
             >
+              {showSelection && (
+                <TableCell
+                  className="w-10 sticky left-0 bg-background z-10"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Checkbox
+                    checked={selectedIds?.has(exercise.id) ?? false}
+                    onCheckedChange={(checked) =>
+                      onToggleSelect(exercise.id, checked === true)
+                    }
+                  />
+                </TableCell>
+              )}
               <TableCell className="font-medium sticky left-0 bg-background z-10">
                 <div className="flex items-center gap-2">
                   {onToggleFavorite && (

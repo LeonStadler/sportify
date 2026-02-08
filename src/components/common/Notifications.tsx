@@ -19,6 +19,7 @@ import {
   Bell,
   CheckCircle,
   Clock,
+  Rocket,
   Smile,
   Trophy,
   UserMinus,
@@ -53,6 +54,7 @@ const notificationIcons: Record<string, JSX.Element> = {
   // Invitation types
   "invitation-expired": <Clock className="w-5 h-5 text-orange-500" />,
   "workout-reaction": <Smile className="w-5 h-5 text-pink-500" />,
+  "app-version-update": <Rocket className="w-5 h-5 text-primary" />,
 };
 
 export function Notifications() {
@@ -155,6 +157,14 @@ export function Notifications() {
   };
 
   const handleNotificationClick = (notification: Notification) => {
+    if (notification.type === "app-version-update") {
+      const path =
+        typeof notification.payload?.path === "string"
+          ? notification.payload.path
+          : "/changelog";
+      navigate(path);
+      return;
+    }
     if (notification.type !== "workout-reaction") {
       return;
     }
@@ -281,7 +291,10 @@ export function Notifications() {
                   key={notification.id}
                   className={`flex items-start gap-3 p-2.5 ${!notification.isRead ? "bg-muted/50" : ""}`}
                   onSelect={(event) => {
-                    if (notification.type === "workout-reaction") {
+                    if (
+                      notification.type === "workout-reaction" ||
+                      notification.type === "app-version-update"
+                    ) {
                       event.preventDefault();
                       handleNotificationClick(notification);
                     }

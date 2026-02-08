@@ -11,10 +11,11 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { usePWA } from "@/hooks/usePWA";
+import { API_URL } from "@/lib/api";
 import { APP_VERSION } from "@/version";
 import { lazy, Suspense, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Route, Routes } from "react-router-dom";
+import { Route, Routes, useNavigate } from "react-router-dom";
 
 // Lazy load pages for code splitting
 const Admin = lazy(() =>
@@ -86,18 +87,41 @@ const App = () => {
   const { isMobilePWA } = usePWA();
   const { toast } = useToast();
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const mainRef = useRef<HTMLElement>(null);
 
   // Offline-Synchronisation aktivieren
   useOfflineSync();
+
+  // Push-Klick: wenn App offen ist, zu Changelog navigieren bei Version-Update
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      const data = e.data;
+      if (
+        data?.type === "notification-clicked" &&
+        data?.payload?.type === "app-version-update"
+      ) {
+        const path =
+          data.payload?.payload?.path ?? "/changelog";
+        navigate(path);
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, [navigate]);
 
   useEffect(() => {
     const storageKey = "sportify_app_version_seen";
     try {
       const seenVersion = localStorage.getItem(storageKey);
       if (seenVersion !== APP_VERSION) {
+        const versionTitle = t("common.versionUpdateTitle", "Neue Version verfügbar");
+        const versionMessage = t("common.versionUpdateNotificationMessage", {
+          version: APP_VERSION,
+          defaultValue: `Version ${APP_VERSION} ist verfügbar. Schau dir den Changelog an.`,
+        });
         toast({
-          title: t("common.versionUpdateTitle", "Neue Version verfügbar"),
+          title: versionTitle,
           description: t("common.versionUpdateDescription", {
             version: APP_VERSION,
             defaultValue: `Version ${APP_VERSION} ist verfügbar. Schau dir den Changelog an.`,
@@ -117,11 +141,28 @@ const App = () => {
           ),
         });
         localStorage.setItem(storageKey, APP_VERSION);
+        if (isAuthenticated) {
+          const token = localStorage.getItem("token");
+          if (token) {
+            fetch(`${API_URL}/notifications/version-update`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                version: APP_VERSION,
+                title: versionTitle,
+                message: versionMessage,
+              }),
+            }).catch((err) => console.error("Version-update notification request failed", err));
+          }
+        }
       }
     } catch (error) {
       console.error("Version notification error", error);
     }
-  }, [toast, t]);
+  }, [toast, t, isAuthenticated]);
 
   // Zeige einen Loader während der Auth-Initialisierung
   if (isLoading) {

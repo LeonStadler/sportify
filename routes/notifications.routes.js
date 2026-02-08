@@ -2,12 +2,15 @@ import { randomUUID } from "crypto";
 import express from "express";
 import authMiddleware from "../middleware/authMiddleware.js";
 import {
+  createNotification as createNotificationService,
   getPushPublicKey,
   listNotifications,
   markNotificationsRead,
   removePushSubscription,
   upsertPushSubscription,
 } from "../services/notificationService.js";
+
+const VERSION_UPDATE_TYPE = "app-version-update";
 
 export const createNotificationsRouter = (pool) => {
   const router = express.Router();
@@ -60,6 +63,41 @@ export const createNotificationsRouter = (pool) => {
       res
         .status(500)
         .json({ error: "Serverfehler beim Laden der Benachrichtigungen." });
+    }
+  });
+
+  // POST /api/notifications/version-update - Create in-app + push for new app version (client calls when it detects new version)
+  router.post("/version-update", authMiddleware, async (req, res) => {
+    try {
+      const { version, title, message } = req.body || {};
+      if (!version || !title || !message) {
+        return res.status(400).json({
+          error: "version, title und message sind erforderlich.",
+        });
+      }
+      const versionStr = String(version).slice(0, 32);
+      const { rows: existing } = await pool.query(
+        `SELECT id FROM notifications
+         WHERE user_id = $1 AND type = $2 AND payload->>'version' = $3
+         LIMIT 1`,
+        [req.user.id, VERSION_UPDATE_TYPE, versionStr]
+      );
+      if (existing.length > 0) {
+        return res.status(201).json({ message: "Benachrichtigung bereits vorhanden." });
+      }
+      await createNotificationService(pool, {
+        userId: req.user.id,
+        type: VERSION_UPDATE_TYPE,
+        title: String(title).slice(0, 255),
+        message: String(message).slice(0, 500),
+        payload: { path: "/changelog", version: versionStr },
+      });
+      res.status(201).json({ message: "Benachrichtigung erstellt." });
+    } catch (error) {
+      console.error("Version-update notification error:", error);
+      res.status(500).json({
+        error: "Serverfehler beim Erstellen der Benachrichtigung.",
+      });
     }
   });
 

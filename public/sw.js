@@ -213,7 +213,13 @@ self.addEventListener("notificationclick", (event) => {
       }
 
       if (clients.openWindow) {
-        await clients.openWindow("/");
+        const path =
+          notificationData.type === "app-version-update" &&
+          notificationData.payload &&
+          typeof notificationData.payload.path === "string"
+            ? notificationData.payload.path
+            : "/";
+        await clients.openWindow(path);
       }
     })()
   );

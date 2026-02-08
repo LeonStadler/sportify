@@ -3271,6 +3271,8 @@ const resources = {
           "Version {{version}} ist verfügbar. Schau dir den Changelog an.",
         versionUpdateAction: "Changelog",
         versionUpdateActionAlt: "Changelog öffnen",
+        versionUpdateNotificationMessage:
+          "Version {{version}} ist verfügbar. Schau dir den Changelog an.",
       },
     },
   },
@@ -5979,6 +5981,8 @@ const resources = {
           "Version {{version}} is available. Check out the changelog.",
         versionUpdateAction: "Changelog",
         versionUpdateActionAlt: "Open changelog",
+        versionUpdateNotificationMessage:
+          "Version {{version}} is available. Check out the changelog.",
       },
       // Legal Pages
       legal: {

@@ -30,6 +30,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import {
   Dialog,
@@ -42,21 +47,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -69,6 +63,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { useDateTimeFormatter } from "@/hooks/use-date-time-formatter";
 import { useToast } from "@/hooks/use-toast";
@@ -82,19 +82,19 @@ import {
   Ban,
   Check,
   ChevronDown,
+  Download,
   Eye,
   EyeOff,
+  FileJson,
+  FileSpreadsheet,
+  FileText,
   MoreHorizontal,
   RefreshCw,
   Settings,
   Shield,
   Unlock,
-  Users,
   Upload,
-  Download,
-  FileSpreadsheet,
-  FileJson,
-  FileText,
+  Users,
 } from "lucide-react";
 import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -2725,107 +2725,107 @@ export function Admin() {
 
           <TabsContent value="exercise-management" className="space-y-6">
             <div ref={exerciseManagementTopRef} className="space-y-6">
-            <div className="flex items-center justify-between gap-4 border-b pb-4">
-              <h2 className="text-lg font-semibold">
-                {t("admin.tabs.exercises", "Übungsverwaltung")}
-              </h2>
-              <div className="flex items-center gap-2">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div>
-                        <Input
-                          type="file"
-                          id="header-import-upload"
-                          className="hidden"
-                          accept=".csv,.json,.xlsx,application/json,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                          onChange={(event) => {
-                            const file = event.target.files?.[0];
-                            if (file) {
-                              requestExerciseImportPreview(file);
+              <div className="flex items-center justify-between gap-4 border-b pb-4">
+                <h2 className="text-lg font-semibold">
+                  {t("admin.tabs.exercises", "Übungsverwaltung")}
+                </h2>
+                <div className="flex items-center gap-2">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div>
+                          <Input
+                            type="file"
+                            id="header-import-upload"
+                            className="hidden"
+                            accept=".csv,.json,.xlsx,application/json,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                            onChange={(event) => {
+                              const file = event.target.files?.[0];
+                              if (file) {
+                                requestExerciseImportPreview(file);
+                              }
+                              event.currentTarget.value = "";
+                            }}
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              document.getElementById("header-import-upload")?.click()
                             }
-                            event.currentTarget.value = "";
-                          }}
-                        />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            document.getElementById("header-import-upload")?.click()
-                          }
-                        >
-                          <Upload className="mr-2 h-4 w-4" />
-                          Import
-                        </Button>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>
-                        Importiere Übungen aus CSV, JSON oder Excel.
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm">
-                            <Download className="mr-2 h-4 w-4" />
-                            Vorlage
-                            <ChevronDown className="ml-2 h-3 w-3 opacity-50" />
+                          >
+                            <Upload className="mr-2 h-4 w-4" />
+                            Import
                           </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Export-Format wählen</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleExerciseExport("csv")}>
-                            <FileText className="mr-2 h-4 w-4" />
-                            CSV
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleExerciseExport("json")}>
-                            <FileJson className="mr-2 h-4 w-4" />
-                            JSON
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleExerciseExport("xlsx")}>
-                            <FileSpreadsheet className="mr-2 h-4 w-4" />
-                            Excel
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Lade eine Vorlage für den Import herunter.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>
+                          Importiere Übungen aus CSV, JSON oder Excel.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
 
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={handleExportSelectedExercises}
-                        disabled={exerciseManagementSelectedIds.size === 0}
-                      >
-                        <Download className="mr-2 h-4 w-4" />
-                        {t("admin.exercises.exportSelected.button", "Ausgewählte exportieren")}
-                        {exerciseManagementSelectedIds.size > 0 &&
-                          ` (${exerciseManagementSelectedIds.size})`}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>
-                        Exportiere die ausgewählten Übungen als JSON (inkl. aller Daten).
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <Download className="mr-2 h-4 w-4" />
+                              Vorlage
+                              <ChevronDown className="ml-2 h-3 w-3 opacity-50" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Export-Format wählen</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleExerciseExport("csv")}>
+                              <FileText className="mr-2 h-4 w-4" />
+                              CSV
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleExerciseExport("json")}>
+                              <FileJson className="mr-2 h-4 w-4" />
+                              JSON
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleExerciseExport("xlsx")}>
+                              <FileSpreadsheet className="mr-2 h-4 w-4" />
+                              Excel
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Lade eine Vorlage für den Import herunter.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={handleExportSelectedExercises}
+                          disabled={exerciseManagementSelectedIds.size === 0}
+                        >
+                          <Download className="mr-2 h-4 w-4" />
+                          {t("admin.exercises.exportSelected.button", "Ausgewählte exportieren")}
+                          {exerciseManagementSelectedIds.size > 0 &&
+                            ` (${exerciseManagementSelectedIds.size})`}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>
+                          Exportiere die ausgewählten Übungen als JSON (inkl. aller Daten).
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
               </div>
-            </div>
 
               <Dialog
                 open={exerciseImportDialogOpen}
@@ -3463,7 +3463,7 @@ export function Admin() {
                             {t("common.previous", "Zurück")}
                           </Button>
                           {exerciseImportWizardIndex <
-                          exerciseImportWizardItems.length - 1 ? (
+                            exerciseImportWizardItems.length - 1 ? (
                             <Button
                               onClick={() =>
                                 setExerciseImportWizardIndex((i) => i + 1)
@@ -3495,73 +3495,72 @@ export function Admin() {
                 </DialogContent>
               </Dialog>
 
-            <Collapsible
-              open={mergeSectionOpen}
-              onOpenChange={setMergeSectionOpen}
-              className="w-full space-y-2"
-            >
-              <CollapsibleTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full justify-between font-medium"
-                >
-                  <span>
-                    {t("admin.exercises.toolsSection.title", "Werkzeuge")}
-                    <span className="text-muted-foreground font-normal ml-2">
-                      {t("admin.exercises.toolsSection.hint", "Zusammenführen von Übungen")}
+              <Collapsible
+                open={mergeSectionOpen}
+                onOpenChange={setMergeSectionOpen}
+                className="w-full space-y-2"
+              >
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-between font-medium"
+                  >
+                    <span>
+                      {t("admin.exercises.toolsSection.title", "Werkzeuge")}
+                      <span className="text-muted-foreground font-normal ml-2">
+                        {t("admin.exercises.toolsSection.hint", "Zusammenführen von Übungen")}
+                      </span>
                     </span>
-                  </span>
-                  <ChevronDown
-                    className={`h-4 w-4 shrink-0 transition-transform duration-200 ${
-                      mergeSectionOpen ? "rotate-180" : ""
-                    }`}
-                  />
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-4">
-                <Card ref={mergeSectionRef}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">
-                      {t("admin.exercises.merge.title", "Zusammenführen")}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-                    <div>
-                      <Label>{t("admin.exercises.merge.source", "Quell‑Übung")}</Label>
-                      <ExerciseMergeSelect
-                        value={mergeSourceId}
-                        onChange={handleMergeSourceChange}
-                        placeholder={t("admin.exercises.merge.sourcePlaceholder", "Quelle wählen")}
-                        options={exercises}
-                      />
-                    </div>
-                    <div>
-                      <Label>{t("admin.exercises.merge.target", "Ziel‑Übung")}</Label>
-                      <ExerciseMergeSelect
-                        value={mergeTargetId}
-                        onChange={handleMergeTargetChange}
-                        placeholder={t("admin.exercises.merge.targetPlaceholder", "Ziel wählen")}
-                        options={exercises.filter((exercise) => exercise.id !== mergeSourceId)}
-                      />
-                    </div>
-                    <Button
-                      variant="outline"
-                      disabled={!mergeSourceId || !mergeTargetId}
-                      onClick={() => handleMergeExercise(mergeSourceId, mergeTargetId)}
-                    >
-                      {t("admin.exercises.merge.action", "Zusammenführen")}
-                    </Button>
-                    <div className="md:col-span-3 text-xs text-muted-foreground">
-                      {t(
-                        "admin.exercises.merge.helper",
-                        "Die Quell‑Übung wird in die Ziel‑Übung übernommen. Alle Verknüpfungen werden auf die Ziel‑Übung verschoben, die Quell‑Übung wird deaktiviert."
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </CollapsibleContent>
-            </Collapsible>
+                    <ChevronDown
+                      className={`h-4 w-4 shrink-0 transition-transform duration-200 ${mergeSectionOpen ? "rotate-180" : ""
+                        }`}
+                    />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-4">
+                  <Card ref={mergeSectionRef}>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">
+                        {t("admin.exercises.merge.title", "Zusammenführen")}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                      <div>
+                        <Label>{t("admin.exercises.merge.source", "Quell‑Übung")}</Label>
+                        <ExerciseMergeSelect
+                          value={mergeSourceId}
+                          onChange={handleMergeSourceChange}
+                          placeholder={t("admin.exercises.merge.sourcePlaceholder", "Quelle wählen")}
+                          options={exercises}
+                        />
+                      </div>
+                      <div>
+                        <Label>{t("admin.exercises.merge.target", "Ziel‑Übung")}</Label>
+                        <ExerciseMergeSelect
+                          value={mergeTargetId}
+                          onChange={handleMergeTargetChange}
+                          placeholder={t("admin.exercises.merge.targetPlaceholder", "Ziel wählen")}
+                          options={exercises.filter((exercise) => exercise.id !== mergeSourceId)}
+                        />
+                      </div>
+                      <Button
+                        variant="outline"
+                        disabled={!mergeSourceId || !mergeTargetId}
+                        onClick={() => handleMergeExercise(mergeSourceId, mergeTargetId)}
+                      >
+                        {t("admin.exercises.merge.action", "Zusammenführen")}
+                      </Button>
+                      <div className="md:col-span-3 text-xs text-muted-foreground">
+                        {t(
+                          "admin.exercises.merge.helper",
+                          "Die Quell‑Übung wird in die Ziel‑Übung übernommen. Alle Verknüpfungen werden auf die Ziel‑Übung verschoben, die Quell‑Übung wird deaktiviert."
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </CollapsibleContent>
+              </Collapsible>
 
               <ExerciseBrowsePanel
                 title={t("exerciseLibrary.search", "Übungen durchsuchen")}

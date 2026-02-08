@@ -76,7 +76,7 @@ import { ArrowDown, ArrowUp, Calendar, ChevronDown, Clock, Copy, Eye, Info, Penc
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { useTranslation } from "react-i18next";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 interface WorkoutResponse {
@@ -163,6 +163,8 @@ const getTemplateRelevanceScore = (template: Workout, query: string) => {
 export function Training() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const { user, updateProfile } = useAuth();
   const { formatDateTime } = useDateTimeFormatter();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
@@ -946,7 +948,7 @@ export function Training() {
     }
   }, [searchParams]);
 
-  // templateId aus Query-Param: Template als Vorlage laden
+  // templateId aus Query-Param: Template als Vorlage laden; Param danach entfernen (kein doppeltes Laden)
   useEffect(() => {
     const templateId = searchParams.get("templateId");
     if (!templateId) return;
@@ -956,6 +958,12 @@ export function Training() {
         const template = await fetchTemplateById(templateId);
         if (template && !cancelled) {
           handleUseTemplate(template);
+          const params = new URLSearchParams(searchParams);
+          params.delete("templateId");
+          const search = params.toString();
+          navigate(`${location.pathname}${search ? `?${search}` : ""}`, {
+            replace: true,
+          });
         }
       } catch {
         // silently ignore – Template not found

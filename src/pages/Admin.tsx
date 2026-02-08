@@ -98,6 +98,7 @@ import {
 } from "lucide-react";
 import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router-dom";
 
 const EXERCISE_IMPORT_COLUMNS = [
   "name",
@@ -324,6 +325,7 @@ export function Admin() {
   const { toast } = useToast();
   const { t, i18n } = useTranslation();
   const { formatDateTime } = useDateTimeFormatter();
+  const [searchParams] = useSearchParams();
   const primaryDistanceUnit = getPrimaryDistanceUnit(user?.preferences?.units?.distance);
   const distanceUnitOptions =
     primaryDistanceUnit === "miles"
@@ -343,7 +345,21 @@ export function Admin() {
   const [overviewStats, setOverviewStats] = useState<AdminOverviewStats | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showEmails, setShowEmails] = useState(false);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(() => {
+    const validTabs = ["overview", "users", "exercise-management", "moderation", "monitoring"];
+    const urlTab = searchParams.get("tab");
+    return urlTab && validTabs.includes(urlTab) ? urlTab : "overview";
+  });
+
+  // Sync tab from URL when navigating (e.g. from Command Palette)
+  useEffect(() => {
+    const validTabs = ["overview", "users", "exercise-management", "moderation", "monitoring"];
+    const urlTab = searchParams.get("tab");
+    if (urlTab && validTabs.includes(urlTab)) {
+      setActiveTab(urlTab);
+    }
+  }, [searchParams]);
+
   const [monitoringData, setMonitoringData] = useState<MonitoringData | null>(null);
   const [isLoadingMonitoring, setIsLoadingMonitoring] = useState(false);
   const [mergeSourceId, setMergeSourceId] = useState("");

@@ -24,6 +24,7 @@ import { ChevronDown, Eye, EyeOff, Globe, Plus, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { useTranslation } from "react-i18next";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { API_URL } from "@/lib/api";
 import type { Exercise, ExerciseListResponse } from "@/types/exercise";
 
@@ -84,8 +85,36 @@ export function Scoreboard() {
   const { user, updateProfile } = useAuth();
   const { t, i18n } = useTranslation();
   const { toast } = useToast();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState("all");
-  const [scope, setScope] = useState("friends");
+  const [scope, setScope] = useState(() => {
+    const urlScope = searchParams.get("scope");
+    return urlScope === "friends" || urlScope === "global" ? urlScope : "friends";
+  });
+
+  // React to URL scope changes (e.g. from CommandPalette)
+  useEffect(() => {
+    const urlScope = searchParams.get("scope");
+    if (urlScope === "friends" || urlScope === "global") {
+      setScope(urlScope);
+    }
+  }, [searchParams]);
+
+  // Refetch when user picks same scoreboard route again in Command Palette
+  const [commandPaletteRefreshKey, setCommandPaletteRefreshKey] = useState(0);
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const customEvent = e as CustomEvent<{ path: string }>;
+      const currentPath = location.pathname + location.search;
+      if (customEvent.detail?.path === currentPath) {
+        setCommandPaletteRefreshKey((k) => k + 1);
+      }
+    };
+    window.addEventListener("command-palette-navigate", handler);
+    return () => window.removeEventListener("command-palette-navigate", handler);
+  }, [location.pathname, location.search]);
+
   const [period, setPeriod] = useState("month");
   const [customRange, setCustomRange] = useState<DateRange | undefined>();
   const [offset, setOffset] = useState(0);
@@ -406,7 +435,13 @@ export function Scoreboard() {
       }
     };
     loadTopExercises();
-  }, [exerciseOptions, period, resolvedRangeForRequest?.end, resolvedRangeForRequest?.start]);
+  }, [
+    commandPaletteRefreshKey,
+    exerciseOptions,
+    period,
+    resolvedRangeForRequest?.end,
+    resolvedRangeForRequest?.start,
+  ]);
 
   const handlePinnedExerciseChange = async (nextPinned: string[]) => {
     if (!user) return;

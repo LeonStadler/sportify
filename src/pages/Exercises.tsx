@@ -53,8 +53,9 @@ import { API_URL } from "@/lib/api";
 import type { Exercise, ExerciseListResponse } from "@/types/exercise";
 import { getPrimaryDistanceUnit } from "@/utils/units";
 import { ArrowDown, ArrowUp, Info } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router-dom";
 
 const buildEditChanges = (original: Exercise, draft: Partial<Exercise>) => {
   const changes = {};
@@ -115,6 +116,17 @@ export function Exercises() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  const browseRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to browse section when ?section=browse
+  useEffect(() => {
+    if (searchParams.get("section") === "browse") {
+      requestAnimationFrame(() => {
+        browseRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+  }, [searchParams]);
 
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [facets, setFacets] = useState({ categories: [], muscleGroups: [], equipment: [] });
@@ -1034,6 +1046,7 @@ export function Exercises() {
           </CardContent>
         </Card>
 
+        <div ref={browseRef}>
         <ExerciseBrowsePanel
           title={t("exerciseLibrary.search", "Übungen durchsuchen")}
           query={query}
@@ -1182,6 +1195,7 @@ export function Exercises() {
             </div>
           }
         />
+        </div>
         <Dialog open={Boolean(detailExerciseId)} onOpenChange={(open) => (open ? null : closeExerciseDetails())}>
           <DialogContent className="max-w-4xl overflow-y-auto max-h-[85vh]">
             <DialogHeader className="pr-10">

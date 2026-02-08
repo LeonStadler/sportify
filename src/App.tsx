@@ -1,4 +1,5 @@
 import { AppSidebar } from "@/components/common/AppSidebar";
+import { CommandPalette } from "@/components/common/CommandPalette";
 import { InstallPrompt } from "@/components/common/InstallPrompt";
 import { MobileBottomNav } from "@/components/common/MobileBottomNav";
 import { OfflineBanner } from "@/components/common/OfflineBanner";
@@ -287,6 +288,7 @@ const App = () => {
             </main>
           </div>
           <MobileBottomNav />
+          <CommandPalette />
         </div>
       </SidebarProvider>
     </TooltipProvider>

@@ -946,6 +946,25 @@ export function Training() {
     }
   }, [searchParams]);
 
+  // templateId aus Query-Param: Template als Vorlage laden
+  useEffect(() => {
+    const templateId = searchParams.get("templateId");
+    if (!templateId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const template = await fetchTemplateById(templateId);
+        if (template && !cancelled) {
+          handleUseTemplate(template);
+        }
+      } catch {
+        // silently ignore – Template not found
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   const handleRecoveryDialogCancel = () => {
     setShowRecoveryDialog(false);
     setCreatedWorkoutId(undefined);

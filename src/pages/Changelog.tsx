@@ -42,6 +42,21 @@ interface ChangelogEntry {
 // Changelog-Daten mit i18n-Keys
 const changelogEntries: ChangelogEntry[] = [
   {
+    version: "2.1.2",
+    date: "2026-02-08",
+    titleKey: "changelog.entries.v212.title",
+    descriptionKey: "changelog.entries.v212.description",
+    icon: Keyboard,
+    type: "feature",
+    highlightKeys: [
+      "changelog.entries.v212.highlights.0",
+      "changelog.entries.v212.highlights.1",
+      "changelog.entries.v212.highlights.2",
+      "changelog.entries.v212.highlights.3",
+      "changelog.entries.v212.highlights.4",
+    ],
+  },
+  {
     version: "2.1.0",
     date: "2026-02-07",
     titleKey: "changelog.entries.v210.title",

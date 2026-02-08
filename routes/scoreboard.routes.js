@@ -26,6 +26,8 @@ export const createScoreboardRouter = (pool) => {
       clause = `AND w.start_time >= date_trunc('week', CURRENT_DATE) AND w.start_time < date_trunc('week', CURRENT_DATE) + INTERVAL '1 week'`;
     } else if (period === "month") {
       clause = `AND w.start_time >= NOW() - INTERVAL '30 days'`;
+    } else if (period === "quarter") {
+      clause = `AND w.start_time >= NOW() - INTERVAL '90 days'`;
     } else if (period === "year") {
       clause = `AND w.start_time >= NOW() - INTERVAL '365 days'`;
     } else if (period === "custom") {
@@ -519,6 +521,8 @@ export const createScoreboardRouter = (pool) => {
         dateFilter = `AND w.start_time >= date_trunc('week', CURRENT_DATE) AND w.start_time < date_trunc('week', CURRENT_DATE) + INTERVAL '1 week'`;
       } else if (period === "month") {
         dateFilter = `AND w.start_time >= NOW() - INTERVAL '30 days'`;
+      } else if (period === "quarter") {
+        dateFilter = `AND w.start_time >= NOW() - INTERVAL '90 days'`;
       } else if (period === "year") {
         dateFilter = `AND w.start_time >= NOW() - INTERVAL '365 days'`;
       } else if (period === "custom") {

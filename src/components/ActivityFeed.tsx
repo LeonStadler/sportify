@@ -222,7 +222,7 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
     return (
       <Card className={cn("h-full flex flex-col min-h-0", className)}>
         <CardHeader className="pb-4">
-          <CardTitle className="text-lg md:text-xl">
+          <CardTitle className="text-lg font-medium min-w-0 break-words">
             {t("activityFeed.title")}
           </CardTitle>
         </CardHeader>
@@ -252,7 +252,7 @@ export function ActivityFeed({ className }: ActivityFeedProps) {
   return (
     <Card className={cn("h-full flex flex-col min-h-0", className)}>
       <CardHeader className="pb-4">
-        <CardTitle className="text-lg md:text-xl">
+        <CardTitle className="text-lg font-medium min-w-0 break-words">
           {t("activityFeed.widgetTitle", "Aktivitäten")}
         </CardTitle>
         <p className="text-sm text-muted-foreground">

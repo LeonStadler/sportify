@@ -38,6 +38,8 @@ interface DashboardLeaderboardCardProps {
   className?: string;
 }
 
+type LeaderboardPeriod = "week" | "month";
+
 export function DashboardLeaderboardCard({
   className,
 }: DashboardLeaderboardCardProps) {
@@ -45,7 +47,7 @@ export function DashboardLeaderboardCard({
   const { t } = useTranslation();
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [period, setPeriod] = useState<"week" | "month">("week");
+  const [period, setPeriod] = useState<LeaderboardPeriod>("week");
   const [scope, setScope] = useState<"friends" | "global">("friends");
 
   useEffect(() => {
@@ -184,38 +186,41 @@ export function DashboardLeaderboardCard({
 
   return (
     <Card className={cn("flex flex-col h-full", className)}>
-      <CardHeader className="flex flex-wrap w-full min-w-0 h-fit flex-col sm:flex-row sm:items-center sm:justify-start gap-[15px] space-y-0 pb-2">
-        <CardTitle className="text-lg font-medium flex flex-nowrap items-center gap-[15px] w-fit h-fit">
-          <Trophy className="h-5 w-5 text-yellow-500" />
+      <CardHeader className="flex flex-row flex-wrap w-full min-w-0 justify-between items-start gap-x-4 gap-y-2 pb-2">
+        <CardTitle className="text-lg font-medium flex items-center gap-2 min-w-0 break-words">
+          <Trophy className="h-5 w-5 text-yellow-500 shrink-0" />
           {t("scoreboard.title", "Rangliste")}
         </CardTitle>
-        <div className="flex flex-wrap items-end gap-[15px] justify-start w-fit h-fit">
+        {/* Buttons: brechen zuerst in der Gruppe untereinander (min-w nur eine Button-Breite); erst bei sehr wenig Platz wandert die ganze Gruppe unter den Titel */}
+        <div className="flex flex-wrap justify-between items-start gap-2 flex-1 min-w-[7rem]">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2"
+                className="gap-2 min-w-[7rem]"
                 aria-label={t("filters.periodLabel", "Zeitraum")}
               >
                 {period === "week" ? (
-                  <CalendarDays className="h-4 w-4" aria-hidden="true" />
+                  <CalendarDays className="h-4 w-4 shrink-0" aria-hidden="true" />
                 ) : (
-                  <Calendar className="h-4 w-4" aria-hidden="true" />
+                  <Calendar className="h-4 w-4 shrink-0" aria-hidden="true" />
                 )}
-                {period === "week"
-                  ? t("common.week", "Woche")
-                  : t("common.month", "Monat")}
+                <span className="truncate">
+                  {period === "week"
+                    ? t("filters.period.week", "Woche")
+                    : t("filters.period.month", "Monat")}
+                </span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
               <DropdownMenuItem onClick={() => setPeriod("week")}>
                 <CalendarDays className="mr-2 h-4 w-4" />
-                {t("common.week", "Woche")}
+                {t("filters.period.week", "Woche")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setPeriod("month")}>
                 <Calendar className="mr-2 h-4 w-4" />
-                {t("common.month", "Monat")}
+                {t("filters.period.month", "Monat")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -225,17 +230,19 @@ export function DashboardLeaderboardCard({
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2"
+                className="gap-2 min-w-[7rem]"
                 aria-label={t("scoreboard.scope", "Bereich")}
               >
                 {scope === "friends" ? (
-                  <Users className="h-4 w-4" aria-hidden="true" />
+                  <Users className="h-4 w-4 shrink-0" aria-hidden="true" />
                 ) : (
-                  <Globe className="h-4 w-4" aria-hidden="true" />
+                  <Globe className="h-4 w-4 shrink-0" aria-hidden="true" />
                 )}
-                {scope === "friends"
-                  ? t("scoreboard.friends", "Freunde")
-                  : t("scoreboard.global", "Global")}
+                <span className="truncate">
+                  {scope === "friends"
+                    ? t("scoreboard.friends", "Freunde")
+                    : t("scoreboard.global", "Global")}
+                </span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">

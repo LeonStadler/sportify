@@ -48,7 +48,7 @@ export function WeeklyGoalsCard({
   return (
     <Card className={className + " relative"}>
       <CardHeader className="pb-4 relative">
-        <CardTitle className="text-lg md:text-xl">
+        <CardTitle className="text-lg font-medium min-w-0 break-words">
           {t("dashboard.weeklyGoals")}
         </CardTitle>
         <Button

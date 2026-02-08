@@ -102,11 +102,11 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
         tabIndex={0}
       >
         <CardHeader className="p-4 sm:p-5 pb-2">
-          <div className="flex flex-nowrap items-center justify-between gap-5 min-w-0">
-            <Skeleton className="h-7 w-32 rounded-md" />
-            <div className="flex flex-wrap items-center justify-between gap-0 w-full">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-2 min-w-0">
+            <Skeleton className="h-7 w-32 rounded-md shrink-0" />
+            <div className="flex flex-1 min-w-[200px] items-center justify-between gap-1">
               <Skeleton className="h-9 w-9 rounded-md shrink-0" />
-              <Skeleton className="h-5 w-28 rounded-md" />
+              <Skeleton className="h-5 w-28 rounded-md flex-1 max-w-[140px]" />
               <Skeleton className="h-9 w-9 rounded-md shrink-0" />
             </div>
             <Skeleton className="h-10 w-10 rounded-md shrink-0" />
@@ -136,14 +136,15 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
       tabIndex={0}
     >
       <CardHeader className="p-4 sm:p-5 pb-2">
-        <div className="flex flex-nowrap items-center justify-between gap-5 min-w-0">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 min-w-0 order-1 xs:order-1">
           <CardTitle
-            className="flex flex-wrap w-fit min-w-[140px] h-fit text-[23px] font-semibold tracking-tight"
+            className="text-lg font-medium min-w-0 break-words"
             id={titleId}
           >
             {t("dashboard.monthlyGoal", "Monthly goal")}
           </CardTitle>
-          <div className="flex flex-wrap items-center justify-between gap-0 w-full">
+          {/* Umschalter bricht bei Platzmangel in eigene Zeile; flex-1 + min-w füllen die Zeile wenn umgebrochen */}
+          <div className="flex flex-1 min-w-[200px] items-center justify-between gap-1 order-last xs:order-2">
             <Button
               type="button"
               variant="outline"
@@ -158,7 +159,7 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
               <ChevronLeft className="h-4 w-4" aria-hidden />
             </Button>
             <span
-              className="text-sm sm:text-base font-semibold tabular-nums text-foreground text-center min-w-0 break-words px-1"
+              className="text-sm sm:text-base font-semibold tabular-nums text-foreground text-center min-w-0 flex-1 truncate px-1"
               aria-live="polite"
             >
               {labelDate}
@@ -182,7 +183,7 @@ export function MonthlyGoalCard({ className }: MonthlyGoalCardProps) {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="shrink-0 p-3 text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                  className="shrink-0 p-3 text-muted-foreground hover:text-foreground hover:bg-muted/80 order-2 xs:order-last"
                   title={t("dashboard.monthlyGoalAutoAdjust")}
                 >
                   <Info className="h-4 w-4" aria-hidden />

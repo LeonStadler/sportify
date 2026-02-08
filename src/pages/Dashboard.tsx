@@ -765,7 +765,7 @@ export function Dashboard() {
         >
           <Settings className="h-4 w-4" aria-hidden="true" />
         </Button>
-        <div className="grid grid-cols-1 2xs:grid-cols-2 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+        <div className="grid grid-cols-1 2xs:grid-cols-2 xs:grid-cols-2 sm:grid-cols-4 md:grid-cols-2 lg:grid-cols-2 gap-3 md:gap-6">
           {cardConfigs.map((config) => renderStatCard(config))}
         </div>
       </div>

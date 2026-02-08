@@ -1,31 +1,31 @@
-import { useEffect, useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { WidgetFooterButton } from "@/components/dashboard/WidgetFooterButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  CalendarDays,
-  CalendarRange,
-  BarChart3,
-  FileText,
-  Info,
-  ArrowRight,
-} from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { API_URL } from "@/lib/api";
-import { useTranslation } from "react-i18next";
+import type { TrainingJournalEntry } from "@/types/training-journal";
 import { format } from "date-fns";
 import { de, enUS } from "date-fns/locale";
-import type { TrainingJournalEntry } from "@/types/training-journal";
+import {
+  ArrowRight,
+  BarChart3,
+  Calendar,
+  CalendarDays,
+  FileText,
+  Info,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { WidgetFooterButton } from "@/components/dashboard/WidgetFooterButton";
 
-type PeriodOption = "week" | "month" | "quarter" | "year";
+type PeriodOption = "week" | "month";
 
 interface RecoverySummary {
   entries: number;
@@ -156,8 +156,8 @@ export function RecoveryJournalCard({ className }: { className?: string }) {
               const workoutsArray = Array.isArray(data)
                 ? data
                 : Array.isArray(data.workouts)
-                ? data.workouts
-                : [];
+                  ? data.workouts
+                  : [];
               const mapped: RecentWorkoutOption[] = workoutsArray
                 .map((w: unknown) => {
                   if (!w || typeof w !== "object") return null;
@@ -170,8 +170,8 @@ export function RecoveryJournalCard({ className }: { className?: string }) {
                     typeof entry.workoutDate === "string"
                       ? entry.workoutDate
                       : typeof entry.createdAt === "string"
-                      ? entry.createdAt
-                      : undefined;
+                        ? entry.createdAt
+                        : undefined;
                   return { id, title, workoutDate };
                 })
                 .filter((w): w is RecentWorkoutOption => Boolean(w));
@@ -220,19 +220,15 @@ export function RecoveryJournalCard({ className }: { className?: string }) {
 
   const periodLabel =
     period === "week"
-      ? t("common.week", "Woche")
-      : period === "month"
-      ? t("common.month", "Monat")
-      : period === "quarter"
-      ? t("common.quarter", "Quartal")
-      : t("common.year", "Jahr");
+      ? t("filters.period.week", "Woche")
+      : t("filters.period.month", "Monat");
 
   return (
     <Card className={className}>
-      <CardHeader className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 space-y-0 pb-3">
+      <CardHeader className="flex flex-row flex-wrap justify-between items-start gap-x-4 gap-y-2 pb-3">
         <div className="space-y-1.5 min-w-0">
-          <CardTitle className="text-lg md:text-xl flex items-center gap-2 flex-wrap">
-            <BarChart3 className="h-5 w-5 text-amber-500" />
+          <CardTitle className="text-lg font-medium flex items-center gap-2 min-w-0 break-words">
+            <BarChart3 className="h-5 w-5 text-amber-500 shrink-0" />
             {t("recoveryDiary.title", "Erholungstagebuch")}
           </CardTitle>
           <div className="flex flex-col gap-1 text-xs text-muted-foreground">
@@ -255,26 +251,31 @@ export function RecoveryJournalCard({ className }: { className?: string }) {
             ) : null}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2 justify-start md:justify-end">
+        <div className="flex flex-wrap justify-end items-start gap-2 flex-1 min-w-[7rem]">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1">
-                <CalendarDays className="h-4 w-4" />
-                {periodLabel}
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 min-w-[7rem]"
+                aria-label={t("filters.periodLabel", "Zeitraum")}
+              >
+                {period === "week" ? (
+                  <CalendarDays className="h-4 w-4 shrink-0" aria-hidden="true" />
+                ) : (
+                  <Calendar className="h-4 w-4 shrink-0" aria-hidden="true" />
+                )}
+                <span className="truncate">{periodLabel}</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="start">
               <DropdownMenuItem onClick={() => setPeriod("week")}>
-                {t("common.week", "Woche")}
+                <CalendarDays className="mr-2 h-4 w-4" />
+                {t("filters.period.week", "Woche")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setPeriod("month")}>
-                {t("common.month", "Monat")}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setPeriod("quarter")}>
-                {t("common.quarter", "Quartal")}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setPeriod("year")}>
-                {t("common.year", "Jahr")}
+                <Calendar className="mr-2 h-4 w-4" />
+                {t("filters.period.month", "Monat")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

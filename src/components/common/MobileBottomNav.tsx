@@ -64,7 +64,7 @@ export function MobileBottomNav() {
       title: t("navigation.exercises", "Übungen"),
       url: "/exercises",
       icon: Dumbbell,
-      className: "max-[440px]:hidden",
+      className: "max-[360px]:hidden",
     },
     {
       title: t("navigation.stats"),

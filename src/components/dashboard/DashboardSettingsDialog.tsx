@@ -1,3 +1,4 @@
+import { ExercisePicker } from "@/components/exercises/ExercisePicker";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,7 +19,6 @@ import {
 import { Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ExercisePicker } from "@/components/exercises/ExercisePicker";
 
 export interface StatCardConfig {
   id: string;
@@ -156,253 +156,253 @@ export function DashboardSettingsDialog({
             const baseId = `dashboard-card-${card.id}`;
             const selectedExercise = exercises.find((exercise) => exercise.id === card.activityId);
             return (
-            <div
-              key={card.id}
-              className="p-4 border rounded-lg space-y-4 bg-card shadow-sm"
-            >
-              <div className="flex items-start gap-3">
-                <span
-                  className={`mt-1 h-8 w-1.5 rounded-full ${
-                    colorClasses[card.color] ?? colorClasses.orange
-                  }`}
-                />
-                <div className="space-y-1">
-                  <h3 className="font-semibold text-sm">
-                    {t("dashboard.settings.card", "Kachel")} {index + 1}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    {getTypeLabel(card.type)} · {getPeriodLabel(card.period)}
-                  </p>
-                  {card.type === "activity" && (
+              <div
+                key={card.id}
+                className="p-4 border rounded-lg space-y-4 bg-card shadow-sm"
+              >
+                <div className="flex items-start gap-3">
+                  <span
+                    className={`mt-1 h-8 w-1.5 rounded-full ${colorClasses[card.color] ?? colorClasses.orange
+                      }`}
+                  />
+                  <div className="space-y-1">
+                    <h3 className="font-semibold text-sm">
+                      {t("dashboard.settings.card", "Kachel")} {index + 1}
+                    </h3>
                     <p className="text-xs text-muted-foreground">
-                      {card.activityMode === "custom"
-                        ? t("dashboard.cardMeta.manual", "Manuell")
-                        : t("dashboard.cardMeta.auto", "Auto")}
-                      {card.activityMode === "custom" && selectedExercise?.name
-                        ? ` · ${selectedExercise.name}`
-                        : ""}
+                      {getTypeLabel(card.type)} · {getPeriodLabel(card.period)}
                     </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor={`${baseId}-type`}>
-                    {t('dashboard.settings.type', 'Typ')}
-                  </Label>
-                  <Select
-                    value={card.type}
-                    onValueChange={(value) =>
-                      updateCard(index, {
-                        type: value as StatCardConfig["type"],
-                        activityId:
-                          value === "activity" ? card.activityId : undefined,
-                        activityMode:
-                          value === "activity" ? card.activityMode || "auto" : undefined,
-                        activityMetric:
-                          value === "activity"
-                            ? card.activityMetric || getDefaultMetric(card.activityId)
-                            : undefined,
-                      })
-                    }
-                  >
-                    <SelectTrigger id={`${baseId}-type`}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="points">
-                        {t('dashboard.totalPoints', 'Gesamtpunkte')}
-                      </SelectItem>
-                      <SelectItem value="activity">
-                        {t('dashboard.activity', 'Sportübung')}
-                      </SelectItem>
-                      <SelectItem value="rank">
-                        {t('dashboard.rank', 'Rang')}
-                      </SelectItem>
-                      <SelectItem value="workouts">
-                        {t('dashboard.workouts', 'Anzahl Trainings')}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                    {card.type === "activity" && (
+                      <p className="text-xs text-muted-foreground">
+                        {card.activityMode === "custom"
+                          ? t("dashboard.cardMeta.manual", "Manuell")
+                          : t("dashboard.cardMeta.auto", "Auto")}
+                        {card.activityMode === "custom" && selectedExercise?.name
+                          ? ` · ${selectedExercise.name}`
+                          : ""}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
-                {card.type === "activity" && (
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor={`${baseId}-activity-mode`}>
-                        {t("dashboard.settings.activityMode", "Auswahl")}
-                      </Label>
-                      <Select
-                        value={card.activityMode || "auto"}
-                        onValueChange={(value) =>
-                          updateCard(index, {
-                            activityMode: value as StatCardConfig["activityMode"],
-                          })
-                        }
-                      >
-                        <SelectTrigger id={`${baseId}-activity-mode`}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="auto">
-                            {t("dashboard.settings.activityAuto", "Top‑Übung automatisch")}
-                          </SelectItem>
-                          <SelectItem value="custom">
-                            {t("dashboard.settings.activityCustom", "Übung auswählen")}
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor={`${baseId}-type`}>
+                      {t('dashboard.settings.type', 'Typ')}
+                    </Label>
+                    <Select
+                      value={card.type}
+                      onValueChange={(value) =>
+                        updateCard(index, {
+                          type: value as StatCardConfig["type"],
+                          activityId:
+                            value === "activity" ? card.activityId : undefined,
+                          activityMode:
+                            value === "activity" ? card.activityMode || "auto" : undefined,
+                          activityMetric:
+                            value === "activity"
+                              ? card.activityMetric || getDefaultMetric(card.activityId)
+                              : undefined,
+                        })
+                      }
+                    >
+                      <SelectTrigger id={`${baseId}-type`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="points">
+                          {t('dashboard.totalPoints', 'Gesamtpunkte')}
+                        </SelectItem>
+                        <SelectItem value="activity">
+                          {t('dashboard.activity', 'Sportübung')}
+                        </SelectItem>
+                        <SelectItem value="rank">
+                          {t('dashboard.rank', 'Rang')}
+                        </SelectItem>
+                        <SelectItem value="workouts">
+                          {t('dashboard.workouts', 'Anzahl Trainings')}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                    {card.activityMode !== "auto" && (
+                  {card.type === "activity" && (
+                    <>
                       <div className="space-y-2">
-                        <Label htmlFor={`${baseId}-activity`}>
-                          {t("dashboard.settings.activityType", "Übung")}
+                        <Label htmlFor={`${baseId}-activity-mode`}>
+                          {t("dashboard.settings.activityMode", "Auswahl")}
                         </Label>
-                        <ExercisePicker
-                          value={card.activityId}
-                          onSelect={(value) =>
+                        <Select
+                          value={card.activityMode || "auto"}
+                          onValueChange={(value) =>
                             updateCard(index, {
-                              activityId: value,
-                              activityMetric: getDefaultMetric(value),
-                              activityMode: "custom",
+                              activityMode: value as StatCardConfig["activityMode"],
                             })
                           }
-                          exercises={exercises}
-                          facets={facets}
-                          enableFilters
-                        />
-                      </div>
-                    )}
-
-                    <div className="space-y-2">
-                      <Label htmlFor={`${baseId}-activity-metric`}>
-                        {t("dashboard.settings.activityMetric", "Wert")}
-                      </Label>
-                      <Select
-                        value={card.activityMetric || getDefaultMetric(card.activityId)}
-                        onValueChange={(value) =>
-                          updateCard(index, {
-                            activityMetric: value as StatCardConfig["activityMetric"],
-                          })
-                        }
-                      >
-                        <SelectTrigger id={`${baseId}-activity-metric`}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {getAvailableMetrics(card.activityId).map((metric) => (
-                            <SelectItem key={metric} value={metric}>
-                              {metric === "distance"
-                                ? t("training.form.units.kilometersShort", "km")
-                                : metric === "time"
-                                  ? t("training.form.units.minutesShort", "Min")
-                                  : t("training.form.units.repetitionsShort", "Wdh.")}
+                        >
+                          <SelectTrigger id={`${baseId}-activity-mode`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="auto">
+                              {t("dashboard.settings.activityAuto", "Top‑Übung automatisch")}
                             </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </>
-                )}
+                            <SelectItem value="custom">
+                              {t("dashboard.settings.activityCustom", "Übung auswählen")}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor={`${baseId}-period`}>
-                    {t('dashboard.settings.period', 'Zeitraum')}
-                  </Label>
-                  <Select
-                    value={card.period}
-                    onValueChange={(value) =>
-                      updateCard(index, {
-                        period: value as StatCardConfig['period'],
-                      })
-                    }
-                  >
-                    <SelectTrigger id={`${baseId}-period`}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="week">
-                        {t('dashboard.week', 'Woche')}
-                      </SelectItem>
-                      <SelectItem value="month">
-                        {t('dashboard.month', 'Monat')}
-                      </SelectItem>
-                      <SelectItem value="quarter">
-                        {t('dashboard.quarter', 'Quartal')}
-                      </SelectItem>
-                      <SelectItem value="year">
-                        {t('dashboard.year', 'Jahr')}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                      {card.activityMode !== "auto" && (
+                        <div className="space-y-2">
+                          <Label htmlFor={`${baseId}-activity`}>
+                            {t("dashboard.settings.activityType", "Übung")}
+                          </Label>
+                          <ExercisePicker
+                            value={card.activityId}
+                            onSelect={(value) =>
+                              updateCard(index, {
+                                activityId: value,
+                                activityMetric: getDefaultMetric(value),
+                                activityMode: "custom",
+                              })
+                            }
+                            exercises={exercises}
+                            facets={facets}
+                            enableFilters
+                          />
+                        </div>
+                      )}
 
-                <div className="space-y-2">
-                  <Label htmlFor={`${baseId}-color`}>
-                    {t('dashboard.settings.color', 'Farbe')}
-                  </Label>
-                  <Select
-                    value={card.color}
-                    onValueChange={(value) =>
-                      updateCard(index, {
-                        color: value as StatCardConfig['color'],
-                      })
-                    }
-                  >
-                    <SelectTrigger id={`${baseId}-color`}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="orange">
-                        <span className="inline-flex items-center gap-2">
-                          <span className="h-2.5 w-2.5 rounded-full bg-orange-500" />
-                          {t('dashboard.settings.colors.orange', 'Orange')}
-                        </span>
-                      </SelectItem>
-                      <SelectItem value="blue">
-                        <span className="inline-flex items-center gap-2">
-                          <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
-                          {t('dashboard.settings.colors.blue', 'Blau')}
-                        </span>
-                      </SelectItem>
-                      <SelectItem value="green">
-                        <span className="inline-flex items-center gap-2">
-                          <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
-                          {t('dashboard.settings.colors.green', 'Grün')}
-                        </span>
-                      </SelectItem>
-                      <SelectItem value="purple">
-                        <span className="inline-flex items-center gap-2">
-                          <span className="h-2.5 w-2.5 rounded-full bg-purple-500" />
-                          {t('dashboard.settings.colors.purple', 'Lila')}
-                        </span>
-                      </SelectItem>
-                      <SelectItem value="teal">
-                        <span className="inline-flex items-center gap-2">
-                          <span className="h-2.5 w-2.5 rounded-full bg-teal-500" />
-                          {t('dashboard.settings.colors.teal', 'Türkis')}
-                        </span>
-                      </SelectItem>
-                      <SelectItem value="rose">
-                        <span className="inline-flex items-center gap-2">
-                          <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
-                          {t('dashboard.settings.colors.rose', 'Rosa')}
-                        </span>
-                      </SelectItem>
-                      <SelectItem value="slate">
-                        <span className="inline-flex items-center gap-2">
-                          <span className="h-2.5 w-2.5 rounded-full bg-slate-500" />
-                          {t('dashboard.settings.colors.slate', 'Grau')}
-                        </span>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                      <div className="space-y-2">
+                        <Label htmlFor={`${baseId}-activity-metric`}>
+                          {t("dashboard.settings.activityMetric", "Wert")}
+                        </Label>
+                        <Select
+                          value={card.activityMetric || getDefaultMetric(card.activityId)}
+                          onValueChange={(value) =>
+                            updateCard(index, {
+                              activityMetric: value as StatCardConfig["activityMetric"],
+                            })
+                          }
+                        >
+                          <SelectTrigger id={`${baseId}-activity-metric`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {getAvailableMetrics(card.activityId).map((metric) => (
+                              <SelectItem key={metric} value={metric}>
+                                {metric === "distance"
+                                  ? t("training.form.units.kilometersShort", "km")
+                                  : metric === "time"
+                                    ? t("training.form.units.minutesShort", "Min")
+                                    : t("training.form.units.repetitionsShort", "Wdh.")}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`${baseId}-period`}>
+                      {t('dashboard.settings.period', 'Zeitraum')}
+                    </Label>
+                    <Select
+                      value={card.period}
+                      onValueChange={(value) =>
+                        updateCard(index, {
+                          period: value as StatCardConfig['period'],
+                        })
+                      }
+                    >
+                      <SelectTrigger id={`${baseId}-period`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="week">
+                          {t('dashboard.week', 'Woche')}
+                        </SelectItem>
+                        <SelectItem value="month">
+                          {t('dashboard.month', 'Monat')}
+                        </SelectItem>
+                        <SelectItem value="quarter">
+                          {t('dashboard.quarter', 'Quartal')}
+                        </SelectItem>
+                        <SelectItem value="year">
+                          {t('dashboard.year', 'Jahr')}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`${baseId}-color`}>
+                      {t('dashboard.settings.color', 'Farbe')}
+                    </Label>
+                    <Select
+                      value={card.color}
+                      onValueChange={(value) =>
+                        updateCard(index, {
+                          color: value as StatCardConfig['color'],
+                        })
+                      }
+                    >
+                      <SelectTrigger id={`${baseId}-color`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="orange">
+                          <span className="inline-flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full bg-orange-500" />
+                            {t('dashboard.settings.colors.orange', 'Orange')}
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="blue">
+                          <span className="inline-flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
+                            {t('dashboard.settings.colors.blue', 'Blau')}
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="green">
+                          <span className="inline-flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
+                            {t('dashboard.settings.colors.green', 'Grün')}
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="purple">
+                          <span className="inline-flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full bg-purple-500" />
+                            {t('dashboard.settings.colors.purple', 'Lila')}
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="teal">
+                          <span className="inline-flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full bg-teal-500" />
+                            {t('dashboard.settings.colors.teal', 'Türkis')}
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="rose">
+                          <span className="inline-flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
+                            {t('dashboard.settings.colors.rose', 'Rosa')}
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="slate">
+                          <span className="inline-flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full bg-slate-500" />
+                            {t('dashboard.settings.colors.slate', 'Grau')}
+                          </span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
-            </div>
-          )})}
+            )
+          })}
         </div>
 
         <DialogFooter>

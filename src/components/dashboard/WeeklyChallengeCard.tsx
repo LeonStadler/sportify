@@ -95,8 +95,8 @@ export function WeeklyChallengeCard({
     return (
       <Card className={cn("h-full", className)}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Flame className="h-5 w-5 text-orange-500" />
+          <CardTitle className="text-lg font-medium flex items-center gap-2 min-w-0 break-words">
+            <Flame className="h-5 w-5 text-orange-500 shrink-0" />
             {t("weeklyChallenge.title")}
           </CardTitle>
         </CardHeader>
@@ -113,8 +113,8 @@ export function WeeklyChallengeCard({
     return (
       <Card className={cn("h-full", className)}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Flame className="h-5 w-5 text-orange-500" />
+          <CardTitle className="text-lg font-medium flex items-center gap-2 min-w-0 break-words">
+            <Flame className="h-5 w-5 text-orange-500 shrink-0" />
             {t("weeklyChallenge.title")}
           </CardTitle>
         </CardHeader>
@@ -150,8 +150,8 @@ export function WeeklyChallengeCard({
     return (
       <Card className={cn("h-full", className)}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Flame className="h-5 w-5 text-orange-500" />
+          <CardTitle className="text-lg font-medium flex items-center gap-2 min-w-0 break-words">
+            <Flame className="h-5 w-5 text-orange-500 shrink-0" />
             {t("weeklyChallenge.title")}
           </CardTitle>
         </CardHeader>
@@ -181,23 +181,23 @@ export function WeeklyChallengeCard({
   return (
     <Card className={cn("h-full relative", className)}>
       <CardHeader className="space-y-2 relative pr-10">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle className="flex flex-wrap items-center gap-2 text-lg md:text-xl">
-            <Flame className="h-5 w-5 text-orange-500" />
+        <div className="flex flex-row flex-wrap justify-between items-center gap-x-4 gap-y-2">
+          <CardTitle className="text-lg font-medium flex items-center gap-2 min-w-0 break-words">
+            <Flame className="h-5 w-5 text-orange-500 shrink-0" />
             {t("weeklyChallenge.title")}
           </CardTitle>
           <Badge
             variant={challengeCompleted ? "default" : "secondary"}
-            className="flex items-center mr-4 gap-1"
+            className="flex items-center gap-1 shrink-0 whitespace-nowrap"
           >
             {challengeCompleted ? (
               <>
-                <ShieldCheck className="h-4 w-4" />
+                <ShieldCheck className="h-4 w-4 shrink-0" />
                 {t("weeklyChallenge.completed")}
               </>
             ) : (
               <>
-                <Target className="h-4 w-4" />
+                <Target className="h-4 w-4 shrink-0" />
                 {data.week.daysRemaining}{" "}
                 {data.week.daysRemaining === 1
                   ? t("weeklyChallenge.day")
@@ -218,8 +218,8 @@ export function WeeklyChallengeCard({
             <Settings className="h-4 w-4" aria-hidden="true" />
           </Button>
         )}
-        <p className="text-sm text-muted-foreground">{formattedRange}</p>
-        <div className="flex flex-wrap items-center gap-4 text-sm">
+        <p className="text-sm text-muted-foreground min-w-0">{formattedRange}</p>
+        <div className="flex flex-row flex-wrap items-center gap-4 text-sm min-w-0">
           <span className="font-medium">
             {data.progress.totalPoints.toLocaleString()}{" "}
             {t("weeklyChallenge.points")}

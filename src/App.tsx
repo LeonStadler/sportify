@@ -111,18 +111,16 @@ const App = () => {
     return () => window.removeEventListener("message", handler);
   }, [navigate]);
 
+  const storageKey = "sportify_app_version_seen";
+  const notificationSentKey = `sportify_version_notification_sent_${APP_VERSION}`;
+
+  // Toast: einmal anzeigen wenn neue Version, dann "gesehen" speichern
   useEffect(() => {
-    const storageKey = "sportify_app_version_seen";
     try {
       const seenVersion = localStorage.getItem(storageKey);
       if (seenVersion !== APP_VERSION) {
-        const versionTitle = t("common.versionUpdateTitle", "Neue Version verfügbar");
-        const versionMessage = t("common.versionUpdateNotificationMessage", {
-          version: APP_VERSION,
-          defaultValue: `Version ${APP_VERSION} ist verfügbar. Schau dir den Changelog an.`,
-        });
         toast({
-          title: versionTitle,
+          title: t("common.versionUpdateTitle", "Neue Version verfügbar"),
           description: t("common.versionUpdateDescription", {
             version: APP_VERSION,
             defaultValue: `Version ${APP_VERSION} ist verfügbar. Schau dir den Changelog an.`,
@@ -142,28 +140,42 @@ const App = () => {
           ),
         });
         localStorage.setItem(storageKey, APP_VERSION);
-        if (isAuthenticated) {
-          const token = localStorage.getItem("token");
-          if (token) {
-            fetch(`${API_URL}/notifications/version-update`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({
-                version: APP_VERSION,
-                title: versionTitle,
-                message: versionMessage,
-              }),
-            }).catch((err) => console.error("Version-update notification request failed", err));
-          }
-        }
       }
     } catch (error) {
       console.error("Version notification error", error);
     }
-  }, [toast, t, isAuthenticated]);
+  }, [toast, t]);
+
+  // Mitteilungszentrale + Push: nachlegen sobald eingeloggt (läuft oft nach Toast, wenn Auth erst dann fertig ist)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    if (localStorage.getItem(storageKey) !== APP_VERSION) return;
+    if (localStorage.getItem(notificationSentKey) === "1") return;
+
+    const versionTitle = t("common.versionUpdateTitle", "Neue Version verfügbar");
+    const versionMessage = t("common.versionUpdateNotificationMessage", {
+      version: APP_VERSION,
+      defaultValue: `Version ${APP_VERSION} ist verfügbar. Schau dir den Changelog an.`,
+    });
+    fetch(`${API_URL}/notifications/version-update`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        version: APP_VERSION,
+        title: versionTitle,
+        message: versionMessage,
+      }),
+    })
+      .then((res) => {
+        if (res.ok) localStorage.setItem(notificationSentKey, "1");
+      })
+      .catch((err) => console.error("Version-update notification request failed", err));
+  }, [isAuthenticated, t]);
 
   // Zeige einen Loader während der Auth-Initialisierung
   if (isLoading) {

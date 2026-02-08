@@ -44,7 +44,19 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -77,7 +89,12 @@ import {
   Settings,
   Shield,
   Unlock,
-  Users
+  Users,
+  Upload,
+  Download,
+  FileSpreadsheet,
+  FileJson,
+  FileText,
 } from "lucide-react";
 import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -378,6 +395,15 @@ export function Admin() {
     Record<string, Record<string, string>>
   >({});
   const [exerciseImportActiveKey, setExerciseImportActiveKey] = useState<string | null>(null);
+  const [exerciseImportWizardOpen, setExerciseImportWizardOpen] = useState(false);
+  const [exerciseImportWizardIndex, setExerciseImportWizardIndex] = useState(0);
+  const [exerciseImportWizardItems, setExerciseImportWizardItems] = useState<ImportPreviewItem[]>(
+    []
+  );
+  const [exerciseImportSkippedKeys, setExerciseImportSkippedKeys] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [mergeSectionOpen, setMergeSectionOpen] = useState(false);
   const [exerciseEditDialogOpen, setExerciseEditDialogOpen] = useState(false);
   const [exerciseEditTarget, setExerciseEditTarget] = useState<Exercise | null>(null);
   const [exerciseEditDraft, setExerciseEditDraft] = useState<ExerciseFormValue | null>(null);
@@ -470,6 +496,16 @@ export function Admin() {
     setExerciseManagementMuscleFilters([]);
     setExerciseManagementRequiresWeightFilter("all");
     setExerciseManagementDifficultyRange([1, 10]);
+  };
+
+  const handleMergeSectionOpen = () => {
+    setMergeSectionOpen(true);
+    requestAnimationFrame(() => {
+      mergeSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
   };
 
   const downloadBlob = (blob: Blob, filename: string) => {
@@ -592,6 +628,10 @@ export function Admin() {
     setExerciseImportSelection(new Set());
     setExerciseImportDecisions({});
     setExerciseImportActiveKey(null);
+    setExerciseImportWizardOpen(false);
+    setExerciseImportWizardItems([]);
+    setExerciseImportWizardIndex(0);
+    setExerciseImportSkippedKeys(new Set());
   };
 
   const requestExerciseImportPreview = async (file: File) => {
@@ -737,9 +777,11 @@ export function Admin() {
     }));
   };
 
-  const handleExerciseImportConfirm = async () => {
+  const handleExerciseImportConfirm = async (options?: {
+    selectedKeys?: Set<string>;
+  }) => {
     if (!exerciseImportPreview) return;
-    const selectedKeys = new Set(exerciseImportSelection);
+    const selectedKeys = options?.selectedKeys ?? new Set(exerciseImportSelection);
     const selectedExercises = exerciseImportRaw.filter((item) =>
       selectedKeys.has(String(item._importKey))
     );
@@ -2683,83 +2725,107 @@ export function Admin() {
 
           <TabsContent value="exercise-management" className="space-y-6">
             <div ref={exerciseManagementTopRef} className="space-y-6">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">
-                    {t("admin.exercises.importExport.title", "Import & Export")}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => handleExerciseExport("csv")}
-                    >
-                      {t("admin.exercises.importExport.exportCsv", "CSV-Vorlage exportieren")}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => handleExerciseExport("json")}
-                    >
-                      {t("admin.exercises.importExport.exportJson", "JSON-Vorlage exportieren")}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => handleExerciseExport("xlsx")}
-                    >
-                      {t(
-                        "admin.exercises.importExport.exportXlsx",
-                        "Excel-Vorlage exportieren"
-                      )}
-                    </Button>
-                    <span className="text-muted-foreground">|</span>
-                    <Button
-                      variant="default"
-                      onClick={handleExportSelectedExercises}
-                      disabled={exerciseManagementSelectedIds.size === 0}
-                    >
-                      {t("admin.exercises.exportSelected.button", "Ausgewählte exportieren")}
-                      {exerciseManagementSelectedIds.size > 0 &&
-                        ` (${exerciseManagementSelectedIds.size})`}
-                    </Button>
-                    {exerciseManagementSelectedIds.size > 0 && (
+            <div className="flex items-center justify-between gap-4 border-b pb-4">
+              <h2 className="text-lg font-semibold">
+                {t("admin.tabs.exercises", "Übungsverwaltung")}
+              </h2>
+              <div className="flex items-center gap-2">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div>
+                        <Input
+                          type="file"
+                          id="header-import-upload"
+                          className="hidden"
+                          accept=".csv,.json,.xlsx,application/json,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            if (file) {
+                              requestExerciseImportPreview(file);
+                            }
+                            event.currentTarget.value = "";
+                          }}
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            document.getElementById("header-import-upload")?.click()
+                          }
+                        >
+                          <Upload className="mr-2 h-4 w-4" />
+                          Import
+                        </Button>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>
+                        Importiere Übungen aus CSV, JSON oder Excel.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <Download className="mr-2 h-4 w-4" />
+                            Vorlage
+                            <ChevronDown className="ml-2 h-3 w-3 opacity-50" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Export-Format wählen</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleExerciseExport("csv")}>
+                            <FileText className="mr-2 h-4 w-4" />
+                            CSV
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleExerciseExport("json")}>
+                            <FileJson className="mr-2 h-4 w-4" />
+                            JSON
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleExerciseExport("xlsx")}>
+                            <FileSpreadsheet className="mr-2 h-4 w-4" />
+                            Excel
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Lade eine Vorlage für den Import herunter.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
                       <Button
-                        variant="ghost"
+                        variant="default"
                         size="sm"
-                        onClick={exerciseManagementClearSelection}
+                        onClick={handleExportSelectedExercises}
+                        disabled={exerciseManagementSelectedIds.size === 0}
                       >
-                        {t("admin.exercises.exportSelected.clear", "Auswahl aufheben")}
+                        <Download className="mr-2 h-4 w-4" />
+                        {t("admin.exercises.exportSelected.button", "Ausgewählte exportieren")}
+                        {exerciseManagementSelectedIds.size > 0 &&
+                          ` (${exerciseManagementSelectedIds.size})`}
                       </Button>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-2 text-sm text-muted-foreground">
-                    <span>
-                      {t(
-                        "admin.exercises.exportSelected.hint",
-                        "Übungen unten einzeln per Checkbox auswählen, dann „Ausgewählte exportieren“. Der Export enthält alle Daten verlustfrei für Import auf einer anderen Instanz."
-                      )}
-                    </span>
-                    <span>
-                      {t(
-                        "admin.exercises.importExport.note",
-                        "Pflichtfelder sind alle Spalten außer Beschreibung. Ungültige Einträge werden übersprungen. Die Excel-Vorlage enthält Auswahlfelder."
-                      )}
-                    </span>
-                    <Input
-                      type="file"
-                      accept=".csv,.json,.xlsx,application/json,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                      disabled={exerciseImporting}
-                      onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        if (file) {
-                          requestExerciseImportPreview(file);
-                        }
-                        event.currentTarget.value = "";
-                      }}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>
+                        Exportiere die ausgewählten Übungen als JSON (inkl. aller Daten).
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            </div>
 
               <Dialog
                 open={exerciseImportDialogOpen}
@@ -2870,15 +2936,25 @@ export function Admin() {
                           placeholder={t("admin.exercises.importReview.search", "Suche...")}
                           className="max-w-sm"
                         />
-                        <Button
-                          variant={exerciseImportGroupByStatus ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setExerciseImportGroupByStatus((prev) => !prev)}
-                        >
-                          {exerciseImportGroupByStatus
-                            ? t("admin.exercises.importReview.grouped", "Gruppiert")
-                            : t("admin.exercises.importReview.group", "Gruppieren")}
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant={exerciseImportGroupByStatus ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => setExerciseImportGroupByStatus((prev) => !prev)}
+                            >
+                              {exerciseImportGroupByStatus
+                                ? t("admin.exercises.importReview.grouped", "Gruppiert")
+                                : t("admin.exercises.importReview.group", "Gruppieren")}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-xs">
+                            {t(
+                              "admin.exercises.importReview.groupTooltip",
+                              "Tabelle nach Status gruppieren: Neu, Update, Ungültig."
+                            )}
+                          </TooltipContent>
+                        </Tooltip>
                         <Button
                           variant={exerciseImportCompactView ? "default" : "outline"}
                           size="sm"
@@ -2926,7 +3002,7 @@ export function Admin() {
                         </div>
                       </div>
 
-                      <div className="border rounded-lg overflow-hidden max-h-[420px] overflow-y-auto">
+                      <div className="border rounded-lg overflow-hidden min-h-[320px] max-h-[420px] overflow-y-auto">
                         <Table>
                           <TableHeader className="sticky top-0 z-10 bg-background">
                             <TableRow>
@@ -2955,7 +3031,6 @@ export function Admin() {
                                 <TableHead>{t("exerciseLibrary.difficulty", "Schwierigkeit")}</TableHead>
                               )}
                               <TableHead>{t("admin.exercises.importReview.status", "Status")}</TableHead>
-                              <TableHead className="text-right" />
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -2963,7 +3038,7 @@ export function Admin() {
                               <Fragment key={group.status}>
                                 {exerciseImportGroupByStatus && (
                                   <TableRow>
-                                    <TableCell colSpan={exerciseImportCompactView ? 4 : 8}>
+                                    <TableCell colSpan={exerciseImportCompactView ? 4 : 7}>
                                       <div className="text-xs uppercase tracking-wide text-muted-foreground">
                                         {group.status === "new"
                                           ? t("admin.exercises.importReview.statusNew", "Neu")
@@ -3029,18 +3104,6 @@ export function Admin() {
                                           {statusLabel}
                                         </Badge>
                                       </TableCell>
-                                      <TableCell className="text-right">
-                                        {exerciseImportMode === "manual" &&
-                                          item.status === "update" && (
-                                            <Button
-                                              variant="outline"
-                                              size="sm"
-                                              onClick={() => openExerciseImportMerge(item)}
-                                            >
-                                              {t("admin.exercises.importReview.merge", "Vergleichen")}
-                                            </Button>
-                                          )}
-                                      </TableCell>
                                     </TableRow>
                                   );
                                 })}
@@ -3060,7 +3123,20 @@ export function Admin() {
                             {t("common.cancel", "Abbrechen")}
                           </Button>
                           <Button
-                            onClick={handleExerciseImportConfirm}
+                            onClick={() => {
+                              if (exerciseImportMode === "manual") {
+                                const items =
+                                  exerciseImportPreview?.items?.filter((i) =>
+                                    exerciseImportSelection.has(i.key)
+                                  ) ?? [];
+                                setExerciseImportWizardItems(items);
+                                setExerciseImportWizardIndex(0);
+                                setExerciseImportSkippedKeys(new Set());
+                                setExerciseImportWizardOpen(true);
+                              } else {
+                                handleExerciseImportConfirm();
+                              }
+                            }}
                             disabled={exerciseImportSelection.size === 0}
                           >
                             {t("admin.exercises.importReview.import", "Import starten")}
@@ -3182,46 +3258,310 @@ export function Admin() {
                 </DialogContent>
               </Dialog>
 
-              <Card ref={mergeSectionRef}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">
-                    {t("admin.exercises.merge.title", "Zusammenführen")}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-                  <div>
-                    <Label>{t("admin.exercises.merge.source", "Quell‑Übung")}</Label>
-                    <ExerciseMergeSelect
-                      value={mergeSourceId}
-                      onChange={handleMergeSourceChange}
-                      placeholder={t("admin.exercises.merge.sourcePlaceholder", "Quelle wählen")}
-                      options={exercises}
-                    />
-                  </div>
-                  <div>
-                    <Label>{t("admin.exercises.merge.target", "Ziel‑Übung")}</Label>
-                    <ExerciseMergeSelect
-                      value={mergeTargetId}
-                      onChange={handleMergeTargetChange}
-                      placeholder={t("admin.exercises.merge.targetPlaceholder", "Ziel wählen")}
-                      options={exercises.filter((exercise) => exercise.id !== mergeSourceId)}
-                    />
-                  </div>
-                  <Button
-                    variant="outline"
-                    disabled={!mergeSourceId || !mergeTargetId}
-                    onClick={() => handleMergeExercise(mergeSourceId, mergeTargetId)}
-                  >
-                    {t("admin.exercises.merge.action", "Zusammenführen")}
-                  </Button>
-                  <div className="md:col-span-3 text-xs text-muted-foreground">
-                    {t(
-                      "admin.exercises.merge.helper",
-                      "Die Quell‑Übung wird in die Ziel‑Übung übernommen. Alle Verknüpfungen werden auf die Ziel‑Übung verschoben, die Quell‑Übung wird deaktiviert."
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Manueller Import: Schritt-für-Schritt Wizard mit Split-Screen */}
+              <Dialog
+                open={exerciseImportWizardOpen}
+                onOpenChange={(open) => {
+                  if (!open) {
+                    setExerciseImportWizardOpen(false);
+                  }
+                }}
+              >
+                <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col">
+                  <DialogHeader>
+                    <DialogTitle>
+                      {t("admin.exercises.importWizard.title", "Import – Übung für Übung")}
+                    </DialogTitle>
+                    <DialogDescription>
+                      {t(
+                        "admin.exercises.importWizard.description",
+                        "Links: bestehende Übung im System. Rechts: zu importierende Daten. Pro Feld wählen, welcher Wert übernommen wird."
+                      )}
+                    </DialogDescription>
+                  </DialogHeader>
+                  {exerciseImportWizardItems.length > 0 && (
+                    <>
+                      <div className="text-sm text-muted-foreground">
+                        {t("admin.exercises.importWizard.step", "Übung")}{" "}
+                        {exerciseImportWizardIndex + 1} / {exerciseImportWizardItems.length}
+                        {exerciseImportSkippedKeys.size > 0 && (
+                          <span className="ml-2">
+                            ({t("admin.exercises.importWizard.skipped", "ausgelassen")}:{" "}
+                            {exerciseImportSkippedKeys.size})
+                          </span>
+                        )}
+                      </div>
+                      {(() => {
+                        const item =
+                          exerciseImportWizardItems[exerciseImportWizardIndex];
+                        if (!item) return null;
+                        const showAllFields =
+                          item.status === "new" ||
+                          exerciseImportScope === "all";
+                        const diffEntries = Object.entries(item.diffs || {}).filter(
+                          ([, d]) => showAllFields || d.changed
+                        );
+                        return (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-0 overflow-auto">
+                            <div className="border rounded-lg p-4 bg-muted/30 flex flex-col min-h-[280px]">
+                              <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                                {t(
+                                  "admin.exercises.importWizard.existing",
+                                  "Bestehende Übung im System"
+                                )}
+                              </div>
+                              {item.existing ? (
+                                <div className="space-y-2 overflow-y-auto">
+                                  {diffEntries.map(([field, diff]) => (
+                                    <div key={field} className="text-sm">
+                                      <span className="text-muted-foreground">
+                                        {importFieldLabels[field] || field}:
+                                      </span>{" "}
+                                      {formatImportPreviewValue(diff.existing)}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
+                                  {t(
+                                    "admin.exercises.importWizard.noExisting",
+                                    "Keine bestehende Übung – diese wird neu angelegt."
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                            <div className="border rounded-lg p-4 flex flex-col min-h-[280px]">
+                              <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                                {t(
+                                  "admin.exercises.importWizard.incoming",
+                                  "Zu importierende Übung"
+                                )}
+                              </div>
+                              <div className="space-y-3 overflow-y-auto flex-1">
+                                {diffEntries.map(([field, diff]) => {
+                                  const decision =
+                                    exerciseImportDecisions[item.key]?.[field] ??
+                                    (item.status === "new"
+                                      ? "import"
+                                      : diff.incomingEmpty
+                                        ? "keep"
+                                        : "import");
+                                  return (
+                                    <div
+                                      key={field}
+                                      className="flex flex-wrap items-center gap-2 border-b pb-2 last:border-0"
+                                    >
+                                      <div className="flex-1 min-w-0">
+                                        <div className="text-xs text-muted-foreground">
+                                          {importFieldLabels[field] || field}
+                                        </div>
+                                        <div className="text-sm">
+                                          {formatImportPreviewValue(diff.incoming)}
+                                        </div>
+                                      </div>
+                                      {item.status === "update" ? (
+                                        <div className="flex gap-1 shrink-0">
+                                          <Button
+                                            variant={decision === "keep" ? "default" : "outline"}
+                                            size="sm"
+                                            onClick={() =>
+                                              updateExerciseImportDecision(
+                                                item.key,
+                                                field,
+                                                "keep"
+                                              )
+                                            }
+                                          >
+                                            {t(
+                                              "admin.exercises.importReview.keep",
+                                              "Behalten"
+                                            )}
+                                          </Button>
+                                          <Button
+                                            variant={decision === "import" ? "default" : "outline"}
+                                            size="sm"
+                                            onClick={() =>
+                                              updateExerciseImportDecision(
+                                                item.key,
+                                                field,
+                                                "import"
+                                              )
+                                            }
+                                          >
+                                            {t(
+                                              "admin.exercises.importReview.useImport",
+                                              "Import"
+                                            )}
+                                          </Button>
+                                        </div>
+                                      ) : (
+                                        <Label className="flex items-center gap-2 text-sm font-normal cursor-pointer shrink-0">
+                                          <Checkbox
+                                            checked={decision === "import"}
+                                            onCheckedChange={(checked) =>
+                                              updateExerciseImportDecision(
+                                                item.key,
+                                                field,
+                                                checked === true ? "import" : "keep"
+                                              )
+                                            }
+                                          />
+                                          {t(
+                                            "admin.exercises.importWizard.includeField",
+                                            "Übernehmen"
+                                          )}
+                                        </Label>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t">
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            const currentKey =
+                              exerciseImportWizardItems[exerciseImportWizardIndex].key;
+                            setExerciseImportSkippedKeys((prev) =>
+                              new Set(prev).add(currentKey)
+                            );
+                            if (
+                              exerciseImportWizardIndex >=
+                              exerciseImportWizardItems.length - 1
+                            ) {
+                              setExerciseImportWizardOpen(false);
+                              const finalKeys = new Set(exerciseImportSelection);
+                              finalKeys.delete(currentKey);
+                              exerciseImportSkippedKeys.forEach((k) =>
+                                finalKeys.delete(k)
+                              );
+                              handleExerciseImportConfirm({
+                                selectedKeys: finalKeys,
+                              });
+                              return;
+                            }
+                            setExerciseImportWizardIndex((i) => i + 1);
+                          }}
+                        >
+                          {t(
+                            "admin.exercises.importWizard.skipExercise",
+                            "Diese Übung nicht importieren"
+                          )}
+                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            disabled={exerciseImportWizardIndex === 0}
+                            onClick={() =>
+                              setExerciseImportWizardIndex((i) => Math.max(0, i - 1))
+                            }
+                          >
+                            {t("common.previous", "Zurück")}
+                          </Button>
+                          {exerciseImportWizardIndex <
+                          exerciseImportWizardItems.length - 1 ? (
+                            <Button
+                              onClick={() =>
+                                setExerciseImportWizardIndex((i) => i + 1)
+                              }
+                            >
+                              {t("common.next", "Weiter")}
+                            </Button>
+                          ) : (
+                            <Button
+                              onClick={() => {
+                                setExerciseImportWizardOpen(false);
+                                const finalKeys = new Set(exerciseImportSelection);
+                                exerciseImportSkippedKeys.forEach((k) => finalKeys.delete(k));
+                                handleExerciseImportConfirm({
+                                  selectedKeys: finalKeys,
+                                });
+                              }}
+                            >
+                              {t(
+                                "admin.exercises.importReview.import",
+                                "Import starten"
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </DialogContent>
+              </Dialog>
+
+            <Collapsible
+              open={mergeSectionOpen}
+              onOpenChange={setMergeSectionOpen}
+              className="w-full space-y-2"
+            >
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-between font-medium"
+                >
+                  <span>
+                    {t("admin.exercises.toolsSection.title", "Werkzeuge")}
+                    <span className="text-muted-foreground font-normal ml-2">
+                      {t("admin.exercises.toolsSection.hint", "Zusammenführen von Übungen")}
+                    </span>
+                  </span>
+                  <ChevronDown
+                    className={`h-4 w-4 shrink-0 transition-transform duration-200 ${
+                      mergeSectionOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-4">
+                <Card ref={mergeSectionRef}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">
+                      {t("admin.exercises.merge.title", "Zusammenführen")}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                    <div>
+                      <Label>{t("admin.exercises.merge.source", "Quell‑Übung")}</Label>
+                      <ExerciseMergeSelect
+                        value={mergeSourceId}
+                        onChange={handleMergeSourceChange}
+                        placeholder={t("admin.exercises.merge.sourcePlaceholder", "Quelle wählen")}
+                        options={exercises}
+                      />
+                    </div>
+                    <div>
+                      <Label>{t("admin.exercises.merge.target", "Ziel‑Übung")}</Label>
+                      <ExerciseMergeSelect
+                        value={mergeTargetId}
+                        onChange={handleMergeTargetChange}
+                        placeholder={t("admin.exercises.merge.targetPlaceholder", "Ziel wählen")}
+                        options={exercises.filter((exercise) => exercise.id !== mergeSourceId)}
+                      />
+                    </div>
+                    <Button
+                      variant="outline"
+                      disabled={!mergeSourceId || !mergeTargetId}
+                      onClick={() => handleMergeExercise(mergeSourceId, mergeTargetId)}
+                    >
+                      {t("admin.exercises.merge.action", "Zusammenführen")}
+                    </Button>
+                    <div className="md:col-span-3 text-xs text-muted-foreground">
+                      {t(
+                        "admin.exercises.merge.helper",
+                        "Die Quell‑Übung wird in die Ziel‑Übung übernommen. Alle Verknüpfungen werden auf die Ziel‑Übung verschoben, die Quell‑Übung wird deaktiviert."
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </CollapsibleContent>
+            </Collapsible>
 
               <ExerciseBrowsePanel
                 title={t("exerciseLibrary.search", "Übungen durchsuchen")}
@@ -3339,12 +3679,7 @@ export function Admin() {
                                 }
                               ),
                             });
-                            requestAnimationFrame(() => {
-                              mergeSectionRef.current?.scrollIntoView({
-                                behavior: "smooth",
-                                block: "start",
-                              });
-                            });
+                            handleMergeSectionOpen();
                           }}
                         >
                           {t("admin.exercises.actions.merge", "Zusammenführen")}
@@ -3411,12 +3746,7 @@ export function Admin() {
                                 }
                               ),
                             });
-                            requestAnimationFrame(() => {
-                              mergeSectionRef.current?.scrollIntoView({
-                                behavior: "smooth",
-                                block: "start",
-                              });
-                            });
+                            handleMergeSectionOpen();
                           }}
                         >
                           {t("admin.exercises.actions.merge", "Zusammenführen")}

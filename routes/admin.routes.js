@@ -485,6 +485,26 @@ export const createAdminRouter = (pool) => {
       }
 
       const exerciseId = randomUUID();
+      const decisionMapNew =
+        decisions[payload.slug] || decisions[payload.name] || {};
+      const newValues = {};
+      for (const field of mergeFields) {
+        const decision =
+          typeof decisionMapNew[field] === "string"
+            ? decisionMapNew[field]
+            : decisionMapNew[field] === false
+              ? "keep"
+              : decisionMapNew[field] === true
+                ? "import"
+                : undefined;
+        if (decision === "keep") {
+          newValues[field] = undefined;
+        } else {
+          newValues[field] = payload.values[field];
+        }
+      }
+      const v = (key, fallback) =>
+        newValues[key] !== undefined ? newValues[key] : fallback;
       await pool.query(
         `
           INSERT INTO exercises (
@@ -519,30 +539,30 @@ export const createAdminRouter = (pool) => {
         `,
         [
           exerciseId,
-          payload.values.name,
-          payload.values.slug,
-          payload.values.description,
-          payload.values.category,
-          payload.values.discipline,
-          payload.values.movementPattern,
-          payload.values.measurementType,
-          payload.values.pointsPerUnit,
-          payload.values.unit,
-          payload.values.hasWeight,
-          payload.values.hasSetMode,
-          payload.values.requiresWeight,
-          payload.values.allowsWeight,
-          payload.values.supportsSets,
-          payload.values.supportsTime,
-          payload.values.supportsDistance,
-          payload.values.supportsGrade,
-          payload.values.difficultyTier,
-          payload.values.muscleGroups,
-          payload.values.equipment,
-          JSON.stringify(payload.values.unitOptions || []),
+          v("name", payload.values.name),
+          v("slug", payload.values.slug),
+          v("description", null),
+          v("category", null),
+          v("discipline", null),
+          v("movementPattern", null),
+          v("measurementType", null),
+          v("pointsPerUnit", null),
+          v("unit", payload.values.unit),
+          v("hasWeight", null),
+          v("hasSetMode", null),
+          v("requiresWeight", null),
+          v("allowsWeight", null),
+          v("supportsSets", null),
+          v("supportsTime", null),
+          v("supportsDistance", null),
+          v("supportsGrade", null),
+          v("difficultyTier", null),
+          v("muscleGroups", null),
+          v("equipment", null),
+          JSON.stringify(v("unitOptions", []) || []),
           "approved",
           userId,
-          payload.values.isActive !== false,
+          v("isActive", true) !== false,
         ],
       );
 
